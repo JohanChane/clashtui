@@ -143,7 +143,7 @@ edit_cmd = "notepad %s"
 
 ```yaml
 # 不添加 `interval: 3600` 的原因: clash-meta 重载配置时, 如果检测到要更新配置时会更新 url, 这样会导致加载速度慢。
-pp: &pp {type: http, intehealth-check: {enable: true, url: https://cp.cloudflare.com/generate_204, interval: 300}}
+pp: &pp {intehealth-check: {enable: true, url: https://cp.cloudflare.com/generate_204, interval: 300}}
 delay_test: &delay_test {url: https://cp.cloudflare.com/generate_204, interval: 300}
 ```
 
@@ -153,6 +153,7 @@ delay_test: &delay_test {url: https://cp.cloudflare.com/generate_204, interval: 
 proxy-providers:
   provider:
     tpl_param:
+    type: http    # type 字段要放在此处, 不能放入 pp。原因是要用于更新资源。
     <<: *pp
 ```
 
