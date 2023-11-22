@@ -8,6 +8,8 @@ pub struct Symbols {
     pub clashsrvctl: String,
 
     pub help: String,
+    pub default_clash_cfg_content: String,
+    pub default_basic_clash_cfg_content: String,
 }
 
 impl Default for Symbols {
@@ -38,18 +40,30 @@ impl Default for Symbols {
                         S: Stop clash service
                         P: Preview
                         H: Locate app home path
+                        G: Locate clash config dir
                         L: show recent log
                         1,2,...,9: Switch tab
                         Esc: Close popup
                         q: Quit
                         ?: help"#
             .to_string();
+        let default_clash_cfg_content = r#"[default]
+clash_core_path = ""
+clash_cfg_dir = ""
+clash_cfg_path = ""
+clash_srv_name = "clash-meta""#.to_string();
+        let default_basic_clash_cfg_content = r#"mixed-port: 7890
+mode: rule
+log-level: info
+external-controller: 127.0.0.1:9090"#.to_string();
         Self {
             profile: "Profile".to_string(),
             template: "Template".to_string(),
             clashsrvctl: "ClashSrvCtl".to_string(),
 
             help,
+            default_clash_cfg_content,
+            default_basic_clash_cfg_content,
         }
     }
 }

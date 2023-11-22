@@ -1,0 +1,7 @@
+[default]
+clash_core_path = "clash-meta"
+clash_cfg_dir = "/srv/clash-meta"
+clash_cfg_path = "/srv/clash-meta/config.yaml"
+clash_srv_name = "clash-meta"
+edit_cmd = "alacritty -e nvim %s"
+opendir_cmd = "alacritty -e ranger %s"

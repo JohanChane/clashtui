@@ -225,7 +225,7 @@ impl ProfileTab {
                             let path = self
                                 .clashtui_util
                                 .clashtui_dir
-                                .join(format!("data/templates/{}", name));
+                                .join(format!("templates/{}", name));
                             let content = std::fs::read_to_string(&path).unwrap();
                             let lines: Vec<String> =
                                 content.lines().map(|s| s.to_string()).collect();
@@ -238,7 +238,7 @@ impl ProfileTab {
                             let tpl_file_path = self
                                 .clashtui_util
                                 .clashtui_dir
-                                .join(format!("data/templates/{}", name));
+                                .join(format!("templates/{}", name));
 
                             if let Err(err) = self.clashtui_util.edit_file(&tpl_file_path) {
                                 self.popup_txt_msg(err.to_string());

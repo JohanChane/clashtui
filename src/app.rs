@@ -9,11 +9,13 @@ use ratatui::{prelude::*, widgets::*};
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::env;
 use std::ops::{Deref, DerefMut};
+use std::process::Command;
 use std::rc::Rc;
 use std::{
-    fs::{read_dir, File},
-    path::Path,
+    fs::{self, read_dir, File},
+    path::{Path, PathBuf},
 };
 
 use crate::clashtui_state::{ClashTuiState, SharedClashTuiState};
@@ -52,24 +54,43 @@ impl App {
         let names = Rc::new(Symbols::default());
         let theme = Rc::new(Theme::default());
 
-        #[cfg(debug_assertions)]
-        #[cfg(target_os = "linux")]
-        let exe_dir = Path::new("/opt/clashtui").to_path_buf();
-        #[cfg(debug_assertions)]
-        #[cfg(target_os = "windows")]
-        let exe_dir = Path::new("D:/PortableProgramFiles/clashtui").to_path_buf();
-        #[cfg(not(debug_assertions))]
         let exe_dir = std::env::current_exe()
             .unwrap()
             .parent()
             .unwrap()
             .to_path_buf();
-        Self::setup_logging(&exe_dir.join("clashtui.log").to_str().unwrap());
+
+        let data_dir = exe_dir.join("data");
+        let clashtui_config_dir = if data_dir.exists() && data_dir.is_dir() {
+            // portable mode
+            data_dir
+        } else {
+            #[cfg(target_os = "linux")]
+            let clashtui_config_dir_str = env::var("XDG_CONFIG_HOME")
+                .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)))
+                .unwrap();
+            #[cfg(target_os = "windows")]
+            let clashtui_config_dir_str = env::var("APPDATA")
+                .map(|appdata| format!("{}/clashtui", appdata))
+                .unwrap();
+            PathBuf::from(&clashtui_config_dir_str)
+        };
+
+        if !clashtui_config_dir.join("basic_clash_config.yaml").exists() {
+            if let Err(err) = fs::create_dir_all(&clashtui_config_dir) {
+                log::error!("{}", err.to_string());
+            }
+
+            if let Err(err) = Self::first_run(&clashtui_config_dir, &names) {
+                log::error!("{}", err.to_string());
+            }
+        }
+
+        Self::setup_logging(&clashtui_config_dir.join("clashtui.log").to_str().unwrap());
 
         let clashtui_util = Rc::new(ClashTuiUtil::new(
-            &exe_dir,
-            &exe_dir.join("clash_config"),
-            &exe_dir.join("data/profiles"),
+            &clashtui_config_dir,
+            &clashtui_config_dir.join("profiles"),
         ));
 
         let help_popup = ClashTuiListPopup::new("Help".to_string(), Rc::clone(&theme));
@@ -160,6 +181,10 @@ impl App {
             } else if match_key(key, &self.key_list.app_home_open) {
                 self.clashtui_util
                     .open_dir(self.clashtui_util.clashtui_dir.as_path())?;
+                EventState::WorkDone
+            } else if match_key(key, &self.key_list.clash_cfg_dir_open) {
+                self.clashtui_util
+                    .open_dir(self.clashtui_util.clash_cfg_dir.as_path())?;
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.log_cat) {
                 let log = self.clashtui_util.fetch_recent_logs(20);
@@ -328,6 +353,16 @@ impl App {
             .unwrap();
 
         log4rs::init_config(config).unwrap();
+    }
+
+    pub fn first_run(clashtui_cfg_dir: &PathBuf, symbols: &SharedSymbols) -> Result<()> {
+        fs::create_dir_all(clashtui_cfg_dir.join("profiles"))?;
+        fs::create_dir_all(clashtui_cfg_dir.join("templates"))?;
+        fs::File::create(clashtui_cfg_dir.join("templates/template_proxy_providers"));
+        fs::write(clashtui_cfg_dir.join("config.toml"), &symbols.default_clash_cfg_content)?;
+        fs::write(clashtui_cfg_dir.join("basic_clash_config.yaml"), &symbols.default_basic_clash_cfg_content)?;
+
+        Ok(())
     }
 }
 

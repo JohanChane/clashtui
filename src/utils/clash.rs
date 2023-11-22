@@ -32,21 +32,24 @@ pub struct ClashTuiConfig {
 }
 
 pub struct ClashTuiUtil {
-    pub clash_cfg_dir: PathBuf,
-    pub profile_dir: PathBuf,
     pub clashtui_dir: PathBuf,
+    pub profile_dir: PathBuf,
+
+    pub clash_core_path: PathBuf,
+    pub clash_cfg_dir: PathBuf,
+    pub clash_cfg_path: PathBuf,
+    pub clash_srv_name: String,
 
     pub proxy_addr: String,
     pub controller_api: String,
-    pub clash_core_path: PathBuf,
     pub clashtui_client: reqwest::blocking::Client,
     pub default_client: reqwest::blocking::Client,
-    pub clashtui_config: Option<toml::Value>,
+    pub clashtui_config: toml::Value,
 }
 
 impl ClashTuiUtil {
-    pub fn new(clashtui_dir: &PathBuf, cfg_dir: &PathBuf, profile_dir: &PathBuf) -> Self {
-        let basic_clash_config_path = Path::new(clashtui_dir).join("data/basic_clash_config.yaml");
+    pub fn new(clashtui_dir: &PathBuf, profile_dir: &PathBuf) -> Self {
+        let basic_clash_config_path = Path::new(clashtui_dir).join("basic_clash_config.yaml");
         let basic_clash_config_value = Self::parse_yaml(basic_clash_config_path.as_path()).unwrap();
         let controller_api = if let Some(controller_api) = basic_clash_config_value
             .get("external-controller")
@@ -69,23 +72,42 @@ impl ClashTuiUtil {
             .build()
             .unwrap();
 
-        let config_path = clashtui_dir.join("data/config.toml");
+        let config_path = clashtui_dir.join("config.toml");
         let toml_content = match fs::read_to_string(&config_path) {
             Ok(content) => content,
             Err(_) => String::new(),
         };
-        let clashtui_config: Option<toml::Value> = toml::from_str(&toml_content).ok();
+        let clashtui_config: toml::Value = toml::from_str(&toml_content).unwrap_or_else(|e| {
+            panic!("{}", e.to_string());
+        });
+        let default_section_of_clashtui_cfg = clashtui_config.get("default").unwrap_or_else(|| {
+            panic!("No default section in clashtui config");
+        });
+        let clash_core_path_str = default_section_of_clashtui_cfg.get("clash_core_path").unwrap_or_else(|| {
+            panic!("No `clash_core_path` in default section of clashtui config");
+        }).as_str().unwrap();
+        let clash_core_path = Path::new(&clash_core_path_str).to_path_buf();
+        let clash_cfg_path_str = default_section_of_clashtui_cfg.get("clash_cfg_path").unwrap_or_else(|| {
+            panic!("No `clash_cfg_path` in default section of clashtui config");
+        }).as_str().unwrap();
+        let clash_cfg_path = Path::new(&clash_cfg_path_str).to_path_buf();
+        let clash_cfg_dir_str = default_section_of_clashtui_cfg.get("clash_cfg_dir").unwrap_or_else(|| {
+                panic!("No `clash_cfg_dir` in default section of clashtui config");
+            }).as_str().unwrap();
+        let clash_cfg_dir = Path::new(&clash_cfg_dir_str).to_path_buf();
+        let clash_srv_name = default_section_of_clashtui_cfg.get("clash_srv_name").unwrap_or_else(|| {
+                panic!("No `clash_srv_name` in default section of clashtui config");
+            }).as_str().unwrap().to_string();
 
         let instance = Self {
             clashtui_dir: clashtui_dir.clone(),
-            clash_cfg_dir: cfg_dir.clone(),
             profile_dir: profile_dir.clone(),
+            clash_core_path,
+            clash_cfg_dir,
+            clash_cfg_path,
+            clash_srv_name,
             proxy_addr,
             controller_api,
-            #[cfg(target_os = "linux")]
-            clash_core_path: Path::new("clash-meta").to_path_buf(),
-            #[cfg(target_os = "windows")]
-            clash_core_path: clashtui_dir.join("clash-meta"),
             clashtui_client,
             default_client: reqwest::blocking::Client::new(),
             clashtui_config,
@@ -95,9 +117,8 @@ impl ClashTuiUtil {
     }
 
     pub fn load_config(&self) -> Result<()> {
-        let cfg_path = self.clashtui_dir.join("final_clash_config.yaml");
         let body = serde_json::json!({
-            "path": cfg_path.to_str().unwrap(),
+            "path": self.clash_cfg_path.to_str().unwrap(),
             "payload": ""
         })
         .to_string();
@@ -131,7 +152,7 @@ impl ClashTuiUtil {
     }
 
     pub fn merge_profile(&self, profile_name: &String, tun: bool) -> Result<()> {
-        let basic_clash_cfg_path = self.clashtui_dir.join("data/basic_clash_config.yaml");
+        let basic_clash_cfg_path = self.clashtui_dir.join("basic_clash_config.yaml");
         let mut dst_parsed_yaml = Self::parse_yaml(&basic_clash_cfg_path)?;
 
         if !tun {
@@ -159,8 +180,7 @@ impl ClashTuiUtil {
             }
         }
 
-        let final_clash_cfg_path = self.clashtui_dir.join("final_clash_config.yaml");
-        let final_clash_cfg_file = File::create(final_clash_cfg_path)?;
+        let final_clash_cfg_file = File::create(&self.clash_cfg_path)?;
         serde_yaml::to_writer(final_clash_cfg_file, &dst_parsed_yaml)?;
 
         Ok(())
@@ -290,16 +310,13 @@ impl ClashTuiUtil {
     }
 
     pub fn create_yaml_with_template(&self, template_name: &String) -> Result<()> {
-        let template_dir = self.clashtui_dir.join("data/templates");
+        let template_dir = self.clashtui_dir.join("templates");
         let template_path = template_dir.join(template_name);
         let tpl_parsed_yaml = Self::parse_yaml(&template_path)?;
         let mut out_parsed_yaml = tpl_parsed_yaml.clone();
 
-        let proxy_url_file = File::open(
-            self.clashtui_dir
-                .join("data/templates/template_proxy_providers"),
-        )
-        .unwrap();
+        let proxy_url_file =
+            File::open(self.clashtui_dir.join("templates/template_proxy_providers")).unwrap();
         let proxy_url_reader = BufReader::new(proxy_url_file);
         let mut proxy_urls = Vec::new();
         for line in proxy_url_reader.lines() {
@@ -491,7 +508,8 @@ impl ClashTuiUtil {
                 );
             }
         }
-
+        
+        log::error!("testssdfs");
         let out_yaml_path = self.profile_dir.join(template_name);
         let out_yaml_file = File::create(out_yaml_path).unwrap();
         serde_yaml::to_writer(out_yaml_file, &out_parsed_yaml)?;
@@ -523,12 +541,10 @@ impl ClashTuiUtil {
         })
     }
     pub fn get_template_names(&self) -> Result<Vec<String>> {
-        Self::get_file_names(self.clashtui_dir.join("data/templates").as_path()).and_then(
-            |mut v| {
-                v.sort();
-                Ok(v)
-            },
-        )
+        Self::get_file_names(self.clashtui_dir.join("templates").as_path()).and_then(|mut v| {
+            v.sort();
+            Ok(v)
+        })
     }
 
     #[cfg(target_os = "linux")]
@@ -537,7 +553,7 @@ impl ClashTuiUtil {
             ClashTuiOp::RestartClash => {
                 let output = Command::new("systemctl")
                     .arg("restart")
-                    .arg("clash-meta@root")
+                    .arg(self.clash_srv_name.as_str())
                     .output()?;
 
                 return Self::string_process_output(output);
@@ -545,72 +561,73 @@ impl ClashTuiUtil {
             ClashTuiOp::StopClash => {
                 let output = Command::new("systemctl")
                     .arg("stop")
-                    .arg("clash-meta@root")
+                    .arg(self.clash_srv_name.as_str())
                     .output()?;
                 return Self::string_process_output(output);
             }
             ClashTuiOp::TestClashConfig => {
-                let path = self.clashtui_dir.join("final_clash_config.yaml");
-                return self.test_profile_config(&path, true);
+                return self.test_profile_config(&self.clash_cfg_path, false);
             }
             _ => Ok("".to_string()),
         }
     }
     #[cfg(target_os = "windows")]
     pub fn clash_srv_ctl(&self, op: ClashTuiOp) -> Result<String> {
-        let clash_servic_name = "clash-meta";
-        let nssm_path = self.clashtui_dir.join("nssm");
+        let exe_dir = std::env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let nssm_path = exe_dir.join("nssm");
         let nssm_path_str = nssm_path.to_str().unwrap();
 
         let output = match op {
             ClashTuiOp::RestartClash => {
                 Self::start_process_as_admin(
                     nssm_path_str,
-                    format!("restart {}", clash_servic_name).as_str(),
+                    format!("restart {}", self.clash_srv_name).as_str(),
                     true,
                 )?;
 
-                Command::new(self.clashtui_dir.join("nssm").to_str().unwrap())
+                Command::new(nssm_path_str)
                     .arg("status")
-                    .arg(clash_servic_name)
+                    .arg(self.clash_srv_name.as_str())
                     .output()?
             }
 
             ClashTuiOp::StopClash => {
                 Self::start_process_as_admin(
                     nssm_path_str,
-                    &format!("stop {}", clash_servic_name),
+                    &format!("stop {}", self.clash_srv_name),
                     true,
                 )?;
 
-                Command::new(self.clashtui_dir.join("nssm").to_str().unwrap())
+                Command::new(nssm_path_str)
                     .arg("status")
-                    .arg(clash_servic_name)
+                    .arg(self.clash_srv_name.as_str())
                     .output()?
             }
 
             ClashTuiOp::TestClashConfig => {
-                let path = self.clashtui_dir.join("final_clash_config.yaml");
-                return self.test_profile_config(&path, true);
+                return self.test_profile_config(&self.clash_cfg_path, true);
             }
 
             ClashTuiOp::InstallSrv => {
-                let path = self.clashtui_dir.join("final_clash_config.yaml");
                 Self::start_process_as_admin(
                     nssm_path_str,
                     &format!(
-                        "install {} \"{}\" -m -d \"{}\" -f \"{}\"",
-                        clash_servic_name,
+                        "install {} \"{}\" -d \"{}\" -f \"{}\"",
+                        self.clash_srv_name,
                         self.clash_core_path.to_str().unwrap(),
                         self.clash_cfg_dir.to_str().unwrap(),
-                        path.to_str().unwrap()
+                        self.clash_cfg_path.to_str().unwrap()
                     ),
                     true,
                 )?;
 
-                Command::new(self.clashtui_dir.join("nssm").to_str().unwrap())
+                Command::new(nssm_path_str)
                     .arg("status")
-                    .arg(clash_servic_name)
+                    .arg(self.clash_srv_name.as_str())
                     .output()?
             }
 
@@ -618,22 +635,24 @@ impl ClashTuiUtil {
                 Self::execute_powershell_script_as_admin(
                     &format!(
                         "{0} stop {1}; {0} remove {1}",
-                        nssm_path_str, clash_servic_name
+                        nssm_path_str, self.clash_srv_name
                     ),
                     true,
-                )?;
-
-                Command::new(self.clashtui_dir.join("nssm").to_str().unwrap())
-                    .arg("status")
-                    .arg(clash_servic_name)
-                    .output()?
+                )?
             }
 
-            ClashTuiOp::EnableLoopback => Self::start_process_as_admin(
-                self.clashtui_dir.join("EnableLoopback").to_str().unwrap(),
-                "",
-                false,
-            )?,
+            ClashTuiOp::EnableLoopback => {
+                let exe_dir = std::env::current_exe()
+                    .unwrap()
+                    .parent()
+                    .unwrap()
+                    .to_path_buf();
+                Self::start_process_as_admin(
+                    exe_dir.join("EnableLoopback").to_str().unwrap(),
+                    "",
+                    false,
+                )?
+            }
             _ => {
                 bail!("Do nothing for the ClashTuiOp.")
             }
@@ -854,7 +873,7 @@ impl ClashTuiUtil {
         if self.is_profile_yaml(profile_name) {
             return profile_path;
         } else {
-            let profile_cache_dir = self.clashtui_dir.join("data/profile_cache");
+            let profile_cache_dir = self.clashtui_dir.join("profile_cache");
             let profile_yaml_name = Path::new(profile_name).with_extension("yaml");
             let profile_yaml_path = profile_cache_dir.join(profile_yaml_name);
 
@@ -882,8 +901,7 @@ impl ClashTuiUtil {
 
     pub fn edit_file(&self, path: &PathBuf) -> Result<String> {
         if let Some(edit_cmd) = self
-            .get_clashtui_config()
-            .and_then(|v| v.get("default"))
+            .get_clashtui_config().get("default")
             .and_then(|default| default.get("edit_cmd"))
             .and_then(|edit_cmd| edit_cmd.as_str())
         {
@@ -920,8 +938,7 @@ impl ClashTuiUtil {
     }
     pub fn open_dir(&self, path: &Path) -> Result<String> {
         if let Some(opendir_cmd) = self
-            .get_clashtui_config()
-            .and_then(|v| v.get("default"))
+            .get_clashtui_config().get("default")
             .and_then(|default| default.get("opendir_cmd"))
             .and_then(|opendir_cmd| opendir_cmd.as_str())
         {
@@ -957,8 +974,8 @@ impl ClashTuiUtil {
         Ok("Done".to_string())
     }
 
-    pub fn get_clashtui_config(&self) -> Option<&toml::Value> {
-        self.clashtui_config.as_ref()
+    pub fn get_clashtui_config(&self) -> &toml::Value {
+        &self.clashtui_config
     }
 
     pub fn fetch_recent_logs(&self, num_lines: usize) -> Vec<String> {

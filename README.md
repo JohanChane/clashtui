@@ -8,11 +8,16 @@
 
 * [支持的平台](#支持的平台)
 * [适用人群](#适用人群)
-* [启动](#启动)
-    * [Windows](#windows)
-* [安装](#安装)
-    * [Windows](#windows-1)
+* [安装 Clash Meta 服务 (启用 Tun 模式)](#安装-clash-meta-服务-启用-tun-模式)
     * [Linux](#linux)
+    * [Windows](#windows)
+* [安装 clashtui](#安装-clashtui)
+    * [Linux](#linux-1)
+    * [Windows](#windows-1)
+    * [配置 `basic_clash_config.yaml`](#配置-basic_clash_configyaml)
+* [启动](#启动)
+    * [Windows](#windows-2)
+* [便携模式](#便携模式)
 * [使用说明](#使用说明)
     * [导入链接](#导入链接)
     * [使用配置模板](#使用配置模板)
@@ -35,6 +40,97 @@
 -   对 clash 配置有一定了解。
 -   喜欢 TUI 软件。
 
+## 安装 Clash Meta 服务 (启用 Tun 模式)
+
+### Linux
+
+比如: [ArchLinux](https://aur.archlinux.org/packages/clash-meta)。
+
+```sh
+# cat /etc/pacman.d/hooks/clash-meta.hook (没有类似于 hook 的系统可能要手动 setcap 或者使用 clash-meta@root 服务)
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = usr/bin/clash-meta
+[Action]
+When = PostTransaction
+Exec = /usr/bin/setcap 'cap_net_admin,cap_net_bind_service=+ep' /usr/bin/clash-meta
+# ---
+
+paru -S clash-meta
+
+# systemctl edit clash-meta
+[Service]
+# 删除原先的 ExecStart
+ExecStart=
+ExecStart=/usr/bin/clash-meta -d /srv/clash-meta -f /srv/clash-meta/config.yaml
+# ---
+
+mkdir /srv/clash-meta
+cd /srv/clash-meta
+chown -R clash-meta:clash-meta /srv/clash-meta
+usermod -a -G clash-meta <user>
+groups <user>       # 查看是否已经加入 clash-meta group
+chmod g+w /srv/clash-meta               # clashtui 要有创建文件的权限。
+chmod g+w /srv/clash-meta/config.yaml   # clashtui 要有写的权限。
+
+systemctl enable clash-meta  # 开机启动
+systemctl restart clash-meta  # 启动服务
+```
+
+建议先用一个可用的 clash 配置测试 clash-meta 服务是否成功。检查是否缺少 [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) 文件。
+
+### Windows
+
+比如:
+
+-   下载一个适合自己系统的 [clash-meta](https://github.com/MetaCubeX/Clash.Meta/releases), 将其放在 `D:/PortableProgramFiles/clash-meta`。
+-   在 clash-meta 所在的目录, 创建目录 `./config` 和文件 `./config/config.yaml`
+-   安装 clashtui 后, 再操作。
+
+## 安装 clashtui
+
+### Linux
+
+比如: ArchLinux
+
+```sh
+# 有最新的 [PKGBUILD](https://github.com/JohanChane/clashtui/blob/main/PKGBUID)。
+paru -S clashtui。      # 其他 linux 发行版, 手动下载, 将 clashtui 放在 PATH 即可。
+clashtui                # 先运行会在 ~/.config/clashtui 生成一些默认文件。
+
+# nvim ~/.config/clashtui/config.toml
+[default]
+# 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
+clash_core_path = "clash-meta"
+clash_cfg_dir = "/srv/clash-meta"
+clash_cfg_path = "/srv/clash-meta/config.yaml"
+clash_srv_name = "clash-meta"       # systemctl {restart | stop} <clash_srv_name>
+# ---
+```
+
+### Windows
+
+先运行 clashtui, 会在 `%APPDATA%/clashtui` 生成一些默认文件。
+
+修改 `%APPDATA%/clashtui/config.toml`:
+
+```toml
+[default]
+# 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
+clash_core_path = "D:/PortableProgramFiles/clash-meta/clash-meta"
+clash_cfg_dir = "D:/PortableProgramFiles/clash-meta/config"
+clash_cfg_path = "D:/PortableProgramFiles/clash-meta/config/config.yaml"
+clash_srv_name = "clash-meta"       # nssm {install | remove | restart | stop | edit} <clash_srv_name>
+```
+
+改好之后, 运行 clashtui。在 `ClashSrvCtl` Tab 选择 `InstallSrv`, 程序会根据上面的配置安装 `clash-meta` 内核服务。该服务会开机启动。安装之后启动内核服务, 输入 `R` 即可。
+
+### 配置 `basic_clash_config.yaml`
+
+自行配置 `{~/.config | %APPDATA%}/clashtui/basic_clash_config.yaml`。该文件的一些基础字段会合并到 `clash_cfg_path`。
+
 ## 启动
 
 ### Windows
@@ -46,35 +142,9 @@
 
 *clashtui 使用 [crossterm](https://docs.rs/crossterm/latest/crossterm/), [ratatui](https://github.com/ratatui-org/ratatui) 实现, Windows 最好使用 [Windows Terminal](https://github.com/microsoft/terminal)。在 Windows Terminal 中设置命令的启动方式使用 `Windows Terminal`, 则执行 clashtui 命令会自动使用 Windows Teminal 打开。*
 
-## 安装
+## 便携模式
 
-### Windows
-
-在 `ClashSrvCtl` Tab 选择 `InstallSrv` 安装 `clash-meta` 内核服务。该服务会开机启动。安装之后启动内核服务, 输入 `R` 即可。
-
-### Linux
-
-比如: ArchLinux
-
-```sh
-paru -S clash-meta。
-systemctl edit clash-meta@root  # tun 模式需要管理员权限启动。
-```
-
-修改 clash-meta@root unit:
-
-```
-[Service]
-# 删除原先的 ExecStart
-ExecStart=
-# 修改 `-d, -f` 参数。我的 clashtui 放在在 `/opt/clashtui`
-ExecStart=/usr/bin/clash -d /opt/clashtui/clash_config -f /opt/clashtui/final_clash_config.yaml
-```
-
-```sh
-systemctl enable clash-meta@root  # 开机启动
-systemctl restart clash-meta@root  # 启动服务
-```
+在 clashtui 程序所有的目录创建一个名为 `data` 的文件夹。则会将数据放在 `data` 内而不是 `~/.config/clashtui` 或 `%APPDATA%/clashtui`。
 
 ## 使用说明
 
@@ -89,7 +159,7 @@ systemctl restart clash-meta@root  # 启动服务
 
 如果 Windows 平台无法打开 `http://127.0.0.1:9090/ui`:
 -   在 `ClashSrvCtl` 选择 `TestClashConfig` 检测配置语法是否正确和是否自动下载了 geo 文件。
--   按 `L` 查看日志。
+-   按 `L` 查看日志。(`H` 打开 clashtui config dir。`G` 打开 clash config dir。查看相关的文件是否正确。)
 -   可以使用 `netstat -aon | findstr "9090"` 查看端口是否存在, 如果不存在可以换一个 compatible 版本的 clash-meta。
 -   如果可以打开, 但是无法访问需要代理的网站。可以允许 `clash-meta` 通过防火墙。
 
@@ -111,6 +181,8 @@ systemctl restart clash-meta@root  # 启动服务
     ```
 
 -   按 `Enter` 生成配置到 `Profile`。按 `p` 切换回 Profile, `Enter` 选择该配置即可。
+
+下载的 clashtui 一般会附带 templates。如果没有, 在[这里](https://github.com/JohanChane/clashtui/tree/main/App/templates)有最新的 templates。
 
 ### 高级使用
 
@@ -186,12 +258,8 @@ proxy-groups:
 
 ## clashtui 的文件结构
 
--   data: 存放个人数据
-    -   basic_clash_config.yaml: clash-meta 配置的基本字段, 会合并到 `final_clash_config`。
-    -   config.yaml: clashtui 的配置。
--   final_clash_config.yaml: clash-meta 使用的配置。
--   clash_config: clash-meta config directory。
-
+-   basic_clash_config.yaml: clash-meta 配置的基本字段, 会合并到 `clash_cfg_path`。
+-   config.yaml: clashtui 的配置。
 
 ## 项目免责声明
 
