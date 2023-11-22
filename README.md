@@ -96,7 +96,7 @@ systemctl restart clash-meta  # 启动服务
 比如: ArchLinux
 
 ```sh
-# 有最新的 [PKGBUILD](https://github.com/JohanChane/clashtui/blob/main/PKGBUID)。
+# 有最新的 [PKGBUILD](https://github.com/JohanChane/clashtui/blob/main/PKGBUILD)。
 paru -S clashtui。      # 其他 linux 发行版, 手动下载, 将 clashtui 放在 PATH 即可。
 clashtui                # 先运行会在 ~/.config/clashtui 生成一些默认文件。
 
