@@ -162,7 +162,9 @@ impl ClashTuiUtil {
         }
 
         let profile_yaml_path = self.get_profile_yaml_path(profile_name);
-        let profile_parsed_yaml = Self::parse_yaml(&profile_yaml_path)?;
+        let profile_parsed_yaml = Self::parse_yaml(&profile_yaml_path).or_else(|e| {
+            bail!("Maybe need to update first. Failed to parse {}: {}", profile_yaml_path.to_str().unwrap(), e.to_string());
+        })?;
 
         if let serde_yaml::Value::Mapping(dst_mapping) = &mut dst_parsed_yaml {
             if let serde_yaml::Value::Mapping(mapping) = &profile_parsed_yaml {
@@ -199,13 +201,15 @@ impl ClashTuiUtil {
 
         let profile_path = self.profile_dir.join(profile_name);
         let mut profile_yaml_path = profile_path.clone();
+        let mut net_res: Vec<(String, String)> = Vec::new();
         // ## 如果是订阅链接
         if !self.is_profile_yaml(profile_name) {
             let mut file = File::open(profile_path)?;
             let mut file_content = String::new();
             file.read_to_string(&mut file_content)?;
 
-            let mut response = self.clashtui_client.get(file_content).send()?;
+            let sub_url = file_content.trim();
+            let mut response = self.clashtui_client.get(sub_url).send()?;
 
             profile_yaml_path = self.get_profile_yaml_path(profile_name);
             let directory = profile_yaml_path
@@ -216,6 +220,8 @@ impl ClashTuiUtil {
             }
             let mut output_file = File::create(&profile_yaml_path)?;
             response.copy_to(&mut output_file)?;
+
+            net_res.push((sub_url.to_string(), profile_yaml_path.to_string_lossy().to_string()))
         }
 
         // ## 更新 yaml 的网络资源
@@ -225,7 +231,6 @@ impl ClashTuiUtil {
 
         let parsed_yaml: serde_yaml::Value = serde_yaml::from_str(yaml_content.as_str()).unwrap();
 
-        let mut net_res: Vec<(String, String)> = Vec::new();
         for key in &net_res_keys {
             let providers =
                 if let Some(serde_yaml::Value::Mapping(providers)) = parsed_yaml.get(key) {
