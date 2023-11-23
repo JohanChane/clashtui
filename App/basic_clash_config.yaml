@@ -10,7 +10,14 @@ external-controller: 127.0.0.1:9090
 external-ui: /usr/share/metacubexd
 external-ui-name: metacubexd
 external-ui-url: https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip
-# meta-rules-dat: https://github.com/MetaCubeX/meta-rules-dat
+#自定义 geodata url
+geox-url:
+  geoip: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat"
+  geosite: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
+  mmdb: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.metadb"
+profile:
+  store-selected: true
+unified-delay: true
 tun:
   enable: true
   stack: system
