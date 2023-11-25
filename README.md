@@ -83,11 +83,22 @@ systemctl restart clash-meta  # 启动服务
 
 ### Windows
 
+[安装 scoop](https://github.com/ScoopInstaller/Install) (可选):
+
+```powershell
+irm get.scoop.sh -outfile 'install.ps1'
+.\install.ps1 -ScoopDir 'D:\Scoop' -ScoopGlobalDir 'D:\ScoopGlobal' -NoProxy    # 我选择安装在 D 盘。
+```
+
 比如:
 
--   下载一个适合自己系统的 [clash-meta](https://github.com/MetaCubeX/Clash.Meta/releases), 将其放在 `D:/PortableProgramFiles/clash-meta`。
--   在 clash-meta 所在的目录, 创建目录 `./config` 和文件 `./config/config.yaml`
+-   通过 `scoop install clash.meta` 安装 clash.meta。或者, 下载一个适合自己系统的 [clash.meta](https://github.com/MetaCubeX/Clash.Meta/releases), 将其放在 `D:/PortableProgramFiles/clash-meta/clash-meta.exe`。
+-   创建目录 `D:/MyAppData/clash-meta` 和文件 `D:/MyAppData/clash-meta/config.yaml`
 -   安装 clashtui 后, 再操作。
+
+如果可以访问 clash meta 客户端 (比如: metacubexd) 而无法访问需要代理的网站, 则尝试允许 `clash.meta.exe` 通过防火墙:
+-   通过 Scoop 安装的 clash.meta: 允许 `D:\Scoop\apps\clash.meta\1.16.0\Clash.Meta.exe`, 而不是 current 路径的。之后 clash.meta 升级版本之后, 可以还要继续这样的操作。
+-   手动下载 clash.meta 安装的: 允许 `D:/PortableProgramFiles/clash-meta/clash-meta.exe`。
 
 ## 安装 clashtui
 
@@ -112,6 +123,8 @@ clash_srv_name = "clash-meta"       # systemctl {restart | stop} <clash_srv_name
 
 ### Windows
 
+手动下载安装 clashtui, 或者通过 `scoop bucket add extras; scoop install clashtui` 安装。后续会将文件 [clashtui.json](./Scoop/clashtui.json) 加入scoop extras 仓库。如果没有加入 scoop extras, 你可以将 clashtui.json 文件添加到 `D:\Scoop\buckets\extras\bucket\clashtui.json`, 这样就可以使用 `scoop install clashtui` 了。
+
 先运行 clashtui, 会在 `%APPDATA%/clashtui` 生成一些默认文件。
 
 修改 `%APPDATA%/clashtui/config.toml`:
@@ -119,17 +132,22 @@ clash_srv_name = "clash-meta"       # systemctl {restart | stop} <clash_srv_name
 ```toml
 [default]
 # 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
-clash_core_path = "D:/PortableProgramFiles/clash-meta/clash-meta"
-clash_cfg_dir = "D:/PortableProgramFiles/clash-meta/config"
-clash_cfg_path = "D:/PortableProgramFiles/clash-meta/config/config.yaml"
+#clash_core_path = "D:/PortableProgramFiles/clash-meta/clash-meta.exe"
+clash_core_path = "D:/Scoop/shims/clash.meta.exe"
+clash_cfg_dir = "D:/MyAppData/clash-meta"
+clash_cfg_path = "D:/MyAppData/clash-meta/config.yaml"
 clash_srv_name = "clash-meta"       # nssm {install | remove | restart | stop | edit} <clash_srv_name>
 ```
 
-改好之后, 运行 clashtui。在 `ClashSrvCtl` Tab 选择 `InstallSrv`, 程序会根据上面的配置安装 `clash-meta` 内核服务。该服务会开机启动。安装之后启动内核服务, 输入 `R` 即可。
+改好之后, 将 clashtui, nssm 加入 PATH:
+-   scoop 安装 clashtui 的: scoop install nssm
+-   手动下载安装 clashtui 的: 将 `D:/PortableProgramFiles/clashtui` 加入 PATH。
+
+运行 clashtui。在 `ClashSrvCtl` Tab 选择 `InstallSrv`, 程序会根据上面的配置安装 `clash-meta` 内核服务。该服务会开机启动。安装之后启动内核服务, 输入 `R` 即可。
 
 ### 配置 `basic_clash_config.yaml`
 
-自行配置 `{~/.config | %APPDATA%}/clashtui/basic_clash_config.yaml`。该文件的一些基础字段会合并到 `clash_cfg_path`。
+自行配置 `{~/.config | %APPDATA%}/clashtui/basic_clash_config.yaml`。该文件的一些基础字段会合并到 `clash_cfg_path`。可以参考[这里](./App/basic_clash_config.yaml)配置 tun 模式。
 
 ## 启动
 

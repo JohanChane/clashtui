@@ -584,8 +584,9 @@ impl ClashTuiUtil {
             .parent()
             .unwrap()
             .to_path_buf();
-        let nssm_path = exe_dir.join("nssm");
-        let nssm_path_str = nssm_path.to_str().unwrap();
+        //let nssm_path = exe_dir.join("nssm");
+        //let nssm_path_str = nssm_path.to_str().unwrap();
+        let nssm_path_str = "nssm";
 
         let output = match op {
             ClashTuiOp::RestartClash => {
@@ -615,7 +616,7 @@ impl ClashTuiUtil {
             }
 
             ClashTuiOp::TestClashConfig => {
-                return self.test_profile_config(&self.clash_cfg_path, true);
+                return self.test_profile_config(&self.clash_cfg_path, false);
             }
 
             ClashTuiOp::InstallSrv => {

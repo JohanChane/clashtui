@@ -1,5 +1,5 @@
 pp: &pp {intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
-delay_test: &delay_test {url: https://cp.cloudflare.com/generate_204, interval: 300}
+delay_test: &delay_test {url: https://www.gstatic.com/generate_204, interval: 300}
 
 proxy-groups:
   - name: "Entry"
