@@ -97,7 +97,7 @@ irm get.scoop.sh -outfile 'install.ps1'
 -   安装 clashtui 后, 再操作。
 
 如果可以访问 clash meta 客户端 (比如: metacubexd) 而无法访问需要代理的网站, 则尝试允许 `clash.meta.exe` 通过防火墙:
--   通过 Scoop 安装的 clash.meta: 允许 `D:\Scoop\apps\clash.meta\1.16.0\Clash.Meta.exe`, 而不是 current 路径的。之后 clash.meta 升级版本之后, 可以还要继续这样的操作。
+-   通过 Scoop 安装的 clash.meta: 允许 `D:\Scoop\apps\clash.meta\1.16.0\Clash.Meta.exe`, 而不是 current 路径的。之后 clash.meta 升级版本之后, 可能还要继续这样的操作。
 -   手动下载 clash.meta 安装的: 允许 `D:/PortableProgramFiles/clash-meta/clash-meta.exe`。
 
 ## 安装 clashtui
@@ -133,7 +133,7 @@ clash_srv_name = "clash-meta"       # systemctl {restart | stop} <clash_srv_name
 [default]
 # 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
 #clash_core_path = "D:/PortableProgramFiles/clash-meta/clash-meta.exe"
-clash_core_path = "D:/Scoop/shims/clash.meta.exe"
+clash_core_path = "D:/Scoop/shims/clash.meta.exe"       # `Get-Command clash.meta`
 clash_cfg_dir = "D:/MyAppData/clash-meta"
 clash_cfg_path = "D:/MyAppData/clash-meta/config.yaml"
 clash_srv_name = "clash-meta"       # nssm {install | remove | restart | stop | edit} <clash_srv_name>
