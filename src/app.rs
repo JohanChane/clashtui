@@ -6,7 +6,6 @@ use log4rs::config::{Appender, Config, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::{prelude::*, widgets::*};
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::env;
@@ -96,7 +95,7 @@ impl App {
         let help_popup = ClashTuiListPopup::new("Help".to_string(), Rc::clone(&theme));
 
         let clashtui_state = Rc::new(RefCell::new(ClashTuiState::new(Rc::clone(&clashtui_util))));
-        clashtui_state.as_ref().borrow_mut().load_status_from_file();
+        clashtui_state.borrow_mut().load_status_from_file();
 
         let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
         let mut app = Self {
@@ -258,7 +257,7 @@ impl App {
             EventState::EnableTun | EventState::DisableTun => {
                 self.clashsrvctl_tab.hide_msgpopup();
                 let res = {
-                    let mut clashtui_state = self.clashtui_state.as_ref().borrow_mut();
+                    let mut clashtui_state = self.clashtui_state.borrow_mut();
                     let tun = if last_ev == &EventState::EnableTun {
                         true
                     } else {
@@ -278,7 +277,7 @@ impl App {
             EventState::EnableSysProxy => {
                 self.clashsrvctl_tab.hide_msgpopup();
                 self.clashtui_util.enable_system_proxy();
-                self.clashtui_state.as_ref().borrow_mut().set_sysproxy(true);
+                self.clashtui_state.borrow_mut().set_sysproxy(true);
                 EventState::WorkDone
             }
             #[cfg(target_os = "windows")]
@@ -286,7 +285,6 @@ impl App {
                 self.clashsrvctl_tab.hide_msgpopup();
                 ClashTuiUtil::disable_system_proxy();
                 self.clashtui_state
-                    .as_ref()
                     .borrow_mut()
                     .set_sysproxy(false);
                 EventState::WorkDone

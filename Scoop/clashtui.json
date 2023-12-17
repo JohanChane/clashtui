@@ -1,6 +1,6 @@
 {
   "version": "v0.0.2",
-  "description": "Clash Meta TUI Client",
+  "description": "Mihomo TUI Client",
   "homepage": "https://github.com/JohanChane/clashtui",
   "license": "MIT",
   "architecture": {
@@ -13,10 +13,10 @@
   "bin": "clashtui.exe",
   "suggest": {
     "nssm": "nssm",
-    "clash.meta": "clash.meta"
+    "mihomo": "mihomo"
   },
   "pre_uninstall": [
-    "echo 'Please make sure to remove the clash-meta service installed by clashtui before uninstalling.'"
+    "echo 'Please make sure to remove the mihomo service installed by clashtui before uninstalling.'"
   ],
   "checkver": "github",
   "autoupdate": {

@@ -1,4 +1,4 @@
-pp: &pp {intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
+pp: &pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
 delay_test: &delay_test {url: https://www.gstatic.com/generate_204, interval: 300}
 
 proxy-groups:
@@ -53,23 +53,24 @@ proxy-providers:
     <<: *pp
 
 rules:
-- GEOSITE,biliintl,Entry
-- GEOSITE,ehentai,Entry
-- GEOSITE,github,Entry
-- GEOSITE,twitter,Entry
-- GEOSITE,youtube,Entry
-- GEOSITE,google,Entry
-- GEOSITE,telegram,Entry
-- GEOSITE,netflix,Entry
-- GEOSITE,bilibili,Entry-RuleMode
-- GEOSITE,bahamut,Entry
-- GEOSITE,spotify,Entry
-- GEOSITE,geolocation-!cn,Entry
-- GEOIP,google,Entry
-- GEOIP,netflix,Entry
-- GEOIP,telegram,Entry
-- GEOIP,twitter,Entry
-- GEOSITE,pixiv,Entry
-- GEOSITE,CN,Entry-RuleMode
-- GEOIP,CN,Entry-RuleMode
-- MATCH,Entry-LastMatch
+  - GEOIP,lan,DIRECT,no-resolve
+  - GEOSITE,biliintl,Entry
+  - GEOSITE,ehentai,Entry
+  - GEOSITE,github,Entry
+  - GEOSITE,twitter,Entry
+  - GEOSITE,youtube,Entry
+  - GEOSITE,google,Entry
+  - GEOSITE,telegram,Entry
+  - GEOSITE,netflix,Entry
+  - GEOSITE,bilibili,Entry-RuleMode
+  - GEOSITE,bahamut,Entry
+  - GEOSITE,spotify,Entry
+  - GEOSITE,geolocation-!cn,Entry
+  - GEOIP,google,Entry
+  - GEOIP,netflix,Entry
+  - GEOIP,telegram,Entry
+  - GEOIP,twitter,Entry
+  - GEOSITE,pixiv,Entry
+  - GEOSITE,CN,Entry-RuleMode
+  - GEOIP,CN,Entry-RuleMode
+  - MATCH,Entry-LastMatch

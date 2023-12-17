@@ -3,7 +3,6 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use log;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::{prelude::*, widgets::*};
-use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::fs;
 use std::ops::{Deref, DerefMut};
@@ -311,10 +310,9 @@ impl ProfileTab {
                 self.popup_txt_msg(err.to_string());
             } else {
                 self.clashtui_state
-                    .as_ref()
                     .borrow_mut()
                     .set_profile(profile_name.to_string());
-                self.clashtui_state.as_ref().borrow().save_status_to_file();
+                self.clashtui_state.borrow().save_status_to_file();
             }
         }
     }

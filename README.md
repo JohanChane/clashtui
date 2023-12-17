@@ -8,7 +8,7 @@
 
 * [支持的平台](#支持的平台)
 * [适用人群](#适用人群)
-* [安装 Clash Meta 服务 (启用 Tun 模式)](#安装-clash-meta-服务-启用-tun-模式)
+* [安装 Mihomo 服务 (启用 Tun 模式)](#安装-mihomo-服务-启用-tun-模式)
     * [Linux](#linux)
     * [Windows](#windows)
 * [安装 clashtui](#安装-clashtui)
@@ -40,46 +40,47 @@
 -   对 clash 配置有一定了解。
 -   喜欢 TUI 软件。
 
-## 安装 Clash Meta 服务 (启用 Tun 模式)
+## 安装 Mihomo 服务 (启用 Tun 模式)
 
 ### Linux
 
-比如: [ArchLinux](https://aur.archlinux.org/packages/clash-meta)。
+比如: [ArchLinux](https://aur.archlinux.org/packages/mihomo)。
 
 ```sh
-# cat /etc/pacman.d/hooks/clash-meta.hook (没有类似于 hook 的系统可能要手动 setcap 或者使用 clash-meta@root 服务)
+# cat /etc/pacman.d/hooks/mihomo.hook (没有类似于 hook 的系统可能要手动 setcap 或者使用 mihomo@root 服务)
 [Trigger]
 Operation = Install
 Operation = Upgrade
 Type = Path
-Target = usr/bin/clash-meta
+Target = usr/bin/mihomo
+
 [Action]
 When = PostTransaction
-Exec = /usr/bin/setcap 'cap_net_admin,cap_net_bind_service=+ep' /usr/bin/clash-meta
+Exec = /usr/bin/setcap 'cap_net_admin,cap_net_bind_service=+ep' /usr/bin/mihomo
 # ---
 
-paru -S clash-meta
+paru -S mihomo
 
-# systemctl edit clash-meta
+# systemctl edit mihomo
 [Service]
 # 删除原先的 ExecStart
 ExecStart=
-ExecStart=/usr/bin/clash-meta -d /srv/clash-meta -f /srv/clash-meta/config.yaml
+ExecStart=/usr/bin/mihomo -d /srv/mihomo -f /srv/mihomo/config.yaml
 # ---
 
-mkdir /srv/clash-meta
-cd /srv/clash-meta
-chown -R clash-meta:clash-meta /srv/clash-meta
-usermod -a -G clash-meta <user>
-groups <user>       # 查看是否已经加入 clash-meta group
-chmod g+w /srv/clash-meta               # clashtui 要有创建文件的权限。
-chmod g+w /srv/clash-meta/config.yaml   # clashtui 要有写的权限。
+mkdir /srv/mihomo
+cd /srv/mihomo
+chown -R mihomo:mihomo /srv/mihomo
+usermod -a -G mihomo <user>
+groups <user>       # 查看是否已经加入 mihomo group
+chmod g+w /srv/mihomo               # clashtui 要有创建文件的权限。
+chmod g+w /srv/mihomo/config.yaml   # clashtui 要有写的权限。
 
-systemctl enable clash-meta  # 开机启动
-systemctl restart clash-meta  # 启动服务
+systemctl enable mihomo  # 开机启动
+systemctl restart mihomo  # 启动服务
 ```
 
-建议先用一个可用的 clash 配置测试 clash-meta 服务是否成功。检查是否缺少 [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) 文件。
+建议先用一个可用的 mihomo 配置测试 mihomo 服务是否成功。检查是否缺少 [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) 文件。
 
 ### Windows
 
@@ -92,13 +93,13 @@ irm get.scoop.sh -outfile 'install.ps1'
 
 比如:
 
--   通过 `scoop install clash.meta` 安装 clash.meta。或者, 下载一个适合自己系统的 [clash.meta](https://github.com/MetaCubeX/Clash.Meta/releases), 将其放在 `D:/PortableProgramFiles/clash-meta/clash-meta.exe`。
--   创建目录 `D:/MyAppData/clash-meta` 和文件 `D:/MyAppData/clash-meta/config.yaml`
+-   通过 `scoop install mihomo` 安装 mihomo。或者, 下载一个适合自己系统的 [mihomo](https://github.com/MetaCubeX/mihomo/releases), 将其放在 `D:/PortableProgramFiles/mihomo/mihomo.exe`。
+-   创建目录 `D:/MyAppData/mihomo` 和文件 `D:/MyAppData/mihomo/config.yaml`
 -   安装 clashtui 后, 再操作。
 
-如果可以访问 clash meta 客户端 (比如: metacubexd) 而无法访问需要代理的网站, 则尝试允许 `clash.meta.exe` 通过防火墙:
--   通过 Scoop 安装的 clash.meta: 允许 `D:\Scoop\apps\clash.meta\1.16.0\Clash.Meta.exe`, 而不是 current 路径的。之后 clash.meta 升级版本之后, 可能还要继续这样的操作。
--   手动下载 clash.meta 安装的: 允许 `D:/PortableProgramFiles/clash-meta/clash-meta.exe`。
+如果可以访问 mihomo 客户端 (比如: metacubexd) 而无法访问需要代理的网站, 则尝试允许 `mihomo.exe` 通过防火墙:
+-   通过 Scoop 安装的 mihomo: 允许 `D:\Scoop\apps\mihomo\1.17.0\mihomo.exe`, 而不是 current 路径的。之后 mihomo 升级版本之后, 可能还要继续这样的操作。
+-   手动下载 mihomo 安装的: 允许 `D:/PortableProgramFiles/mihomo/mihomo.exe`。
 
 ## 安装 clashtui
 
@@ -114,10 +115,10 @@ clashtui                # 先运行会在 ~/.config/clashtui 生成一些默认�
 # nvim ~/.config/clashtui/config.toml
 [default]
 # 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
-clash_core_path = "clash-meta"
-clash_cfg_dir = "/srv/clash-meta"
-clash_cfg_path = "/srv/clash-meta/config.yaml"
-clash_srv_name = "clash-meta"       # systemctl {restart | stop} <clash_srv_name>
+clash_core_path = "mihomo"
+clash_cfg_dir = "/srv/mihomo"
+clash_cfg_path = "/srv/mihomo/config.yaml"
+clash_srv_name = "mihomo"       # systemctl {restart | stop} <clash_srv_name>
 # ---
 ```
 
@@ -132,18 +133,18 @@ clash_srv_name = "clash-meta"       # systemctl {restart | stop} <clash_srv_name
 ```toml
 [default]
 # 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
-#clash_core_path = "D:/PortableProgramFiles/clash-meta/clash-meta.exe"
-clash_core_path = "D:/Scoop/shims/clash.meta.exe"       # `Get-Command clash.meta`
-clash_cfg_dir = "D:/MyAppData/clash-meta"
-clash_cfg_path = "D:/MyAppData/clash-meta/config.yaml"
-clash_srv_name = "clash-meta"       # nssm {install | remove | restart | stop | edit} <clash_srv_name>
+#clash_core_path = "D:/PortableProgramFiles/mihomo/mihomo.exe"
+clash_core_path = "D:/Scoop/shims/mihomo.exe"       # `Get-Command mihomo`
+clash_cfg_dir = "D:/MyAppData/mihomo"
+clash_cfg_path = "D:/MyAppData/mihomo/config.yaml"
+clash_srv_name = "mihomo"       # nssm {install | remove | restart | stop | edit} <clash_srv_name>
 ```
 
 改好之后, 将 clashtui, nssm 加入 PATH:
 -   scoop 安装 clashtui 的: scoop install nssm
 -   手动下载安装 clashtui 的: 将 `D:/PortableProgramFiles/clashtui` 加入 PATH。
 
-运行 clashtui。在 `ClashSrvCtl` Tab 选择 `InstallSrv`, 程序会根据上面的配置安装 `clash-meta` 内核服务。该服务会开机启动。安装之后启动内核服务, 输入 `R` 即可。
+运行 clashtui。在 `ClashSrvCtl` Tab 选择 `InstallSrv`, 程序会根据上面的配置安装 `mihomo` 内核服务。该服务会开机启动。安装之后启动内核服务, 输入 `R` 即可。
 
 ### 配置 `basic_clash_config.yaml`
 
@@ -171,15 +172,15 @@ clash_srv_name = "clash-meta"       # nssm {install | remove | restart | stop | 
 ### 导入链接
 
 -   在 Profile 区域, 按 `i` 输入 Name (尽量不使用后缀) 和 Uri
--   按 `U` 更新 Profile 的依赖的所有资源。默认使用自身代理更新, 如果开启 tun 模式或系统代理且没有可用节点的情况下, 先停止 clash-meta 服务 (按 `S`), 再更新即可。
+-   按 `U` 更新 Profile 的依赖的所有资源。默认使用自身代理更新, 如果开启 tun 模式或系统代理且没有可用节点的情况下, 先停止 mihomo 服务 (按 `S`), 再更新即可。
 -   按 `Enter` 选择该 Profile。
 -   在浏览器输入 `http://127.0.0.1:9090/ui`。
 
 如果 Windows 平台无法打开 `http://127.0.0.1:9090/ui`:
 -   在 `ClashSrvCtl` 选择 `TestClashConfig` 检测配置语法是否正确和是否自动下载了 geo 文件。
 -   按 `L` 查看日志。(`H` 打开 clashtui config dir。`G` 打开 clash config dir。查看相关的文件是否正确。)
--   可以使用 `netstat -aon | findstr "9090"` 查看端口是否存在, 如果不存在可以换一个 compatible 版本的 clash-meta。
--   如果可以打开, 但是无法访问需要代理的网站。可以允许 `clash-meta` 通过防火墙。
+-   可以使用 `netstat -aon | findstr "9090"` 查看端口是否存在, 如果不存在可以换一个 compatible 版本的 mihomo。
+-   如果可以打开, 但是无法访问需要代理的网站。可以允许 `mihomo` 通过防火墙。
 
 支持导入文件配置。`Uri` 输入是文件路径即可。
 
@@ -232,7 +233,7 @@ edit_cmd = "notepad %s"
 定义重复使用的字段:
 
 ```yaml
-# 不添加 `interval: 3600` 的原因: clash-meta 重载配置时, 如果检测到要更新配置时会更新 url, 这样会导致加载速度慢。
+# 不添加 `interval: 3600` 的原因: mihomo 重载配置时, 如果检测到要更新配置时会更新 url, 这样会导致加载速度慢。
 pp: &pp {intehealth-check: {enable: true, url: https://cp.cloudflare.com/generate_204, interval: 300}}
 delay_test: &delay_test {url: https://cp.cloudflare.com/generate_204, interval: 300}
 ```
@@ -276,7 +277,7 @@ proxy-groups:
 
 ## clashtui 的文件结构
 
--   basic_clash_config.yaml: clash-meta 配置的基本字段, 会合并到 `clash_cfg_path`。
+-   basic_clash_config.yaml: mihomo 配置的基本字段, 会合并到 `clash_cfg_path`。
 -   config.yaml: clashtui 的配置。
 
 ## 项目免责声明

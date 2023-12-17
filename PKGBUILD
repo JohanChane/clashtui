@@ -1,6 +1,6 @@
 # Maintainer: Kimiblock Moe
 pkgname=clashtui-git
-pkgdesc="Clash Meta TUI Client"
+pkgdesc="Mihomo TUI Client"
 url="https://github.com/JohanChane/clashtui"
 license=("MIT")
 arch=("any")
