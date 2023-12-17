@@ -233,9 +233,8 @@ edit_cmd = "notepad %s"
 定义重复使用的字段:
 
 ```yaml
-# 不添加 `interval: 3600` 的原因: mihomo 重载配置时, 如果检测到要更新配置时会更新 url, 这样会导致加载速度慢。
-pp: &pp {intehealth-check: {enable: true, url: https://cp.cloudflare.com/generate_204, interval: 300}}
-delay_test: &delay_test {url: https://cp.cloudflare.com/generate_204, interval: 300}
+pp: &pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
+delay_test: &delay_test {url: https://www.gstatic.com/generate_204, interval: 300}
 ```
 
 为 `template_proxy_providers` 的每个链接生成一个 proxy-provider:
