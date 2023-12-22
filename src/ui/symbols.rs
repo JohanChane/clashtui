@@ -15,7 +15,7 @@ pub struct Symbols {
 impl Default for Symbols {
     fn default() -> Self {
         let help = r#"## Profile
-                        p: Switch profile
+                        p: Switch to profile
                         enter: Select
                         u: Update proxy-providers only
                         U: Update all network resources in profile
@@ -23,11 +23,13 @@ impl Default for Symbols {
                         D: Delete
                         e: Edit
                         T: Test
+                        P: Preview
 
                         ## Tempalte
-                        t: Switch template
+                        t: Switch to template
                         enter: Create yaml
                         e: Edit
+                        P: Preview
 
                         ## ClashSrvCtl
                         enter: Action
@@ -38,7 +40,6 @@ impl Default for Symbols {
                         ## Global
                         R: Start clash service
                         S: Stop clash service
-                        P: Preview
                         H: Locate app home path
                         G: Locate clash config dir
                         L: show recent log

@@ -61,7 +61,7 @@ impl ProfileTab {
         let profiles = ClashTuiList::new(symbols.profile.clone(), Rc::clone(&theme));
         let templates = ClashTuiList::new(symbols.template.clone(), Rc::clone(&theme));
 
-        let mut obj = Self {
+        let mut instance = Self {
             title,
             is_visible: true,
             profile_list: profiles,
@@ -80,13 +80,14 @@ impl ProfileTab {
             input_uri: String::new(),
         };
 
-        obj.update_profile_list();
-        let template_names: Vec<String> = obj.clashtui_util.get_template_names().unwrap();
-        obj.template_list.set_items(template_names);
+        instance.update_profile_list();
+        instance.profile_list.select(instance.clashtui_state.borrow().get_profile());
+        let template_names: Vec<String> = instance.clashtui_util.get_template_names().unwrap();
+        instance.template_list.set_items(template_names);
 
-        obj.switch_fouce(Fouce::Profile);
+        instance.switch_fouce(Fouce::Profile);
 
-        obj
+        instance
     }
 
     pub fn popup_event(&mut self, ev: &Event) -> Result<EventState> {

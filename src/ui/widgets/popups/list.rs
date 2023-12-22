@@ -62,10 +62,6 @@ impl ClashTuiListPopup {
             return;
         }
 
-        if self.list_state.selected() == None {
-            self.list_state.select(Some(0));
-        }
-
         let items: Vec<ListItem> = self
             .items
             .iter()
@@ -159,6 +155,10 @@ impl ClashTuiListPopup {
             None => self.list_state.select(None),
         }
         self.items = items;
+
+        if self.list_state.selected() == None && self.items.len() > 0 {
+            self.list_state.select(Some(0));
+        }
     }
 
     pub fn get_items(&self) -> &Vec<String> {
