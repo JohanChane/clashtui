@@ -89,7 +89,7 @@ impl ClashTuiState {
     pub fn get_sysproxy(&self) -> bool {
         self.state.sysproxy
     }
-    pub fn set_sysproxy(&mut self, profile: bool) {
-        self.state.sysproxy = profile;
+    pub fn set_sysproxy(&mut self, sysproxy: bool) {
+        self.state.sysproxy = sysproxy;
     }
 }

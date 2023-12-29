@@ -231,7 +231,7 @@ impl App {
         Ok(event_state)
     }
 
-    // 为了需要长时间处理的操作, 先刷新一次界面再操作。
+    // For refreshing the interface before performing lengthy operation.
     pub fn handle_last_ev(&mut self, last_ev: &EventState) -> EventState {
         let ev_state = match last_ev {
             EventState::NotConsumed | EventState::WorkDone => EventState::NotConsumed,

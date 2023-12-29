@@ -89,7 +89,7 @@ impl MsgPopup {
         let paragraph = if text.len() == 1 && max_item_width < area.width as usize {
             Paragraph::new(text)
                 .wrap(Wrap { trim: true })
-                .alignment(Alignment::Center) // 会导致无法水平滚动
+                .alignment(Alignment::Center) // Will cause inability to scroll horizontally.
         } else {
             Paragraph::new(text).scroll((self.scroll_v, self.scroll_h))
         };
