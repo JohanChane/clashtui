@@ -79,8 +79,11 @@ fn run_app<B: Backend>(
     let mut last_ev = EventState::NotConsumed;
     if app.clashtui_util.err_code != 0
     {
-        app.popup_txt_msg("The config.yaml might be broken, the progrem will try to fix it".to_string());
-        app.msgpopup.show(); // I think it`s strange to manually set visible after the msg is send
+        app.popup_txt_msg(format!("The {} might be broken, the progrem will try to fix it", match app.clashtui_util.err_code {
+            1 => "basic_clash_config.yaml",
+            _ => "config.toml",
+        }).to_string()); // the output will definitelt be overwritten, but I am lazy to solve. Maybe just show "Config file broken" will be better?
+        app.msgpopup.show(); // it`s strange to manually set visible after the msg is send
         terminal.draw(|f| app.draw(f))?;
     }
     loop {
