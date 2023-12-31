@@ -15,7 +15,7 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
 };
-use toml;
+use toml::{self, Value};
 use toml::de::from_str;
 
 #[cfg(target_os = "windows")]
@@ -45,10 +45,30 @@ pub struct ClashTuiUtil {
     pub clashtui_client: reqwest::blocking::Client,
     pub default_client: reqwest::blocking::Client,
     pub clashtui_config: toml::Value,
+
+    pub err_code: i32,
+}
+trait MonkeyPatch { // to make the code more 'beautiful'
+    fn get_str(self, index:&str, code:&mut i32, level:u32) -> String;
+}
+impl MonkeyPatch for &Value {
+    fn get_str(self, index: &str, code:&mut i32 ,level:u32) -> String {
+        match self.get(index) {
+            Some(r) => {
+                r.as_str().unwrap().to_owned()
+            },
+            None => {
+                *code += 2_i32.pow(level);
+                String::new()
+            }
+        }
+    }
+    
 }
 
 impl ClashTuiUtil {
     pub fn new(clashtui_dir: &PathBuf, profile_dir: &PathBuf) -> Self {
+        let mut err_code: i32 = 0; // a trick from chmod, though simply set the flag is enough
         let basic_clash_config_path = Path::new(clashtui_dir).join("basic_clash_config.yaml");
         let basic_clash_config_value = Self::parse_yaml(basic_clash_config_path.as_path()).unwrap();
         let controller_api = if let Some(controller_api) = basic_clash_config_value
@@ -78,28 +98,43 @@ impl ClashTuiUtil {
             Ok(content) => content,
             Err(_) => String::new(),
         };
-        let clashtui_config: toml::Value = toml::from_str(&toml_content).unwrap_or_else(|e| {
-            panic!("{}", e.to_string());
-        });
-        let default_section_of_clashtui_cfg = clashtui_config.get("default").unwrap_or_else(|| {
-            panic!("No default section in clashtui config");
-        });
-        let clash_core_path_str = default_section_of_clashtui_cfg.get("clash_core_path").unwrap_or_else(|| {
-            panic!("No `clash_core_path` in default section of clashtui config");
-        }).as_str().unwrap();
-        let clash_core_path = Path::new(&clash_core_path_str).to_path_buf();
-        let clash_cfg_path_str = default_section_of_clashtui_cfg.get("clash_cfg_path").unwrap_or_else(|| {
-            panic!("No `clash_cfg_path` in default section of clashtui config");
-        }).as_str().unwrap();
-        let clash_cfg_path = Path::new(&clash_cfg_path_str).to_path_buf();
-        let clash_cfg_dir_str = default_section_of_clashtui_cfg.get("clash_cfg_dir").unwrap_or_else(|| {
-                panic!("No `clash_cfg_dir` in default section of clashtui config");
-            }).as_str().unwrap();
-        let clash_cfg_dir = Path::new(&clash_cfg_dir_str).to_path_buf();
-        let clash_srv_name = default_section_of_clashtui_cfg.get("clash_srv_name").unwrap_or_else(|| {
-                panic!("No `clash_srv_name` in default section of clashtui config");
-            }).as_str().unwrap().to_string();
 
+        let err_ret = Value::from("");
+        let clashtui_config: toml::Value = match toml::from_str(&toml_content) {
+            Ok(v) => v,
+            Err(e) => {
+                err_code += 2_i32.pow(0);
+                log::error!("[ClashTuiUtil] Unable to load config file:{}", e.to_string());
+                err_ret.clone() // to meet lifetime
+        }  
+        };
+        let default_section_of_clashtui_cfg = match clashtui_config.get("default") {
+            Some(v) => v,
+            None => {
+                err_code += 2_i32.pow(1);
+                log::error!("[ClashTuiUtil] No default section in clashtui config");
+                &err_ret
+            }
+        }; 
+        let clash_core_path;
+        let clash_cfg_path;
+        let clash_cfg_dir ;
+        let clash_srv_name;
+
+        if default_section_of_clashtui_cfg != &err_ret{ // precheck to reduce some cost
+            let clash_core_path_str = default_section_of_clashtui_cfg.get_str("clash_core_path", &mut err_code, 2 as u32);
+            clash_core_path = Path::new(&clash_core_path_str).to_path_buf();
+            let clash_cfg_path_str = default_section_of_clashtui_cfg.get_str("clash_cfg_path", &mut err_code, 3 as u32);
+            clash_cfg_path = Path::new(&clash_cfg_path_str).to_path_buf();
+            let clash_cfg_dir_str = default_section_of_clashtui_cfg.get_str("clash_cfg_dir", &mut err_code, 4 as u32);
+            clash_cfg_dir = Path::new(&clash_cfg_dir_str).to_path_buf();
+            clash_srv_name = default_section_of_clashtui_cfg.get_str("clash_srv_name", &mut err_code, 5 as u32);
+        } else {
+            clash_core_path = Path::new("").to_path_buf();
+            clash_cfg_path = Path::new("").to_path_buf();
+            clash_cfg_dir = Path::new("").to_path_buf();
+            clash_srv_name = String::new();
+        }
         let instance = Self {
             clashtui_dir: clashtui_dir.clone(),
             profile_dir: profile_dir.clone(),
@@ -112,6 +147,7 @@ impl ClashTuiUtil {
             clashtui_client,
             default_client: reqwest::blocking::Client::new(),
             clashtui_config,
+            err_code,
         };
 
         return instance;

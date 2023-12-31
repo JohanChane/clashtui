@@ -77,6 +77,12 @@ fn run_app<B: Backend>(
 ) -> Result<()> {
     let mut last_tick = Instant::now();
     let mut last_ev = EventState::NotConsumed;
+    if app.clashtui_util.err_code != 0
+    {
+        app.popup_txt_msg("The config.yaml might be broken, the progrem will try to fix it".to_string());
+        app.msgpopup.show(); // I think it`s strange to manually set visible after the msg is send
+        terminal.draw(|f| app.draw(f))?;
+    }
     loop {
         terminal.draw(|f| app.draw(f))?;
 
