@@ -23,6 +23,8 @@ use encoding::all::GBK;
 
 use crate::ui::ClashTuiOp;
 
+use super::mihomo::ClashUtil;
+
 pub type SharedClashTuiUtil = Rc<ClashTuiUtil>;
 
 #[derive(Debug, Deserialize)]
@@ -40,10 +42,7 @@ pub struct ClashTuiUtil {
     pub clash_cfg_path: PathBuf,
     pub clash_srv_name: String,
 
-    pub proxy_addr: String,
-    pub controller_api: String,
-    pub clashtui_client: reqwest::blocking::Client,
-    pub default_client: reqwest::blocking::Client,
+    pub clash_client: ClashUtil,
     pub clashtui_config: toml::Value,
 
     pub err_code: i32,
@@ -90,14 +89,7 @@ impl ClashTuiUtil {
         let proxy_addr = Self::get_proxy_addr(&basic_clash_config_value);
         log::info!("proxy_addr: {}", proxy_addr);
 
-        let proxy = reqwest::Proxy::http(&proxy_addr).unwrap();
-        let clashtui_client = reqwest::blocking::Client::builder()
-            //.user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36 uacq")
-            //.user_agent("clash-verge/v1.2.0") // url 后不加 `flag=clash` 也会返回 yaml 配置, 而不是返回 base64 编码。
-            .user_agent("clash.meta")
-            .proxy(proxy)
-            .build()
-            .unwrap();
+        let clash_client = ClashUtil::new(controller_api, proxy_addr);
 
         let config_path = clashtui_dir.join("config.toml");
         let toml_content = match fs::read_to_string(&config_path) {
@@ -148,10 +140,7 @@ impl ClashTuiUtil {
             clash_cfg_dir,
             clash_cfg_path,
             clash_srv_name,
-            proxy_addr,
-            controller_api,
-            clashtui_client,
-            default_client: reqwest::blocking::Client::new(),
+            clash_client,
             clashtui_config,
             err_code,
         };
@@ -166,11 +155,8 @@ impl ClashTuiUtil {
         })
         .to_string();
 
-        let response = self
-            .default_client
-            .put(format!("{}/configs?force=true", self.controller_api))
-            .body(body)
-            .send()?;
+        let response = self.clash_client
+          .config_reload(body)?;
         log::error!("response err: {:?}", response);
         Ok(())
     }
@@ -252,7 +238,7 @@ impl ClashTuiUtil {
             file.read_to_string(&mut file_content)?;
 
             let sub_url = file_content.trim();
-            let mut response = self.clashtui_client.get(sub_url).send()?;
+            let mut response = self.clash_client.mock_clash_core(sub_url)?;
 
             profile_yaml_path = self.get_profile_yaml_path(profile_name);
             let directory = profile_yaml_path
@@ -328,7 +314,7 @@ impl ClashTuiUtil {
     }
 
     pub fn download_file(&self, url: &String, path: &PathBuf) -> Result<()> {
-        let mut response = self.clashtui_client.get(url).send()?;
+        let mut response = self.clash_client.mock_clash_core(url)?;
 
         let directory = path.parent().ok_or_else(|| anyhow!("Invalid file path"))?;
         if !directory.exists() {
@@ -887,12 +873,11 @@ impl ClashTuiUtil {
 
     pub fn get_tun_mode(&self) -> bool {
         if let Ok(response) = self
-            .default_client
-            .get(format!("{}/configs", self.controller_api))
-            .send()
+            .clash_client
+            .config_get()
         {
             if let Ok(serde_json::Value::Object(cfg)) =
-                serde_json::from_str(response.text().unwrap().as_str())
+                serde_json::from_str(response.as_str())
             {
                 if let Some(serde_json::Value::Object(tun)) = cfg.get("tun") {
                     if let Some(serde_json::Value::Bool(enable)) = tun.get("enable") {
