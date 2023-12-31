@@ -44,6 +44,7 @@ impl ClashUtil {
             }
         }
     }
+    #[allow(unused)]
     fn put(&self, url:&str, payload:Option<&String>) -> Result<String, reqwest::Error>{
         let api = format!("{}{}", self.api, url);
         let response = match payload {
@@ -58,16 +59,19 @@ impl ClashUtil {
             }
         }
     }
-
+    
     pub fn restart(&self) -> Result<String, reqwest::Error>{
         self.post("/restart", Some(&self.default_payload))
     }
+    #[allow(unused)]
     pub fn update_geo(&self) -> Result<String, reqwest::Error>{
         self.post("/configs/geo", Some(&self.default_payload))
     }
+    #[allow(unused)]
     pub fn log(&self) -> Result<String, reqwest::Error>{
         self.get("/logs", None)
     }
+    #[allow(unused)]
     pub fn traffic(&self) -> Result<String, reqwest::Error>{
         self.get(&"/traffic", None)
     }

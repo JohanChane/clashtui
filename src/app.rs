@@ -1,31 +1,27 @@
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{Event, KeyEventKind};
 use log;
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Config, Root};
 use log4rs::encode::pattern::PatternEncoder;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::{prelude::*, widgets::*};
+use ratatui::prelude::*;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::env;
-use std::ops::{Deref, DerefMut};
-use std::process::{Command, Output};
 use std::rc::Rc;
 use std::{
-    fs::{self, read_dir, File},
-    path::{Path, PathBuf},
+    fs::{self},
+    path::PathBuf,
 };
 
 use crate::clashtui_state::{ClashTuiState, SharedClashTuiState};
 use crate::keys::{match_key, KeyList, SharedKeyList};
 use crate::msgpopup_methods;
-use crate::ui::clashsrvctl_tab::{self, ClashSrvCtlTab};
+use crate::ui::clashsrvctl_tab::ClashSrvCtlTab;
 use crate::ui::profile_tab::ProfileTab;
 use crate::ui::statusbar::ClashTuiStatusBar;
 use crate::ui::ClashTuiOp;
 use crate::ui::{
-    widgets::{helper, ClashTuiListPopup, ClashTuiTabBar, SharedTheme, Theme},
+    widgets::{helper, ClashTuiListPopup, ClashTuiTabBar, Theme},
     EventState, MsgPopup,
 };
 use crate::ui::{SharedSymbols, Symbols};

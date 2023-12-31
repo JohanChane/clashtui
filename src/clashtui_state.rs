@@ -1,9 +1,5 @@
-use crate::utils::ClashTuiUtil;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::fs::File;
-use std::io::{self, Read, Write};
 use std::rc::Rc;
 
 use crate::utils::SharedClashTuiUtil;

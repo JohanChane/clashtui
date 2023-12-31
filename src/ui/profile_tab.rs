@@ -1,22 +1,17 @@
-use anyhow::{bail, Result};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use anyhow::Result;
+use crossterm::event::{Event, KeyCode, KeyEventKind};
 use log;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::{prelude::*, widgets::*};
-use std::cell::RefCell;
+use ratatui::prelude::*;
 use std::fs;
-use std::ops::{Deref, DerefMut};
 use std::path::Path;
 use std::rc::Rc;
 use std::{
-    fs::{read_dir, remove_file, File, OpenOptions},
-    io::{self, Read, Write},
+    fs::{remove_file, OpenOptions},
+    io::Write,
 };
 
-use crate::clashtui_state::ClashTuiState;
 use crate::clashtui_state::SharedClashTuiState;
 use crate::keys::{match_key, SharedKeyList};
-use crate::ui::widgets::helper;
 use crate::ui::widgets::{ClashTuiList, SharedTheme};
 use crate::ui::EventState;
 use crate::ui::SharedSymbols;

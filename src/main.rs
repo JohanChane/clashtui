@@ -1,17 +1,14 @@
 use anyhow::Result;
 use argh::FromArgs;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use log::{info, warn};
-use log4rs;
 use ratatui::prelude::*;
 use std::{
     error::Error,
-    io, panic,
-    time::{Duration, Instant},
+    io, time::{Duration, Instant},
 };
 
 mod app;

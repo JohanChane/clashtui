@@ -1,4 +1,4 @@
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Color;
 use std::rc::Rc;
 
 pub type SharedTheme = Rc<Theme>;

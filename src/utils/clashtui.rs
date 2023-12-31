@@ -1,22 +1,19 @@
-use anyhow::{anyhow, bail, Context, Result};
-use encoding::{DecoderTrap, EncoderTrap, Encoding};
+use anyhow::{anyhow, bail, Result};
 use log;
-use reqwest;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
-use std::io::prelude::*;
 use std::process::Output;
-use std::process::{self, Command};
+use std::process::Command;
 use std::rc::Rc;
 use std::{
     self,
-    fs::{self, create_dir_all, read_dir, read_to_string, File},
+    fs::{self, create_dir_all, read_dir, File},
     io::{BufRead, BufReader},
-    io::{Read, Write},
+    io::Read,
     path::{Path, PathBuf},
 };
 use toml::{self, Value};
-use toml::de::from_str;
+
 
 #[cfg(target_os = "windows")]
 use encoding::all::GBK;
