@@ -30,6 +30,7 @@ pub struct KeyList {
     pub template_create: ClashTuiKeyEvent,
     pub clashsrvctl_select: ClashTuiKeyEvent,
     pub clashsrvctl_restart: ClashTuiKeyEvent,
+    pub clashsrvctl_restart_soft: ClashTuiKeyEvent,
     pub clashsrvctl_stop: ClashTuiKeyEvent,
 
     pub edit: ClashTuiKeyEvent,
@@ -57,6 +58,7 @@ impl Default for KeyList {
             template_create: ClashTuiKeyEvent::new(KeyCode::Enter),
             clashsrvctl_select: ClashTuiKeyEvent::new(KeyCode::Enter),
             clashsrvctl_restart: ClashTuiKeyEvent::new(KeyCode::Char('R')),
+            clashsrvctl_restart_soft: ClashTuiKeyEvent::new(KeyCode::Char('r')),
             clashsrvctl_stop: ClashTuiKeyEvent::new(KeyCode::Char('S')),
 
             edit: ClashTuiKeyEvent::new(KeyCode::Char('e')),

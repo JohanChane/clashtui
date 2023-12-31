@@ -10,7 +10,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::env;
 use std::ops::{Deref, DerefMut};
-use std::process::Command;
+use std::process::{Command, Output};
 use std::rc::Rc;
 use std::{
     fs::{self, read_dir, File},
@@ -194,6 +194,18 @@ impl App {
                     Ok(output) => {
                         let list_msg: Vec<String> =
                             output.lines().map(|line| line.trim().to_string()).collect();
+                        self.popup_list_msg(list_msg);
+                    }
+                    Err(err) => {
+                        self.popup_txt_msg(err.to_string());
+                    }
+                }
+                EventState::WorkDone
+            } else if match_key(key, &self.key_list.clashsrvctl_restart_soft) {
+                match self.clashtui_util.clash_client.restart() {
+                    Ok(output) => {
+                        let list_msg: Vec<String> =
+                            output.lines().map(|line|line.trim().to_string()).collect();
                         self.popup_list_msg(list_msg);
                     }
                     Err(err) => {
