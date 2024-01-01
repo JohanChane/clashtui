@@ -30,6 +30,8 @@ impl ClashTuiState {
 
         instance.load_status_from_file();
 
+        instance.set_tun(tun.0);
+
         #[cfg(target_os = "windows")]
         {
             let sysproxy = ClashTuiUtil::is_system_proxy_enabled().unwrap_or(false);
@@ -75,6 +77,8 @@ impl ClashTuiState {
     }
     pub fn set_profile(&mut self, profile: String) {
         self.state.profile = profile;
+        let tun = self.clashtui_util.get_tun_mode();
+        self.set_tun(tun.0);
     }
     pub fn get_tun(&self) -> bool {
         self.state.tun

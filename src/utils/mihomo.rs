@@ -1,3 +1,77 @@
+use serde_derive::{Serialize, Deserialize};
+
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+#[serde(default)]
+pub struct ClashConfig{
+    pub mixed_port:                 usize,
+    pub mode:                       Mode,
+    pub log_level:                  LogLevel,
+    pub allow_lan:                  bool,
+    bind_address:                   String,
+    pub ipv6:                       bool,
+    pub secret:                     String,
+    tcp_concurrent:                 bool,
+    pub external_controller:        String,
+    pub global_client_fingerprint:  String,
+    pub tun:                        TunStack,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum Mode {
+    #[default] Rule,
+    Global,
+    Direct,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    Silent,
+    Error,
+    Warning,
+    #[default] Info,
+    Debug,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum Tunstack {
+    #[default] Mixed,
+    #[serde(alias = "gVisor")]
+    Gvisor,
+    System,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct TunStack{
+    pub enable: bool,
+    pub stack: Tunstack,
+    dns_hijack: Vec<String>,
+    auto_route: bool,
+    auto_detect_interface: bool,
+}
+
+impl TunStack {
+    fn set(&mut self, on:bool){
+        self.enable = on;
+    }
+}
+
+impl ClashConfig {
+    pub fn from_str(s:&str) -> Self{
+        serde_json::from_str(s).unwrap()
+    }
+    pub fn set_tun(&mut self, on:bool, conf:Option<TunStack>){
+        match conf {
+            Some(v) => self.tun = v,
+            None => self.tun.set(on),
+        }
+    }
+}
 pub struct ClashUtil{
     client: reqwest::blocking::Client,
     api: String,
@@ -207,7 +281,7 @@ impl ClashUtil {
     }
 }
 
-struct ClashConfig {}
+
 
 #[test]
 fn test(){
@@ -222,14 +296,22 @@ fn test(){
 
 #[test]
 fn config(){
-    use serde_json::json;
     let mut is = true;
     let sym = ClashUtil::new("http://127.0.0.1:9090".to_string(), "http://127.0.0.1:7890".to_string());
     match sym.config_get() {
         Ok(r) => {
-            let t = json!(r);
-            println!("{:?}", t)
+            println!("{:?}", r);
+            let mut t: ClashConfig = serde_json::from_str(r.as_str()).unwrap();
+            let mut p = ClashConfig::default();
+            
+            println!("{:?}", t);
+            t.set_tun(false, None);
+            println!("{:?}", p);
         },
-        Err(_) => is = false       
+        Err(e) => {
+            println!("{:?}", e);
+            is = false
+        }       
     }
+    assert!(is)
 }
