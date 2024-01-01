@@ -25,7 +25,7 @@ impl ClashUtil {
         match response {
             Ok(r) => r.text(),
             Err(e) => {
-                log::error!("[ClashUtil] exec {} failed! {}", url, e.status().unwrap());
+                log::error!("[ClashUtil] {} exec {} failed! {}", "get", url, e.status().unwrap());
                 Err(e)
             }
         }
@@ -39,12 +39,12 @@ impl ClashUtil {
         match response {
             Ok(r) => r.text(),
             Err(e) => {
-                log::error!("[ClashUtil] exec {} failed! {}", url, e.status().unwrap());
+                log::error!("[ClashUtil] {} exec {} failed! {}", "post", url, e.status().unwrap());
                 Err(e)
             }
         }
     }
-    #[allow(unused)]
+    
     fn put(&self, url:&str, payload:Option<&String>) -> Result<String, reqwest::Error>{
         let api = format!("{}{}", self.api, url);
         let response = match payload {
@@ -54,18 +54,28 @@ impl ClashUtil {
         match response {
             Ok(r) => r.text(),
             Err(e) => {
-                log::error!("[ClashUtil] exec {} failed! {}", url, e.status().unwrap());
+                log::error!("[ClashUtil] {} exec {} failed! {}", "put", url, e.status().unwrap());
                 Err(e)
             }
         }
     }
     
-    pub fn restart(&self) -> Result<String, reqwest::Error>{
-        self.post("/restart", Some(&self.default_payload))
+    pub fn restart(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
+        match payload {
+            Some(load) => self.post("/restart", Some(load)),
+            None => self.post("/restart", Some(&self.default_payload))            
+        }
     }
     #[allow(unused)]
-    pub fn update_geo(&self) -> Result<String, reqwest::Error>{
-        self.post("/configs/geo", Some(&self.default_payload))
+    pub fn flush_fakeip(&self) -> Result<String, reqwest::Error>{
+        self.post("/cache/fakeip/flush", None)
+    }
+    #[allow(unused)]
+    pub fn update_geo(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
+        match payload {
+            Some(load) => self.post("/configs/geo", Some(load)),
+            None => self.post("/configs/geo", Some(&self.default_payload))            
+        }
     }
     #[allow(unused)]
     pub fn log(&self) -> Result<String, reqwest::Error>{
@@ -75,15 +85,113 @@ impl ClashUtil {
     pub fn traffic(&self) -> Result<String, reqwest::Error>{
         self.get(&"/traffic", None)
     }
-    pub fn config_reload(&self, payload:String) -> Result<reqwest::blocking::Response, reqwest::Error>{
-        let request = self.client
-          .put(format!("{}/configs?force=true", self.api))
-          .body(payload)
-          .send();
-    request
+    #[allow(unused)]
+    pub fn memory(&self) -> Result<String, reqwest::Error>{
+        self.get(&"/memory", None)
+    }
+    #[allow(unused)]
+    pub fn version(&self) -> Result<String, reqwest::Error>{
+        self.get(&"/version", None)
+    }
+    pub fn config_reload(&self, payload:String) -> Result<String, reqwest::Error>{
+        self.put("/configs?force=true", Some(&payload))
     }
     pub fn config_get(&self) -> Result<String, reqwest::Error>{
         self.get(&"/configs", None)
+    }
+    #[allow(unused)]
+    pub fn config_patch(&self, payload:String) -> Result<String, reqwest::Error>{
+        match self.client.patch("/configs").body(payload).send() {
+            Ok(r) => r.text(),
+            Err(e) => {
+                log::error!("[ClashUtil] {} exec {} failed! {}", "patch", "/configs", e.status().unwrap());
+                Err(e)
+            }
+        }
+    }
+    #[allow(unused)]
+    pub fn upgrade(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
+        match payload {
+            Some(load) => self.post("/upgrade", Some(load)),
+            None => self.post("/upgrade", Some(&self.default_payload))            
+        }
+    }
+    #[allow(unused)]
+    pub fn upgrade_ui(&self) -> Result<String, reqwest::Error>{
+        self.post("/upgrade/ui", None)
+    }
+    #[allow(unused)]
+    pub fn proxies(&self, name:Option<&String>, test_delay: bool) -> Result<String, reqwest::Error>{
+        let api = match name {
+            Some(v) => if test_delay {
+                format!("/proxies/{}/delay", v)
+            } else {
+                format!("/proxies/{}", v)
+            },
+            None => "/proxies/".to_string()
+        };
+        self.get(&api, None)
+    }
+    #[allow(unused)]
+    pub fn set_proxy(&self, name:&String) -> Result<String, reqwest::Error> {
+        self.put(&format!("/proxies/{}", name), None)
+    }
+    #[allow(unused)]
+    pub fn rules(&self) -> Result<String, reqwest::Error>{
+        self.get("/rules", None)
+    }
+    #[allow(unused)]
+    pub fn connection(&self, is_close: bool, id:Option<usize>) -> Result<String, reqwest::Error>{
+        if !is_close {
+            self.get("/connections", None)
+        } else {
+            match
+                match id {
+                    Some(v) => self.client.delete(format!("/connections/{}", v)).send(),
+                    None => self.client.delete("/connections").send(),
+                }
+                {
+                Ok(r) => r.text(),
+                Err(e) => {
+                    log::error!("[ClashUtil] {} exec {} failed! {}", "patch", "/configs", e.status().unwrap());
+                    Err(e)
+                }
+            }
+        }
+    }
+    #[allow(unused)]
+    pub fn provider(&self, is_rule: bool, name:Option<&String>, is_update: bool, is_check: bool) -> Result<String, reqwest::Error>{
+        //
+        if !is_rule{
+            let api = "/providers/proxies";
+            match name {
+                Some(v) => {
+                    if is_update{
+                        self.put(&format!("{}/{}", api, v), None)
+                    } else {
+                        if is_check{
+                            self.get(&format!("{}/{}/healthcheck", api, v), None)
+                        } else {
+                            self.get(&format!("{}/{}", api, v), None)
+                        }
+                    }
+                },
+                None => self.get(api, None),
+            }
+        } else {
+            let api = "/providers/rules";
+            match name {
+                Some(v) => self.put(&format!("{}/{}", api, v), None),
+                None => self.get(api, None)
+            }
+        }
+    }
+    #[allow(unused)]
+    pub fn dns_resolve(&self, name:&String, _type:Option<&String>) -> Result<String, reqwest::Error>{
+        match _type {
+            Some(v) => self.get(&format!("/dns/query?name={}&type={}", name, v), None),
+            None => self.get(&format!("/dns/query?name={}", name), None),
+        }
     }
     pub fn mock_clash_core(&self, url:&str) -> Result<reqwest::blocking::Response, reqwest::Error>{
         let proxy = reqwest::Proxy::http(&self.proxy_addr).unwrap();
@@ -99,17 +207,29 @@ impl ClashUtil {
     }
 }
 
+struct ClashConfig {}
+
 #[test]
 fn test(){
     let mut is = true;
     let sym = ClashUtil::new("http://127.0.0.1:9090".to_string(), "http://127.0.0.1:7890".to_string());
-    match sym.config_get() {
-        Ok(r) => println!("{:?}", r),
-        Err(_) => is = false       
-    }
-    match sym.restart() {
+    match sym.proxies(Some(&"DIRECT".to_string()), false) {
         Ok(r) => println!("{:?}", r),
         Err(_) => is = false       
     }
     assert!(is)
+}
+
+#[test]
+fn config(){
+    use serde_json::json;
+    let mut is = true;
+    let sym = ClashUtil::new("http://127.0.0.1:9090".to_string(), "http://127.0.0.1:7890".to_string());
+    match sym.config_get() {
+        Ok(r) => {
+            let t = json!(r);
+            println!("{:?}", t)
+        },
+        Err(_) => is = false       
+    }
 }

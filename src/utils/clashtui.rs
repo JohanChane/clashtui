@@ -39,7 +39,7 @@ pub struct ClashTuiUtil {
     pub clash_cfg_path: PathBuf,
     pub clash_srv_name: String,
 
-    pub clash_client: ClashUtil,
+    pub clash_api: ClashUtil,
     pub clashtui_config: toml::Value,
 
     pub err_code: i32,
@@ -137,7 +137,7 @@ impl ClashTuiUtil {
             clash_cfg_dir,
             clash_cfg_path,
             clash_srv_name,
-            clash_client,
+            clash_api: clash_client,
             clashtui_config,
             err_code,
         };
@@ -152,7 +152,7 @@ impl ClashTuiUtil {
         })
         .to_string();
 
-        let response = self.clash_client
+        let response = self.clash_api
           .config_reload(body)?;
         log::error!("response err: {:?}", response);
         Ok(())
@@ -235,7 +235,7 @@ impl ClashTuiUtil {
             file.read_to_string(&mut file_content)?;
 
             let sub_url = file_content.trim();
-            let mut response = self.clash_client.mock_clash_core(sub_url)?;
+            let mut response = self.clash_api.mock_clash_core(sub_url)?;
 
             profile_yaml_path = self.get_profile_yaml_path(profile_name);
             let directory = profile_yaml_path
@@ -311,7 +311,7 @@ impl ClashTuiUtil {
     }
 
     pub fn download_file(&self, url: &String, path: &PathBuf) -> Result<()> {
-        let mut response = self.clash_client.mock_clash_core(url)?;
+        let mut response = self.clash_api.mock_clash_core(url)?;
 
         let directory = path.parent().ok_or_else(|| anyhow!("Invalid file path"))?;
         if !directory.exists() {
@@ -870,7 +870,7 @@ impl ClashTuiUtil {
 
     pub fn get_tun_mode(&self) -> bool {
         if let Ok(response) = self
-            .clash_client
+            .clash_api
             .config_get()
         {
             if let Ok(serde_json::Value::Object(cfg)) =

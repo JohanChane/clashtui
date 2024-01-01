@@ -198,7 +198,7 @@ impl App {
                 }
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.clashsrvctl_restart_soft) {
-                match self.clashtui_util.clash_client.restart() {
+                match self.clashtui_util.clash_api.restart(None) {
                     Ok(output) => {
                         let list_msg: Vec<String> =
                             output.lines().map(|line|line.trim().to_string()).collect();
