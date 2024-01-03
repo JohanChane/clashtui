@@ -59,7 +59,7 @@ impl Default for KeyList {
             clashsrvctl_select: ClashTuiKeyEvent::new(KeyCode::Enter),
             clashsrvctl_start: ClashTuiKeyEvent::new(KeyCode::Char('S')),
             clashsrvctl_restart: ClashTuiKeyEvent::new(KeyCode::Char('R')),
-            clashsrvctl_stop: ClashTuiKeyEvent::new(KeyCode::Char('S')),
+            clashsrvctl_stop: ClashTuiKeyEvent::new(KeyCode::Char('T')),
 
             edit: ClashTuiKeyEvent::new(KeyCode::Char('e')),
             preview: ClashTuiKeyEvent::new(KeyCode::Char('P')),
