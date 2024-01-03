@@ -364,7 +364,7 @@ impl App {
     pub fn first_run(clashtui_cfg_dir: &PathBuf, symbols: &SharedSymbols) -> Result<()> {
         fs::create_dir_all(clashtui_cfg_dir.join("profiles"))?;
         fs::create_dir_all(clashtui_cfg_dir.join("templates"))?;
-        fs::File::create(clashtui_cfg_dir.join("templates/template_proxy_providers"));
+        fs::File::create(clashtui_cfg_dir.join("templates/template_proxy_providers"))?;
         fs::write(clashtui_cfg_dir.join("config.toml"), &symbols.default_clash_cfg_content)?;
         fs::write(clashtui_cfg_dir.join("basic_clash_config.yaml"), &symbols.default_basic_clash_cfg_content)?;
 

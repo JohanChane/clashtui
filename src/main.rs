@@ -8,8 +8,10 @@ use crossterm::{
 use ratatui::prelude::*;
 use std::{
     error::Error,
-    io, time::{Duration, Instant},
+    io,
+    time::{Duration, Instant},
 };
+use utils::ClashTuiConfigError;
 
 mod app;
 mod clashtui_state;
@@ -74,13 +76,28 @@ fn run_app<B: Backend>(
 ) -> Result<()> {
     let mut last_tick = Instant::now();
     let mut last_ev = EventState::NotConsumed;
-    if app.clashtui_util.err_code != 0
-    {
-        app.popup_txt_msg(format!("The {} might be broken, the progrem will try to fix it", match app.clashtui_util.err_code {
-            1 => "basic_clash_config.yaml",
-            _ => "config.toml",
-        }).to_string()); // the output will definitelt be overwritten, but I am lazy to solve. Maybe just show "Config file broken" will be better?
-        terminal.draw(|f| app.draw(f))?;
+    let mut showstr = String::new();
+    let mut err_tarck = app.clashtui_util.get_err_track();
+    loop {
+        if !err_tarck.is_empty() {
+            log::error!("count");
+            let err: Option<ClashTuiConfigError> = err_tarck.pop();
+            showstr += format!(
+                "The {} might be broken, the progrem will try to fix it\n",
+                match err {
+                    Some(v) => match v {
+                        ClashTuiConfigError::LoadAppConfig => "config.toml",
+                        ClashTuiConfigError::LoadProfileConfig => "basic_clash_config.yaml",
+                    },
+                    None => panic!("Should not reached arm!!"),
+                }
+            ).as_str();
+        } else {
+            app.popup_txt_msg(showstr);
+            terminal.draw(|f| app.draw(f))?;
+            drop(err_tarck);
+            break;
+        }
     }
     loop {
         terminal.draw(|f| app.draw(f))?;

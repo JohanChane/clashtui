@@ -1,4 +1,4 @@
 mod clashtui;
 mod mihomo;
 
-pub use self::clashtui::{ClashTuiUtil, SharedClashTuiUtil};
+pub use self::clashtui::{ClashTuiUtil, SharedClashTuiUtil, ClashTuiConfigError};

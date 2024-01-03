@@ -1,19 +1,19 @@
 use anyhow::{anyhow, bail, Result};
 use log;
 use serde_derive::Deserialize;
+use std::borrow::BorrowMut;
 use std::collections::HashMap;
-use std::process::Output;
 use std::process::Command;
+use std::process::Output;
 use std::rc::Rc;
 use std::{
     self,
     fs::{self, create_dir_all, read_dir, File},
-    io::{BufRead, BufReader},
     io::Read,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
 };
 use toml::{self, Value};
-
 
 #[cfg(target_os = "windows")]
 use encoding::all::GBK;
@@ -44,7 +44,13 @@ pub struct ClashTuiUtil {
     pub clashtui_config: toml::Value,
     pub clash_remote_config: ClashConfig,
 
-    pub err_code: i32,
+    pub err_track: Vec<ClashTuiConfigError>,
+}
+
+#[derive(PartialEq, Clone)]
+pub enum ClashTuiConfigError {
+    LoadAppConfig,
+    LoadProfileConfig,
 }
 
 impl ClashTuiUtil {
@@ -57,11 +63,10 @@ impl ClashTuiUtil {
         let controller_api = ret.4;
         let proxy_addr = ret.5;
         let clashtui_config = ret.6;
-        let err_code =ret.7;
         let clash_client = ClashUtil::new(controller_api, proxy_addr);
         let cur_remote = clash_client.config_get().unwrap();
         let remote = ClashConfig::from_str(cur_remote.as_str());
-    Self {
+        Self {
             clashtui_dir: clashtui_dir.clone(),
             profile_dir: profile_dir.clone(),
             clash_core_path,
@@ -71,8 +76,12 @@ impl ClashTuiUtil {
             clash_api: clash_client,
             clashtui_config,
             clash_remote_config: remote,
-            err_code,
+            err_track: ret.7,
         }
+    }
+
+    pub fn get_err_track(&self) -> Vec<ClashTuiConfigError> {
+        return self.err_track.clone();
     }
 
     pub fn update_remote(&mut self) -> Result<()> {
@@ -89,8 +98,7 @@ impl ClashTuiUtil {
         })
         .to_string();
 
-        let response = self.clash_api
-          .config_reload(body)?;
+        let response = self.clash_api.config_reload(body)?;
         log::error!("response err: {:?}", response);
         Ok(())
     }
@@ -126,7 +134,11 @@ impl ClashTuiUtil {
 
         let profile_yaml_path = self.get_profile_yaml_path(profile_name);
         let profile_parsed_yaml = parse_yaml(&profile_yaml_path).or_else(|e| {
-            bail!("Maybe need to update first. Failed to parse {}: {}", profile_yaml_path.to_str().unwrap(), e.to_string());
+            bail!(
+                "Maybe need to update first. Failed to parse {}: {}",
+                profile_yaml_path.to_str().unwrap(),
+                e.to_string()
+            );
         })?;
 
         if let serde_yaml::Value::Mapping(dst_mapping) = &mut dst_parsed_yaml {
@@ -184,7 +196,10 @@ impl ClashTuiUtil {
             let mut output_file = File::create(&profile_yaml_path)?;
             response.copy_to(&mut output_file)?;
 
-            net_res.push((sub_url.to_string(), profile_yaml_path.to_string_lossy().to_string()))
+            net_res.push((
+                sub_url.to_string(),
+                profile_yaml_path.to_string_lossy().to_string(),
+            ))
         }
 
         // ## 更新 yaml 的网络资源
@@ -476,7 +491,7 @@ impl ClashTuiUtil {
                 );
             }
         }
-        
+
         log::error!("testssdfs");
         let out_yaml_path = self.profile_dir.join(template_name);
         let out_yaml_file = File::create(out_yaml_path).unwrap();
@@ -600,15 +615,13 @@ impl ClashTuiUtil {
                     .output()?
             }
 
-            ClashTuiOp::UnInstallSrv => {
-                Self::execute_powershell_script_as_admin(
-                    &format!(
-                        "{0} stop {1}; {0} remove {1}",
-                        nssm_path_str, self.clash_srv_name
-                    ),
-                    true,
-                )?
-            }
+            ClashTuiOp::UnInstallSrv => Self::execute_powershell_script_as_admin(
+                &format!(
+                    "{0} stop {1}; {0} remove {1}",
+                    nssm_path_str, self.clash_srv_name
+                ),
+                true,
+            )?,
 
             ClashTuiOp::EnableLoopback => {
                 let exe_dir = std::env::current_exe()
@@ -806,8 +819,10 @@ impl ClashTuiUtil {
     }
 
     pub fn get_tun_mode(&self) -> (bool, super::mihomo::Tunstack) {
-        (self.clash_remote_config.tun.enable, 
-            self.clash_remote_config.tun.stack.clone())
+        (
+            self.clash_remote_config.tun.enable,
+            self.clash_remote_config.tun.stack.clone(),
+        )
     }
 
     // 目前是根据文件后缀来判断, 而不是文件内容。这样可以减少 io。
@@ -846,7 +861,8 @@ impl ClashTuiUtil {
     }
     pub fn edit_file(&self, path: &PathBuf) -> Result<String> {
         if let Some(edit_cmd) = self
-            .get_clashtui_config().get("default")
+            .get_clashtui_config()
+            .get("default")
             .and_then(|default| default.get("edit_cmd"))
             .and_then(|edit_cmd| edit_cmd.as_str())
         {
@@ -883,7 +899,8 @@ impl ClashTuiUtil {
     }
     pub fn open_dir(&self, path: &Path) -> Result<String> {
         if let Some(opendir_cmd) = self
-            .get_clashtui_config().get("default")
+            .get_clashtui_config()
+            .get("default")
             .and_then(|default| default.get("opendir_cmd"))
             .and_then(|opendir_cmd| opendir_cmd.as_str())
         {
@@ -934,23 +951,31 @@ impl ClashTuiUtil {
     }
 }
 
-
-trait MonkeyPatch { // to make the code more 'beautiful'
-    fn get_str(self, index:&str, code:&mut i32, level:u32) -> String;
+trait MonkeyPatchVec {
+    // to make the code more 'beautiful'
+    fn push_if_not_exist(&mut self, value: ClashTuiConfigError);
 }
-impl MonkeyPatch for &Value {
-    fn get_str(self, index: &str, code:&mut i32 ,level:u32) -> String {
+impl MonkeyPatchVec for Vec<ClashTuiConfigError> {
+    fn push_if_not_exist(&mut self, value: ClashTuiConfigError) {
+        if !self.contains(&value) {
+            self.push(value)
+        };
+    }
+}
+trait MonkeyPatchValue {
+    // to make the code more 'beautiful'
+    fn get_str(self, index: &str, err_collect: &mut Vec<ClashTuiConfigError>) -> String;
+}
+impl MonkeyPatchValue for &Value {
+    fn get_str(self, index: &str, err_collect: &mut Vec<ClashTuiConfigError>) -> String {
         match self.get(index) {
-            Some(r) => {
-                r.as_str().unwrap().to_owned()
-            },
+            Some(r) => r.as_str().unwrap().to_owned(),
             None => {
-                *code += 2_i32.pow(level);
+                err_collect.push_if_not_exist(ClashTuiConfigError::LoadAppConfig);
                 String::new()
             }
         }
     }
-    
 }
 
 fn get_proxy_addr(yaml_data: &serde_yaml::Value) -> String {
@@ -977,18 +1002,28 @@ fn parse_yaml(yaml_path: &Path) -> Result<serde_yaml::Value> {
     Ok(parsed_yaml_content)
 }
 
-
-fn load_app_config(clashtui_dir: &PathBuf) -> (
-    PathBuf, PathBuf, PathBuf, String, String, String, Value, i32){
-    let mut err_code: i32 = 0; // a trick from chmod, though simply set the flag is enough
+fn load_app_config(
+    clashtui_dir: &PathBuf,
+) -> (
+    PathBuf,
+    PathBuf,
+    PathBuf,
+    String,
+    String,
+    String,
+    Value,
+    Vec<ClashTuiConfigError>,
+) {
+    let mut err_collect = Vec::new();
     let basic_clash_config_path = Path::new(clashtui_dir).join("basic_clash_config.yaml");
-    let basic_clash_config_value: serde_yaml::Value = match parse_yaml(basic_clash_config_path.as_path()) {
-        Ok(r) => r,
-        Err(_) => {
-            err_code += 1;
-            serde_yaml::Value::from("") 
-        }
-    };
+    let basic_clash_config_value: serde_yaml::Value =
+        match parse_yaml(basic_clash_config_path.as_path()) {
+            Ok(r) => r,
+            Err(_) => {
+                err_collect.push_if_not_exist(ClashTuiConfigError::LoadProfileConfig);
+                serde_yaml::Value::from("")
+            }
+        };
     let controller_api = if let Some(controller_api) = basic_clash_config_value
         .get("external-controller")
         .and_then(|v| v.as_str())
@@ -1012,44 +1047,54 @@ fn load_app_config(clashtui_dir: &PathBuf) -> (
     let clashtui_config: toml::Value = match toml::from_str(&toml_content) {
         Ok(v) => v,
         Err(e) => {
-            err_code += 2_i32.pow(1);
-            log::error!("[ClashTuiUtil] Unable to load config file:{}", e.to_string());
+            err_collect.push_if_not_exist(ClashTuiConfigError::LoadAppConfig);
+            log::error!(
+                "[ClashTuiUtil] Unable to load config file:{}",
+                e.to_string()
+            );
             err_ret.clone() // to meet lifetime
-    }  
+        }
     };
     let default_section_of_clashtui_cfg = match clashtui_config.get("default") {
         Some(v) => v,
         None => {
-            err_code += 2_i32.pow(2);
+            err_collect.push_if_not_exist(ClashTuiConfigError::LoadAppConfig);
             log::error!("[ClashTuiUtil] No default section in clashtui config");
             &err_ret
         }
-    }; 
+    };
     let clash_core_path;
     let clash_cfg_path;
-    let clash_cfg_dir ;
+    let clash_cfg_dir;
     let clash_srv_name;
 
-    if default_section_of_clashtui_cfg != &err_ret{ // precheck to reduce some cost
-        let clash_core_path_str = default_section_of_clashtui_cfg.get_str("clash_core_path", &mut err_code, 3 as u32);
+    if default_section_of_clashtui_cfg != &err_ret {
+        // precheck to reduce some cost
+        let clash_core_path_str =
+            default_section_of_clashtui_cfg.get_str("clash_core_path", err_collect.borrow_mut());
         clash_core_path = Path::new(&clash_core_path_str).to_path_buf();
-        let clash_cfg_path_str = default_section_of_clashtui_cfg.get_str("clash_cfg_path", &mut err_code, 3 as u32);
+        let clash_cfg_path_str =
+            default_section_of_clashtui_cfg.get_str("clash_cfg_path", err_collect.borrow_mut());
         clash_cfg_path = Path::new(&clash_cfg_path_str).to_path_buf();
-        let clash_cfg_dir_str = default_section_of_clashtui_cfg.get_str("clash_cfg_dir", &mut err_code, 3 as u32);
+        let clash_cfg_dir_str =
+            default_section_of_clashtui_cfg.get_str("clash_cfg_dir", err_collect.borrow_mut());
         clash_cfg_dir = Path::new(&clash_cfg_dir_str).to_path_buf();
-        clash_srv_name = default_section_of_clashtui_cfg.get_str("clash_srv_name", &mut err_code, 3 as u32);
+        clash_srv_name =
+            default_section_of_clashtui_cfg.get_str("clash_srv_name", err_collect.borrow_mut());
     } else {
         clash_core_path = Path::new("").to_path_buf();
         clash_cfg_path = Path::new("").to_path_buf();
         clash_cfg_dir = Path::new("").to_path_buf();
         clash_srv_name = String::new();
     }
-    (clash_core_path,
-    clash_cfg_dir,
-    clash_cfg_path,
-    clash_srv_name,
-    controller_api,
-    proxy_addr,
-    clashtui_config,
-    err_code)
+    (
+        clash_core_path,
+        clash_cfg_dir,
+        clash_cfg_path,
+        clash_srv_name,
+        controller_api,
+        proxy_addr,
+        clashtui_config,
+        err_collect,
+    )
 }
