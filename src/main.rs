@@ -93,6 +93,7 @@ fn run_app<B: Backend>(
                 }
             ).as_str();
         } else {
+            if showstr.is_empty() {break;}
             app.popup_txt_msg(showstr);
             terminal.draw(|f| app.draw(f))?;
             drop(err_tarck);

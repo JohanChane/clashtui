@@ -41,9 +41,12 @@ pub enum LogLevel {
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Tunstack {
-    #[default] Mixed,
+    #[default]
+    #[serde(alias = "Mixed")]
+    Mixed,
     #[serde(alias = "gVisor")]
     Gvisor,
+    #[serde(alias = "System")]
     System,
 }
 
