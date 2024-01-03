@@ -80,7 +80,6 @@ fn run_app<B: Backend>(
             1 => "basic_clash_config.yaml",
             _ => "config.toml",
         }).to_string()); // the output will definitelt be overwritten, but I am lazy to solve. Maybe just show "Config file broken" will be better?
-        app.msgpopup.show(); // it`s strange to manually set visible after the msg is send
         terminal.draw(|f| app.draw(f))?;
     }
     loop {
