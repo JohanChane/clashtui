@@ -66,7 +66,7 @@ macro_rules! define_clashtui_operations {
 
 #[cfg(target_os = "linux")]
 define_clashtui_operations!(
-    RestartClash,
+    StartClash,
     StopClash,
     TestClashConfig,
     EnableTun,
@@ -75,7 +75,7 @@ define_clashtui_operations!(
 
 #[cfg(target_os = "windows")]
 define_clashtui_operations!(
-    RestartClash,
+    StartClash,
     StopClash,
     TestClashConfig,
     EnableTun,

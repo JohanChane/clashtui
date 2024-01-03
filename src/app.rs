@@ -185,8 +185,8 @@ impl App {
                 let log = self.clashtui_util.fetch_recent_logs(20);
                 self.popup_list_msg(log);
                 EventState::WorkDone
-            } else if match_key(key, &self.key_list.clashsrvctl_restart) {
-                match self.clashtui_util.clash_srv_ctl(ClashTuiOp::RestartClash) {
+            } else if match_key(key, &self.key_list.clashsrvctl_start) {
+                match self.clashtui_util.clash_srv_ctl(ClashTuiOp::StartClash) {
                     Ok(output) => {
                         let list_msg: Vec<String> =
                             output.lines().map(|line| line.trim().to_string()).collect();
@@ -197,7 +197,7 @@ impl App {
                     }
                 }
                 EventState::WorkDone
-            } else if match_key(key, &self.key_list.clashsrvctl_restart_soft) {
+            } else if match_key(key, &self.key_list.clashsrvctl_restart) {
                 match self.clashtui_util.clash_api.restart(None) {
                     Ok(output) => {
                         let list_msg: Vec<String> =

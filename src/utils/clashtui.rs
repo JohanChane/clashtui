@@ -518,7 +518,7 @@ impl ClashTuiUtil {
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ClashTuiOp) -> Result<String> {
         match op {
-            ClashTuiOp::RestartClash => {
+            ClashTuiOp::StartClash => {
                 let output = Command::new("systemctl")
                     .arg("restart")
                     .arg(self.clash_srv_name.as_str())
@@ -551,7 +551,7 @@ impl ClashTuiUtil {
         let nssm_path_str = "nssm";
 
         let output = match op {
-            ClashTuiOp::RestartClash => {
+            ClashTuiOp::StartClash => {
                 Self::start_process_as_admin(
                     nssm_path_str,
                     format!("restart {}", self.clash_srv_name).as_str(),
