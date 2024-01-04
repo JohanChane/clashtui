@@ -1,6 +1,6 @@
-use anyhow::{bail, Result};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use ratatui::style::{Color, Modifier, Style};
+use anyhow::Result;
+use crossterm::event::{Event, KeyCode, KeyEventKind};
+use ratatui::style::{Modifier, Style};
 use ratatui::{prelude::*, widgets::*};
 use std::cmp::{max, min};
 

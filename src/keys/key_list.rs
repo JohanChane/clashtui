@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use std::rc::Rc;
 
 pub struct ClashTuiKeyEvent {
@@ -29,6 +29,7 @@ pub struct KeyList {
     pub template_switch: ClashTuiKeyEvent,
     pub template_create: ClashTuiKeyEvent,
     pub clashsrvctl_select: ClashTuiKeyEvent,
+    pub clashsrvctl_start: ClashTuiKeyEvent,
     pub clashsrvctl_restart: ClashTuiKeyEvent,
     pub clashsrvctl_stop: ClashTuiKeyEvent,
 
@@ -56,8 +57,9 @@ impl Default for KeyList {
             template_switch: ClashTuiKeyEvent::new(KeyCode::Char('t')),
             template_create: ClashTuiKeyEvent::new(KeyCode::Enter),
             clashsrvctl_select: ClashTuiKeyEvent::new(KeyCode::Enter),
+            clashsrvctl_start: ClashTuiKeyEvent::new(KeyCode::Char('S')),
             clashsrvctl_restart: ClashTuiKeyEvent::new(KeyCode::Char('R')),
-            clashsrvctl_stop: ClashTuiKeyEvent::new(KeyCode::Char('S')),
+            clashsrvctl_stop: ClashTuiKeyEvent::new(KeyCode::Char('T')),
 
             edit: ClashTuiKeyEvent::new(KeyCode::Char('e')),
             preview: ClashTuiKeyEvent::new(KeyCode::Char('P')),

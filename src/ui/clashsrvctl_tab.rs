@@ -1,8 +1,6 @@
-use anyhow::{anyhow, bail, Result};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::{prelude::*, widgets::*};
-use std::rc::Rc;
+use anyhow::Result;
+use crossterm::event::{Event, KeyEventKind};
+use ratatui::prelude::*;
 
 use crate::clashtui_state::SharedClashTuiState;
 use crate::keys::{match_key, SharedKeyList};
@@ -10,7 +8,6 @@ use crate::ui::widgets::SharedTheme;
 use crate::ui::ClashTuiOp;
 use crate::ui::SharedSymbols;
 use crate::ui::{widgets::ClashTuiList, EventState, MsgPopup};
-use crate::utils::ClashTuiUtil;
 use crate::utils::SharedClashTuiUtil;
 use crate::{msgpopup_methods, title_methods, visible_methods};
 

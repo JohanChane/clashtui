@@ -1,15 +1,14 @@
-use anyhow::{bail, Result};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use anyhow::Result;
+use crossterm::event::{Event, KeyEventKind};
 use ratatui::prelude::Backend;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Style;
 use ratatui::{
     prelude::{Frame, Rect, Span},
-    widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
-use crate::clashtui_state::{ClashTuiState, SharedClashTuiState};
+use crate::clashtui_state::SharedClashTuiState;
 use crate::ui::{widgets::SharedTheme, EventState};
-use crate::utils::ClashTuiUtil;
 use crate::visible_methods;
 
 struct Status {

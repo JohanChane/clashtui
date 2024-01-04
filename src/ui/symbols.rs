@@ -38,8 +38,9 @@ impl Default for Symbols {
                         j/k/h/l OR Up/Down/Left/Right: Scroll
 
                         ## Global
-                        R: Start clash service
-                        S: Stop clash service
+                        S: Start clash service
+                        R: Restart clash core
+                        T: sTop clash service
                         H: Locate app home path
                         G: Locate clash config dir
                         L: show recent log

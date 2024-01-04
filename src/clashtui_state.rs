@@ -1,9 +1,5 @@
-use crate::utils::ClashTuiUtil;
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
 use std::fs::File;
-use std::io::{self, Read, Write};
 use std::rc::Rc;
 
 use crate::utils::SharedClashTuiUtil;
@@ -33,6 +29,8 @@ impl ClashTuiState {
         instance.state.tun = true; // tun default init value is true
 
         instance.load_status_from_file();
+
+        instance.set_tun(tun.0);
 
         #[cfg(target_os = "windows")]
         {
@@ -79,6 +77,8 @@ impl ClashTuiState {
     }
     pub fn set_profile(&mut self, profile: String) {
         self.state.profile = profile;
+        let tun = self.clashtui_util.get_tun_mode();
+        self.set_tun(tun.0);
     }
     pub fn get_tun(&self) -> bool {
         self.state.tun

@@ -1,18 +1,17 @@
 use anyhow::Result;
 use argh::FromArgs;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use log::{info, warn};
-use log4rs;
 use ratatui::prelude::*;
 use std::{
     error::Error,
-    io, panic,
+    io,
     time::{Duration, Instant},
 };
+use utils::ClashTuiConfigError;
 
 mod app;
 mod clashtui_state;
@@ -77,6 +76,30 @@ fn run_app<B: Backend>(
 ) -> Result<()> {
     let mut last_tick = Instant::now();
     let mut last_ev = EventState::NotConsumed;
+    let mut showstr = String::new();
+    let mut err_tarck = app.clashtui_util.get_err_track();
+    loop {
+        if !err_tarck.is_empty() {
+            log::error!("count");
+            let err: Option<ClashTuiConfigError> = err_tarck.pop();
+            showstr += format!(
+                "The {} might be broken, the progrem will try to fix it\n",
+                match err {
+                    Some(v) => match v {
+                        ClashTuiConfigError::LoadAppConfig => "config.toml",
+                        ClashTuiConfigError::LoadProfileConfig => "basic_clash_config.yaml",
+                    },
+                    None => panic!("Should not reached arm!!"),
+                }
+            ).as_str();
+        } else {
+            if showstr.is_empty() {break;}
+            app.popup_txt_msg(showstr);
+            terminal.draw(|f| app.draw(f))?;
+            drop(err_tarck);
+            break;
+        }
+    }
     loop {
         terminal.draw(|f| app.draw(f))?;
 

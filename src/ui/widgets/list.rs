@@ -1,9 +1,9 @@
-use anyhow::{bail, Result};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use anyhow::Result;
+use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::{prelude::*, widgets::*};
 
-use super::{helper, SharedTheme};
+use super::SharedTheme;
 use crate::ui::EventState;
 use crate::{fouce_methods, visible_methods};
 

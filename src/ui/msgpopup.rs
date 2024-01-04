@@ -1,16 +1,14 @@
-use anyhow::{bail, Result};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use ratatui::style::{Color, Modifier, Style};
+use anyhow::Result;
+use crossterm::event::{Event, KeyCode, KeyEventKind};
+use ratatui::style::{Color, Style};
 use ratatui::{
     prelude::*,
-    widgets::{Block, BorderType, Borders, Clear, Padding, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 use std::cmp::{max, min};
-use std::rc::Rc;
 
 use super::widgets::helper;
 use super::EventState;
-use crate::visible_methods;
 
 pub struct MsgPopup {
     title: String,

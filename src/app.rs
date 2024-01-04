@@ -1,31 +1,27 @@
 use anyhow::Result;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{Event, KeyEventKind};
 use log;
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Config, Root};
 use log4rs::encode::pattern::PatternEncoder;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::{prelude::*, widgets::*};
+use ratatui::prelude::*;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::env;
-use std::ops::{Deref, DerefMut};
-use std::process::Command;
 use std::rc::Rc;
 use std::{
-    fs::{self, read_dir, File},
-    path::{Path, PathBuf},
+    fs::{self},
+    path::PathBuf,
 };
 
 use crate::clashtui_state::{ClashTuiState, SharedClashTuiState};
 use crate::keys::{match_key, KeyList, SharedKeyList};
 use crate::msgpopup_methods;
-use crate::ui::clashsrvctl_tab::{self, ClashSrvCtlTab};
+use crate::ui::clashsrvctl_tab::ClashSrvCtlTab;
 use crate::ui::profile_tab::ProfileTab;
 use crate::ui::statusbar::ClashTuiStatusBar;
 use crate::ui::ClashTuiOp;
 use crate::ui::{
-    widgets::{helper, ClashTuiListPopup, ClashTuiTabBar, SharedTheme, Theme},
+    widgets::{helper, ClashTuiListPopup, ClashTuiTabBar, Theme},
     EventState, MsgPopup,
 };
 use crate::ui::{SharedSymbols, Symbols};
@@ -75,7 +71,7 @@ impl App {
             PathBuf::from(&clashtui_config_dir_str)
         };
 
-        if !clashtui_config_dir.join("basic_clash_config.yaml").exists() {
+        if !clashtui_config_dir.exists(){ //.join("basic_clash_config.yaml").exists() { // weird, shouldn`t we check the dir rather the single file?
             if let Err(err) = fs::create_dir_all(&clashtui_config_dir) {
                 log::error!("{}", err.to_string());
             }
@@ -189,11 +185,23 @@ impl App {
                 let log = self.clashtui_util.fetch_recent_logs(20);
                 self.popup_list_msg(log);
                 EventState::WorkDone
-            } else if match_key(key, &self.key_list.clashsrvctl_restart) {
-                match self.clashtui_util.clash_srv_ctl(ClashTuiOp::RestartClash) {
+            } else if match_key(key, &self.key_list.clashsrvctl_start) {
+                match self.clashtui_util.clash_srv_ctl(ClashTuiOp::StartClash) {
                     Ok(output) => {
                         let list_msg: Vec<String> =
                             output.lines().map(|line| line.trim().to_string()).collect();
+                        self.popup_list_msg(list_msg);
+                    }
+                    Err(err) => {
+                        self.popup_txt_msg(err.to_string());
+                    }
+                }
+                EventState::WorkDone
+            } else if match_key(key, &self.key_list.clashsrvctl_restart) {
+                match self.clashtui_util.clash_api.restart(None) {
+                    Ok(output) => {
+                        let list_msg: Vec<String> =
+                            output.lines().map(|line|line.trim().to_string()).collect();
                         self.popup_list_msg(list_msg);
                     }
                     Err(err) => {
@@ -356,7 +364,7 @@ impl App {
     pub fn first_run(clashtui_cfg_dir: &PathBuf, symbols: &SharedSymbols) -> Result<()> {
         fs::create_dir_all(clashtui_cfg_dir.join("profiles"))?;
         fs::create_dir_all(clashtui_cfg_dir.join("templates"))?;
-        fs::File::create(clashtui_cfg_dir.join("templates/template_proxy_providers"));
+        fs::File::create(clashtui_cfg_dir.join("templates/template_proxy_providers"))?;
         fs::write(clashtui_cfg_dir.join("config.toml"), &symbols.default_clash_cfg_content)?;
         fs::write(clashtui_cfg_dir.join("basic_clash_config.yaml"), &symbols.default_basic_clash_cfg_content)?;
 
