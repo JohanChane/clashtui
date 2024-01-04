@@ -7,7 +7,7 @@ use crate::utils::SharedClashTuiUtil;
 #[derive(Serialize, Deserialize, Default)]
 struct State {
     pub profile: String,
-    pub tun: bool,
+    pub tun: String,
     pub sysproxy: bool,
 }
 
@@ -20,17 +20,15 @@ pub struct ClashTuiState {
 
 impl ClashTuiState {
     pub fn new(clashtui_util: SharedClashTuiUtil) -> Self {
-        let tun = clashtui_util.get_tun_mode();
-
         let mut instance = Self {
             state: State::default(),
             clashtui_util,
         };
-        instance.state.tun = true; // tun default init value is true
+        instance.state.tun = "Unknown".to_string(); // tun default init value is Unknown
 
         instance.load_status_from_file();
 
-        instance.set_tun(tun.0);
+        instance.set_tun(instance.clashtui_util.get_tun_mode());
 
         #[cfg(target_os = "windows")]
         {
@@ -77,13 +75,15 @@ impl ClashTuiState {
     }
     pub fn set_profile(&mut self, profile: String) {
         self.state.profile = profile;
-        let tun = self.clashtui_util.get_tun_mode();
-        self.set_tun(tun.0);
+        self.update_tun();
     }
-    pub fn get_tun(&self) -> bool {
-        self.state.tun
+    fn update_tun(&mut self){
+        self.state.tun = self.clashtui_util.get_tun_mode();
     }
-    pub fn set_tun(&mut self, tun: bool) {
+    pub fn get_tun(&self) -> String {
+        self.state.tun.clone()
+    }
+    pub fn set_tun(&mut self, tun: String) {
         self.state.tun = tun;
     }
     #[cfg(target_os = "windows")]

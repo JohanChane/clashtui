@@ -38,8 +38,6 @@ impl ClashSrvCtlTab {
         let mut operations = ClashTuiList::new(symbols.clashsrvctl.clone(), theme);
         operations.set_items(vec![
             ClashTuiOp::TestClashConfig.into(),
-            ClashTuiOp::EnableTun.into(),
-            ClashTuiOp::DisableTun.into(),
             #[cfg(target_os = "windows")]
             ClashTuiOp::EnableSysProxy.into(),
             #[cfg(target_os = "windows")]
@@ -89,14 +87,6 @@ impl ClashSrvCtlTab {
                 let op_str = self.srvctl_list.selected().unwrap();
                 let op: ClashTuiOp = ClashTuiOp::from(op_str.as_ref());
                 match op {
-                    ClashTuiOp::EnableTun => {
-                        self.popup_txt_msg("EnableTun...".to_string());
-                        EventState::EnableTun
-                    }
-                    ClashTuiOp::DisableTun => {
-                        self.popup_txt_msg("DisableTun...".to_string());
-                        EventState::DisableTun
-                    }
                     #[cfg(target_os = "windows")]
                     ClashTuiOp::EnableSysProxy => {
                         self.popup_txt_msg("EnableSysProxy...".to_string());

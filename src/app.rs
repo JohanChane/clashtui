@@ -5,6 +5,7 @@ use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Config, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use ratatui::prelude::*;
+use core::panic;
 use std::cell::RefCell;
 use std::env;
 use std::rc::Rc;
@@ -260,25 +261,6 @@ impl App {
             EventState::ProfileDelete => {
                 self.profile_tab.hide_msgpopup();
                 self.profile_tab.handle_delete_profile_ev();
-                EventState::WorkDone
-            }
-            EventState::EnableTun | EventState::DisableTun => {
-                self.clashsrvctl_tab.hide_msgpopup();
-                let res = {
-                    let mut clashtui_state = self.clashtui_state.borrow_mut();
-                    let tun = if last_ev == &EventState::EnableTun {
-                        true
-                    } else {
-                        false
-                    };
-                    clashtui_state.set_tun(tun);
-                    let profile = clashtui_state.get_profile();
-                    self.clashtui_util.select_profile(profile, tun)
-                };
-                res.unwrap_or_else(|e| {
-                    self.popup_txt_msg(e.to_string());
-                });
-                self.clashtui_state.borrow().save_status_to_file();
                 EventState::WorkDone
             }
             #[cfg(target_os = "windows")]

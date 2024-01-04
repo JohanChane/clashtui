@@ -23,9 +23,9 @@ pub enum EventState {
     ProfileUpdateAll,
     ProfileSelect,
     ProfileDelete,
-    EnableTun,
-    DisableTun,
+    #[cfg(target_os = "windows")]
     EnableSysProxy,
+    #[cfg(target_os = "windows")]
     DisableSysProxy,
 }
 
@@ -68,9 +68,7 @@ macro_rules! define_clashtui_operations {
 define_clashtui_operations!(
     StartClash,
     StopClash,
-    TestClashConfig,
-    EnableTun,
-    DisableTun
+    TestClashConfig
 );
 
 #[cfg(target_os = "windows")]
@@ -78,8 +76,6 @@ define_clashtui_operations!(
     StartClash,
     StopClash,
     TestClashConfig,
-    EnableTun,
-    DisableTun,
     EnableSysProxy,
     DisableSysProxy,
     EnableLoopback,

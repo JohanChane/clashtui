@@ -301,8 +301,7 @@ impl ProfileTab {
 
     pub fn handle_select_profile_ev(&mut self) {
         if let Some(profile_name) = self.profile_list.selected() {
-            let tun = self.clashtui_state.borrow().get_tun();
-            if let Err(err) = self.clashtui_util.select_profile(profile_name, tun) {
+            if let Err(err) = self.clashtui_util.select_profile(profile_name) {
                 self.popup_txt_msg(err.to_string());
             } else {
                 self.clashtui_state
@@ -324,7 +323,7 @@ impl ProfileTab {
                     if profile_name == self.clashtui_state.borrow().get_profile() {
                         if let Err(err) = self
                             .clashtui_util
-                            .select_profile(profile_name, self.clashtui_state.borrow().get_tun())
+                            .select_profile(profile_name)
                         {
                             msg.push(err.to_string());
                         } else {
