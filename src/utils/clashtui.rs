@@ -64,7 +64,7 @@ impl ClashTuiUtil {
         let proxy_addr = ret.5;
         let clashtui_config = ret.6;
         let clash_client = ClashUtil::new(controller_api, proxy_addr);
-        let cur_remote = clash_client.config_get().unwrap();
+        let cur_remote = match clash_client.config_get(){Ok(v)=>v,Err(_)=>String::new()};
         let remote = ClashConfig::from_str(cur_remote.as_str());
         Self {
             clashtui_dir: clashtui_dir.clone(),

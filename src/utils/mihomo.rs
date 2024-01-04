@@ -68,6 +68,9 @@ impl TunStack {
 
 impl ClashConfig {
     pub fn from_str(s:&str) -> Self{
+        if s.is_empty() {
+            return ClashConfig::default();
+        }
         serde_json::from_str(s).unwrap()
     }
     pub fn set_tun(&mut self, on:bool, conf:Option<TunStack>){
@@ -106,7 +109,11 @@ impl ClashUtil {
         match response {
             Ok(r) => r.text(),
             Err(e) => {
-                log::error!("[ClashUtil] {} exec {} failed! {}", "get", url, e.status().unwrap());
+                if e.is_body() {
+                    log::warn!("[ClashUtil] {} exec {} failed! Is your api and proxy properly set?", "put", url)
+                } else {
+                    log::error!("[ClashUtil] {} exec {} failed! {}", "put", url, e);
+                }
                 Err(e)
             }
         }
@@ -120,7 +127,7 @@ impl ClashUtil {
         match response {
             Ok(r) => r.text(),
             Err(e) => {
-                log::error!("[ClashUtil] {} exec {} failed! {}", "post", url, e.status().unwrap());
+                log::error!("[ClashUtil] {} exec {} failed! {}", "post", url, e);
                 Err(e)
             }
         }
@@ -135,7 +142,7 @@ impl ClashUtil {
         match response {
             Ok(r) => r.text(),
             Err(e) => {
-                log::error!("[ClashUtil] {} exec {} failed! {}", "put", url, e.status().unwrap());
+                log::error!("[ClashUtil] {} exec {} failed! {}", "post", url, e);
                 Err(e)
             }
         }
@@ -326,4 +333,11 @@ fn config(){
         }       
     }
     assert!(is)
+}
+
+#[test]
+fn test_connection(){
+    let c = ClashUtil::new("http://127.0.0.1:9090".to_string(), "http://127.0.0.1:7890".into());
+    let res = c.get("", None);
+    println!("{:?}", res);
 }
