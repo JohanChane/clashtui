@@ -83,7 +83,7 @@ fn run_app<B: Backend>(
             log::error!("count");
             let err: Option<ClashTuiConfigError> = err_tarck.pop();
             showstr += format!(
-                "The {} might be broken, the progrem will try to fix it\n",
+                "The {} might be broken, please refer to the logs for specific errors.\n",
                 match err {
                     Some(v) => match v {
                         ClashTuiConfigError::LoadAppConfig => "config.toml",
@@ -91,9 +91,12 @@ fn run_app<B: Backend>(
                     },
                     None => panic!("Should not reached arm!!"),
                 }
-            ).as_str();
+            )
+            .as_str();
         } else {
-            if showstr.is_empty() {break;}
+            if showstr.is_empty() {
+                break;
+            }
             app.popup_txt_msg(showstr);
             terminal.draw(|f| app.draw(f))?;
             drop(err_tarck);

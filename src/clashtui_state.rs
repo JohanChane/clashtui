@@ -8,8 +8,8 @@ use crate::utils::SharedClashTuiUtil;
 #[derive(Serialize, Deserialize, Default)]
 struct State {
     pub profile: String,
-    pub tun: bool,              // user's choice. indicates whether to enable the 'tun' mode.
-    pub sysproxy: bool,         // user's choice. indicates whether to enable system proxy.
+    pub tun: bool,      // user's choice. indicates whether to enable the 'tun' mode.
+    pub sysproxy: bool, // user's choice. indicates whether to enable system proxy.
 }
 
 pub type SharedClashTuiState = Rc<std::cell::RefCell<ClashTuiState>>;
@@ -52,7 +52,11 @@ impl ClashTuiState {
     }
 
     pub fn load_status_from_file(&mut self) {
-        let path = self.clashtui_util.borrow().clashtui_dir.join("clashtui_status.yaml");
+        let path = self
+            .clashtui_util
+            .borrow()
+            .clashtui_dir
+            .join("clashtui_status.yaml");
 
         if let Ok(file) = File::open(&path) {
             match serde_yaml::from_reader::<_, State>(file) {
@@ -67,7 +71,11 @@ impl ClashTuiState {
     }
 
     pub fn save_status_to_file(&self) {
-        let path = self.clashtui_util.borrow().clashtui_dir.join("clashtui_status.yaml");
+        let path = self
+            .clashtui_util
+            .borrow()
+            .clashtui_dir
+            .join("clashtui_status.yaml");
 
         if let Ok(status_file) = File::create(&path) {
             serde_yaml::to_writer(status_file, &self.state).unwrap();

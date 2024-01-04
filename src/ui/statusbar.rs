@@ -25,7 +25,6 @@ pub struct ClashTuiStatusBar {
 
 impl ClashTuiStatusBar {
     pub fn new(clashtui_state: SharedClashTuiState, theme: SharedTheme) -> Self {
-        
         let instance = Self {
             title: "StatusBar".to_string(),
             is_visible: true,
@@ -60,9 +59,9 @@ impl ClashTuiStatusBar {
         }
 
         f.render_widget(Clear, area);
-        
+
         let status_str = if cfg!(target_os = "windows") {
-             format!(
+            format!(
                 "Profile: {}    Tun: {}    SysProxy: {}    Help: ?",
                 self.clashtui_state.borrow().get_profile(),
                 self.clashtui_state.borrow().get_tun(),
@@ -75,7 +74,6 @@ impl ClashTuiStatusBar {
                 self.clashtui_state.borrow().get_tun(),
             )
         };
-        
 
         let paragraph = Paragraph::new(Span::styled(
             status_str,

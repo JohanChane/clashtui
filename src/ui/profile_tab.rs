@@ -76,8 +76,14 @@ impl ProfileTab {
         };
 
         instance.update_profile_list();
-        instance.profile_list.select(instance.clashtui_state.borrow().get_profile());
-        let template_names: Vec<String> = instance.clashtui_util.borrow().get_template_names().unwrap();
+        instance
+            .profile_list
+            .select(instance.clashtui_state.borrow().get_profile());
+        let template_names: Vec<String> = instance
+            .clashtui_util
+            .borrow()
+            .get_template_names()
+            .unwrap();
         instance.template_list.set_items(template_names);
 
         instance.switch_fouce(Fouce::Profile);
@@ -153,7 +159,9 @@ impl ProfileTab {
                         EventState::WorkDone
                     } else if match_key(key, &self.key_list.edit) {
                         if let Some(profile_name) = self.profile_list.selected() {
-                            let res = self.clashtui_util.borrow().edit_file(&self.clashtui_util.borrow().profile_dir.join(profile_name));
+                            let res = self.clashtui_util.borrow().edit_file(
+                                &self.clashtui_util.borrow().profile_dir.join(profile_name),
+                            );
                             if let Err(err) = res {
                                 log::error!("{}", err);
                                 self.popup_txt_msg(err.to_string());
@@ -162,14 +170,17 @@ impl ProfileTab {
                         EventState::WorkDone
                     } else if match_key(key, &self.key_list.preview) {
                         if let Some(profile_name) = self.profile_list.selected() {
-                            let profile_path = self.clashtui_util.borrow().profile_dir.join(profile_name);
+                            let profile_path =
+                                self.clashtui_util.borrow().profile_dir.join(profile_name);
                             let file_content = std::fs::read_to_string(&profile_path).unwrap();
                             let mut lines: Vec<String> =
                                 file_content.lines().map(|s| s.to_string()).collect();
 
                             if !self.clashtui_util.borrow().is_profile_yaml(profile_name) {
-                                let yaml_path =
-                                    self.clashtui_util.borrow().get_profile_yaml_path(profile_name);
+                                let yaml_path = self
+                                    .clashtui_util
+                                    .borrow()
+                                    .get_profile_yaml_path(profile_name);
                                 if yaml_path.is_file() {
                                     let yaml_content = std::fs::read_to_string(&yaml_path).unwrap();
                                     let yaml_lines: Vec<String> =
@@ -189,8 +200,14 @@ impl ProfileTab {
                         EventState::WorkDone
                     } else if match_key(key, &self.key_list.profile_test_config) {
                         if let Some(profile_name) = self.profile_list.selected() {
-                            let path = self.clashtui_util.borrow().get_profile_yaml_path(profile_name);
-                            let res = self.clashtui_util.borrow().test_profile_config(&path, false);
+                            let path = self
+                                .clashtui_util
+                                .borrow()
+                                .get_profile_yaml_path(profile_name);
+                            let res = self
+                                .clashtui_util
+                                .borrow()
+                                .test_profile_config(&path, false);
                             match res {
                                 Ok(output) => {
                                     let list_msg: Vec<String> = output
@@ -217,7 +234,8 @@ impl ProfileTab {
                     } else if match_key(key, &self.key_list.preview) {
                         if let Some(name) = self.template_list.selected() {
                             let path = self
-                                .clashtui_util.borrow()
+                                .clashtui_util
+                                .borrow()
                                 .clashtui_dir
                                 .join(format!("templates/{}", name));
                             let content = std::fs::read_to_string(&path).unwrap();
@@ -230,7 +248,8 @@ impl ProfileTab {
                     } else if match_key(key, &self.key_list.edit) {
                         if let Some(name) = self.template_list.selected() {
                             let tpl_file_path = self
-                                .clashtui_util.borrow()
+                                .clashtui_util
+                                .borrow()
                                 .clashtui_dir
                                 .join(format!("templates/{}", name));
 
@@ -302,7 +321,10 @@ impl ProfileTab {
     pub fn handle_select_profile_ev(&mut self) {
         if let Some(profile_name) = self.profile_list.selected() {
             let tun = self.clashtui_state.borrow().get_tun();
-            let res = self.clashtui_util.borrow_mut().select_profile(profile_name, tun);
+            let res = self
+                .clashtui_util
+                .borrow_mut()
+                .select_profile(profile_name, tun);
             if let Err(err) = res {
                 self.popup_txt_msg(err.to_string());
             } else {
@@ -311,23 +333,24 @@ impl ProfileTab {
                     .set_profile(profile_name.to_string());
                 self.clashtui_state.borrow().save_status_to_file();
 
-                self.clashtui_util.borrow_mut().update_remote();
+                let _ = self.clashtui_util.borrow_mut().update_remote();
             }
         }
     }
     pub fn handle_update_profile_ev(&mut self, does_update_all: bool) {
         if let Some(profile_name) = self.profile_list.selected() {
             let res = self
-                .clashtui_util.borrow()
+                .clashtui_util
+                .borrow()
                 .update_profile(profile_name, does_update_all);
-            match res
-            {
-                Ok(res) => {
-                    let mut msg = ClashTuiUtil::concat_update_profile_result(res);
+            match res {
+                Ok(r) => {
+                    let mut msg = ClashTuiUtil::concat_update_profile_result(r);
 
                     if profile_name == self.clashtui_state.borrow().get_profile() {
                         if let Err(err) = self
-                            .clashtui_util.borrow()
+                            .clashtui_util
+                            .borrow()
                             .select_profile(profile_name, self.clashtui_state.borrow().get_tun())
                         {
                             msg.push(err.to_string());
@@ -398,7 +421,8 @@ impl ProfileTab {
                 Path::new(uri),
                 Path::new(
                     &self
-                        .clashtui_util.borrow()
+                        .clashtui_util
+                        .borrow()
                         .profile_dir
                         .join(Path::new(profile_name).with_extension("yaml")),
                 ),
@@ -411,7 +435,10 @@ impl ProfileTab {
 
     pub fn handle_create_template_ev(&mut self) {
         if let Some(template_name) = self.template_list.selected() {
-            let res = self.clashtui_util.borrow().create_yaml_with_template(template_name);
+            let res = self
+                .clashtui_util
+                .borrow()
+                .create_yaml_with_template(template_name);
             if let Err(err) = res {
                 self.popup_txt_msg(err.to_string());
             } else {

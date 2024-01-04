@@ -65,12 +65,8 @@ impl ClashTuiUtil {
         let clash_client = ClashUtil::new(controller_api, proxy_addr);
         let cur_remote = clash_client.config_get();
         let remote = match cur_remote {
-            Ok(r) => {
-                Some(ClashConfig::from_str(r.as_str()))
-            }
-            Err(_) => {
-                None
-            }
+            Ok(r) => Some(ClashConfig::from_str(r.as_str())),
+            Err(_) => None,
         };
         Self {
             clashtui_dir: clashtui_dir.clone(),
@@ -1009,8 +1005,7 @@ fn parse_yaml(yaml_path: &Path) -> Result<serde_yaml::Value> {
     let mut file = File::open(yaml_path)?;
     let mut yaml_content = String::new();
     file.read_to_string(&mut yaml_content)?;
-    let parsed_yaml_content: serde_yaml::Value =
-        serde_yaml::from_str(yaml_content.as_str()).unwrap();
+    let parsed_yaml_content: serde_yaml::Value = serde_yaml::from_str(&yaml_content)?;
     Ok(parsed_yaml_content)
 }
 

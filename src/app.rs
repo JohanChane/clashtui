@@ -72,7 +72,10 @@ impl App {
         };
 
         // Check if clashtui_config_dir does not exist or if clashtui_config_dir is an empty 'data' directory.
-        if !clashtui_config_dir.exists() || (clashtui_config_dir.file_name() == Some("data".as_ref()) && fs::read_dir(&clashtui_config_dir).unwrap().next().is_none()) {
+        if !clashtui_config_dir.exists()
+            || (clashtui_config_dir.file_name() == Some("data".as_ref())
+                && fs::read_dir(&clashtui_config_dir).unwrap().next().is_none())
+        {
             if let Err(err) = fs::create_dir_all(&clashtui_config_dir) {
                 log::error!("{}", err.to_string());
             }
@@ -175,11 +178,13 @@ impl App {
                 self.help_popup.show();
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.app_home_open) {
-                self.clashtui_util.borrow()
+                self.clashtui_util
+                    .borrow()
                     .open_dir(self.clashtui_util.borrow().clashtui_dir.as_path())?;
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.clash_cfg_dir_open) {
-                self.clashtui_util.borrow()
+                self.clashtui_util
+                    .borrow()
                     .open_dir(self.clashtui_util.borrow().clash_cfg_dir.as_path())?;
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.log_cat) {
@@ -187,7 +192,10 @@ impl App {
                 self.popup_list_msg(log);
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.clashsrvctl_restart) {
-                let res = self.clashtui_util.borrow().clash_srv_ctl(ClashTuiOp::StartClash);
+                let res = self
+                    .clashtui_util
+                    .borrow()
+                    .clash_srv_ctl(ClashTuiOp::StartClash);
                 match res {
                     Ok(output) => {
                         let list_msg: Vec<String> =
@@ -204,7 +212,7 @@ impl App {
                 match res {
                     Ok(output) => {
                         let list_msg: Vec<String> =
-                            output.lines().map(|line|line.trim().to_string()).collect();
+                            output.lines().map(|line| line.trim().to_string()).collect();
                         self.popup_list_msg(list_msg);
                     }
                     Err(err) => {
@@ -213,7 +221,10 @@ impl App {
                 }
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.clashsrvctl_stop) {
-                let res = self.clashtui_util.borrow().clash_srv_ctl(ClashTuiOp::StopClash);
+                let res = self
+                    .clashtui_util
+                    .borrow()
+                    .clash_srv_ctl(ClashTuiOp::StopClash);
                 match res {
                     Ok(output) => {
                         let list_msg: Vec<String> =
@@ -296,9 +307,7 @@ impl App {
             EventState::DisableSysProxy => {
                 self.clashsrvctl_tab.hide_msgpopup();
                 ClashTuiUtil::disable_system_proxy();
-                self.clashtui_state
-                    .borrow_mut()
-                    .set_sysproxy(false);
+                self.clashtui_state.borrow_mut().set_sysproxy(false);
                 EventState::WorkDone
             }
             _ => EventState::NotConsumed,
@@ -369,8 +378,14 @@ impl App {
         fs::create_dir_all(clashtui_cfg_dir.join("profiles"))?;
         fs::create_dir_all(clashtui_cfg_dir.join("templates"))?;
         fs::File::create(clashtui_cfg_dir.join("templates/template_proxy_providers"))?;
-        fs::write(clashtui_cfg_dir.join("config.toml"), &symbols.default_clash_cfg_content)?;
-        fs::write(clashtui_cfg_dir.join("basic_clash_config.yaml"), &symbols.default_basic_clash_cfg_content)?;
+        fs::write(
+            clashtui_cfg_dir.join("config.toml"),
+            &symbols.default_clash_cfg_content,
+        )?;
+        fs::write(
+            clashtui_cfg_dir.join("basic_clash_config.yaml"),
+            &symbols.default_basic_clash_cfg_content,
+        )?;
 
         Ok(())
     }

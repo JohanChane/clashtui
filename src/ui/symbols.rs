@@ -53,11 +53,13 @@ impl Default for Symbols {
 clash_core_path = ""
 clash_cfg_dir = ""
 clash_cfg_path = ""
-clash_srv_name = "mihomo""#.to_string();
+clash_srv_name = "mihomo""#
+            .to_string();
         let default_basic_clash_cfg_content = r#"mixed-port: 7890
 mode: rule
 log-level: info
-external-controller: 127.0.0.1:9090"#.to_string();
+external-controller: 127.0.0.1:9090"#
+            .to_string();
         Self {
             profile: "Profile".to_string(),
             template: "Template".to_string(),
