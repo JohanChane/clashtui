@@ -11,11 +11,10 @@ use std::{
     io,
     time::{Duration, Instant},
 };
-use utils::ClashTuiConfigError;
+use utils::ClashTuiConfigLoadError;
 
 mod app;
 mod clashtui_state;
-mod keys;
 mod ui;
 mod utils;
 
@@ -81,13 +80,13 @@ fn run_app<B: Backend>(
     loop {
         if !err_tarck.is_empty() {
             log::error!("count");
-            let err: Option<ClashTuiConfigError> = err_tarck.pop();
+            let err: Option<ClashTuiConfigLoadError> = err_tarck.pop();
             showstr += format!(
                 "The {} might be broken, the progrem will try to fix it\n",
                 match err {
                     Some(v) => match v {
-                        ClashTuiConfigError::LoadAppConfig => "config.toml",
-                        ClashTuiConfigError::LoadProfileConfig => "basic_clash_config.yaml",
+                        ClashTuiConfigLoadError::LoadAppConfig => "config.toml",
+                        ClashTuiConfigLoadError::LoadProfileConfig => "basic_clash_config.yaml",
                     },
                     None => panic!("Should not reached arm!!"),
                 }

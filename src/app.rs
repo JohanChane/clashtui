@@ -14,7 +14,7 @@ use std::{
 };
 
 use crate::clashtui_state::{ClashTuiState, SharedClashTuiState};
-use crate::keys::{match_key, KeyList, SharedKeyList};
+use crate::ui::keys::{match_key, KeyList, SharedKeyList};
 use crate::msgpopup_methods;
 use crate::ui::clashsrvctl_tab::ClashSrvCtlTab;
 use crate::ui::profile_tab::ProfileTab;

@@ -3,11 +3,11 @@ use crossterm::event::{Event, KeyEventKind};
 use ratatui::prelude::*;
 
 use crate::clashtui_state::SharedClashTuiState;
-use crate::keys::{match_key, SharedKeyList};
-use crate::ui::widgets::SharedTheme;
-use crate::ui::ClashTuiOp;
-use crate::ui::SharedSymbols;
-use crate::ui::{widgets::ClashTuiList, EventState, MsgPopup};
+use super::keys::{match_key, SharedKeyList};
+use super::widgets::SharedTheme;
+use super::ClashTuiOp;
+use super::SharedSymbols;
+use super::{widgets::ClashTuiList, EventState, MsgPopup};
 use crate::utils::SharedClashTuiUtil;
 use crate::{msgpopup_methods, title_methods, visible_methods};
 

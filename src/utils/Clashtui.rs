@@ -1,6 +1,5 @@
 use anyhow::{anyhow, bail, Result};
 use log;
-use serde_derive::Deserialize;
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::process::Command;
@@ -20,16 +19,11 @@ use encoding::all::GBK;
 
 use crate::ui::ClashTuiOp;
 
-use super::mihomo::ClashConfig;
-use super::mihomo::ClashUtil;
+use super::Configs::{ClashConfig, ClashTuiConfigLoadError};
+use super::Clash::ClashUtil;
 
 pub type SharedClashTuiUtil = Rc<ClashTuiUtil>;
 
-#[derive(Debug, Deserialize)]
-pub struct ClashTuiConfig {
-    #[serde(rename = "edit_cmd")]
-    edit_command: String,
-}
 
 pub struct ClashTuiUtil {
     pub clashtui_dir: PathBuf,
@@ -44,14 +38,9 @@ pub struct ClashTuiUtil {
     pub clashtui_config: toml::Value,
     pub clash_remote_config: ClashConfig,
 
-    pub err_track: Vec<ClashTuiConfigError>,
+    pub err_track: Vec<ClashTuiConfigLoadError>,
 }
 
-#[derive(PartialEq, Clone)]
-pub enum ClashTuiConfigError {
-    LoadAppConfig,
-    LoadProfileConfig,
-}
 
 impl ClashTuiUtil {
     pub fn new(clashtui_dir: &PathBuf, profile_dir: &PathBuf) -> Self {
@@ -80,7 +69,7 @@ impl ClashTuiUtil {
         }
     }
 
-    pub fn get_err_track(&self) -> Vec<ClashTuiConfigError> {
+    pub fn get_err_track(&self) -> Vec<ClashTuiConfigLoadError> {
         return self.err_track.clone();
     }
 
@@ -103,8 +92,8 @@ impl ClashTuiUtil {
         Ok(())
     }
 
-    pub fn select_profile(&self, profile_name: &String, tun: bool) -> Result<()> {
-        self.merge_profile(profile_name, tun).or_else(|err| {
+    pub fn select_profile(&self, profile_name: &String) -> Result<()> {
+        self.merge_profile(profile_name).or_else(|err| {
             log::error!(
                 "Failed to Merge Profile `{}`: {}",
                 profile_name,
@@ -122,16 +111,9 @@ impl ClashTuiUtil {
         })
     }
 
-    pub fn merge_profile(&self, profile_name: &String, tun: bool) -> Result<()> {
+    pub fn merge_profile(&self, profile_name: &String) -> Result<()> {
         let basic_clash_cfg_path = self.clashtui_dir.join("basic_clash_config.yaml");
         let mut dst_parsed_yaml = parse_yaml(&basic_clash_cfg_path)?;
-
-        if !tun {
-            if let serde_yaml::Value::Mapping(ref mut map) = dst_parsed_yaml {
-                map.remove(&serde_yaml::Value::String("tun".to_string()));
-            }
-        }
-
         let profile_yaml_path = self.get_profile_yaml_path(profile_name);
         let profile_parsed_yaml = parse_yaml(&profile_yaml_path).or_else(|e| {
             bail!(
@@ -818,11 +800,13 @@ impl ClashTuiUtil {
         Ok(result_str)
     }
 
-    pub fn get_tun_mode(&self) -> (bool, super::mihomo::Tunstack) {
-        (
-            self.clash_remote_config.tun.enable,
-            self.clash_remote_config.tun.stack.clone(),
-        )
+    pub fn get_tun_mode(&self) -> String {
+        if self.clash_remote_config.tun.enable {
+            self.clash_remote_config.tun.stack.to_string()
+        } else {
+            "False".to_string()
+        }
+        
     }
 
     // 目前是根据文件后缀来判断, 而不是文件内容。这样可以减少 io。
@@ -953,10 +937,10 @@ impl ClashTuiUtil {
 
 trait MonkeyPatchVec {
     // to make the code more 'beautiful'
-    fn push_if_not_exist(&mut self, value: ClashTuiConfigError);
+    fn push_if_not_exist(&mut self, value: ClashTuiConfigLoadError);
 }
-impl MonkeyPatchVec for Vec<ClashTuiConfigError> {
-    fn push_if_not_exist(&mut self, value: ClashTuiConfigError) {
+impl MonkeyPatchVec for Vec<ClashTuiConfigLoadError> {
+    fn push_if_not_exist(&mut self, value: ClashTuiConfigLoadError) {
         if !self.contains(&value) {
             self.push(value)
         };
@@ -964,14 +948,14 @@ impl MonkeyPatchVec for Vec<ClashTuiConfigError> {
 }
 trait MonkeyPatchValue {
     // to make the code more 'beautiful'
-    fn get_str(self, index: &str, err_collect: &mut Vec<ClashTuiConfigError>) -> String;
+    fn get_str(self, index: &str, err_collect: &mut Vec<ClashTuiConfigLoadError>) -> String;
 }
 impl MonkeyPatchValue for &Value {
-    fn get_str(self, index: &str, err_collect: &mut Vec<ClashTuiConfigError>) -> String {
+    fn get_str(self, index: &str, err_collect: &mut Vec<ClashTuiConfigLoadError>) -> String {
         match self.get(index) {
             Some(r) => r.as_str().unwrap().to_owned(),
             None => {
-                err_collect.push_if_not_exist(ClashTuiConfigError::LoadAppConfig);
+                err_collect.push_if_not_exist(ClashTuiConfigLoadError::LoadAppConfig);
                 String::new()
             }
         }
@@ -1012,7 +996,7 @@ fn load_app_config(
     String,
     String,
     Value,
-    Vec<ClashTuiConfigError>,
+    Vec<ClashTuiConfigLoadError>,
 ) {
     let mut err_collect = Vec::new();
     let basic_clash_config_path = Path::new(clashtui_dir).join("basic_clash_config.yaml");
@@ -1020,7 +1004,7 @@ fn load_app_config(
         match parse_yaml(basic_clash_config_path.as_path()) {
             Ok(r) => r,
             Err(_) => {
-                err_collect.push_if_not_exist(ClashTuiConfigError::LoadProfileConfig);
+                err_collect.push_if_not_exist(ClashTuiConfigLoadError::LoadProfileConfig);
                 serde_yaml::Value::from("")
             }
         };
@@ -1047,7 +1031,7 @@ fn load_app_config(
     let clashtui_config: toml::Value = match toml::from_str(&toml_content) {
         Ok(v) => v,
         Err(e) => {
-            err_collect.push_if_not_exist(ClashTuiConfigError::LoadAppConfig);
+            err_collect.push_if_not_exist(ClashTuiConfigLoadError::LoadAppConfig);
             log::error!(
                 "[ClashTuiUtil] Unable to load config file:{}",
                 e.to_string()
@@ -1058,7 +1042,7 @@ fn load_app_config(
     let default_section_of_clashtui_cfg = match clashtui_config.get("default") {
         Some(v) => v,
         None => {
-            err_collect.push_if_not_exist(ClashTuiConfigError::LoadAppConfig);
+            err_collect.push_if_not_exist(ClashTuiConfigLoadError::LoadAppConfig);
             log::error!("[ClashTuiUtil] No default section in clashtui config");
             &err_ret
         }

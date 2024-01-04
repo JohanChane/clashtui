@@ -11,7 +11,7 @@ use std::{
 };
 
 use crate::clashtui_state::SharedClashTuiState;
-use crate::keys::{match_key, SharedKeyList};
+use super::keys::{match_key, SharedKeyList};
 use crate::ui::widgets::{ClashTuiList, SharedTheme};
 use crate::ui::EventState;
 use crate::ui::SharedSymbols;

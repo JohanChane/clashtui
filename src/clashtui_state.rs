@@ -86,9 +86,11 @@ impl ClashTuiState {
     pub fn set_tun(&mut self, tun: bool) {
         self.state.tun = tun;
     }
+    #[cfg(target_os = "windows")]
     pub fn get_sysproxy(&self) -> bool {
         self.state.sysproxy
     }
+    #[cfg(target_os = "windows")]
     pub fn set_sysproxy(&mut self, sysproxy: bool) {
         self.state.sysproxy = sysproxy;
     }

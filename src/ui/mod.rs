@@ -4,8 +4,8 @@ pub mod msgpopup;
 pub mod profile_input;
 pub mod profile_tab;
 pub mod statusbar;
-pub mod symbols;
 pub mod widgets;
+pub mod keys;
 
 pub use self::clashsrvctl_tab::ClashSrvCtlTab;
 pub use self::confirm_popup::ConfirmPopup;
@@ -13,7 +13,7 @@ pub use self::msgpopup::MsgPopup;
 pub use self::profile_input::ProfileInputPopup;
 pub use self::profile_tab::ProfileTab;
 pub use self::statusbar::ClashTuiStatusBar;
-pub use self::symbols::{SharedSymbols, Symbols};
+pub use self::keys::symbols::{SharedSymbols, Symbols};
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum EventState {

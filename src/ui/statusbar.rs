@@ -11,10 +11,6 @@ use crate::clashtui_state::SharedClashTuiState;
 use crate::ui::{widgets::SharedTheme, EventState};
 use crate::visible_methods;
 
-struct Status {
-    pub profile: String,
-}
-
 pub struct ClashTuiStatusBar {
     title: String,
     is_visible: bool,
@@ -25,16 +21,13 @@ pub struct ClashTuiStatusBar {
 
 impl ClashTuiStatusBar {
     pub fn new(clashtui_state: SharedClashTuiState, theme: SharedTheme) -> Self {
-        
-        let instance = Self {
+    Self {
             title: "StatusBar".to_string(),
             is_visible: true,
             clashtui_state,
 
             theme,
-        };
-
-        instance
+        }
     }
 
     pub fn event(&mut self, ev: &Event) -> Result<EventState> {
@@ -60,23 +53,20 @@ impl ClashTuiStatusBar {
         }
 
         f.render_widget(Clear, area);
-        
-        let status_str = if cfg!(target_os = "windows") {
-             format!(
+        #[cfg(target_os = "windows")]
+        let status_str = format!(
                 "Profile: {}    Tun: {}    SysProxy: {}    Help: ?",
                 self.clashtui_state.borrow().get_profile(),
                 self.clashtui_state.borrow().get_tun(),
                 self.clashtui_state.borrow().get_sysproxy().to_string(),
-            )
-        } else {
-            format!(
+            );
+        #[cfg(target_os = "linux")]
+        let status_str = format!(
                 "Profile: {}    Tun: {}    Help: ?",
                 self.clashtui_state.borrow().get_profile(),
                 self.clashtui_state.borrow().get_tun(),
-            )
-        };
+            );
         
-
         let paragraph = Paragraph::new(Span::styled(
             status_str,
             Style::default().fg(self.theme.statusbar_txt_fg),
