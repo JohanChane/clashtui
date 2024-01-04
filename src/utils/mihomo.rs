@@ -170,7 +170,6 @@ impl ClashUtil {
                 let proxy = reqwest::Proxy::http(&self.proxy_addr).unwrap();
                 let client = reqwest::blocking::Client::builder()
                 //.user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36 uacq")
-                //.user_agent("clash-verge/v1.2.0") // url 后不加 `flag=clash` 也会返回 yaml 配置, 而不是返回 base64 编码。
                 .user_agent("clash.meta")
                 .proxy(proxy)
                 .build()

@@ -71,7 +71,7 @@ impl ClashTuiListPopup {
             })
             .collect();
 
-        // 自适应
+        // Window size adaptation
         let item_len = items.len();
         let max_item_width = items.iter().map(|i| i.width()).max().unwrap_or(0);
         let dialog_width = max(min(max_item_width + 2, f.size().width as usize - 4), 60); // min_width = 60

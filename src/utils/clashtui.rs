@@ -185,7 +185,7 @@ impl ClashTuiUtil {
         let profile_path = self.profile_dir.join(profile_name);
         let mut profile_yaml_path = profile_path.clone();
         let mut net_res: Vec<(String, String)> = Vec::new();
-        // ## 如果是订阅链接
+        // ## sub url
         if !self.is_profile_yaml(profile_name) {
             let mut file = File::open(profile_path)?;
             let mut file_content = String::new();
@@ -210,7 +210,7 @@ impl ClashTuiUtil {
             ))
         }
 
-        // ## 更新 yaml 的网络资源
+        // ## Update the network resources in the YAML.
         let mut file = File::open(profile_yaml_path)?;
         let mut yaml_content = String::new();
         file.read_to_string(&mut yaml_content)?;
@@ -833,7 +833,7 @@ impl ClashTuiUtil {
         None
     }
 
-    // 目前是根据文件后缀来判断, 而不是文件内容。这样可以减少 io。
+    // Currently, the judgment is based on the file extension rather than the file content. This helps reduce I/O.
     pub fn is_profile_yaml(&self, profile_name: &String) -> bool {
         let profile_path = self.profile_dir.join(profile_name);
         let extension = profile_path.extension();
