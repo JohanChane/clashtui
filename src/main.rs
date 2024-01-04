@@ -79,10 +79,9 @@ fn run_app<B: Backend>(
     let mut err_tarck = app.clashtui_util.get_err_track();
     loop {
         if !err_tarck.is_empty() {
-            log::error!("count");
             let err: Option<ClashTuiConfigLoadError> = err_tarck.pop();
             showstr += format!(
-                "The {} might be broken, the progrem will try to fix it\n",
+                "The {} might be broken, the progrem will ignore it\n",
                 match err {
                     Some(v) => match v {
                         ClashTuiConfigLoadError::LoadAppConfig => "config.toml",

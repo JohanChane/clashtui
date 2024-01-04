@@ -843,6 +843,7 @@ impl ClashTuiUtil {
 
         false
     }
+/*
     pub fn edit_file(&self, path: &PathBuf) -> Result<String> {
         if let Some(edit_cmd) = self
             .get_clashtui_config()
@@ -919,6 +920,7 @@ impl ClashTuiUtil {
 
         Ok("Done".to_string())
     }
+    */
 
     pub fn get_clashtui_config(&self) -> &toml::Value {
         &self.clashtui_config

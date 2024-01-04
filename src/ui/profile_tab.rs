@@ -1,6 +1,5 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use log;
 use ratatui::prelude::*;
 use std::fs;
 use std::path::Path;
@@ -151,17 +150,17 @@ impl ProfileTab {
                             "`y` to Delete, `Esc` to cancel".to_string(),
                         );
                         EventState::WorkDone
-                    } else if match_key(key, &self.key_list.edit) {
-                        if let Some(profile_name) = self.profile_list.selected() {
-                            if let Err(err) = self
-                                .clashtui_util
-                                .edit_file(&self.clashtui_util.profile_dir.join(profile_name))
-                            {
-                                log::error!("{}", err);
-                                self.popup_txt_msg(err.to_string());
-                            }
-                        }
-                        EventState::WorkDone
+                    //} else if match_key(key, &self.key_list.edit) {
+                    //    if let Some(profile_name) = self.profile_list.selected() {
+                    //        if let Err(err) = self
+                    //            .clashtui_util
+                    //            .edit_file(&self.clashtui_util.profile_dir.join(profile_name))
+                    //        {
+                    //            log::error!("{}", err);
+                    //            self.popup_txt_msg(err.to_string());
+                    //        }
+                    //    }
+                    //    EventState::WorkDone
                     } else if match_key(key, &self.key_list.preview) {
                         if let Some(profile_name) = self.profile_list.selected() {
                             let profile_path = self.clashtui_util.profile_dir.join(profile_name);
@@ -228,18 +227,17 @@ impl ProfileTab {
                             self.popup_list_msg(lines);
                         }
                         EventState::WorkDone
-                    } else if match_key(key, &self.key_list.edit) {
-                        if let Some(name) = self.template_list.selected() {
-                            let tpl_file_path = self
-                                .clashtui_util
-                                .clashtui_dir
-                                .join(format!("templates/{}", name));
-
-                            if let Err(err) = self.clashtui_util.edit_file(&tpl_file_path) {
-                                self.popup_txt_msg(err.to_string());
-                            }
-                        }
-                        EventState::WorkDone
+                    //} else if match_key(key, &self.key_list.edit) {
+                    //    if let Some(name) = self.template_list.selected() {
+                    //        let tpl_file_path = self
+                    //            .clashtui_util
+                    //            .clashtui_dir
+                    //            .join(format!("templates/{}", name));
+                    //        if let Err(err) = self.clashtui_util.edit_file(&tpl_file_path) {
+                    //            self.popup_txt_msg(err.to_string());
+                    //        }
+                    //    }
+                    //    EventState::WorkDone
                     } else {
                         EventState::NotConsumed
                     };

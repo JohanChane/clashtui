@@ -174,14 +174,14 @@ impl App {
             } else if match_key(key, &self.key_list.app_help) {
                 self.help_popup.show();
                 EventState::WorkDone
-            } else if match_key(key, &self.key_list.app_home_open) {
-                self.clashtui_util
-                    .open_dir(self.clashtui_util.clashtui_dir.as_path())?;
-                EventState::WorkDone
-            } else if match_key(key, &self.key_list.clash_cfg_dir_open) {
-                self.clashtui_util
-                    .open_dir(self.clashtui_util.clash_cfg_dir.as_path())?;
-                EventState::WorkDone
+            //} else if match_key(key, &self.key_list.app_home_open) {
+            //    self.clashtui_util
+            //        .open_dir(self.clashtui_util.clashtui_dir.as_path())?;
+            //    EventState::WorkDone
+            //} else if match_key(key, &self.key_list.clash_cfg_dir_open) {
+            //    self.clashtui_util
+            //        .open_dir(self.clashtui_util.clashtui_config.clash_cfg_dir.as_path())?;
+            //    EventState::WorkDone
             } else if match_key(key, &self.key_list.log_cat) {
                 let log = self.clashtui_util.fetch_recent_logs(20);
                 self.popup_list_msg(log);
