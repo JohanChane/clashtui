@@ -29,8 +29,8 @@ pub struct KeyList {
     pub template_switch: ClashTuiKeyEvent,
     pub template_create: ClashTuiKeyEvent,
     pub clashsrvctl_select: ClashTuiKeyEvent,
-    pub clashsrvctl_start: ClashTuiKeyEvent,
     pub clashsrvctl_restart: ClashTuiKeyEvent,
+    pub clashsrvctl_api_restart: ClashTuiKeyEvent,
     pub clashsrvctl_stop: ClashTuiKeyEvent,
 
     pub edit: ClashTuiKeyEvent,
@@ -54,12 +54,14 @@ impl Default for KeyList {
             profile_import: ClashTuiKeyEvent::new(KeyCode::Char('i')),
             profile_delete: ClashTuiKeyEvent::new(KeyCode::Char('D')),
             profile_test_config: ClashTuiKeyEvent::new(KeyCode::Char('T')),
+
             template_switch: ClashTuiKeyEvent::new(KeyCode::Char('t')),
             template_create: ClashTuiKeyEvent::new(KeyCode::Enter),
+
             clashsrvctl_select: ClashTuiKeyEvent::new(KeyCode::Enter),
-            clashsrvctl_start: ClashTuiKeyEvent::new(KeyCode::Char('S')),
-            clashsrvctl_restart: ClashTuiKeyEvent::new(KeyCode::Char('R')),
-            clashsrvctl_stop: ClashTuiKeyEvent::new(KeyCode::Char('T')),
+            clashsrvctl_restart: ClashTuiKeyEvent::new(KeyCode::Char('E')),
+            clashsrvctl_api_restart: ClashTuiKeyEvent::new(KeyCode::Char('R')),
+            clashsrvctl_stop: ClashTuiKeyEvent::new(KeyCode::Char('S')),
 
             edit: ClashTuiKeyEvent::new(KeyCode::Char('e')),
             preview: ClashTuiKeyEvent::new(KeyCode::Char('P')),

@@ -20,10 +20,9 @@ use encoding::all::GBK;
 
 use crate::ui::ClashTuiOp;
 
-use super::mihomo::ClashConfig;
-use super::mihomo::ClashUtil;
+use super::mihomo::{self, ClashConfig, ClashUtil};
 
-pub type SharedClashTuiUtil = Rc<ClashTuiUtil>;
+pub type SharedClashTuiUtil = Rc<std::cell::RefCell<ClashTuiUtil>>;
 
 #[derive(Debug, Deserialize)]
 pub struct ClashTuiConfig {
@@ -42,7 +41,7 @@ pub struct ClashTuiUtil {
 
     pub clash_api: ClashUtil,
     pub clashtui_config: toml::Value,
-    pub clash_remote_config: ClashConfig,
+    pub clash_remote_config: Option<ClashConfig>,
 
     pub err_track: Vec<ClashTuiConfigError>,
 }
@@ -64,8 +63,15 @@ impl ClashTuiUtil {
         let proxy_addr = ret.5;
         let clashtui_config = ret.6;
         let clash_client = ClashUtil::new(controller_api, proxy_addr);
-        let cur_remote = clash_client.config_get().unwrap();
-        let remote = ClashConfig::from_str(cur_remote.as_str());
+        let cur_remote = clash_client.config_get();
+        let remote = match cur_remote {
+            Ok(r) => {
+                Some(ClashConfig::from_str(r.as_str()))
+            }
+            Err(_) => {
+                None
+            }
+        };
         Self {
             clashtui_dir: clashtui_dir.clone(),
             profile_dir: profile_dir.clone(),
@@ -85,9 +91,15 @@ impl ClashTuiUtil {
     }
 
     pub fn update_remote(&mut self) -> Result<()> {
-        let cur_remote = self.clash_api.config_get().unwrap();
-        let remote = ClashConfig::from_str(cur_remote.as_str());
-        self.clash_remote_config = remote;
+        match self.clash_api.config_get() {
+            Ok(r) => {
+                self.clash_remote_config = Some(ClashConfig::from_str(r.as_str()));
+            }
+            Err(e) => {
+                bail!("Failed to get_config using clash_api: {}", e.to_string())
+            }
+        }
+
         Ok(())
     }
 
@@ -818,11 +830,11 @@ impl ClashTuiUtil {
         Ok(result_str)
     }
 
-    pub fn get_tun_mode(&self) -> (bool, super::mihomo::Tunstack) {
-        (
-            self.clash_remote_config.tun.enable,
-            self.clash_remote_config.tun.stack.clone(),
-        )
+    pub fn get_tun_mode(&self) -> Option<(bool, mihomo::Tunstack)> {
+        if let Some(remote_config) = &self.clash_remote_config {
+            return Some((remote_config.tun.enable, remote_config.tun.stack.clone()));
+        }
+        None
     }
 
     // 目前是根据文件后缀来判断, 而不是文件内容。这样可以减少 io。

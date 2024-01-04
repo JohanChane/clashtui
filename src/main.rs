@@ -77,7 +77,7 @@ fn run_app<B: Backend>(
     let mut last_tick = Instant::now();
     let mut last_ev = EventState::NotConsumed;
     let mut showstr = String::new();
-    let mut err_tarck = app.clashtui_util.get_err_track();
+    let mut err_tarck = app.clashtui_util.borrow().get_err_track();
     loop {
         if !err_tarck.is_empty() {
             log::error!("count");

@@ -71,7 +71,8 @@ impl App {
             PathBuf::from(&clashtui_config_dir_str)
         };
 
-        if !clashtui_config_dir.exists(){ //.join("basic_clash_config.yaml").exists() { // weird, shouldn`t we check the dir rather the single file?
+        // Check if clashtui_config_dir does not exist or if clashtui_config_dir is an empty 'data' directory.
+        if !clashtui_config_dir.exists() || (clashtui_config_dir.file_name() == Some("data".as_ref()) && fs::read_dir(&clashtui_config_dir).unwrap().next().is_none()) {
             if let Err(err) = fs::create_dir_all(&clashtui_config_dir) {
                 log::error!("{}", err.to_string());
             }
@@ -83,10 +84,10 @@ impl App {
 
         Self::setup_logging(&clashtui_config_dir.join("clashtui.log").to_str().unwrap());
 
-        let clashtui_util = Rc::new(ClashTuiUtil::new(
+        let clashtui_util = Rc::new(std::cell::RefCell::new(ClashTuiUtil::new(
             &clashtui_config_dir,
             &clashtui_config_dir.join("profiles"),
-        ));
+        )));
 
         let help_popup = ClashTuiListPopup::new("Help".to_string(), Rc::clone(&theme));
 
@@ -174,19 +175,20 @@ impl App {
                 self.help_popup.show();
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.app_home_open) {
-                self.clashtui_util
-                    .open_dir(self.clashtui_util.clashtui_dir.as_path())?;
+                self.clashtui_util.borrow()
+                    .open_dir(self.clashtui_util.borrow().clashtui_dir.as_path())?;
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.clash_cfg_dir_open) {
-                self.clashtui_util
-                    .open_dir(self.clashtui_util.clash_cfg_dir.as_path())?;
+                self.clashtui_util.borrow()
+                    .open_dir(self.clashtui_util.borrow().clash_cfg_dir.as_path())?;
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.log_cat) {
-                let log = self.clashtui_util.fetch_recent_logs(20);
+                let log = self.clashtui_util.borrow().fetch_recent_logs(20);
                 self.popup_list_msg(log);
                 EventState::WorkDone
-            } else if match_key(key, &self.key_list.clashsrvctl_start) {
-                match self.clashtui_util.clash_srv_ctl(ClashTuiOp::StartClash) {
+            } else if match_key(key, &self.key_list.clashsrvctl_restart) {
+                let res = self.clashtui_util.borrow().clash_srv_ctl(ClashTuiOp::StartClash);
+                match res {
                     Ok(output) => {
                         let list_msg: Vec<String> =
                             output.lines().map(|line| line.trim().to_string()).collect();
@@ -197,8 +199,9 @@ impl App {
                     }
                 }
                 EventState::WorkDone
-            } else if match_key(key, &self.key_list.clashsrvctl_restart) {
-                match self.clashtui_util.clash_api.restart(None) {
+            } else if match_key(key, &self.key_list.clashsrvctl_api_restart) {
+                let res = self.clashtui_util.borrow().clash_api.restart(None);
+                match res {
                     Ok(output) => {
                         let list_msg: Vec<String> =
                             output.lines().map(|line|line.trim().to_string()).collect();
@@ -210,7 +213,8 @@ impl App {
                 }
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.clashsrvctl_stop) {
-                match self.clashtui_util.clash_srv_ctl(ClashTuiOp::StopClash) {
+                let res = self.clashtui_util.borrow().clash_srv_ctl(ClashTuiOp::StopClash);
+                match res {
                     Ok(output) => {
                         let list_msg: Vec<String> =
                             output.lines().map(|line| line.trim().to_string()).collect();
@@ -273,7 +277,7 @@ impl App {
                     };
                     clashtui_state.set_tun(tun);
                     let profile = clashtui_state.get_profile();
-                    self.clashtui_util.select_profile(profile, tun)
+                    self.clashtui_util.borrow().select_profile(profile, tun)
                 };
                 res.unwrap_or_else(|e| {
                     self.popup_txt_msg(e.to_string());
@@ -284,7 +288,7 @@ impl App {
             #[cfg(target_os = "windows")]
             EventState::EnableSysProxy => {
                 self.clashsrvctl_tab.hide_msgpopup();
-                self.clashtui_util.enable_system_proxy();
+                self.clashtui_util.borrow().enable_system_proxy();
                 self.clashtui_state.borrow_mut().set_sysproxy(true);
                 EventState::WorkDone
             }

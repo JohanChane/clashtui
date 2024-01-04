@@ -106,7 +106,7 @@ impl ClashUtil {
         match response {
             Ok(r) => r.text(),
             Err(e) => {
-                log::error!("[ClashUtil] {} exec {} failed! {}", "get", url, e.status().unwrap());
+                log::error!("[ClashUtil] {} exec {} failed! {}", "get", url, e.status().unwrap_or_default());
                 Err(e)
             }
         }
@@ -120,7 +120,7 @@ impl ClashUtil {
         match response {
             Ok(r) => r.text(),
             Err(e) => {
-                log::error!("[ClashUtil] {} exec {} failed! {}", "post", url, e.status().unwrap());
+                log::error!("[ClashUtil] {} exec {} failed! {}", "post", url, e.status().unwrap_or_default());
                 Err(e)
             }
         }
@@ -135,7 +135,7 @@ impl ClashUtil {
         match response {
             Ok(r) => r.text(),
             Err(e) => {
-                log::error!("[ClashUtil] {} exec {} failed! {}", "put", url, e.status().unwrap());
+                log::error!("[ClashUtil] {} exec {} failed! {}", "put", url, e.status().unwrap_or_default());
                 Err(e)
             }
         }
@@ -187,7 +187,7 @@ impl ClashUtil {
         match self.client.patch("/configs").body(payload).send() {
             Ok(r) => r.text(),
             Err(e) => {
-                log::error!("[ClashUtil] {} exec {} failed! {}", "patch", "/configs", e.status().unwrap());
+                log::error!("[ClashUtil] {} exec {} failed! {}", "patch", "/configs", e.status().unwrap_or_default());
                 Err(e)
             }
         }
@@ -245,7 +245,7 @@ impl ClashUtil {
                 {
                 Ok(r) => r.text(),
                 Err(e) => {
-                    log::error!("[ClashUtil] {} exec {} failed! {}", "patch", "/configs", e.status().unwrap());
+                    log::error!("[ClashUtil] {} exec {} failed! {}", "patch", "/configs", e.status().unwrap_or_default());
                     Err(e)
                 }
             }

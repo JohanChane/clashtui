@@ -108,7 +108,8 @@ impl ClashSrvCtlTab {
                         EventState::DisableSysProxy
                     }
                     _ => {
-                        match self.clashtui_util.clash_srv_ctl(op) {
+                        let res = self.clashtui_util.borrow().clash_srv_ctl(op);
+                        match res {
                             Ok(output) => {
                                 let list_msg: Vec<String> =
                                     output.lines().map(|line| line.trim().to_string()).collect();
