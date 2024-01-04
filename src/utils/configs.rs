@@ -93,7 +93,7 @@ pub enum ClashTuiConfigLoadError {
 #[test]
 #[allow(unused)]
 fn config(){
-    use super::Clash::ClashUtil;
+    use super::clash::ClashUtil;
     let mut is = true;
     let sym = ClashUtil::new("http://127.0.0.1:9090".to_string(), "http://127.0.0.1:7890".to_string());
     match sym.config_get() {

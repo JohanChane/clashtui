@@ -1,6 +1,6 @@
-mod Clashtui;
-mod Clash;
-mod Configs;
+mod clashtui;
+mod clash;
+mod configs;
 
-pub use self::Clashtui::{ClashTuiUtil, SharedClashTuiUtil};
-pub use self::Configs::ClashTuiConfigLoadError;
+pub use self::clashtui::{ClashTuiUtil, SharedClashTuiUtil};
+pub use self::configs::ClashTuiConfigLoadError;
