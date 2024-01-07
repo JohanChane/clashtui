@@ -2,10 +2,9 @@ use anyhow::Result;
 use crossterm::event::{Event, KeyEventKind};
 use ratatui::prelude::*;
 
-use crate::clashtui_state::SharedClashTuiState;
 use super::keys::{match_key, SharedKeyList};
 use super::widgets::SharedTheme;
-use super::ClashTuiOp;
+use super::{ClashTuiOp, CommonTab};
 use super::SharedSymbols;
 use super::{widgets::ClashTuiList, EventState, MsgPopup};
 use crate::utils::SharedClashTuiUtil;
@@ -22,7 +21,6 @@ pub struct ClashSrvCtlTab {
     symbols: SharedSymbols,
 
     clashtui_util: SharedClashTuiUtil,
-    clashtui_state: SharedClashTuiState,
 }
 
 impl ClashSrvCtlTab {
@@ -31,7 +29,6 @@ impl ClashSrvCtlTab {
         key_list: SharedKeyList,
         symbols: SharedSymbols,
         clashtui_util: SharedClashTuiUtil,
-        clashtui_state: SharedClashTuiState,
 
         theme: SharedTheme,
     ) -> Self {
@@ -57,7 +54,6 @@ impl ClashSrvCtlTab {
             key_list,
             symbols,
             clashtui_util,
-            clashtui_state,
             msgpopup: MsgPopup::new(),
         }
     }
@@ -67,12 +63,16 @@ impl ClashSrvCtlTab {
             return Ok(EventState::NotConsumed);
         }
 
-        let mut event_state = self.msgpopup.event(ev)?;
+        let event_state = self.msgpopup.event(ev)?;
 
         Ok(event_state)
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState> {
+}
+
+impl CommonTab for ClashSrvCtlTab {
+    
+    fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -116,14 +116,14 @@ impl ClashSrvCtlTab {
             };
 
             if event_state == EventState::NotConsumed {
-                event_state = self.srvctl_list.event(ev)?;
+                event_state = self.srvctl_list.event(ev).unwrap();
             }
         }
 
         Ok(event_state)
     }
-
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
+    
+    fn draw<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
         if !self.is_visible() {
             return;
         }

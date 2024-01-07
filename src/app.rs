@@ -5,34 +5,30 @@ use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Config, Root};
 use log4rs::encode::pattern::PatternEncoder;
 use ratatui::prelude::*;
-use core::panic;
 use std::cell::RefCell;
 use std::env;
+use std::path::PathBuf;
 use std::rc::Rc;
-use std::{
-    fs::{self},
-    path::PathBuf,
-};
 
-use crate::clashtui_state::{ClashTuiState, SharedClashTuiState};
-use crate::ui::keys::{match_key, KeyList, SharedKeyList};
 use crate::msgpopup_methods;
 use crate::ui::clashsrvctl_tab::ClashSrvCtlTab;
+use crate::ui::keys::{match_key, KeyList, SharedKeyList};
 use crate::ui::profile_tab::ProfileTab;
 use crate::ui::statusbar::ClashTuiStatusBar;
-use crate::ui::ClashTuiOp;
 use crate::ui::{
     widgets::{helper, ClashTuiListPopup, ClashTuiTabBar, Theme},
     EventState, MsgPopup,
 };
+use crate::ui::{ClashTuiOp, CommonTab, Tabs};
 use crate::ui::{SharedSymbols, Symbols};
-use crate::utils::{ClashTuiUtil, SharedClashTuiUtil};
+use crate::utils::{ClashTuiUtil, SharedClashTuiState, SharedClashTuiUtil, State};
 
 pub struct App {
     pub title: String,
     pub tabbar: ClashTuiTabBar,
-    pub profile_tab: ProfileTab,
-    pub clashsrvctl_tab: ClashSrvCtlTab,
+    // pub profile_tab: ProfileTab,
+    // pub clashsrvctl_tab: ClashSrvCtlTab,
+    tabs: Vec<Tabs>,
     pub should_quit: bool,
     pub help_popup: ClashTuiListPopup,
     pub msgpopup: MsgPopup,
@@ -40,12 +36,13 @@ pub struct App {
     pub key_list: SharedKeyList,
     pub symbols: SharedSymbols,
     pub clashtui_util: SharedClashTuiUtil,
-    pub clashtui_state: SharedClashTuiState,
+    clashtui_state: SharedClashTuiState,
     pub statusbar: ClashTuiStatusBar,
 }
 
 impl App {
     pub fn new() -> Self {
+        let mut tab: Vec<Tabs> = Vec::new();
         let key_list = Rc::new(KeyList::default());
         let names = Rc::new(Symbols::default());
         let theme = Rc::new(Theme::default());
@@ -72,13 +69,10 @@ impl App {
             PathBuf::from(&clashtui_config_dir_str)
         };
 
-        if !clashtui_config_dir.exists(){ //.join("basic_clash_config.yaml").exists() { // weird, shouldn`t we check the dir rather the single file?
-            if let Err(err) = fs::create_dir_all(&clashtui_config_dir) {
-                log::error!("{}", err.to_string());
-            }
-
-            if let Err(err) = Self::first_run(&clashtui_config_dir, &names) {
-                log::error!("{}", err.to_string());
+        if !clashtui_config_dir.exists() {
+            //.join("basic_clash_config.yaml").exists() { // weird, shouldn`t we check the dir rather the single file?
+            if let Err(err) = crate::utils::init_config(&clashtui_config_dir, &names) {
+                log::error!("{}", err);
             }
         }
 
@@ -91,31 +85,31 @@ impl App {
 
         let help_popup = ClashTuiListPopup::new("Help".to_string(), Rc::clone(&theme));
 
-        let clashtui_state = Rc::new(RefCell::new(ClashTuiState::new(Rc::clone(&clashtui_util))));
-        clashtui_state.borrow_mut().load_status_from_file();
+        let clashtui_state = SharedClashTuiState::new(RefCell::new(State::new(&clashtui_util)));
 
         let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
+
+        tab.push(Tabs::ProfileTab(RefCell::new(ProfileTab::new(
+                    "".to_string(),
+                    key_list.clone(),
+                    names.clone(),
+                    Rc::clone(&clashtui_util),
+                    Rc::clone(&clashtui_state),
+                    Rc::clone(&theme),
+                ))));
+        tab.push(Tabs::ClashsrvctlTab(RefCell::new(ClashSrvCtlTab::new(
+                    names.clashsrvctl.clone(),
+                    key_list.clone(),
+                    names.clone(),
+                    Rc::clone(&clashtui_util),
+                    Rc::clone(&theme),
+                ))));
+
         let mut app = Self {
             title: "ClashTui".to_string(),
             tabbar: ClashTuiTabBar::new(
                 "".to_string(),
                 vec![names.profile.clone(), names.clashsrvctl.clone()],
-                Rc::clone(&theme),
-            ),
-            profile_tab: ProfileTab::new(
-                "".to_string(),
-                key_list.clone(),
-                names.clone(),
-                Rc::clone(&clashtui_util),
-                Rc::clone(&clashtui_state),
-                Rc::clone(&theme),
-            ),
-            clashsrvctl_tab: ClashSrvCtlTab::new(
-                names.clashsrvctl.clone(),
-                key_list.clone(),
-                names.clone(),
-                Rc::clone(&clashtui_util),
-                Rc::clone(&clashtui_state),
                 Rc::clone(&theme),
             ),
             should_quit: false,
@@ -124,8 +118,9 @@ impl App {
             help_popup,
             msgpopup: MsgPopup::new(),
             statusbar,
-            clashtui_state,
             clashtui_util,
+            clashtui_state,
+            tabs: tab,
         };
 
         let help_text: Vec<String> = app
@@ -145,14 +140,21 @@ impl App {
 
         // ## Tab Popups
         if event_state.is_notconsumed() {
-            event_state = self.profile_tab.popup_event(ev)?;
+            event_state = match self.tabs.get(0).unwrap() {
+                Tabs::ProfileTab(v) => v.borrow_mut().popup_event(ev).unwrap(),
+                Tabs::ClashsrvctlTab(_) => EventState::UnexpectedERROR,
+            };
         }
         if event_state.is_notconsumed() {
-            event_state = self.clashsrvctl_tab.popup_event(ev)?;
+            event_state = match self.tabs.get(1).unwrap() {
+                Tabs::ProfileTab(_) => EventState::UnexpectedERROR,
+                Tabs::ClashsrvctlTab(v) => v.borrow_mut().popup_event(ev).unwrap(),
+            };
         }
 
         Ok(event_state)
     }
+
     pub fn event(&mut self, ev: &Event) -> Result<EventState> {
         let mut event_state = self.msgpopup.event(ev)?;
         if event_state.is_notconsumed() {
@@ -169,7 +171,6 @@ impl App {
 
             event_state = if match_key(key, &self.key_list.app_quit) {
                 self.should_quit = true;
-                self.clashtui_state.borrow().save_status_to_file();
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.app_help) {
                 self.help_popup.show();
@@ -199,10 +200,10 @@ impl App {
                 }
                 EventState::WorkDone
             } else if match_key(key, &self.key_list.clashsrvctl_restart) {
-                match self.clashtui_util.clash_api.restart(None) {
+                match self.clashtui_util.restart_clash() {
                     Ok(output) => {
                         let list_msg: Vec<String> =
-                            output.lines().map(|line|line.trim().to_string()).collect();
+                            output.lines().map(|line| line.trim().to_string()).collect();
                         self.popup_list_msg(list_msg);
                     }
                     Err(err) => {
@@ -229,10 +230,14 @@ impl App {
             if event_state == EventState::NotConsumed {
                 event_state = self.tabbar.event(ev)?;
                 if event_state.is_notconsumed() {
-                    event_state = self.profile_tab.event(ev)?;
+                    if let Tabs::ProfileTab(tab) = self.tab("profile_tab"){
+                        event_state = tab.borrow_mut().event(ev).unwrap();
+                    }
                 }
                 if event_state.is_notconsumed() {
-                    event_state = self.clashsrvctl_tab.event(ev)?;
+                    if let Tabs::ClashsrvctlTab(tab) = self.tab("clashsrvctl_tab"){
+                        event_state = tab.borrow_mut().event(ev).unwrap();
+                    }
                 }
             }
         }
@@ -245,22 +250,34 @@ impl App {
         let ev_state = match last_ev {
             EventState::NotConsumed | EventState::WorkDone => EventState::NotConsumed,
             EventState::ProfileUpdate | EventState::ProfileUpdateAll => {
-                self.profile_tab.hide_msgpopup();
-                if last_ev == &EventState::ProfileUpdate {
-                    self.profile_tab.handle_update_profile_ev(false);
-                } else if last_ev == &EventState::ProfileUpdateAll {
-                    self.profile_tab.handle_update_profile_ev(true);
-                }
+                if let Tabs::ProfileTab(profile_tab) = self.tab("profile_tab") {
+                    profile_tab.borrow_mut().hide_msgpopup();
+                    if last_ev == &EventState::ProfileUpdate {
+                        profile_tab.borrow_mut().handle_update_profile_ev(false);
+                    } else if last_ev == &EventState::ProfileUpdateAll {
+                        profile_tab.borrow_mut().handle_update_profile_ev(true);
+                    }
+                };
                 EventState::WorkDone
             }
             EventState::ProfileSelect => {
-                self.profile_tab.hide_msgpopup();
-                self.profile_tab.handle_select_profile_ev();
+                if let Tabs::ProfileTab(profile_tab) = self.tab("profile_tab") {
+                    profile_tab.borrow_mut().hide_msgpopup();
+                    match profile_tab.borrow_mut().handle_select_profile_ev() {
+                        Some(v) => self
+                            .clashtui_state
+                            .borrow_mut()
+                            .update_tun(&self.clashtui_util),
+                        None => (),
+                    };
+                };
                 EventState::WorkDone
             }
             EventState::ProfileDelete => {
-                self.profile_tab.hide_msgpopup();
-                self.profile_tab.handle_delete_profile_ev();
+                if let Tabs::ProfileTab(profile_tab) = self.tab("profile_tab") {
+                    profile_tab.borrow_mut().hide_msgpopup();
+                    profile_tab.borrow_mut().handle_delete_profile_ev();
+                };
                 EventState::WorkDone
             }
             #[cfg(target_os = "windows")]
@@ -274,9 +291,7 @@ impl App {
             EventState::DisableSysProxy => {
                 self.clashsrvctl_tab.hide_msgpopup();
                 ClashTuiUtil::disable_system_proxy();
-                self.clashtui_state
-                    .borrow_mut()
-                    .set_sysproxy(false);
+                self.clashtui_state.borrow_mut().set_sysproxy(false);
                 EventState::WorkDone
             }
             _ => EventState::NotConsumed,
@@ -301,8 +316,10 @@ impl App {
         self.tabbar.draw(f, chunks[0]);
 
         let tabcontent_chunk = chunks[1];
-        self.profile_tab.draw(f, tabcontent_chunk);
-        self.clashsrvctl_tab.draw(f, tabcontent_chunk);
+        self.tabs.iter().map(|v| match v {
+            Tabs::ProfileTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
+            Tabs::ClashsrvctlTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
+        }).count();
 
         self.statusbar.draw(f, chunks[2]);
 
@@ -314,18 +331,41 @@ impl App {
     pub fn on_tick(&mut self) {}
 
     pub fn update_tabbar(&mut self) {
-        self.profile_tab.hide();
-        self.clashsrvctl_tab.hide();
-
         let tabname = self.tabbar.selected();
-        if tabname == Some(&self.symbols.profile) {
-            self.profile_tab.show();
-        } else if tabname == Some(&self.symbols.clashsrvctl) {
-            self.clashsrvctl_tab.show();
+        let _ = self.tabs.iter().map(|v| match v {
+            Tabs::ProfileTab(k) => {
+                if tabname == Some(&self.symbols.profile) {
+                    k.borrow_mut().show()
+                } else {
+                    k.borrow_mut().hide()
+                }
+            }
+            Tabs::ClashsrvctlTab(k) => {
+                if tabname == Some(&self.symbols.clashsrvctl) {
+                    k.borrow_mut().show()
+                } else {
+                    k.borrow_mut().hide()
+                }
+            }
+        }).count();
+    }
+
+    fn tab(&self, name: &str) -> &Tabs {
+        let idx: usize;
+        if name == "profile_tab" {
+            idx = 0;
+        } else if name == "clashsrvctl_tab" {
+            idx = 1;
+        } else {
+            todo!();
+        }
+        match self.tabs.get(idx) {
+            Some(v) => v,
+            None => todo!(),
         }
     }
 
-    pub fn setup_logging(log_path: &str) {
+    fn setup_logging(log_path: &str) {
         let file_appender = FileAppender::builder()
             .encoder(Box::new(PatternEncoder::new("{d} [{l}] {t} - {m}{n}")))
             .build(log_path)
@@ -336,21 +376,11 @@ impl App {
             .build(
                 Root::builder()
                     .appender("file")
-                    .build(log::LevelFilter::Info),
+                    .build(log::LevelFilter::Debug),
             )
             .unwrap();
 
         log4rs::init_config(config).unwrap();
-    }
-
-    pub fn first_run(clashtui_cfg_dir: &PathBuf, symbols: &SharedSymbols) -> Result<()> {
-        fs::create_dir_all(clashtui_cfg_dir.join("profiles"))?;
-        fs::create_dir_all(clashtui_cfg_dir.join("templates"))?;
-        fs::File::create(clashtui_cfg_dir.join("templates/template_proxy_providers"))?;
-        fs::write(clashtui_cfg_dir.join("config.toml"), &symbols.default_clash_cfg_content)?;
-        fs::write(clashtui_cfg_dir.join("basic_clash_config.yaml"), &symbols.default_basic_clash_cfg_content)?;
-
-        Ok(())
     }
 }
 

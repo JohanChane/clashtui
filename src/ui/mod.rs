@@ -7,16 +7,19 @@ pub mod statusbar;
 pub mod widgets;
 pub mod keys;
 
+use std::cell::RefCell;
+
 pub use self::clashsrvctl_tab::ClashSrvCtlTab;
 pub use self::confirm_popup::ConfirmPopup;
 pub use self::msgpopup::MsgPopup;
 pub use self::profile_input::ProfileInputPopup;
-pub use self::profile_tab::ProfileTab;
+use self::profile_tab::ProfileTab;
 pub use self::statusbar::ClashTuiStatusBar;
 pub use self::keys::symbols::{SharedSymbols, Symbols};
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum EventState {
+    UnexpectedERROR,
     NotConsumed,
     WorkDone,
     ProfileUpdate,
@@ -37,6 +40,31 @@ impl EventState {
         *self == Self::NotConsumed
     }
 }
+
+
+pub trait CommonTab {
+    fn draw<B: ratatui::backend::Backend>(&mut self, f: &mut ratatui::Frame<B>, area: ratatui::layout::Rect);
+    // This should be impled, but rustc won't recognize it
+    fn event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ()>;
+    // Desprate HashMap<_,Box<dyn CommonTab>>
+    // fn as_any(&self) -> &dyn std::any::Any;
+    // just return &self
+}
+
+pub enum Tabs {
+    ProfileTab(RefCell<ProfileTab>),
+    ClashsrvctlTab(RefCell<ClashSrvCtlTab>),
+}
+
+// impl Display for Tabs {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         let val = match self {
+//             Tabs::ClashsrvctlTab(_) => "Clashsrvctl",
+//             Tabs::ProfileTab(_) => "Profile",
+//         };
+//         write!(f, "{}", val)
+//     }
+// }
 
 macro_rules! define_clashtui_operations {
     ($($variant:ident),*) => {

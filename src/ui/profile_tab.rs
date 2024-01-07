@@ -9,12 +9,13 @@ use std::{
     io::Write,
 };
 
-use crate::clashtui_state::SharedClashTuiState;
+use super::CommonTab;
 use super::keys::{match_key, SharedKeyList};
 use crate::ui::widgets::{ClashTuiList, SharedTheme};
 use crate::ui::EventState;
 use crate::ui::SharedSymbols;
 use crate::ui::{ConfirmPopup, MsgPopup, ProfileInputPopup};
+use crate::utils::SharedClashTuiState;
 use crate::utils::{ClashTuiUtil, SharedClashTuiUtil};
 use crate::{msgpopup_methods, title_methods, visible_methods};
 
@@ -75,7 +76,9 @@ impl ProfileTab {
         };
 
         instance.update_profile_list();
-        instance.profile_list.select(instance.clashtui_state.borrow().get_profile());
+        instance
+            .profile_list
+            .select(instance.clashtui_state.borrow().get_profile());
         let template_names: Vec<String> = instance.clashtui_util.get_template_names().unwrap();
         instance.template_list.set_items(template_names);
 
@@ -115,7 +118,141 @@ impl ProfileTab {
         Ok(event_state)
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState> {
+    pub fn switch_fouce(&mut self, fouce: Fouce) {
+        self.profile_list.set_fouce(false);
+        self.template_list.set_fouce(false);
+
+        match fouce {
+            Fouce::Profile => {
+                self.profile_list.set_fouce(true);
+            }
+            Fouce::Template => {
+                self.template_list.set_fouce(true);
+            }
+        }
+        self.fouce = fouce;
+    }
+
+    pub fn handle_select_profile_ev(&mut self) -> Option<String> {
+        if let Some(profile_name) = self.profile_list.selected() {
+            if let Err(err) = self.clashtui_util.select_profile(profile_name) {
+                self.popup_txt_msg(err.to_string());
+                None
+            } else {
+                Some(profile_name.to_string())
+            }
+        } else {
+            None
+        }
+    }
+    pub fn handle_update_profile_ev(&mut self, does_update_all: bool) {
+        if let Some(profile_name) = self.profile_list.selected() {
+            match self
+                .clashtui_util
+                .update_profile(profile_name, does_update_all)
+            {
+                Ok(res) => {
+                    let mut msg = ClashTuiUtil::concat_update_profile_result(res);
+
+                    if profile_name == self.clashtui_state.borrow_mut().get_profile() {
+                        if let Err(err) = self.clashtui_util.select_profile(profile_name) {
+                            msg.push(err.to_string());
+                        } else {
+                            msg.push("Update and selected".to_string());
+                        }
+                    } else {
+                        msg.push("Updated".to_string());
+                    }
+
+                    self.popup_list_msg(msg);
+                }
+                Err(err) => {
+                    self.popup_txt_msg(format!("Failed to Update: {}", err.to_string()));
+                }
+            }
+        }
+    }
+    pub fn handle_delete_profile_ev(&mut self) {
+        if let Some(profile_name) = self.profile_list.selected() {
+            match remove_file(self.clashtui_util.profile_dir.join(profile_name)) {
+                Ok(()) => {
+                    self.update_profile_list();
+                }
+                Err(err) => {
+                    self.popup_txt_msg(err.to_string());
+                }
+            }
+        }
+    }
+
+    pub fn handle_import_profile_ev(&mut self) {
+        let profile_name = self.profile_input.name_input.get_input_data();
+        let uri = self.profile_input.uri_input.get_input_data();
+        let profile_name = profile_name.trim();
+        let uri = uri.trim();
+
+        if uri.is_empty() || profile_name.is_empty() {
+            self.popup_txt_msg("Uri or Name is empty!".to_string());
+            return;
+        }
+
+        if uri.starts_with("http://") || uri.starts_with("https://") {
+            match OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(self.clashtui_util.profile_dir.join(profile_name))
+            {
+                Ok(mut file) => {
+                    if let Err(err) = write!(file, "{}", uri) {
+                        self.popup_txt_msg(err.to_string());
+                    } else {
+                        self.update_profile_list();
+                    }
+                }
+                Err(err) => self.popup_txt_msg(err.to_string()),
+            }
+        } else if Path::new(uri).is_file() {
+            let uri_path = Path::new(uri);
+            if uri_path.exists() {
+                self.popup_txt_msg("Failed to import: file exists".to_string());
+                return;
+            }
+
+            let _ = fs::copy(
+                Path::new(uri),
+                Path::new(
+                    &self
+                        .clashtui_util
+                        .profile_dir
+                        .join(Path::new(profile_name).with_extension("yaml")),
+                ),
+            );
+            self.update_profile_list();
+        } else {
+            self.popup_txt_msg("Uri is invalid.".to_string());
+        }
+    }
+
+    pub fn handle_create_template_ev(&mut self) {
+        if let Some(template_name) = self.template_list.selected() {
+            if let Err(err) = self.clashtui_util.create_yaml_with_template(template_name) {
+                self.popup_txt_msg(err.to_string());
+            } else {
+                self.popup_txt_msg("Created".to_string());
+                self.update_profile_list();
+            }
+        }
+    }
+
+    pub fn update_profile_list(&mut self) {
+        let profile_names: Vec<String> = self.clashtui_util.get_profile_names().unwrap();
+        self.profile_list.set_items(profile_names);
+    }
+}
+
+impl CommonTab for ProfileTab {
+    
+    fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -245,9 +382,9 @@ impl ProfileTab {
             }
 
             if event_state == EventState::NotConsumed {
-                event_state = self.profile_list.event(ev)?;
+                event_state = self.profile_list.event(ev).unwrap();
                 if event_state.is_notconsumed() {
-                    event_state = self.template_list.event(ev)?;
+                    event_state = self.template_list.event(ev).unwrap();
                 }
             }
         }
@@ -255,7 +392,7 @@ impl ProfileTab {
         Ok(event_state)
     }
 
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
+    fn draw<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
         if !self.is_visible() {
             return;
         }
@@ -282,139 +419,6 @@ impl ProfileTab {
         self.confirm_popup.draw(f);
     }
 
-    pub fn switch_fouce(&mut self, fouce: Fouce) {
-        self.profile_list.set_fouce(false);
-        self.template_list.set_fouce(false);
-
-        match fouce {
-            Fouce::Profile => {
-                self.profile_list.set_fouce(true);
-            }
-            Fouce::Template => {
-                self.template_list.set_fouce(true);
-            }
-        }
-        self.fouce = fouce;
-    }
-
-    pub fn handle_select_profile_ev(&mut self) {
-        if let Some(profile_name) = self.profile_list.selected() {
-            if let Err(err) = self.clashtui_util.select_profile(profile_name) {
-                self.popup_txt_msg(err.to_string());
-            } else {
-                self.clashtui_state
-                    .borrow_mut()
-                    .set_profile(profile_name.to_string());
-                self.clashtui_state.borrow().save_status_to_file();
-            }
-        }
-    }
-    pub fn handle_update_profile_ev(&mut self, does_update_all: bool) {
-        if let Some(profile_name) = self.profile_list.selected() {
-            match self
-                .clashtui_util
-                .update_profile(profile_name, does_update_all)
-            {
-                Ok(res) => {
-                    let mut msg = ClashTuiUtil::concat_update_profile_result(res);
-
-                    if profile_name == self.clashtui_state.borrow().get_profile() {
-                        if let Err(err) = self
-                            .clashtui_util
-                            .select_profile(profile_name)
-                        {
-                            msg.push(err.to_string());
-                        } else {
-                            msg.push("Update and selected".to_string());
-                        }
-                    } else {
-                        msg.push("Updated".to_string());
-                    }
-
-                    self.popup_list_msg(msg);
-                }
-                Err(err) => {
-                    self.popup_txt_msg(format!("Failed to Update: {}", err.to_string()));
-                }
-            }
-        }
-    }
-    pub fn handle_delete_profile_ev(&mut self) {
-        if let Some(profile_name) = self.profile_list.selected() {
-            match remove_file(self.clashtui_util.profile_dir.join(profile_name)) {
-                Ok(()) => {
-                    self.update_profile_list();
-                }
-                Err(err) => {
-                    self.popup_txt_msg(err.to_string());
-                }
-            }
-        }
-    }
-
-    pub fn handle_import_profile_ev(&mut self) {
-        let profile_name = self.profile_input.name_input.get_input_data();
-        let uri = self.profile_input.uri_input.get_input_data();
-        let profile_name = profile_name.trim();
-        let uri = uri.trim();
-
-        if uri.is_empty() || profile_name.is_empty() {
-            self.popup_txt_msg("Uri or Name is empty!".to_string());
-            return;
-        }
-
-        if uri.starts_with("http://") || uri.starts_with("https://") {
-            match OpenOptions::new()
-                .create_new(true)
-                .write(true)
-                .open(self.clashtui_util.profile_dir.join(profile_name))
-            {
-                Ok(mut file) => {
-                    if let Err(err) = write!(file, "{}", uri) {
-                        self.popup_txt_msg(err.to_string());
-                    } else {
-                        self.update_profile_list();
-                    }
-                }
-                Err(err) => self.popup_txt_msg(err.to_string()),
-            }
-        } else if Path::new(uri).is_file() {
-            let uri_path = Path::new(uri);
-            if uri_path.exists() {
-                self.popup_txt_msg("Failed to import: file exists".to_string());
-                return;
-            }
-
-            let _ = fs::copy(
-                Path::new(uri),
-                Path::new(
-                    &self
-                        .clashtui_util
-                        .profile_dir
-                        .join(Path::new(profile_name).with_extension("yaml")),
-                ),
-            );
-            self.update_profile_list();
-        } else {
-            self.popup_txt_msg("Uri is invalid.".to_string());
-        }
-    }
-
-    pub fn handle_create_template_ev(&mut self) {
-        if let Some(template_name) = self.template_list.selected() {
-            if let Err(err) = self.clashtui_util.create_yaml_with_template(template_name) {
-                self.popup_txt_msg(err.to_string());
-            } else {
-                self.popup_txt_msg("Created".to_string());
-                self.update_profile_list();
-            }
-        }
-    }
-
-    pub fn update_profile_list(&mut self) {
-        let mut profile_names: Vec<String> = self.clashtui_util.get_profile_names().unwrap();
-        self.profile_list.set_items(profile_names);
-    }
 }
 
 title_methods!(ProfileTab);

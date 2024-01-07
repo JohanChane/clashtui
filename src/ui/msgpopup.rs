@@ -12,7 +12,7 @@ use super::EventState;
 
 pub struct MsgPopup {
     title: String,
-    pub is_visible: bool,
+    is_visible: bool,
     msg: Vec<String>,
     scroll_v: u16,
     scroll_h: u16,

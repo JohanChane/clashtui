@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
-use crate::clashtui_state::SharedClashTuiState;
+use crate::utils::SharedClashTuiState;
 use crate::ui::{widgets::SharedTheme, EventState};
 use crate::visible_methods;
 
