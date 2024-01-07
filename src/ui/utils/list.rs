@@ -11,7 +11,7 @@ use crate::{fouce_methods, visible_methods};
 //     pub state: ScrollbarState,
 //     pub pos: usize,
 // }
-// 
+//
 // impl ClashTuiScrollBar {
 //     pub fn new(pos: usize) -> Self {
 //         Self {
@@ -23,7 +23,7 @@ use crate::{fouce_methods, visible_methods};
 //         self.pos = self.pos.saturating_add(1);
 //         self.state = self.state.position(self.pos as u16)
 //     }
-// 
+//
 //     pub fn previous(&mut self) {
 //         self.pos = self.pos.saturating_sub(1);
 //         self.state = self.state.position(self.pos as u16)

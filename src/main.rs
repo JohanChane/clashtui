@@ -89,9 +89,12 @@ fn run_app<B: Backend>(
                     },
                     None => panic!("Should not reached arm!!"),
                 }
-            ).as_str();
+            )
+            .as_str();
         } else {
-            if showstr.is_empty() {break;}
+            if showstr.is_empty() {
+                break;
+            }
             app.popup_txt_msg(showstr);
             terminal.draw(|f| app.draw(f))?;
             drop(err_tarck);

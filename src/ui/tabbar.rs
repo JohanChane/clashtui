@@ -2,8 +2,8 @@ use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, widgets::*};
 
-use crate::ui::EventState;
 use super::utils::SharedTheme;
+use crate::ui::EventState;
 // use crate::visible_methods;
 
 pub struct ClashTuiTabBar {

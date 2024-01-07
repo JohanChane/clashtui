@@ -98,12 +98,10 @@ impl ClashTuiConfig {
         e.err()
     }
 
-    pub fn update_profile(&mut self, profile: String){
+    pub fn update_profile(&mut self, profile: String) {
         self.cur_profile = profile;
     }
 }
-
-
 
 #[test]
 fn test_save_and_load() {
@@ -112,7 +110,8 @@ fn test_save_and_load() {
         Ok(v) => v,
         Err(e) => {
             println!("{}", e);
-        ClashTuiConfig::default()}
+            ClashTuiConfig::default()
+        }
     };
     println!("{:?}", conf);
     let e = conf.to_file(path);
@@ -128,26 +127,42 @@ pub enum ClashTuiConfigLoadError {
     LoadProfileConfig,
 }
 
-pub fn init_config(clashtui_config_dir: &std::path::PathBuf, symbols: &crate::ui::SharedSymbols) -> Result<(), Error> {
+pub fn init_config(
+    clashtui_config_dir: &std::path::PathBuf,
+    symbols: &crate::ui::SharedSymbols,
+) -> Result<(), Error> {
     // just assume it's working, handle bug when bug occurs
     use std::fs;
     let r = fs::create_dir_all(&clashtui_config_dir);
-    if r.is_err(){return r;}
-    let r = fs::write(clashtui_config_dir.join("config.yaml"), &symbols.default_clash_cfg_content);
-    if r.is_err(){return r;}
+    if r.is_err() {
+        return r;
+    }
+    let r = fs::write(
+        clashtui_config_dir.join("config.yaml"),
+        &symbols.default_clash_cfg_content,
+    );
+    if r.is_err() {
+        return r;
+    }
     let r = fs::create_dir(clashtui_config_dir.join("profiles"));
-    if r.is_err(){return r;}
+    if r.is_err() {
+        return r;
+    }
     // Well, just keep them before I remove the template function or what
     let r = fs::create_dir_all(clashtui_config_dir.join("templates"));
-    if r.is_err(){return r;}
+    if r.is_err() {
+        return r;
+    }
     let r = fs::File::create(clashtui_config_dir.join("templates/template_proxy_providers"));
     match r {
-        Err(e) => return  Err(e),
+        Err(e) => return Err(e),
         Ok(_) => (),
     };
 
-    fs::write(clashtui_config_dir.join("basic_clash_config.yaml"), &symbols.default_basic_clash_cfg_content)
-
+    fs::write(
+        clashtui_config_dir.join("basic_clash_config.yaml"),
+        &symbols.default_basic_clash_cfg_content,
+    )
 }
 
 #[cfg(target_os = "linux")]

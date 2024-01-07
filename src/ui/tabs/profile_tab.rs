@@ -9,15 +9,18 @@ use std::{
     io::Write,
 };
 
-use super::{CommonTab, profile_input::ProfileInputPopup};
+use super::{profile_input::ProfileInputPopup, CommonTab};
 use crate::ui::keys::{match_key, SharedKeyList};
-use crate::ui::{utils::{ClashTuiList, SharedTheme}, popups::MsgPopup};
+use crate::ui::ConfirmPopup;
 use crate::ui::EventState;
 use crate::ui::SharedSymbols;
-use crate::ui::ConfirmPopup;
+use crate::ui::{
+    popups::MsgPopup,
+    utils::{ClashTuiList, SharedTheme},
+};
 use crate::utils::SharedClashTuiState;
 use crate::utils::{ClashTuiUtil, SharedClashTuiUtil};
-use crate::{msgpopup_methods, visible_methods, title_methods};
+use crate::{msgpopup_methods, title_methods, visible_methods};
 
 enum Fouce {
     Profile,
@@ -242,7 +245,6 @@ impl ProfileTab {
 }
 
 impl CommonTab for ProfileTab {
-    
     fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
@@ -409,7 +411,6 @@ impl CommonTab for ProfileTab {
         self.msgpopup.draw(f);
         self.confirm_popup.draw(f);
     }
-
 }
 
 title_methods!(ProfileTab);

@@ -1,9 +1,9 @@
-mod clashtui;
 mod clash;
+mod clashtui;
 mod configs;
 
-pub use self::clashtui::{ClashTuiUtil, State, SharedClashTuiUtil, SharedClashTuiState};
-pub use self::configs::{ClashTuiConfigLoadError, init_config};
+pub use self::clashtui::{ClashTuiUtil, SharedClashTuiState, SharedClashTuiUtil, State};
+pub use self::configs::{init_config, ClashTuiConfigLoadError};
 
 macro_rules! define_clashtui_operations {
     ($($variant:ident),*) => {
@@ -32,11 +32,7 @@ macro_rules! define_clashtui_operations {
 }
 
 #[cfg(target_os = "linux")]
-define_clashtui_operations!(
-    StartClash,
-    StopClash,
-    TestClashConfig
-);
+define_clashtui_operations!(StartClash, StopClash, TestClashConfig);
 
 #[cfg(target_os = "windows")]
 define_clashtui_operations!(

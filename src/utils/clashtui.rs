@@ -18,9 +18,9 @@ use encoding::all::GBK;
 
 use super::ClashTuiOp;
 
-use super::configs::_State;
 use super::clash::ClashUtil;
 use super::configs::ClashTuiConfig;
+use super::configs::_State;
 use super::configs::{ClashConfig, ClashTuiConfigLoadError};
 
 pub type SharedClashTuiUtil = Rc<ClashTuiUtil>;

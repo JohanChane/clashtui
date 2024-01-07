@@ -11,12 +11,12 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::msgpopup_methods;
-use crate::ui::popups::{ClashTuiListPopup, MsgPopup};
-use crate::ui::tabs::{ClashSrvCtlTab, Tabs, CommonTab, ProfileTab};
 use crate::ui::keys::{match_key, KeyList, SharedKeyList};
-use crate::ui::utils::{Theme, helper};
-use crate::ui::{SharedSymbols, Symbols, ClashTuiTabBar, ClashTuiStatusBar, EventState};
-use crate::utils::{ClashTuiUtil, SharedClashTuiState, SharedClashTuiUtil, State, ClashTuiOp};
+use crate::ui::popups::{ClashTuiListPopup, MsgPopup};
+use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ProfileTab, Tabs};
+use crate::ui::utils::{helper, Theme};
+use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState, SharedSymbols, Symbols};
+use crate::utils::{ClashTuiOp, ClashTuiUtil, SharedClashTuiState, SharedClashTuiUtil, State};
 
 pub struct App {
     title: String,
@@ -51,6 +51,7 @@ impl App {
         let data_dir = exe_dir.join("data");
         let clashtui_config_dir = if data_dir.exists() && data_dir.is_dir() {
             // portable mode
+            log::info!("Portable Mode!");
             data_dir
         } else {
             #[cfg(target_os = "linux")]
@@ -85,27 +86,29 @@ impl App {
         let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
 
         tab.push(Tabs::ProfileTab(RefCell::new(ProfileTab::new(
-                    key_list.clone(),
-                    names.clone(),
-                    Rc::clone(&clashtui_util),
-                    Rc::clone(&clashtui_state),
-                    Rc::clone(&theme),
-                ))));
+            key_list.clone(),
+            names.clone(),
+            Rc::clone(&clashtui_util),
+            Rc::clone(&clashtui_state),
+            Rc::clone(&theme),
+        ))));
         tab.push(Tabs::ClashsrvctlTab(RefCell::new(ClashSrvCtlTab::new(
-                    key_list.clone(),
-                    names.clone(),
-                    Rc::clone(&clashtui_util),
-                    Rc::clone(&theme),
-                ))));
+            key_list.clone(),
+            names.clone(),
+            Rc::clone(&clashtui_util),
+            Rc::clone(&theme),
+        ))));
 
         let mut app = Self {
             title: "ClashTui".to_string(),
             tabbar: ClashTuiTabBar::new(
                 "".to_string(),
-                tab.iter().map(|x| match x {
-                    Tabs::ProfileTab(v) => v.borrow().get_title().clone(),
-                    Tabs::ClashsrvctlTab(v) => v.borrow().get_title().clone(),
-                }).collect(),
+                tab.iter()
+                    .map(|x| match x {
+                        Tabs::ProfileTab(v) => v.borrow().get_title().clone(),
+                        Tabs::ClashsrvctlTab(v) => v.borrow().get_title().clone(),
+                    })
+                    .collect(),
                 Rc::clone(&theme),
             ),
             should_quit: false,
@@ -226,12 +229,12 @@ impl App {
             if event_state == EventState::NotConsumed {
                 event_state = self.tabbar.event(ev)?;
                 if event_state.is_notconsumed() {
-                    if let Tabs::ProfileTab(tab) = self.tab("profile_tab"){
+                    if let Tabs::ProfileTab(tab) = self.tab("profile_tab") {
                         event_state = tab.borrow_mut().event(ev).unwrap();
                     }
                 }
                 if event_state.is_notconsumed() {
-                    if let Tabs::ClashsrvctlTab(tab) = self.tab("clashsrvctl_tab"){
+                    if let Tabs::ClashsrvctlTab(tab) = self.tab("clashsrvctl_tab") {
                         event_state = tab.borrow_mut().event(ev).unwrap();
                     }
                 }
@@ -312,10 +315,13 @@ impl App {
         self.tabbar.draw(f, chunks[0]);
 
         let tabcontent_chunk = chunks[1];
-        self.tabs.iter().map(|v| match v {
-            Tabs::ProfileTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
-            Tabs::ClashsrvctlTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
-        }).count();
+        self.tabs
+            .iter()
+            .map(|v| match v {
+                Tabs::ProfileTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
+                Tabs::ClashsrvctlTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
+            })
+            .count();
 
         self.statusbar.draw(f, chunks[2]);
 
@@ -328,24 +334,28 @@ impl App {
 
     pub fn update_tabbar(&mut self) {
         let tabname = self.tabbar.selected();
-        let _ = self.tabs.iter().map(|v| match v {
-            Tabs::ProfileTab(k) => {
-                let mut l = k.borrow_mut();
-                if tabname == Some(l.get_title()) {
-                    l.show()
-                } else {
-                    l.hide()
+        let _ = self
+            .tabs
+            .iter()
+            .map(|v| match v {
+                Tabs::ProfileTab(k) => {
+                    let mut l = k.borrow_mut();
+                    if tabname == Some(l.get_title()) {
+                        l.show()
+                    } else {
+                        l.hide()
+                    }
                 }
-            }
-            Tabs::ClashsrvctlTab(k) => {
-                let mut l = k.borrow_mut();
-                if tabname == Some(l.get_title()) {
-                    l.show()
-                } else {
-                    l.hide()
+                Tabs::ClashsrvctlTab(k) => {
+                    let mut l = k.borrow_mut();
+                    if tabname == Some(l.get_title()) {
+                        l.show()
+                    } else {
+                        l.hide()
+                    }
                 }
-            }
-        }).count();
+            })
+            .count();
     }
 
     fn tab(&self, name: &str) -> &Tabs {

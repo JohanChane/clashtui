@@ -1,6 +1,6 @@
-use std::{collections::HashMap, cell::RefCell};
+use std::{cell::RefCell, collections::HashMap};
 
-pub struct ClashUtil{
+pub struct ClashUtil {
     client: reqwest::blocking::Client,
     api: String,
     proxy_addr: String,
@@ -9,28 +9,33 @@ pub struct ClashUtil{
 }
 
 impl ClashUtil {
-    pub fn new(controller_api:String, proxy_addr:String) -> Self{
+    pub fn new(controller_api: String, proxy_addr: String) -> Self {
         let default_payload = "'{\"path\": \"\", \"payload\": \"\"}'".to_string();
 
-    Self {
-        client: reqwest::blocking::Client::new(),
-        api: controller_api,
-        proxy_addr,
-        default_payload,
-        clash_client: HashMap::new().into(),
+        Self {
+            client: reqwest::blocking::Client::new(),
+            api: controller_api,
+            proxy_addr,
+            default_payload,
+            clash_client: HashMap::new().into(),
+        }
     }
-    }
-    fn get(&self, url:&str, payload:Option<&String>) -> Result<String, reqwest::Error>{
+    fn get(&self, url: &str, payload: Option<&String>) -> Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
             Some(kv) => self.client.get(format!("{}{}", api, kv)),
             None => self.client.get(api),
-        }.send();
+        }
+        .send();
         match response {
             Ok(r) => r.text(),
             Err(e) => {
                 if e.is_body() {
-                    log::warn!("[ClashUtil] {} exec {} failed! Is your api and proxy properly set?", "put", url)
+                    log::warn!(
+                        "[ClashUtil] {} exec {} failed! Is your api and proxy properly set?",
+                        "put",
+                        url
+                    )
                 } else {
                     log::error!("[ClashUtil] {} exec {} failed! {}", "put", url, e);
                 }
@@ -38,12 +43,13 @@ impl ClashUtil {
             }
         }
     }
-    fn post(&self, url:&str, payload:Option<&String>) -> Result<String, reqwest::Error>{
+    fn post(&self, url: &str, payload: Option<&String>) -> Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
             Some(kv) => self.client.post(api).body(kv.to_owned()),
             None => self.client.post(api),
-        }.send();
+        }
+        .send();
         match response {
             Ok(r) => r.text(),
             Err(e) => {
@@ -52,13 +58,14 @@ impl ClashUtil {
             }
         }
     }
-    
-    fn put(&self, url:&str, payload:Option<&String>) -> Result<String, reqwest::Error>{
+
+    fn put(&self, url: &str, payload: Option<&String>) -> Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
             Some(kv) => self.client.put(api).body(kv.to_owned()),
             None => self.client.put(api),
-        }.send();
+        }
+        .send();
         match response {
             Ok(r) => r.text(),
             Err(e) => {
@@ -67,47 +74,51 @@ impl ClashUtil {
             }
         }
     }
-    
-    pub fn restart(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
+
+    pub fn restart(&self, payload: Option<&String>) -> Result<String, reqwest::Error> {
         match payload {
             Some(load) => self.post("/restart", Some(load)),
-            None => self.post("/restart", Some(&self.default_payload))            
+            None => self.post("/restart", Some(&self.default_payload)),
         }
     }
     #[allow(unused)]
-    pub fn flush_fakeip(&self) -> Result<String, reqwest::Error>{
+    pub fn flush_fakeip(&self) -> Result<String, reqwest::Error> {
         self.post("/cache/fakeip/flush", None)
     }
     #[allow(unused)]
-    pub fn version(&self) -> Result<String, reqwest::Error>{
+    pub fn version(&self) -> Result<String, reqwest::Error> {
         self.get(&"/version", None)
     }
-    pub fn config_get(&self) -> Result<String, reqwest::Error>{
+    pub fn config_get(&self) -> Result<String, reqwest::Error> {
         self.get(&"/configs", None)
     }
-    pub fn config_reload(&self, payload:String) -> Result<String, reqwest::Error>{
+    pub fn config_reload(&self, payload: String) -> Result<String, reqwest::Error> {
         self.put("/configs?force=true", Some(&payload))
     }
-    pub fn mock_clash_core(&self, url:&str) -> Result<reqwest::blocking::Response, reqwest::Error>{
+    pub fn mock_clash_core(
+        &self,
+        url: &str,
+    ) -> Result<reqwest::blocking::Response, reqwest::Error> {
         let response;
         let mut hmap = self.clash_client.borrow_mut();
-        match hmap.get(&true) { // Not very good, but it does work. Maybe you can do it better 
+        match hmap.get(&true) {
+            // Not very good, but it does work. Maybe you can do it better
             Some(c) => response = c.get(url).send(),
             None => {
                 let proxy = reqwest::Proxy::http(&self.proxy_addr).unwrap();
                 let client = reqwest::blocking::Client::builder()
-                //.user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36 uacq")
-                //.user_agent("clash-verge/v1.2.0") // url 后不加 `flag=clash` 也会返回 yaml 配置, 而不是返回 base64 编码。
-                .user_agent("clash.meta")
-                .proxy(proxy)
-                .build()
-                .unwrap();
+                    //.user_agent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36 uacq")
+                    //.user_agent("clash-verge/v1.2.0") // url 后不加 `flag=clash` 也会返回 yaml 配置, 而不是返回 base64 编码。
+                    .user_agent("clash.meta")
+                    .proxy(proxy)
+                    .build()
+                    .unwrap();
                 response = client.get(url).send();
                 hmap.insert(true, client);
                 // println!("!! init one");
             }
         }
-    response
+        response
     }
     /*
     pub fn config_patch(&self, payload:String) -> Result<String, reqwest::Error>{
@@ -122,7 +133,7 @@ impl ClashUtil {
     pub fn update_geo(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
         match payload {
             Some(load) => self.post("/configs/geo", Some(load)),
-            None => self.post("/configs/geo", Some(&self.default_payload))            
+            None => self.post("/configs/geo", Some(&self.default_payload))
         }
     }
     pub fn log(&self) -> Result<String, reqwest::Error>{
@@ -137,7 +148,7 @@ impl ClashUtil {
     pub fn upgrade(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
         match payload {
             Some(load) => self.post("/upgrade", Some(load)),
-            None => self.post("/upgrade", Some(&self.default_payload))            
+            None => self.post("/upgrade", Some(&self.default_payload))
         }
     }
     pub fn upgrade_ui(&self) -> Result<String, reqwest::Error>{
@@ -213,29 +224,37 @@ impl ClashUtil {
     */
 }
 
-
 #[test]
-fn test(){
+fn test() {
     let mut is = true;
-    let sym = ClashUtil::new("http://127.0.0.1:9090".to_string(), "http://127.0.0.1:7890".to_string());
+    let sym = ClashUtil::new(
+        "http://127.0.0.1:9090".to_string(),
+        "http://127.0.0.1:7890".to_string(),
+    );
     match sym.version() {
         Ok(r) => println!("{:?}", r),
-        Err(_) => is = false       
+        Err(_) => is = false,
     }
     assert!(is)
 }
 
 #[test]
 #[allow(unused)]
-fn test_clash_mock(){
-    let stru = ClashUtil::new("http://127.0.0.1:9090".to_string(), "http://127.0.0.1:7890".to_string());
+fn test_clash_mock() {
+    let stru = ClashUtil::new(
+        "http://127.0.0.1:9090".to_string(),
+        "http://127.0.0.1:7890".to_string(),
+    );
     let r1 = stru.mock_clash_core("");
     let r2 = stru.mock_clash_core("");
 }
 
 #[test]
-fn test_connection(){
-    let c = ClashUtil::new("http://127.0.0.1:9090".to_string(), "http://127.0.0.1:7890".into());
+fn test_connection() {
+    let c = ClashUtil::new(
+        "http://127.0.0.1:9090".to_string(),
+        "http://127.0.0.1:7890".into(),
+    );
     let res = c.get("", None);
     println!("{:?}", res);
 }

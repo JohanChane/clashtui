@@ -1,14 +1,14 @@
 mod confirm_popup;
+pub mod keys;
+pub mod popups;
 mod statusbar;
 mod tabbar;
-pub mod utils;
-pub mod popups;
 pub mod tabs;
-pub mod keys;
+pub mod utils;
 
 pub use self::confirm_popup::ConfirmPopup;
-pub use self::statusbar::ClashTuiStatusBar;
 pub use self::keys::symbols::{SharedSymbols, Symbols};
+pub use self::statusbar::ClashTuiStatusBar;
 
 pub use tabbar::ClashTuiTabBar;
 
@@ -35,7 +35,6 @@ impl EventState {
         *self == Self::NotConsumed
     }
 }
-
 
 #[macro_export]
 macro_rules! msgpopup_methods {
