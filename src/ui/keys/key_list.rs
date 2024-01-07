@@ -66,7 +66,7 @@ impl Default for KeyList {
             //app_home_open: ClashTuiKeyEvent::new(KeyCode::Char('H')),
             //clash_cfg_dir_open: ClashTuiKeyEvent::new(KeyCode::Char('G')),
             log_cat: ClashTuiKeyEvent::new(KeyCode::Char('L')),
-            app_quit: ClashTuiKeyEvent::new(KeyCode::Char('q')),
+            app_quit: ClashTuiKeyEvent::new(KeyCode::Char('Q')),
             app_help: ClashTuiKeyEvent::new(KeyCode::Char('?')),
         }
     }

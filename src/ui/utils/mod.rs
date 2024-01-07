@@ -1,14 +1,9 @@
 pub mod helper;
 mod list;
-mod popups;
 pub mod style;
-mod tabbar;
 
 pub use self::list::ClashTuiList;
-pub use self::popups::ClashTuiInputPopup;
-pub use self::popups::ClashTuiListPopup;
 pub use self::style::{SharedTheme, Theme};
-pub use self::tabbar::ClashTuiTabBar;
 
 #[macro_export]
 macro_rules! title_methods {
@@ -22,37 +17,9 @@ macro_rules! title_methods {
 }
 
 #[macro_export]
-macro_rules! title_methods_f {
-    ($type:ident) => {
-        impl $type<'_> {
-            pub fn get_title(&self) -> &String {
-                &self.title
-            }
-        }
-    };
-}
-
-#[macro_export]
 macro_rules! visible_methods {
     ($type:ident) => {
         impl $type {
-            pub fn is_visible(&self) -> bool {
-                self.is_visible
-            }
-            pub fn show(&mut self) {
-                self.is_visible = true;
-            }
-            pub fn hide(&mut self) {
-                self.is_visible = false;
-            }
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! visible_methods_f {
-    ($type:ident) => {
-        impl $type<'_> {
             pub fn is_visible(&self) -> bool {
                 self.is_visible
             }

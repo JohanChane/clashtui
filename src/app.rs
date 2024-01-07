@@ -11,21 +11,16 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::msgpopup_methods;
-use crate::ui::clashsrvctl_tab::ClashSrvCtlTab;
+use crate::ui::popups::{ClashTuiListPopup, MsgPopup};
+use crate::ui::tabs::{ClashSrvCtlTab, Tabs, CommonTab, ProfileTab};
 use crate::ui::keys::{match_key, KeyList, SharedKeyList};
-use crate::ui::profile_tab::ProfileTab;
-use crate::ui::statusbar::ClashTuiStatusBar;
-use crate::ui::{
-    widgets::{helper, ClashTuiListPopup, ClashTuiTabBar, Theme},
-    EventState, MsgPopup,
-};
-use crate::ui::{ClashTuiOp, CommonTab, Tabs};
-use crate::ui::{SharedSymbols, Symbols};
-use crate::utils::{ClashTuiUtil, SharedClashTuiState, SharedClashTuiUtil, State};
+use crate::ui::utils::{Theme, helper};
+use crate::ui::{SharedSymbols, Symbols, ClashTuiTabBar, ClashTuiStatusBar, EventState};
+use crate::utils::{ClashTuiUtil, SharedClashTuiState, SharedClashTuiUtil, State, ClashTuiOp};
 
 pub struct App {
-    pub title: String,
-    pub tabbar: ClashTuiTabBar,
+    title: String,
+    tabbar: ClashTuiTabBar,
     // pub profile_tab: ProfileTab,
     // pub clashsrvctl_tab: ClashSrvCtlTab,
     tabs: Vec<Tabs>,
@@ -90,7 +85,6 @@ impl App {
         let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
 
         tab.push(Tabs::ProfileTab(RefCell::new(ProfileTab::new(
-                    "".to_string(),
                     key_list.clone(),
                     names.clone(),
                     Rc::clone(&clashtui_util),
@@ -98,7 +92,6 @@ impl App {
                     Rc::clone(&theme),
                 ))));
         tab.push(Tabs::ClashsrvctlTab(RefCell::new(ClashSrvCtlTab::new(
-                    names.clashsrvctl.clone(),
                     key_list.clone(),
                     names.clone(),
                     Rc::clone(&clashtui_util),
@@ -109,7 +102,10 @@ impl App {
             title: "ClashTui".to_string(),
             tabbar: ClashTuiTabBar::new(
                 "".to_string(),
-                vec![names.profile.clone(), names.clashsrvctl.clone()],
+                tab.iter().map(|x| match x {
+                    Tabs::ProfileTab(v) => v.borrow().get_title().clone(),
+                    Tabs::ClashsrvctlTab(v) => v.borrow().get_title().clone(),
+                }).collect(),
                 Rc::clone(&theme),
             ),
             should_quit: false,
@@ -334,17 +330,19 @@ impl App {
         let tabname = self.tabbar.selected();
         let _ = self.tabs.iter().map(|v| match v {
             Tabs::ProfileTab(k) => {
-                if tabname == Some(&self.symbols.profile) {
-                    k.borrow_mut().show()
+                let mut l = k.borrow_mut();
+                if tabname == Some(l.get_title()) {
+                    l.show()
                 } else {
-                    k.borrow_mut().hide()
+                    l.hide()
                 }
             }
             Tabs::ClashsrvctlTab(k) => {
-                if tabname == Some(&self.symbols.clashsrvctl) {
-                    k.borrow_mut().show()
+                let mut l = k.borrow_mut();
+                if tabname == Some(l.get_title()) {
+                    l.show()
                 } else {
-                    k.borrow_mut().hide()
+                    l.hide()
                 }
             }
         }).count();

@@ -4,7 +4,7 @@ use ratatui::style::{Modifier, Style};
 use ratatui::{prelude::*, widgets::*};
 use std::cmp::{max, min};
 
-use crate::ui::widgets::SharedTheme;
+use crate::ui::utils::{SharedTheme, helper};
 
 pub struct ClashTuiListPopup {
     title: String,
@@ -14,7 +14,6 @@ pub struct ClashTuiListPopup {
     theme: SharedTheme,
 }
 
-use super::super::helper;
 use crate::ui::EventState;
 use crate::visible_methods;
 

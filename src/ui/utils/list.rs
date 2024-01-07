@@ -7,28 +7,28 @@ use super::SharedTheme;
 use crate::ui::EventState;
 use crate::{fouce_methods, visible_methods};
 
-struct ClashTuiScrollBar {
-    pub state: ScrollbarState,
-    pub pos: usize,
-}
-
-impl ClashTuiScrollBar {
-    pub fn new(pos: usize) -> Self {
-        Self {
-            state: ScrollbarState::default(),
-            pos,
-        }
-    }
-    pub fn next(&mut self) {
-        self.pos = self.pos.saturating_add(1);
-        self.state = self.state.position(self.pos as u16)
-    }
-
-    pub fn previous(&mut self) {
-        self.pos = self.pos.saturating_sub(1);
-        self.state = self.state.position(self.pos as u16)
-    }
-}
+// struct ClashTuiScrollBar {
+//     pub state: ScrollbarState,
+//     pub pos: usize,
+// }
+// 
+// impl ClashTuiScrollBar {
+//     pub fn new(pos: usize) -> Self {
+//         Self {
+//             state: ScrollbarState::default(),
+//             pos,
+//         }
+//     }
+//     pub fn next(&mut self) {
+//         self.pos = self.pos.saturating_add(1);
+//         self.state = self.state.position(self.pos as u16)
+//     }
+// 
+//     pub fn previous(&mut self) {
+//         self.pos = self.pos.saturating_sub(1);
+//         self.state = self.state.position(self.pos as u16)
+//     }
+// }
 
 pub struct ClashTuiList {
     title: String,
@@ -36,7 +36,7 @@ pub struct ClashTuiList {
     is_fouce: bool,
     items: Vec<String>,
     list_state: ListState,
-    scrollbar: ClashTuiScrollBar,
+    scrollbar: ScrollbarState,
 
     theme: SharedTheme,
 }
@@ -49,7 +49,7 @@ impl ClashTuiList {
             is_fouce: true,
             items: vec![],
             list_state: ListState::default(),
-            scrollbar: ClashTuiScrollBar::new(0),
+            scrollbar: ScrollbarState::default(),
 
             theme,
         }
@@ -120,14 +120,14 @@ impl ClashTuiList {
         f.render_stateful_widget(list, area, &mut self.list_state);
 
         if item_len > area.height as usize {
-            self.scrollbar.state = self.scrollbar.state.content_length(item_len as u16);
+            self.scrollbar = self.scrollbar.content_length(item_len as u16);
             f.render_stateful_widget(
                 Scrollbar::default()
                     .orientation(ScrollbarOrientation::VerticalRight)
                     .begin_symbol(Some("↑"))
                     .end_symbol(Some("↓")),
                 area,
-                &mut self.scrollbar.state,
+                &mut self.scrollbar,
             );
         }
     }

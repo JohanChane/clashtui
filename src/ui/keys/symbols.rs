@@ -46,7 +46,7 @@ impl Default for Symbols {
                         L: show recent log
                         1,2,...,9: Switch tab
                         Esc: Close popup
-                        q: Quit
+                        Q: Quit
                         ?: help"#
             .to_string();
         let default_clash_cfg_content = r#"[default]

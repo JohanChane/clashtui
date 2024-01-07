@@ -3,7 +3,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::prelude::*;
 
 use crate::ui::EventState;
-use crate::ui::MsgPopup;
+use crate::ui::popups::MsgPopup;
 
 pub struct ConfirmPopup {
     msgpopup: MsgPopup,

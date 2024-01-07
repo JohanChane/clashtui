@@ -2,13 +2,13 @@ use anyhow::Result;
 use crossterm::event::{Event, KeyEventKind};
 use ratatui::prelude::*;
 
-use super::keys::{match_key, SharedKeyList};
-use super::widgets::SharedTheme;
-use super::{ClashTuiOp, CommonTab};
-use super::SharedSymbols;
-use super::{widgets::ClashTuiList, EventState, MsgPopup};
+use crate::ui::keys::{match_key, SharedKeyList};
+use super::CommonTab;
+use crate::ui::SharedSymbols;
+use crate::ui::{utils::{ClashTuiList, SharedTheme}, EventState, popups::MsgPopup};
 use crate::utils::SharedClashTuiUtil;
-use crate::{msgpopup_methods, title_methods, visible_methods};
+use crate::{msgpopup_methods, visible_methods, title_methods};
+use crate::utils::ClashTuiOp;
 
 pub struct ClashSrvCtlTab {
     title: String,
@@ -18,14 +18,12 @@ pub struct ClashSrvCtlTab {
     msgpopup: MsgPopup,
 
     key_list: SharedKeyList,
-    symbols: SharedSymbols,
 
     clashtui_util: SharedClashTuiUtil,
 }
 
 impl ClashSrvCtlTab {
     pub fn new(
-        title: String,
         key_list: SharedKeyList,
         symbols: SharedSymbols,
         clashtui_util: SharedClashTuiUtil,
@@ -48,11 +46,10 @@ impl ClashSrvCtlTab {
         ]);
 
         Self {
-            title,
+            title: symbols.clashsrvctl.clone(),
             is_visible: false,
             srvctl_list: operations,
             key_list,
-            symbols,
             clashtui_util,
             msgpopup: MsgPopup::new(),
         }

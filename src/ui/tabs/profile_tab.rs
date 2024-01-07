@@ -9,17 +9,17 @@ use std::{
     io::Write,
 };
 
-use super::CommonTab;
-use super::keys::{match_key, SharedKeyList};
-use crate::ui::widgets::{ClashTuiList, SharedTheme};
+use super::{CommonTab, profile_input::ProfileInputPopup};
+use crate::ui::keys::{match_key, SharedKeyList};
+use crate::ui::{utils::{ClashTuiList, SharedTheme}, popups::MsgPopup};
 use crate::ui::EventState;
 use crate::ui::SharedSymbols;
-use crate::ui::{ConfirmPopup, MsgPopup, ProfileInputPopup};
+use crate::ui::ConfirmPopup;
 use crate::utils::SharedClashTuiState;
 use crate::utils::{ClashTuiUtil, SharedClashTuiUtil};
-use crate::{msgpopup_methods, title_methods, visible_methods};
+use crate::{msgpopup_methods, visible_methods, title_methods};
 
-pub enum Fouce {
+enum Fouce {
     Profile,
     Template,
 }
@@ -29,24 +29,19 @@ pub struct ProfileTab {
     is_visible: bool,
     fouce: Fouce,
 
-    pub profile_list: ClashTuiList,
-    pub template_list: ClashTuiList,
+    profile_list: ClashTuiList,
+    template_list: ClashTuiList,
     msgpopup: MsgPopup,
     confirm_popup: ConfirmPopup,
     profile_input: ProfileInputPopup,
 
-    pub key_list: SharedKeyList,
-    pub symbols: SharedSymbols,
-    pub clashtui_util: SharedClashTuiUtil,
-    pub clashtui_state: SharedClashTuiState,
-
-    pub input_name: String,
-    pub input_uri: String,
+    key_list: SharedKeyList,
+    clashtui_util: SharedClashTuiUtil,
+    clashtui_state: SharedClashTuiState,
 }
 
 impl ProfileTab {
     pub fn new(
-        title: String,
         key_list: SharedKeyList,
         symbols: SharedSymbols,
         clashtui_util: SharedClashTuiUtil,
@@ -57,7 +52,7 @@ impl ProfileTab {
         let templates = ClashTuiList::new(symbols.template.clone(), Rc::clone(&theme));
 
         let mut instance = Self {
-            title,
+            title: symbols.profile.clone(),
             is_visible: true,
             profile_list: profiles,
             template_list: templates,
@@ -67,12 +62,8 @@ impl ProfileTab {
             profile_input: ProfileInputPopup::new(),
 
             key_list,
-            symbols,
             clashtui_util,
             clashtui_state,
-
-            input_name: String::new(),
-            input_uri: String::new(),
         };
 
         instance.update_profile_list();
@@ -118,7 +109,7 @@ impl ProfileTab {
         Ok(event_state)
     }
 
-    pub fn switch_fouce(&mut self, fouce: Fouce) {
+    fn switch_fouce(&mut self, fouce: Fouce) {
         self.profile_list.set_fouce(false);
         self.template_list.set_fouce(false);
 

@@ -1,18 +1,14 @@
-use anyhow::Result;
-use crossterm::event::{Event, KeyEventKind};
-use ratatui::prelude::Backend;
 use ratatui::style::Style;
 use ratatui::{
-    prelude::{Frame, Rect, Span},
+    prelude::{Frame, Rect, Span, Backend},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
 
 use crate::utils::SharedClashTuiState;
-use crate::ui::{widgets::SharedTheme, EventState};
-use crate::visible_methods;
+use crate::ui::utils::SharedTheme;
+// use crate::visible_methods;
 
 pub struct ClashTuiStatusBar {
-    title: String,
     is_visible: bool,
     clashtui_state: SharedClashTuiState,
 
@@ -22,29 +18,10 @@ pub struct ClashTuiStatusBar {
 impl ClashTuiStatusBar {
     pub fn new(clashtui_state: SharedClashTuiState, theme: SharedTheme) -> Self {
     Self {
-            title: "StatusBar".to_string(),
             is_visible: true,
             clashtui_state,
-
             theme,
         }
-    }
-
-    pub fn event(&mut self, ev: &Event) -> Result<EventState> {
-        if !self.is_visible {
-            return Ok(EventState::NotConsumed);
-        }
-
-        let mut event_state = EventState::NotConsumed;
-        if let Event::Key(key) = ev {
-            if key.kind == KeyEventKind::Press {
-                event_state = match key.code {
-                    _ => EventState::NotConsumed,
-                };
-            }
-        }
-
-        Ok(event_state)
     }
 
     pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
@@ -78,4 +55,4 @@ impl ClashTuiStatusBar {
     }
 }
 
-visible_methods!(ClashTuiStatusBar);
+// visible_methods!(ClashTuiTabBar);

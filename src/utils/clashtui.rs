@@ -16,7 +16,7 @@ use std::{
 #[cfg(target_os = "windows")]
 use encoding::all::GBK;
 
-use crate::ui::ClashTuiOp;
+use super::ClashTuiOp;
 
 use super::configs::_State;
 use super::clash::ClashUtil;

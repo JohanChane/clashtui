@@ -2,7 +2,7 @@ use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, widgets::*};
 
-use crate::ui::widgets::ClashTuiInputPopup;
+use crate::ui::popups::ClashTuiInputPopup;
 use crate::ui::EventState;
 
 pub struct ProfileInputPopup {

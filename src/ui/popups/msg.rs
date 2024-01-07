@@ -7,8 +7,8 @@ use ratatui::{
 };
 use std::cmp::{max, min};
 
-use super::widgets::helper;
-use super::EventState;
+use crate::ui::utils::helper;
+use crate::ui::EventState;
 
 pub struct MsgPopup {
     title: String,

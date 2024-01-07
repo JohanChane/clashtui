@@ -3,8 +3,8 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude::*, widgets::*};
 
 use crate::ui::EventState;
-use super::SharedTheme;
-use crate::visible_methods;
+use super::utils::SharedTheme;
+// use crate::visible_methods;
 
 pub struct ClashTuiTabBar {
     title: String,
@@ -88,4 +88,4 @@ impl ClashTuiTabBar {
     }
 }
 
-visible_methods!(ClashTuiTabBar);
+// visible_methods!(ClashTuiTabBar);
