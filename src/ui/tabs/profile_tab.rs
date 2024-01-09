@@ -1,25 +1,23 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::prelude::*;
-use std::fs;
-use std::path::Path;
-use std::rc::Rc;
+use ratatui::prelude as Ra;
 use std::{
+    fs,
     fs::{remove_file, OpenOptions},
     io::Write,
+    path::Path,
+    rc::Rc,
 };
 
 use super::{profile_input::ProfileInputPopup, CommonTab};
-use crate::ui::keys::{match_key, SharedKeyList};
-use crate::ui::ConfirmPopup;
-use crate::ui::EventState;
-use crate::ui::SharedSymbols;
 use crate::ui::{
+    keys::{match_key, SharedKeyList},
     popups::MsgPopup,
     utils::{ClashTuiList, SharedTheme},
+    ConfirmPopup, EventState, SharedSymbols,
 };
-use crate::utils::SharedClashTuiState;
-use crate::utils::{ClashTuiUtil, SharedClashTuiUtil};
+use crate::utils::utils as Utils;
+use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
 use crate::{msgpopup_methods, title_methods, visible_methods};
 
 enum Fouce {
@@ -143,13 +141,14 @@ impl ProfileTab {
         if let Some(profile_name) = self.profile_list.selected() {
             match self
                 .clashtui_util
-                .update_profile(profile_name, does_update_all)
+                .update_local_profile(profile_name, does_update_all)
             {
                 Ok(res) => {
-                    let mut msg = ClashTuiUtil::concat_update_profile_result(res);
+                    let mut msg = Utils::concat_update_profile_result(res);
 
-                    if profile_name == self.clashtui_state.borrow_mut().get_profile() {
+                    if profile_name == self.clashtui_state.borrow().get_profile() {
                         if let Err(err) = self.clashtui_util.select_profile(profile_name) {
+                            log::debug!("{:?}", err);
                             msg.push(err.to_string());
                         } else {
                             msg.push("Update and selected".to_string());
@@ -385,7 +384,8 @@ impl CommonTab for ProfileTab {
         Ok(event_state)
     }
 
-    fn draw<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
+    fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
+        use Ra::{Constraint, Layout};
         if !self.is_visible() {
             return;
         }
@@ -408,8 +408,8 @@ impl CommonTab for ProfileTab {
             .split(f.size())[1];
 
         self.profile_input.draw(f, input_area);
-        self.msgpopup.draw(f);
-        self.confirm_popup.draw(f);
+        self.msgpopup.draw(f, area);
+        self.confirm_popup.draw(f, area);
     }
 }
 

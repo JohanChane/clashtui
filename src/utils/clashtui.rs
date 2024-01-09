@@ -1,71 +1,30 @@
-use anyhow::{anyhow, bail, Result};
 use log;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::process::Command;
-use std::process::Output;
-use std::rc::Rc;
 use std::{
-    self,
-    fs::{self, create_dir_all, read_dir, File},
-    io::Read,
-    io::{BufRead, BufReader},
+    fs,
+    fs::{create_dir_all, File},
+    io::{BufRead, BufReader, Error, Read},
     path::{Path, PathBuf},
 };
 
 #[cfg(target_os = "windows")]
 use encoding::all::GBK;
 
-use super::ClashTuiOp;
-
 use super::clash::ClashUtil;
-use super::configs::ClashTuiConfig;
-use super::configs::_State;
-use super::configs::{ClashConfig, ClashTuiConfigLoadError};
-
-pub type SharedClashTuiUtil = Rc<ClashTuiUtil>;
-pub type SharedClashTuiState = Rc<RefCell<State>>;
-// We need it to be here during the time ui is shown, which's almost always
-
-pub struct State {
-    pub st: _State,
-}
-impl State {
-    pub fn new(ct: &ClashTuiUtil) -> Self {
-        Self {
-            st: ct.update_state(None).into(),
-        }
-    }
-    pub fn get_profile(&self) -> &String {
-        &self.st.profile
-    }
-    pub fn set_profile(&mut self, profile: String, ct: &ClashTuiUtil) {
-        // With update state
-        self.st = ct.update_state(Some(profile)).into();
-    }
-    pub fn update_tun(&mut self, ct: &ClashTuiUtil) {
-        self.st = ct.update_state(None).into();
-    }
-    pub fn get_tun(&self) -> String {
-        self.st.tun.clone()
-    }
-    #[cfg(target_os = "windows")]
-    pub fn get_sysproxy(&self) -> bool {
-        self.state.sysproxy
-    }
-    #[cfg(target_os = "windows")]
-    pub fn set_sysproxy(&mut self, sysproxy: bool) {
-        self.state.sysproxy = sysproxy;
-    }
-}
+use super::clash_state::_State;
+use super::configs::{ClashConfig, ClashTuiConfig, ClashTuiConfigLoadError};
+use super::utils as Utils;
+use super::ClashTuiOp;
 
 pub struct ClashTuiUtil {
     pub clashtui_dir: PathBuf,
     pub profile_dir: PathBuf,
 
     clash_api: ClashUtil,
-    clashtui_config: ClashTuiConfig,
-    clash_remote_config: Option<ClashConfig>,
+    clashtui_config: RefCell<ClashTuiConfig>,
+    clash_remote_config: RefCell<Option<ClashConfig>>,
 
     err_track: Vec<ClashTuiConfigLoadError>,
 }
@@ -73,19 +32,23 @@ pub struct ClashTuiUtil {
 impl ClashTuiUtil {
     pub fn new(clashtui_dir: &PathBuf, profile_dir: &PathBuf) -> Self {
         let ret = load_app_config(clashtui_dir);
+        let mut err_track = ret.3;
         let clash_api = ClashUtil::new(ret.1, ret.2);
         let cur_remote = match clash_api.config_get() {
             Ok(v) => v,
             Err(_) => String::new(),
         };
         let remote = ClashConfig::from_str(cur_remote.as_str());
+        if remote.is_none() {
+            err_track.push(ClashTuiConfigLoadError::LoadClashConfig);
+        }
         Self {
             clashtui_dir: clashtui_dir.clone(),
             profile_dir: profile_dir.clone(),
             clash_api,
-            clashtui_config: ret.0,
-            clash_remote_config: remote,
-            err_track: ret.3,
+            clashtui_config: RefCell::new(ret.0),
+            clash_remote_config: RefCell::new(remote),
+            err_track,
         }
     }
 
@@ -93,54 +56,54 @@ impl ClashTuiUtil {
         return self.err_track.clone();
     }
 
-    pub fn fetch_remote(&mut self) -> Result<()> {
+    fn fetch_remote(&self) {
         let cur_remote = self.clash_api.config_get().unwrap();
         let remote = ClashConfig::from_str(cur_remote.as_str());
-        self.clash_remote_config = remote;
-        Ok(())
+        *self.clash_remote_config.borrow_mut() = remote;
     }
 
     pub fn restart_clash(&self) -> Result<String, reqwest::Error> {
         self.clash_api.restart(None)
     }
 
-    pub fn load_config(&self) -> Result<()> {
+    pub fn patch_config(&self) -> Option<reqwest::Error> {
         let body = serde_json::json!({
-            "path": self.clashtui_config.clash_cfg_path.as_str(),
+            "path": self.clashtui_config.borrow().clash_cfg_path.as_str(),
             "payload": ""
         })
         .to_string();
 
-        let response = self.clash_api.config_reload(body)?;
-        log::error!("response err: {:?}", response);
-        Ok(())
+        self.clash_api.config_reload(body)
     }
 
-    pub fn select_profile(&self, profile_name: &String) -> Result<()> {
-        self.merge_profile(profile_name).or_else(|err| {
+    pub fn select_profile(&self, profile_name: &String) -> Result<(), Error> {
+        if let Err(err) = self.merge_profile(profile_name) {
             log::error!(
                 "Failed to Merge Profile `{}`: {}",
                 profile_name,
                 err.to_string()
             );
-            return Err(err);
-        })?;
-        self.load_config().or_else(|err| {
+            return Err(Error::new(std::io::ErrorKind::Other, err));
+        } else {
+        };
+        if let Some(err) = self.patch_config() {
             log::error!(
-                "Failed to load Profile `{}`: {}",
+                "Failed to Patch Profile `{}`: {}",
                 profile_name,
                 err.to_string()
             );
-            return Err(err);
-        })
+            return Err(Error::new(std::io::ErrorKind::Other, err));
+        } else {
+        };
+        Ok(())
     }
 
-    pub fn merge_profile(&self, profile_name: &String) -> Result<()> {
+    pub fn merge_profile(&self, profile_name: &String) -> anyhow::Result<()> {
         let basic_clash_cfg_path = self.clashtui_dir.join("basic_clash_config.yaml");
         let mut dst_parsed_yaml = parse_yaml(&basic_clash_cfg_path)?;
         let profile_yaml_path = self.get_profile_yaml_path(profile_name);
         let profile_parsed_yaml = parse_yaml(&profile_yaml_path).or_else(|e| {
-            bail!(
+            anyhow::bail!(
                 "Maybe need to update first. Failed to parse {}: {}",
                 profile_yaml_path.to_str().unwrap(),
                 e.to_string()
@@ -163,17 +126,17 @@ impl ClashTuiUtil {
             }
         }
 
-        let final_clash_cfg_file = File::create(&self.clashtui_config.clash_cfg_path)?;
+        let final_clash_cfg_file = File::create(&self.clashtui_config.borrow().clash_cfg_path)?;
         serde_yaml::to_writer(final_clash_cfg_file, &dst_parsed_yaml)?;
 
         Ok(())
     }
 
-    pub fn update_profile(
+    pub fn update_local_profile(
         &self,
         profile_name: &String,
         does_update_all: bool,
-    ) -> Result<(Vec<(String, String)>, Vec<(String, String)>)> {
+    ) -> anyhow::Result<(Vec<(String, String)>, Vec<(String, String)>)> {
         let net_res_keys = if !does_update_all {
             vec!["proxy-providers"]
         } else {
@@ -195,7 +158,7 @@ impl ClashTuiUtil {
             profile_yaml_path = self.get_profile_yaml_path(profile_name);
             let directory = profile_yaml_path
                 .parent()
-                .ok_or_else(|| anyhow!("Invalid file path"))?;
+                .ok_or_else(|| anyhow::anyhow!("Invalid file path"))?;
             if !directory.exists() {
                 create_dir_all(directory)?;
             }
@@ -256,7 +219,7 @@ impl ClashTuiUtil {
         for (url, path) in &net_res {
             match self.download_file(
                 url,
-                &Path::new(&self.clashtui_config.clash_cfg_dir).join(path),
+                &Path::new(&self.clashtui_config.borrow().clash_cfg_dir).join(path),
             ) {
                 Ok(_) => {
                     updated_res.push((url.clone(), path.clone()));
@@ -271,10 +234,12 @@ impl ClashTuiUtil {
         Ok((updated_res, not_updated_res))
     }
 
-    fn download_file(&self, url: &String, path: &PathBuf) -> Result<()> {
+    fn download_file(&self, url: &String, path: &PathBuf) -> anyhow::Result<()> {
         let mut response = self.clash_api.mock_clash_core(url)?;
 
-        let directory = path.parent().ok_or_else(|| anyhow!("Invalid file path"))?;
+        let directory = path
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Invalid file path"))?;
         if !directory.exists() {
             create_dir_all(directory)?;
         }
@@ -284,24 +249,7 @@ impl ClashTuiUtil {
         Ok(())
     }
 
-    pub fn concat_update_profile_result(
-        result: (Vec<(String, String)>, Vec<(String, String)>),
-    ) -> Vec<String> {
-        let (updated_res, not_updated_res) = result;
-        let mut concatenated_result = Vec::new();
-
-        for (url, path) in not_updated_res {
-            concatenated_result.push(format!("Not Updated: {} -> {}", url, path));
-        }
-
-        for (url, path) in updated_res {
-            concatenated_result.push(format!("Updated: {} -> {}", url, path));
-        }
-
-        concatenated_result
-    }
-
-    pub fn create_yaml_with_template(&self, template_name: &String) -> Result<()> {
+    pub fn create_yaml_with_template(&self, template_name: &String) -> anyhow::Result<()> {
         let template_dir = self.clashtui_dir.join("templates");
         let template_path = template_dir.join(template_name);
         let tpl_parsed_yaml = parse_yaml(&template_path)?;
@@ -327,7 +275,7 @@ impl ClashTuiUtil {
         {
             pp_mapping
         } else {
-            bail!("Failed to parse `proxy-providers`");
+            anyhow::bail!("Failed to parse `proxy-providers`");
         };
 
         for (pp_key, pp_value) in pp_mapping {
@@ -339,7 +287,7 @@ impl ClashTuiUtil {
             let pp = if let serde_yaml::Value::Mapping(pp) = pp_value {
                 pp
             } else {
-                bail!("Failed to parse `proxy-providers` value");
+                anyhow::bail!("Failed to parse `proxy-providers` value");
             };
 
             let mut new_pp = pp.clone();
@@ -378,7 +326,7 @@ impl ClashTuiUtil {
         {
             pg_value
         } else {
-            bail!("Failed to parse `proxy-groups`.");
+            anyhow::bail!("Failed to parse `proxy-groups`.");
         };
 
         for the_pg_value in pg_value {
@@ -390,7 +338,7 @@ impl ClashTuiUtil {
             let the_pg = if let serde_yaml::Value::Mapping(the_pg) = the_pg_value {
                 the_pg
             } else {
-                bail!("Failed to parse `proxy-groups` value");
+                anyhow::bail!("Failed to parse `proxy-groups` value");
             };
 
             let mut new_pg = the_pg.clone();
@@ -401,14 +349,14 @@ impl ClashTuiUtil {
             {
                 provider_keys
             } else {
-                bail!("Failed to parse `providers` in `tpl_param`");
+                anyhow::bail!("Failed to parse `providers` in `tpl_param`");
             };
 
             for the_provider_key in provider_keys {
                 let the_pk_str = if let serde_yaml::Value::String(the_pk_str) = the_provider_key {
                     the_pk_str
                 } else {
-                    bail!("Failed to parse string in `providers`");
+                    anyhow::bail!("Failed to parse string in `providers`");
                 };
 
                 let names = if let Some(names) = pp_names.get(the_pk_str) {
@@ -422,7 +370,7 @@ impl ClashTuiUtil {
                 {
                     the_pg_name
                 } else {
-                    bail!("Failed to parse `name` in `proxy-groups`")
+                    anyhow::bail!("Failed to parse `name` in `proxy-groups`")
                 };
 
                 for n in names {
@@ -456,7 +404,7 @@ impl ClashTuiUtil {
         {
             pg_sequence
         } else {
-            bail!("Failed to parse `proxy-groups`");
+            anyhow::bail!("Failed to parse `proxy-groups`");
         };
 
         for the_pg_seq in pg_sequence {
@@ -509,63 +457,50 @@ impl ClashTuiUtil {
         Ok(())
     }
 
-    fn get_file_names(dir: &Path) -> Result<Vec<String>> {
-        let mut file_names: Vec<String> = Vec::new();
-
-        for entry in read_dir(dir)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_file() {
-                if let Some(file_name) = path.file_name() {
-                    if let Some(file_name_str) = file_name.to_str() {
-                        file_names.push(file_name_str.to_string());
-                    }
-                }
-            }
-        }
-
-        Ok(file_names)
-    }
-    pub fn get_profile_names(&self) -> Result<Vec<String>> {
-        Self::get_file_names(self.profile_dir.as_path()).and_then(|mut v| {
+    pub fn get_profile_names(&self) -> anyhow::Result<Vec<String>> {
+        Utils::get_file_names(self.profile_dir.as_path()).and_then(|mut v| {
             v.sort();
             Ok(v)
         })
     }
-    pub fn get_template_names(&self) -> Result<Vec<String>> {
-        Self::get_file_names(self.clashtui_dir.join("templates").as_path()).and_then(|mut v| {
+    pub fn get_template_names(&self) -> anyhow::Result<Vec<String>> {
+        Utils::get_file_names(self.clashtui_dir.join("templates").as_path()).and_then(|mut v| {
             v.sort();
             Ok(v)
         })
     }
-
     #[cfg(target_os = "linux")]
-    pub fn clash_srv_ctl(&self, op: ClashTuiOp) -> Result<String> {
+    pub fn clash_srv_ctl(&self, op: ClashTuiOp) -> Result<String, Error> {
+        let tuiconf = self.clashtui_config.borrow();
         match op {
             ClashTuiOp::StartClash => {
-                let output = Command::new("systemctl")
+                let output = match Command::new("systemctl")
                     .arg("restart")
-                    .arg(self.clashtui_config.clash_srv_name.as_str())
-                    .output()?;
+                    .arg(tuiconf.clash_srv_name.as_str())
+                    .output()
+                {
+                    Ok(v) => v,
+                    Err(e) => return Err(e),
+                };
 
-                return Self::string_process_output(output);
+                return Utils::string_process_output(output);
             }
             ClashTuiOp::StopClash => {
                 let output = Command::new("systemctl")
                     .arg("stop")
-                    .arg(self.clashtui_config.clash_srv_name.as_str())
-                    .output()?;
-                return Self::string_process_output(output);
+                    .arg(tuiconf.clash_srv_name.as_str())
+                    .output()
+                    .unwrap();
+                return Utils::string_process_output(output);
             }
             ClashTuiOp::TestClashConfig => {
-                return self
-                    .test_profile_config(&Path::new(&self.clashtui_config.clash_cfg_path), false);
+                return self.test_profile_config(&Path::new(&tuiconf.clash_cfg_path), false);
             }
             _ => Ok("".to_string()),
         }
     }
     #[cfg(target_os = "windows")]
-    pub fn clash_srv_ctl(&self, op: ClashTuiOp) -> Result<String> {
+    pub fn clash_srv_ctl(&self, op: ClashTuiOp) -> Result<String, Error> {
         let exe_dir = std::env::current_exe()
             .unwrap()
             .parent()
@@ -653,165 +588,18 @@ impl ClashTuiUtil {
         Self::string_process_output(output)
     }
 
-    #[cfg(target_os = "windows")]
-    fn execute_powershell_script(script: &str) -> Result<std::process::Output> {
-        let output = Command::new("powershell")
-            .arg("-Command")
-            .arg(script)
-            .output()?;
-
-        return Ok(output);
-    }
-    #[cfg(target_os = "windows")]
-    pub fn start_process_as_admin(
-        path: &str,
-        arg_list: &str,
-        does_wait: bool,
-    ) -> Result<std::process::Output> {
-        let wait_op = if does_wait { "-Wait" } else { "" };
-        let arg_op = if arg_list.is_empty() {
-            "".to_string()
-        } else {
-            format!("-ArgumentList '{}'", arg_list)
-        };
-
-        let output = Command::new("powershell")
-            .arg("-Command")
-            .arg(&format!(
-                "Start-Process {} -FilePath '{}' {} -Verb 'RunAs'",
-                wait_op, path, arg_op
-            ))
-            .output()?;
-
-        return Ok(output);
-    }
-    #[cfg(target_os = "windows")]
-    pub fn execute_powershell_script_as_admin(
-        cmd: &str,
-        does_wait: bool,
-    ) -> Result<std::process::Output> {
-        let wait_op = if does_wait { "-Wait" } else { "" };
-        let cmd_op: String = if cmd.is_empty() {
-            "".to_string()
-        } else {
-            format!("-ArgumentList '-Command {}'", cmd)
-        };
-        let output = Command::new("powershell")
-            .arg("-Command")
-            .arg(&format!(
-                "Start-Process {} -FilePath powershell {} -Verb 'RunAs' 2>&1 | Out-String",
-                wait_op, cmd_op
-            ))
-            .output()?;
-
-        return Ok(output);
-    }
-    #[cfg(target_os = "windows")]
-    pub fn enable_system_proxy(&self) -> Result<std::process::Output> {
-        let enable_script = format!(
-            r#"
-            $proxyAddress = "{}"
-            $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
-            Set-ItemProperty -Path $regPath -Name ProxyEnable -Value 1
-            Set-ItemProperty -Path $regPath -Name ProxyServer -Value $proxyAddress
-            gpupdate /force
-        "#,
-            self.proxy_addr
-        );
-
-        Self::execute_powershell_script(&enable_script).context("Failed to enable system proxy")
-    }
-
-    #[cfg(target_os = "windows")]
-    pub fn disable_system_proxy() -> Result<std::process::Output> {
-        let disable_script = r#"
-            $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
-            Set-ItemProperty -Path $regPath -Name ProxyEnable -Value 0
-            gpupdate /force
-        "#;
-        //Remove-ItemProperty -Path $regPath -Name ProxyServer
-
-        Self::execute_powershell_script(disable_script).context("Failed to disable system proxy")
-    }
-
-    #[cfg(target_os = "windows")]
-    pub fn is_system_proxy_enabled() -> Result<bool> {
-        let reg_query_output = Command::new("reg")
-            .args(&[
-                "query",
-                "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
-                "/v",
-                "ProxyEnable",
-            ])
-            .output()?;
-
-        let output_str = String::from_utf8_lossy(&reg_query_output.stdout);
-
-        //log::error!("{}", output_str);
-        // Assuming the output format is like "ProxyEnable    REG_DWORD    0x00000001"
-        let is_enabled = output_str.contains("REG_DWORD")
-            && (output_str.contains("0x1") || output_str.contains("0x00000001"));
-
-        Ok(is_enabled)
-    }
-
-    #[cfg(target_os = "windows")]
-    fn string_process_output(output: Output) -> Result<String> {
-        let stdout_vec: Vec<u8> = output.stdout;
-
-        let stdout_str = GBK
-            .decode(&stdout_vec, DecoderTrap::Strict)
-            .map_err(|err| anyhow!("Failed to decode stdout: {}", err))?;
-
-        let stderr_str = GBK
-            .decode(&output.stderr, DecoderTrap::Strict)
-            .map_err(|err| anyhow!("Failed to decode stderr: {}", err))?;
-
-        let result_str = format!(
-            r#"
-            Status:
-            {}
-    
-            Stdout:
-            {}
-    
-            Stderr:
-            {}
-            "#,
-            output.status, stdout_str, stderr_str
-        );
-
-        Ok(result_str)
-    }
-    #[cfg(target_os = "linux")]
-    fn string_process_output(output: Output) -> Result<String> {
-        let stdout_str = String::from_utf8(output.stdout).unwrap();
-        let stderr_str = String::from_utf8(output.stderr).unwrap();
-
-        let result_str = format!(
-            r#"
-            Status:
-            {}
-    
-            Stdout:
-            {}
-    
-            Stderr:
-            {}
-            "#,
-            output.status, stdout_str, stderr_str
-        );
-
-        Ok(result_str)
-    }
-
     #[cfg(target_os = "linux")]
     pub fn update_state(&self, new_pf: Option<String>) -> _State {
+        self.fetch_remote();
+        let mut tuiconf = self.clashtui_config.borrow_mut();
         let pf = match new_pf {
-            Some(v) => v,
-            None => self.clashtui_config.cur_profile.clone(),
+            Some(v) => {
+                tuiconf.update_profile(v.clone());
+                v
+            }
+            None => tuiconf.cur_profile.clone(),
         };
-        let tun = match &self.clash_remote_config {
+        let tun = match self.clash_remote_config.borrow().as_ref() {
             Some(v) => {
                 if v.tun.enable {
                     v.tun.stack.to_string()
@@ -824,27 +612,28 @@ impl ClashTuiUtil {
         _State::new(pf, tun)
     }
 
-    pub fn test_profile_config(&self, path: &Path, geodata_mode: bool) -> Result<String> {
+    pub fn test_profile_config(&self, path: &Path, geodata_mode: bool) -> Result<String, Error> {
+        let tuiconf = self.clashtui_config.borrow();
         let cmd = if geodata_mode {
             format!(
                 "{} -m -d {} -f {} -t",
-                self.clashtui_config.clash_core_path.as_str(),
-                self.clashtui_config.clash_cfg_dir.as_str(),
+                tuiconf.clash_core_path.as_str(),
+                tuiconf.clash_cfg_dir.as_str(),
                 path.to_str().unwrap(),
             )
         } else {
             format!(
                 "{} -d {} -f {} -t",
-                self.clashtui_config.clash_core_path.as_str(),
-                self.clashtui_config.clash_cfg_dir.as_str(),
+                tuiconf.clash_core_path.as_str(),
+                tuiconf.clash_cfg_dir.as_str(),
                 path.to_str().unwrap(),
             )
         };
         #[cfg(target_os = "linux")]
-        let output = Command::new("sh").arg("-c").arg(&cmd).output()?;
+        let output = Command::new("sh").arg("-c").arg(&cmd).output().unwrap();
         #[cfg(target_os = "windows")]
         let output = Command::new("cmd").arg("/C").arg(&cmd).output()?;
-        return Self::string_process_output(output);
+        return Utils::string_process_output(output);
     }
 
     // 目前是根据文件后缀来判断, 而不是文件内容。这样可以减少 io。
@@ -960,10 +749,6 @@ impl ClashTuiUtil {
     }
     */
 
-    pub fn get_clashtui_config(&self) -> &ClashTuiConfig {
-        &self.clashtui_config
-    }
-
     pub fn fetch_recent_logs(&self, num_lines: usize) -> Vec<String> {
         let log = std::fs::read_to_string(self.clashtui_dir.join("clashtui.log"))
             .unwrap_or_else(|_| String::new());
@@ -1002,7 +787,7 @@ fn get_proxy_addr(yaml_data: &serde_yaml::Value) -> String {
     format!("http://{}:7890", host)
 }
 
-fn parse_yaml(yaml_path: &Path) -> Result<serde_yaml::Value> {
+fn parse_yaml(yaml_path: &Path) -> anyhow::Result<serde_yaml::Value> {
     let mut file = File::open(yaml_path)?;
     let mut yaml_content = String::new();
     file.read_to_string(&mut yaml_content)?;

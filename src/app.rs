@@ -81,16 +81,17 @@ impl App {
 
         let help_popup = ClashTuiListPopup::new("Help".to_string(), Rc::clone(&theme));
 
-        let clashtui_state = SharedClashTuiState::new(RefCell::new(State::new(&clashtui_util)));
+        let clashtui_state =
+            SharedClashTuiState::new(RefCell::new(State::new(clashtui_util.clone())));
 
         let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
 
         tab.push(Tabs::ProfileTab(RefCell::new(ProfileTab::new(
             key_list.clone(),
             names.clone(),
-            Rc::clone(&clashtui_util),
-            Rc::clone(&clashtui_state),
-            Rc::clone(&theme),
+            clashtui_util.clone(),
+            clashtui_state.clone(),
+            theme.clone(),
         ))));
         tab.push(Tabs::ClashsrvctlTab(RefCell::new(ClashSrvCtlTab::new(
             key_list.clone(),
@@ -263,10 +264,7 @@ impl App {
                 if let Tabs::ProfileTab(profile_tab) = self.tab("profile_tab") {
                     profile_tab.borrow_mut().hide_msgpopup();
                     match profile_tab.borrow_mut().handle_select_profile_ev() {
-                        Some(v) => self
-                            .clashtui_state
-                            .borrow_mut()
-                            .update_tun(&self.clashtui_util),
+                        Some(v) => self.clashtui_state.borrow_mut().set_profile(v),
                         None => (),
                     };
                 };
@@ -327,7 +325,7 @@ impl App {
 
         let help_area = helper::centered_percent_rect(60, 60, f.size());
         self.help_popup.draw(f, help_area);
-        self.msgpopup.draw(f);
+        self.msgpopup.draw(f, help_area);
     }
 
     pub fn on_tick(&mut self) {}

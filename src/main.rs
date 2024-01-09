@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     Ok(())
 }
-
+#[allow(unused_variables)]
 pub fn run(tick_rate: Duration, enhanced_graphics: bool) -> Result<()> {
     // setup terminal
     enable_raw_mode()?;
@@ -80,17 +80,14 @@ fn run_app<B: Backend>(
     loop {
         if !err_tarck.is_empty() {
             let err: Option<ClashTuiConfigLoadError> = err_tarck.pop();
-            showstr += format!(
-                "The {} might be broken, the progrem will ignore it\n",
-                match err {
+            showstr += match err {
                     Some(v) => match v {
-                        ClashTuiConfigLoadError::LoadAppConfig => "config.toml",
-                        ClashTuiConfigLoadError::LoadProfileConfig => "basic_clash_config.yaml",
+                        ClashTuiConfigLoadError::LoadAppConfig => "The config.yaml might be broken, the progrem contiune with default value\n",
+                        ClashTuiConfigLoadError::LoadProfileConfig => "The basic_clash_config.yaml might be broken, the progrem contiune with default value\n",
+                        ClashTuiConfigLoadError::LoadClashConfig => "Unable to connect to Clash Core, Is the address correct?"
                     },
                     None => panic!("Should not reached arm!!"),
-                }
-            )
-            .as_str();
+                };
         } else {
             if showstr.is_empty() {
                 break;

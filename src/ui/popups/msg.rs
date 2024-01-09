@@ -1,10 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::style::{Color, Style};
-use ratatui::{
-    prelude::*,
-    widgets::{Block, Borders, Clear, Paragraph, Wrap},
-};
+use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
 use crate::ui::utils::helper;
@@ -60,19 +56,20 @@ impl MsgPopup {
 
         Ok(EventState::WorkDone)
     }
-
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>) {
+    
+    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, _area: Ra::Rect) {
+        //! area is only used to keep the args
         if !self.is_visible {
             return;
         }
 
-        let text: Vec<Line> = self
+        let text: Vec<Ra::Line> = self
             .msg
             .iter()
             .map(|s| {
-                Line::from(Span::styled(
+                Ra::Line::from(Ra::Span::styled(
                     s,
-                    Style::default().fg(Color::Rgb(46, 204, 113)),
+                    Ra::Style::default().fg(Ra::Color::Rgb(46, 204, 113)),
                 ))
             })
             .collect();
@@ -85,18 +82,18 @@ impl MsgPopup {
             helper::centered_lenght_rect(dialog_width as u16, dialog_height as u16, f.size());
 
         let paragraph = if text.len() == 1 && max_item_width < area.width as usize {
-            Paragraph::new(text)
-                .wrap(Wrap { trim: true })
-                .alignment(Alignment::Center) // Will cause inability to scroll horizontally.
+            Raw::Paragraph::new(text)
+                .wrap(Raw::Wrap { trim: true })
+                .alignment(Ra::Alignment::Center) // Will cause inability to scroll horizontally.
         } else {
-            Paragraph::new(text).scroll((self.scroll_v, self.scroll_h))
+            Raw::Paragraph::new(text).scroll((self.scroll_v, self.scroll_h))
         };
 
-        let block = Block::new()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(0, 102, 102)));
+        let block = Raw::Block::new()
+            .borders(Raw::Borders::ALL)
+            .border_style(Ra::Style::default().fg(Ra::Color::Rgb(0, 102, 102)));
 
-        f.render_widget(Clear, area);
+        f.render_widget(Raw::Clear, area);
         f.render_widget(paragraph.clone().block(block), area);
     }
 

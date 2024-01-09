@@ -1,9 +1,8 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::ui::popups::ClashTuiInputPopup;
-use crate::ui::EventState;
+use crate::ui::{popups::ClashTuiInputPopup, EventState};
 
 pub struct ProfileInputPopup {
     pub name_input: ClashTuiInputPopup,
@@ -63,24 +62,27 @@ impl ProfileInputPopup {
         Ok(event_state)
     }
 
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
+    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
         if !self.is_visible() {
             return;
         }
 
-        let chunks = Layout::default()
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        let chunks = Ra::Layout::default()
+            .constraints([
+                Ra::Constraint::Percentage(50),
+                Ra::Constraint::Percentage(50),
+            ])
             .margin(1)
             .split(area);
 
-        f.render_widget(Clear, area);
+        f.render_widget(Raw::Clear, area);
 
         self.name_input.draw(f, chunks[0]);
         self.uri_input.draw(f, chunks[1]);
 
-        let block = Block::new()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Rgb(135, 206, 236)))
+        let block = Raw::Block::new()
+            .borders(Raw::Borders::ALL)
+            .border_style(Ra::Style::default().fg(Ra::Color::Rgb(135, 206, 236)))
             .title("InputProfile");
         f.render_widget(block, area);
     }

@@ -1,7 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::style::{Modifier, Style};
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
 use crate::ui::utils::{helper, SharedTheme};
@@ -10,7 +9,7 @@ pub struct ClashTuiListPopup {
     title: String,
     is_visible: bool,
     items: Vec<String>,
-    list_state: ListState,
+    list_state: Raw::ListState,
     theme: SharedTheme,
 }
 
@@ -23,7 +22,7 @@ impl ClashTuiListPopup {
             title,
             is_visible: false,
             items: vec![],
-            list_state: ListState::default(),
+            list_state: Raw::ListState::default(),
             theme,
         }
     }
@@ -55,18 +54,19 @@ impl ClashTuiListPopup {
 
         Ok(EventState::WorkDone)
     }
-
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
+    #[allow(unused_variables)]
+    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
+        use Ra::Style;
         if !self.is_visible {
             return;
         }
 
-        let items: Vec<ListItem> = self
+        let items: Vec<Raw::ListItem> = self
             .items
             .iter()
             .map(|i| {
-                let lines = vec![Line::from(i.clone())];
-                ListItem::new(lines).style(Style::default())
+                let lines = vec![Ra::Line::from(i.clone())];
+                Raw::ListItem::new(lines).style(Style::default())
             })
             .collect();
 
@@ -78,20 +78,20 @@ impl ClashTuiListPopup {
         let area =
             helper::centered_lenght_rect(dialog_width as u16, dialog_height as u16, f.size());
 
-        let list = List::new(items)
+        let list = Raw::List::new(items)
             .block(
-                Block::default()
-                    .borders(Borders::ALL)
+                Raw::Block::default()
+                    .borders(Raw::Borders::ALL)
                     .border_style(Style::default().fg(self.theme.list_block_fg_fouced))
                     .title(self.title.clone()),
             )
             .highlight_style(
                 Style::default()
                     .bg(self.theme.list_hl_bg_fouced)
-                    .add_modifier(Modifier::BOLD),
+                    .add_modifier(Ra::Modifier::BOLD),
             );
 
-        f.render_widget(Clear, area);
+        f.render_widget(Raw::Clear, area);
         f.render_stateful_widget(list, area, &mut self.list_state);
     }
 

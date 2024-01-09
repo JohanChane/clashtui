@@ -92,10 +92,9 @@ impl ClashTuiConfig {
     }
 
     pub fn to_file(&self, config_path: &str) -> Result<(), String> {
-        let e = File::create(config_path)
+        File::create(config_path)
             .map_err(|e| e.to_string())
-            .and_then(|f| serde_yaml::to_writer(f, self).map_err(|e| e.to_string()));
-        e
+            .and_then(|f| serde_yaml::to_writer(f, self).map_err(|e| e.to_string()))
     }
 
     pub fn update_profile(&mut self, profile: String) {
@@ -130,6 +129,7 @@ fn test_save_and_load() {
 pub enum ClashTuiConfigLoadError {
     LoadAppConfig,
     LoadProfileConfig,
+    LoadClashConfig,
 }
 
 pub fn init_config(
@@ -166,36 +166,6 @@ pub fn init_config(
         clashtui_config_dir.join("basic_clash_config.yaml"),
         &symbols.default_basic_clash_cfg_content,
     )
-}
-
-#[cfg(target_os = "linux")]
-#[derive(Serialize, Deserialize, Default)]
-pub struct _State {
-    pub profile: String,
-    pub tun: String,
-}
-#[cfg(target_os = "linux")]
-impl _State {
-    pub fn new(pf: String, tun: String) -> Self {
-        Self { tun, profile: pf }
-    }
-}
-#[cfg(target_os = "windows")]
-#[derive(Serialize, Deserialize, Default)]
-pub struct State {
-    pub profile: String,
-    pub tun: String,
-    pub sysproxy: bool,
-}
-#[cfg(target_os = "windows")]
-impl _State {
-    pub fn new(pf: String, tun: String, syp: bool) -> Self {
-        Self {
-            tun,
-            profile: pf,
-            sysproxy: syp,
-        }
-    }
 }
 
 #[test]

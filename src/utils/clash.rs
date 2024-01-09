@@ -92,8 +92,11 @@ impl ClashUtil {
     pub fn config_get(&self) -> Result<String, reqwest::Error> {
         self.get(&"/configs", None)
     }
-    pub fn config_reload(&self, payload: String) -> Result<String, reqwest::Error> {
-        self.put("/configs?force=true", Some(&payload))
+    pub fn config_reload(&self, payload: String) -> Option<reqwest::Error> {
+        match self.put("/configs?force=true", Some(&payload)) {
+            Err(e) => Some(e),
+            _ => None,
+        }
     }
     pub fn mock_clash_core(
         &self,

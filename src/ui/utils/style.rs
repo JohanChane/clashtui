@@ -16,7 +16,11 @@ pub struct Theme {
     pub statusbar_txt_fg: Color,
 }
 
-impl Theme {}
+impl Theme {
+    pub fn load_theme(ph: &std::path::PathBuf) -> Self {
+        todo!("Load User Themes")
+    }
+}
 
 impl Default for Theme {
     fn default() -> Self {

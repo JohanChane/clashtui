@@ -1,6 +1,5 @@
-use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{prelude as Ra, widgets as Raw};
 
 use super::utils::SharedTheme;
 use crate::ui::EventState;
@@ -27,7 +26,7 @@ impl ClashTuiTabBar {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, std::io::Error> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -54,19 +53,24 @@ impl ClashTuiTabBar {
         Ok(event_stata)
     }
 
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
+    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
         let items = self
             .tab_titles
             .iter()
-            .map(|t| text::Line::from(Span::styled(t, Style::default().fg(self.theme.tab_txt_fg))))
+            .map(|t| {
+                Ra::text::Line::from(Ra::Span::styled(
+                    t,
+                    Ra::Style::default().fg(self.theme.tab_txt_fg),
+                ))
+            })
             .collect();
-        let tabs = Tabs::new(items)
+        let tabs = Raw::Tabs::new(items)
             .block(
-                Block::default()
-                    .borders(Borders::ALL)
+                Raw::Block::default()
+                    .borders(Raw::Borders::ALL)
                     .title(self.title.clone()),
             )
-            .highlight_style(Style::default().fg(self.theme.tab_hl_fg))
+            .highlight_style(Ra::Style::default().fg(self.theme.tab_hl_fg))
             .select(self.index);
         f.render_widget(tabs, area);
     }

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::prelude::*;
+use ratatui::prelude as Ra;
 
 use crate::ui::popups::MsgPopup;
 use crate::ui::EventState;
@@ -42,8 +42,9 @@ impl ConfirmPopup {
         Ok(event_state)
     }
 
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>) {
-        self.msgpopup.draw(f);
+    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, _area: Ra::Rect) {
+        //! area is only used to keep the args
+        self.msgpopup.draw(f, _area);
     }
 
     //pub fn is_visible(&self) -> bool {

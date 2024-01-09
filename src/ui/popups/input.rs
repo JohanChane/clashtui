@@ -1,6 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{prelude as Ra, widgets as Raw};
 
 use crate::ui::EventState;
 use crate::{fouce_methods, visible_methods};
@@ -62,22 +62,22 @@ impl ClashTuiInputPopup {
         Ok(EventState::WorkDone)
     }
 
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
+    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
         if !self.is_visible {
             return;
         }
 
-        f.render_widget(Clear, area);
+        f.render_widget(Raw::Clear, area);
 
-        let input = Paragraph::new(self.input.as_str())
-            .style(Style::default().fg(if self.is_fouce {
-                Color::Yellow
+        let input = Raw::Paragraph::new(self.input.as_str())
+            .style(Ra::Style::default().fg(if self.is_fouce {
+                Ra::Color::Yellow
             } else {
-                Color::default()
+                Ra::Color::default()
             }))
             .block(
-                Block::default()
-                    .borders(Borders::ALL)
+                Raw::Block::default()
+                    .borders(Raw::Borders::ALL)
                     .title(self.title.clone()),
             );
         f.render_widget(input, area);

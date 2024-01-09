@@ -1,7 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{prelude as Ra, widgets as Raw};
 
 use super::SharedTheme;
 use crate::ui::EventState;
@@ -35,8 +34,8 @@ pub struct ClashTuiList {
     is_visible: bool,
     is_fouce: bool,
     items: Vec<String>,
-    list_state: ListState,
-    scrollbar: ScrollbarState,
+    list_state: Raw::ListState,
+    scrollbar: Raw::ScrollbarState,
 
     theme: SharedTheme,
 }
@@ -48,8 +47,8 @@ impl ClashTuiList {
             is_visible: true,
             is_fouce: true,
             items: vec![],
-            list_state: ListState::default(),
-            scrollbar: ScrollbarState::default(),
+            list_state: Raw::ListState::default(),
+            scrollbar: Raw::ScrollbarState::default(),
 
             theme,
         }
@@ -80,27 +79,27 @@ impl ClashTuiList {
         Ok(event_state)
     }
 
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, area: Rect) {
+    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
         if !self.is_visible {
             return;
         }
 
-        let items: Vec<ListItem> = self
+        let items: Vec<Raw::ListItem> = self
             .items
             .iter()
             .map(|i| {
-                let lines = vec![Line::from(i.clone())];
-                ListItem::new(lines).style(Style::default())
+                let lines = vec![Ra::Line::from(i.clone())];
+                Raw::ListItem::new(lines).style(Ra::Style::default())
             })
             .collect();
 
         let item_len = items.len();
 
-        let list = List::new(items)
+        let list = Raw::List::new(items)
             .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(if self.is_fouce {
+                Raw::Block::default()
+                    .borders(Raw::Borders::ALL)
+                    .border_style(Ra::Style::default().fg(if self.is_fouce {
                         self.theme.list_block_fg_fouced
                     } else {
                         self.theme.list_block_fg_unfouced
@@ -108,13 +107,13 @@ impl ClashTuiList {
                     .title(self.title.clone()),
             )
             .highlight_style(
-                Style::default()
+                Ra::Style::default()
                     .bg(if self.is_fouce {
                         self.theme.list_hl_bg_fouced
                     } else {
-                        Color::default()
+                        Ra::Color::default()
                     })
-                    .add_modifier(Modifier::BOLD),
+                    .add_modifier(Ra::Modifier::BOLD),
             );
 
         f.render_stateful_widget(list, area, &mut self.list_state);
@@ -122,8 +121,8 @@ impl ClashTuiList {
         if item_len > area.height as usize {
             self.scrollbar = self.scrollbar.content_length(item_len as u16);
             f.render_stateful_widget(
-                Scrollbar::default()
-                    .orientation(ScrollbarOrientation::VerticalRight)
+                Raw::Scrollbar::default()
+                    .orientation(Raw::ScrollbarOrientation::VerticalRight)
                     .begin_symbol(Some("↑"))
                     .end_symbol(Some("↓")),
                 area,

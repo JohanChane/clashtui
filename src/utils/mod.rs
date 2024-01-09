@@ -1,9 +1,15 @@
 mod clash;
+mod clash_state;
 mod clashtui;
 mod configs;
+pub mod utils;
 
-pub use self::clashtui::{ClashTuiUtil, SharedClashTuiState, SharedClashTuiUtil, State};
+pub use self::clash_state::State;
+pub use self::clashtui::ClashTuiUtil;
 pub use self::configs::{init_config, ClashTuiConfigLoadError};
+
+pub type SharedClashTuiUtil = std::rc::Rc<ClashTuiUtil>;
+pub type SharedClashTuiState = std::rc::Rc<std::cell::RefCell<State>>;
 
 macro_rules! define_clashtui_operations {
     ($($variant:ident),*) => {

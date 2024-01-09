@@ -1,4 +1,5 @@
-use ratatui::prelude::*;
+use ratatui::prelude as Ra;
+use Ra::{Constraint, Direction, Layout, Rect};
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
 pub fn centered_percent_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
