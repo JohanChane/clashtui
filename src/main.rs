@@ -77,17 +77,22 @@ fn run_app<B: Backend>(
     let mut last_ev = EventState::NotConsumed;
     let mut showstr = String::new();
     let mut err_tarck = app.clashtui_util.get_err_track();
+    app.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
     loop {
         if !err_tarck.is_empty() {
             let err: Option<ClashTuiConfigLoadError> = err_tarck.pop();
+            let el;
             showstr += match err {
-                    Some(v) => match v {
-                        ClashTuiConfigLoadError::LoadAppConfig => "The config.yaml might be broken, the progrem contiune with default value\n",
-                        ClashTuiConfigLoadError::LoadProfileConfig => "The basic_clash_config.yaml might be broken, the progrem contiune with default value\n",
-                        ClashTuiConfigLoadError::LoadClashConfig => "Unable to connect to Clash Core, Is the address correct?"
-                    },
-                    None => panic!("Should not reached arm!!"),
-                };
+                Some(v) => {
+                    el = match v {
+                        ClashTuiConfigLoadError::LoadAppConfig(x) => x.into_string(),
+                        ClashTuiConfigLoadError::LoadProfileConfig(x) => x.into_string(),
+                        ClashTuiConfigLoadError::LoadClashConfig(x) => x.into_string(),
+                    };
+                    el.as_str()
+                }
+                None => panic!("Should not reached arm!!"),
+            };
         } else {
             if showstr.is_empty() {
                 break;
@@ -98,6 +103,7 @@ fn run_app<B: Backend>(
             break;
         }
     }
+    log::info!("App init finished");
     loop {
         terminal.draw(|f| app.draw(f))?;
 
@@ -115,6 +121,7 @@ fn run_app<B: Backend>(
             last_tick = Instant::now();
         }
         if app.should_quit {
+            app.clashtui_util.save_config();
             return Ok(());
         }
     }

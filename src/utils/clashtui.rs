@@ -40,7 +40,9 @@ impl ClashTuiUtil {
         };
         let remote = ClashConfig::from_str(cur_remote.as_str());
         if remote.is_none() {
-            err_track.push(ClashTuiConfigLoadError::LoadClashConfig);
+            err_track.push(ClashTuiConfigLoadError::LoadClashConfig(
+                "Fail to load config from clash core. Is it Running?\n".into(),
+            ));
         }
         Self {
             clashtui_dir: clashtui_dir.clone(),
@@ -54,6 +56,16 @@ impl ClashTuiUtil {
 
     pub fn get_err_track(&self) -> Vec<ClashTuiConfigLoadError> {
         return self.err_track.clone();
+    }
+
+    pub fn save_config(&self) {
+        if let Err(x) = self
+            .clashtui_config
+            .borrow()
+            .to_file(self.clashtui_dir.join("config.yaml").to_str().unwrap())
+        {
+            log::error!("Error while saving config: {}", x);
+        }
     }
 
     fn fetch_remote(&self) {
@@ -496,7 +508,6 @@ impl ClashTuiUtil {
             ClashTuiOp::TestClashConfig => {
                 return self.test_profile_config(&Path::new(&tuiconf.clash_cfg_path), false);
             }
-            _ => Ok("".to_string()),
         }
     }
     #[cfg(target_os = "windows")]
@@ -805,7 +816,9 @@ fn load_app_config(
         match parse_yaml(basic_clash_config_path.as_path()) {
             Ok(r) => r,
             Err(_) => {
-                err_collect.push_if_not_exist(ClashTuiConfigLoadError::LoadProfileConfig);
+                err_collect.push(ClashTuiConfigLoadError::LoadProfileConfig(
+                    "Fail to load User Defined Config\n".into(),
+                ));
                 serde_yaml::Value::from("")
             }
         };
@@ -824,9 +837,20 @@ fn load_app_config(
 
     let config_path = clashtui_dir.join("config.yaml");
     let configs = match ClashTuiConfig::from_file(config_path.to_str().unwrap()) {
-        Ok(v) => v,
+        Ok(v) => {
+            if !v.check() {
+                err_collect.push(ClashTuiConfigLoadError::LoadAppConfig(
+                    "Some Key Configs are missing, or Default\n".into(),
+                ));
+                log::warn!("Empty Config ?");
+                log::debug!("{:?}", v)
+            };
+            v
+        }
         Err(e) => {
-            err_collect.push_if_not_exist(ClashTuiConfigLoadError::LoadAppConfig);
+            err_collect.push(ClashTuiConfigLoadError::LoadAppConfig(
+                "Fail to load configs, using Default\n".into(),
+            ));
             log::error!("Unable to load config file. {}", e);
             ClashTuiConfig::default()
         }

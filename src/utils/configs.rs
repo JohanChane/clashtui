@@ -97,6 +97,19 @@ impl ClashTuiConfig {
             .and_then(|f| serde_yaml::to_writer(f, self).map_err(|e| e.to_string()))
     }
 
+    pub fn check(&self) -> bool {
+        if self.clash_cfg_dir == "" {
+            return false;
+        }
+        if self.clash_cfg_path == "" {
+            return false;
+        }
+        if self.clash_core_path == "" {
+            return false;
+        }
+        true
+    }
+
     pub fn update_profile(&mut self, profile: String) {
         self.cur_profile = profile;
     }
@@ -127,9 +140,9 @@ fn test_save_and_load() {
 
 #[derive(PartialEq, Clone)]
 pub enum ClashTuiConfigLoadError {
-    LoadAppConfig,
-    LoadProfileConfig,
-    LoadClashConfig,
+    LoadAppConfig(Box<str>),
+    LoadProfileConfig(Box<str>),
+    LoadClashConfig(Box<str>),
 }
 
 pub fn init_config(
