@@ -36,8 +36,9 @@ impl ClashTuiStatusBar {
         );
         #[cfg(target_os = "linux")]
         let status_str = format!(
-            "Profile: {}    Tun: {}    Help: ?",
+            "Profile: {}    Mode: {}    Tun: {}    Help: ?",
             state.get_profile(),
+            state.get_mode(),
             state.get_tun(),
         );
 

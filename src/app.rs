@@ -21,8 +21,6 @@ use crate::utils::{ClashTuiOp, ClashTuiUtil, SharedClashTuiState, SharedClashTui
 pub struct App {
     title: String,
     tabbar: ClashTuiTabBar,
-    // pub profile_tab: ProfileTab,
-    // pub clashsrvctl_tab: ClashSrvCtlTab,
     tabs: Vec<Tabs>,
     pub should_quit: bool,
     pub help_popup: ClashTuiListPopup,
@@ -66,7 +64,6 @@ impl App {
         };
 
         if !clashtui_config_dir.join("config.yaml").exists() {
-            //.join("basic_clash_config.yaml").exists() { // weird, shouldn`t we check the dir rather the single file?
             if let Err(err) = crate::utils::init_config(&clashtui_config_dir, &names) {
                 log::error!("{}", err);
             }

@@ -1,5 +1,5 @@
 use serde_derive::{Deserialize, Serialize};
-use std::{fs::File, io::Error};
+use std::{fmt::Display, fs::File, io::Error};
 #[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 #[serde(default)]
@@ -33,7 +33,16 @@ pub enum Mode {
     Global,
     Direct,
 }
-
+impl Display for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let x = match self {
+            Mode::Rule => "Rule",
+            Mode::Global => "Global",
+            Mode::Direct => "Direct",
+        };
+        write!(f, "{}", x)
+    }
+}
 // #[derive(Debug, Serialize, Deserialize, Default)]
 // #[serde(rename_all = "lowercase")]
 // pub enum LogLevel {

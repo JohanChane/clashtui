@@ -610,17 +610,22 @@ impl ClashTuiUtil {
             }
             None => tuiconf.cur_profile.clone(),
         };
+        let mode;
         let tun = match self.clash_remote_config.borrow().as_ref() {
             Some(v) => {
+                mode = v.mode.to_string();
                 if v.tun.enable {
                     v.tun.stack.to_string()
                 } else {
                     "False".to_string()
                 }
             }
-            None => "Unknown".to_string(),
+            None => {
+                mode = "UnKnown".to_string();
+                "Unknown".to_string()
+            }
         };
-        _State::new(pf, tun)
+        _State::new(pf, mode, tun)
     }
 
     pub fn test_profile_config(&self, path: &Path, geodata_mode: bool) -> Result<String, Error> {

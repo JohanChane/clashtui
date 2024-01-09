@@ -3,12 +3,17 @@ use super::SharedClashTuiUtil;
 #[cfg(target_os = "linux")]
 pub struct _State {
     pub profile: String,
+    pub mode: String,
     pub tun: String,
 }
 #[cfg(target_os = "linux")]
 impl _State {
-    pub fn new(pf: String, tun: String) -> Self {
-        Self { tun, profile: pf }
+    pub fn new(pf: String, mode: String, tun: String) -> Self {
+        Self {
+            tun,
+            mode,
+            profile: pf,
+        }
     }
 }
 #[cfg(target_os = "windows")]
@@ -40,6 +45,9 @@ impl State {
     }
     pub fn get_profile(&self) -> &String {
         &self.st.profile
+    }
+    pub fn get_mode(&self) -> &String {
+        &self.st.mode
     }
     pub fn get_tun(&self) -> &String {
         &self.st.tun
