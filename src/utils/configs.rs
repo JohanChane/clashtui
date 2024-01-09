@@ -91,11 +91,11 @@ impl ClashTuiConfig {
             .and_then(|f| serde_yaml::from_reader(f).map_err(|e| e.to_string()))
     }
 
-    pub fn to_file(&self, config_path: &str) -> Option<String> {
+    pub fn to_file(&self, config_path: &str) -> Result<(), String> {
         let e = File::create(config_path)
             .map_err(|e| e.to_string())
             .and_then(|f| serde_yaml::to_writer(f, self).map_err(|e| e.to_string()));
-        e.err()
+        e
     }
 
     pub fn update_profile(&mut self, profile: String) {
@@ -105,20 +105,25 @@ impl ClashTuiConfig {
 
 #[test]
 fn test_save_and_load() {
+    let mut flag = true;
     let path = "/root/.config/clashtui/config.yaml";
     let conf = match ClashTuiConfig::from_file(path) {
         Ok(v) => v,
         Err(e) => {
+            flag = false;
             println!("{}", e);
             ClashTuiConfig::default()
         }
     };
+    assert!(flag);
+    flag = false;
     println!("{:?}", conf);
     let e = conf.to_file(path);
     match e {
-        Some(v) => println!("{}", v),
-        None => (),
-    }
+        Ok(_) => flag = true,
+        Err(v) => println!("{}", v),
+    };
+    assert!(flag);
 }
 
 #[derive(PartialEq, Clone)]
@@ -137,12 +142,10 @@ pub fn init_config(
     if r.is_err() {
         return r;
     }
-    let r = fs::write(
-        clashtui_config_dir.join("config.yaml"),
-        &symbols.default_clash_cfg_content,
-    );
+    let r = ClashTuiConfig::default()
+        .to_file(clashtui_config_dir.join("config.yaml").to_str().unwrap());
     if r.is_err() {
-        return r;
+        return Err(Error::new(std::io::ErrorKind::Other, r.err().unwrap()));
     }
     let r = fs::create_dir(clashtui_config_dir.join("profiles"));
     if r.is_err() {

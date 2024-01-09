@@ -65,7 +65,7 @@ impl App {
             PathBuf::from(&clashtui_config_dir_str)
         };
 
-        if !clashtui_config_dir.exists() {
+        if !clashtui_config_dir.join("config.yaml").exists() {
             //.join("basic_clash_config.yaml").exists() { // weird, shouldn`t we check the dir rather the single file?
             if let Err(err) = crate::utils::init_config(&clashtui_config_dir, &names) {
                 log::error!("{}", err);

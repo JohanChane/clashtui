@@ -8,7 +8,6 @@ pub struct Symbols {
     pub clashsrvctl: String,
 
     pub help: String,
-    pub default_clash_cfg_content: String,
     pub default_basic_clash_cfg_content: String,
 }
 
@@ -49,13 +48,6 @@ impl Default for Symbols {
                         Q: Quit
                         ?: help"#
             .to_string();
-        let default_clash_cfg_content = r#"[default]
-clash_core_path = ""
-clash_cfg_dir = ""
-clash_cfg_path = ""
-clash_srv_name = ""
-current_profile = """#
-            .to_string();
         let default_basic_clash_cfg_content = r#"mixed-port: 7890
 mode: rule
 log-level: info
@@ -67,7 +59,6 @@ external-controller: 127.0.0.1:9090"#
             clashsrvctl: "ClashSrvCtl".to_string(),
 
             help,
-            default_clash_cfg_content,
             default_basic_clash_cfg_content,
         }
     }
