@@ -30,8 +30,8 @@ pub struct ClashTuiUtil {
 }
 
 impl ClashTuiUtil {
-    pub fn new(clashtui_dir: &PathBuf, profile_dir: &PathBuf) -> Self {
-        let ret = load_app_config(clashtui_dir);
+    pub fn new(clashtui_dir: &PathBuf, profile_dir: &PathBuf, is_init: bool) -> Self {
+        let ret = load_app_config(clashtui_dir, is_init);
         let mut err_track = ret.3;
         let clash_api = ClashUtil::new(ret.1, ret.2);
         let cur_remote = match clash_api.config_get() {
@@ -814,6 +814,7 @@ fn parse_yaml(yaml_path: &Path) -> anyhow::Result<serde_yaml::Value> {
 
 fn load_app_config(
     clashtui_dir: &PathBuf,
+    skip_load_conf: bool,
 ) -> (ClashTuiConfig, String, String, Vec<ClashTuiConfigLoadError>) {
     let mut err_collect = Vec::new();
     let basic_clash_config_path = Path::new(clashtui_dir).join("basic_clash_config.yaml");
@@ -840,26 +841,31 @@ fn load_app_config(
     let proxy_addr = get_proxy_addr(&basic_clash_config_value);
     log::debug!("proxy_addr: {}", proxy_addr);
 
-    let config_path = clashtui_dir.join("config.yaml");
-    let configs = match ClashTuiConfig::from_file(config_path.to_str().unwrap()) {
-        Ok(v) => {
-            if !v.check() {
+    let configs;
+    if !skip_load_conf {
+        let config_path = clashtui_dir.join("config.yaml");
+        configs = match ClashTuiConfig::from_file(config_path.to_str().unwrap()) {
+            Ok(v) => {
+                if !v.check() {
+                    err_collect.push(ClashTuiConfigLoadError::LoadAppConfig(
+                        "Some Key Configs are missing, or Default\n".into(),
+                    ));
+                    log::warn!("Empty Config ?");
+                    log::debug!("{:?}", v)
+                };
+                v
+            }
+            Err(e) => {
                 err_collect.push(ClashTuiConfigLoadError::LoadAppConfig(
-                    "Some Key Configs are missing, or Default\n".into(),
+                    "Fail to load configs, using Default\n".into(),
                 ));
-                log::warn!("Empty Config ?");
-                log::debug!("{:?}", v)
-            };
-            v
-        }
-        Err(e) => {
-            err_collect.push(ClashTuiConfigLoadError::LoadAppConfig(
-                "Fail to load configs, using Default\n".into(),
-            ));
-            log::error!("Unable to load config file. {}", e);
-            ClashTuiConfig::default()
-        }
-    };
+                log::error!("Unable to load config file. {}", e);
+                ClashTuiConfig::default()
+            }
+        };
+    } else {
+        configs = ClashTuiConfig::default();
+    }
 
     (configs, controller_api, proxy_addr, err_collect)
 }

@@ -77,7 +77,13 @@ fn run_app<B: Backend>(
     let mut last_ev = EventState::NotConsumed;
     let mut showstr = String::new();
     let mut err_tarck = app.clashtui_util.get_err_track();
-    app.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
+    if *app.flags.get(&utils::Flags::FirstInit).unwrap() {
+        app.popup_txt_msg(
+            "Welcome to ClashTui(forked)!\n
+        Please go to Config Tab to set configs so that program can work properly"
+                .to_string(),
+        )
+    };
     loop {
         if !err_tarck.is_empty() {
             let err: Option<ClashTuiConfigLoadError> = err_tarck.pop();

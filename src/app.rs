@@ -1,14 +1,7 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyEventKind};
 use log;
-use log4rs::append::file::FileAppender;
-use log4rs::config::{Appender, Config, Root};
-use log4rs::encode::pattern::PatternEncoder;
-use ratatui::prelude::*;
-use std::cell::RefCell;
-use std::env;
-use std::path::PathBuf;
-use std::rc::Rc;
+use std::{cell::RefCell, collections::HashMap, env, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
 use crate::ui::keys::{match_key, KeyList, SharedKeyList};
@@ -16,7 +9,9 @@ use crate::ui::popups::{ClashTuiListPopup, MsgPopup};
 use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ProfileTab, Tabs};
 use crate::ui::utils::{helper, Theme};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState, SharedSymbols, Symbols};
-use crate::utils::{ClashTuiOp, ClashTuiUtil, SharedClashTuiState, SharedClashTuiUtil, State};
+use crate::utils::{
+    ClashTuiOp, ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State,
+};
 
 pub struct App {
     title: String,
@@ -31,11 +26,12 @@ pub struct App {
     pub clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
     pub statusbar: ClashTuiStatusBar,
+    pub flags: HashMap<Flags, bool>,
 }
 
 impl App {
     pub fn new() -> Self {
-        let mut tab: Vec<Tabs> = Vec::new();
+        let mut flags: HashMap<Flags, bool> = HashMap::with_capacity(1);
         let key_list = Rc::new(KeyList::default());
         let names = Rc::new(Symbols::default());
         let theme = Rc::new(Theme::default());
@@ -64,9 +60,12 @@ impl App {
         };
 
         if !clashtui_config_dir.join("config.yaml").exists() {
+            flags.insert(Flags::FirstInit, true);
             if let Err(err) = crate::utils::init_config(&clashtui_config_dir, &names) {
                 log::error!("{}", err);
             }
+        } else {
+            flags.insert(Flags::FirstInit, false);
         }
 
         Self::setup_logging(&clashtui_config_dir.join("clashtui.log").to_str().unwrap());
@@ -74,6 +73,7 @@ impl App {
         let clashtui_util = Rc::new(ClashTuiUtil::new(
             &clashtui_config_dir,
             &clashtui_config_dir.join("profiles"),
+            *flags.get(&Flags::FirstInit).unwrap(),
         ));
 
         let help_popup = ClashTuiListPopup::new("Help".to_string(), Rc::clone(&theme));
@@ -118,6 +118,7 @@ impl App {
             clashtui_util,
             clashtui_state,
             tabs: tab,
+            flags,
         };
 
         let help_text: Vec<String> = app
@@ -369,6 +370,9 @@ impl App {
     }
 
     fn setup_logging(log_path: &str) {
+        use log4rs::append::file::FileAppender;
+        use log4rs::config::{Appender, Config, Root};
+        use log4rs::encode::pattern::PatternEncoder;
         let file_appender = FileAppender::builder()
             .encoder(Box::new(PatternEncoder::new("{d} [{l}] {t} - {m}{n}")))
             .build(log_path)
