@@ -1,4 +1,3 @@
-use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::prelude as Ra;
 
@@ -18,7 +17,7 @@ impl ConfirmPopup {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.msgpopup.is_visible() {
             return Ok(EventState::NotConsumed);
         }
@@ -34,7 +33,7 @@ impl ConfirmPopup {
                     return Ok(self.event_state.clone());
                 }
                 _ => {
-                    event_state = self.msgpopup.event(ev)?;
+                    event_state = self.msgpopup.event(ev).unwrap();
                 }
             }
         }

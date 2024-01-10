@@ -1,5 +1,4 @@
 use crossterm::event::{KeyCode, KeyEvent};
-use std::rc::Rc;
 
 pub struct ClashTuiKeyEvent {
     pub code: KeyCode,
@@ -16,8 +15,6 @@ impl ClashTuiKeyEvent {
 pub fn match_key(ev: &KeyEvent, binding: &ClashTuiKeyEvent) -> bool {
     ev.code == binding.code
 }
-
-pub type SharedKeyList = Rc<KeyList>;
 
 pub struct KeyList {
     pub profile_switch: ClashTuiKeyEvent,

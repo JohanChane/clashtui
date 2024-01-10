@@ -7,7 +7,7 @@ use std::{cell::RefCell, collections::HashMap, env, path::PathBuf, rc::Rc};
 use crate::msgpopup_methods;
 use crate::ui::keys::{match_key, KeyList, SharedKeyList};
 use crate::ui::popups::{ClashTuiListPopup, MsgPopup};
-use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tabs};
+use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tabs, Tab};
 use crate::ui::utils::{helper, Theme};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState, SharedSymbols, Symbols};
 use crate::utils::{
@@ -92,14 +92,13 @@ impl App {
             clashtui_state.clone(),
             theme.clone(),
         ))));
-        tab.push(Tabs::ClashsrvctlTab(RefCell::new(ClashSrvCtlTab::new(
+        tab.push(Tabs::ClashSrvCtlTab(RefCell::new(ClashSrvCtlTab::new(
             key_list.clone(),
             names.clone(),
             Rc::clone(&clashtui_util),
             Rc::clone(&theme),
         ))));
         tab.push(Tabs::ConfigTab(RefCell::new(ConfigTab::new(
-            key_list.clone(),
             names.clone(),
             clashtui_util.clone(),
             theme.clone(),
@@ -112,7 +111,7 @@ impl App {
                 tab.iter()
                     .map(|x| match x {
                         Tabs::ProfileTab(v) => v.borrow().get_title().clone(),
-                        Tabs::ClashsrvctlTab(v) => v.borrow().get_title().clone(),
+                        Tabs::ClashSrvCtlTab(v) => v.borrow().get_title().clone(),
                         Tabs::ConfigTab(v) => v.borrow().get_title().clone(),
                     })
                     .collect(),
@@ -143,7 +142,7 @@ impl App {
 
     pub fn popup_event(&mut self, ev: &Event) -> Result<EventState> {
         // ## Self Popups
-        let mut event_state = self.help_popup.event(ev)?;
+        let mut event_state = self.help_popup.event(ev).unwrap();
 
         // ## Tab Popups
         if event_state.is_notconsumed() {
@@ -154,14 +153,14 @@ impl App {
         }
         if event_state.is_notconsumed() {
             event_state = match self.tabs.get(1).unwrap() {
-                Tabs::ClashsrvctlTab(v) => v.borrow_mut().popup_event(ev).unwrap(),
+                Tabs::ClashSrvCtlTab(v) => v.borrow_mut().popup_event(ev).unwrap(),
                 _ => EventState::UnexpectedERROR,
             };
         }
         if event_state.is_notconsumed() {
             event_state = match self.tabs.get(2).unwrap() {
                 Tabs::ConfigTab(v) => v.borrow_mut().popup_event(ev).unwrap(),
-                Tabs::ClashsrvctlTab(_) => EventState::UnexpectedERROR,
+                Tabs::ClashSrvCtlTab(_) => EventState::UnexpectedERROR,
                 Tabs::ProfileTab(_) => EventState::UnexpectedERROR,
             };
         }
@@ -170,7 +169,7 @@ impl App {
     }
 
     pub fn event(&mut self, ev: &Event) -> Result<EventState> {
-        let mut event_state = self.msgpopup.event(ev)?;
+        let mut event_state = self.msgpopup.event(ev).unwrap();
         if event_state.is_notconsumed() {
             event_state = self.popup_event(ev)?;
         }
@@ -244,17 +243,17 @@ impl App {
             if event_state == EventState::NotConsumed {
                 event_state = self.tabbar.event(ev)?;
                 if event_state.is_notconsumed() {
-                    if let Tabs::ProfileTab(tab) = self.tab("profile_tab") {
+                    if let Tabs::ProfileTab(tab) = self.tab(Tab::ProfileTab) {
                         event_state = tab.borrow_mut().event(ev).unwrap();
                     }
                 }
                 if event_state.is_notconsumed() {
-                    if let Tabs::ClashsrvctlTab(tab) = self.tab("clashsrvctl_tab") {
+                    if let Tabs::ClashSrvCtlTab(tab) = self.tab(Tab::ClashSrvCtlTab) {
                         event_state = tab.borrow_mut().event(ev).unwrap();
                     }
                 }
                 if event_state.is_notconsumed() {
-                    if let Tabs::ConfigTab(tab) = self.tab("config_tab") {
+                    if let Tabs::ConfigTab(tab) = self.tab(Tab::ConfigTab) {
                         event_state = tab.borrow_mut().event(ev).unwrap();
                     }
                 }
@@ -269,7 +268,7 @@ impl App {
         let ev_state = match last_ev {
             EventState::NotConsumed | EventState::WorkDone => EventState::NotConsumed,
             EventState::ProfileUpdate | EventState::ProfileUpdateAll => {
-                if let Tabs::ProfileTab(profile_tab) = self.tab("profile_tab") {
+                if let Tabs::ProfileTab(profile_tab) = self.tab(Tab::ProfileTab) {
                     profile_tab.borrow_mut().hide_msgpopup();
                     if last_ev == &EventState::ProfileUpdate {
                         profile_tab.borrow_mut().handle_update_profile_ev(false);
@@ -280,7 +279,7 @@ impl App {
                 EventState::WorkDone
             }
             EventState::ProfileSelect => {
-                if let Tabs::ProfileTab(profile_tab) = self.tab("profile_tab") {
+                if let Tabs::ProfileTab(profile_tab) = self.tab(Tab::ProfileTab) {
                     profile_tab.borrow_mut().hide_msgpopup();
                     match profile_tab.borrow_mut().handle_select_profile_ev() {
                         Some(v) => self.clashtui_state.borrow_mut().set_profile(v),
@@ -290,7 +289,7 @@ impl App {
                 EventState::WorkDone
             }
             EventState::ProfileDelete => {
-                if let Tabs::ProfileTab(profile_tab) = self.tab("profile_tab") {
+                if let Tabs::ProfileTab(profile_tab) = self.tab(Tab::ProfileTab) {
                     profile_tab.borrow_mut().hide_msgpopup();
                     profile_tab.borrow_mut().handle_delete_profile_ev();
                 };
@@ -336,7 +335,7 @@ impl App {
             .iter()
             .map(|v| match v {
                 Tabs::ProfileTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
-                Tabs::ClashsrvctlTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
+                Tabs::ClashSrvCtlTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
                 Tabs::ConfigTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
             })
             .count();
@@ -364,7 +363,7 @@ impl App {
                         l.hide()
                     }
                 }
-                Tabs::ClashsrvctlTab(k) => {
+                Tabs::ClashSrvCtlTab(k) => {
                     let mut l = k.borrow_mut();
                     if tabname == Some(l.get_title()) {
                         l.show()
@@ -384,13 +383,13 @@ impl App {
             .count();
     }
 
-    fn tab(&self, name: &str) -> &Tabs {
+    fn tab(&self, name: Tab) -> &Tabs {
         let idx: usize;
-        if name == "profile_tab" {
+        if name == Tab::ProfileTab {
             idx = 0;
-        } else if name == "clashsrvctl_tab" {
+        } else if name == Tab::ClashSrvCtlTab {
             idx = 1;
-        } else if name == "config_tab" {
+        } else if name == Tab::ConfigTab {
             idx = 2;
         } else {
             todo!();

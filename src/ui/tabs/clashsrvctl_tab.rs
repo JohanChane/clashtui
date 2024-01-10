@@ -1,4 +1,3 @@
-use anyhow::Result;
 use crossterm::event::{Event, KeyEventKind};
 use ratatui::prelude as Ra;
 
@@ -57,12 +56,12 @@ impl ClashSrvCtlTab {
         }
     }
 
-    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState> {
+    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
 
-        let event_state = self.msgpopup.event(ev)?;
+        let event_state = self.msgpopup.event(ev).unwrap();
 
         Ok(event_state)
     }

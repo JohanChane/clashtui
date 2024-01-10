@@ -1,4 +1,3 @@
-use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::prelude as Ra;
 use std::{
@@ -12,9 +11,9 @@ use std::{
 use super::{profile_input::ProfileInputPopup, CommonTab};
 use crate::ui::{
     keys::{match_key, SharedKeyList},
-    popups::MsgPopup,
+    popups::{ConfirmPopup, MsgPopup},
     utils::{ClashTuiList, SharedTheme},
-    ConfirmPopup, EventState, SharedSymbols,
+    EventState, SharedSymbols,
 };
 use crate::utils::utils as Utils;
 use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
@@ -79,17 +78,17 @@ impl ProfileTab {
         instance
     }
 
-    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState> {
+    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
 
-        let mut event_state = self.msgpopup.event(ev)?;
+        let mut event_state = self.msgpopup.event(ev).unwrap();
         if event_state.is_notconsumed() {
-            event_state = self.confirm_popup.event(ev)?;
+            event_state = self.confirm_popup.event(ev).unwrap();
         }
         if event_state.is_notconsumed() {
-            event_state = self.profile_input.event(ev)?;
+            event_state = self.profile_input.event(ev).unwrap();
 
             if event_state == EventState::WorkDone {
                 if let Event::Key(key) = ev {

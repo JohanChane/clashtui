@@ -1,4 +1,3 @@
-use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
@@ -21,7 +20,7 @@ impl ProfileInputPopup {
         obj
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible() {
             return Ok(EventState::NotConsumed);
         }

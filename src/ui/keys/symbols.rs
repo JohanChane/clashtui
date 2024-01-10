@@ -1,7 +1,3 @@
-use std::rc::Rc;
-
-pub type SharedSymbols = Rc<Symbols>;
-
 pub struct Symbols {
     pub profile: String,
     pub template: String,

@@ -3,7 +3,6 @@ use ratatui::{prelude as Ra, widgets as Raw};
 
 use super::CommonTab;
 use crate::ui::{
-    keys::SharedKeyList,
     popups::{ClashTuiInputPopup, MsgPopup},
     utils::{ClashTuiList, SharedTheme},
     EventState, SharedSymbols,
@@ -19,8 +18,6 @@ pub struct ConfigTab {
     setting_list: ClashTuiList,
     msgpopup: MsgPopup,
 
-    key_list: SharedKeyList,
-
     clashtui_util: SharedClashTuiUtil,
 
     input: ClashTuiInputPopup,
@@ -29,7 +26,6 @@ pub struct ConfigTab {
 
 impl ConfigTab {
     pub fn new(
-        key_list: SharedKeyList,
         symbols: SharedSymbols,
         clashtui_util: SharedClashTuiUtil,
 
@@ -53,17 +49,16 @@ impl ConfigTab {
             clashtui_util,
             msgpopup: MsgPopup::new(),
             input: inp,
-            key_list,
             last_op: None,
         }
     }
 
-    pub fn popup_event(&mut self, ev: &Event) -> anyhow::Result<EventState> {
+    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
 
-        let event_state = self.msgpopup.event(ev)?;
+        let event_state = self.msgpopup.event(ev).unwrap();
 
         Ok(event_state)
     }

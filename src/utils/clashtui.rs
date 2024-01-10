@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::process::Command;
 use std::{
-    fs,
     fs::{create_dir_all, File},
     io::{BufRead, BufReader, Error, Read},
     path::{Path, PathBuf},
@@ -79,10 +78,14 @@ impl ClashTuiUtil {
         self.save_config();
     }
 
-    fn fetch_remote(&self) {
-        let cur_remote = self.clash_api.config_get().unwrap();
+    fn fetch_remote(&self) -> Option<reqwest::Error>  {
+        let cur_remote = match self.clash_api.config_get() {
+            Ok(v) => v,
+            Err(e) => return Some(e),
+        };
         let remote = ClashConfig::from_str(cur_remote.as_str());
         *self.clash_remote_config.borrow_mut() = remote;
+        None
     }
 
     pub fn restart_clash(&self) -> Result<String, reqwest::Error> {
@@ -612,7 +615,9 @@ impl ClashTuiUtil {
 
     #[cfg(target_os = "linux")]
     pub fn update_state(&self, new_pf: Option<String>) -> _State {
-        self.fetch_remote();
+        if let Some(e)=self.fetch_remote(){
+            log::warn!("{}", e);
+        };
         let mut tuiconf = self.clashtui_config.borrow_mut();
         let pf = match new_pf {
             Some(v) => {
@@ -688,6 +693,7 @@ impl ClashTuiUtil {
         }
     }
 
+    /*
     pub fn is_yaml(path: &Path) -> bool {
         if let Ok(file_content) = fs::read_to_string(&path) {
             if let Ok(_) = serde_yaml::from_str::<serde_yaml::Value>(&file_content) {
@@ -697,7 +703,6 @@ impl ClashTuiUtil {
 
         false
     }
-    /*
     pub fn edit_file(&self, path: &PathBuf) -> Result<String> {
         if let Some(edit_cmd) = self
             .get_clashtui_config()

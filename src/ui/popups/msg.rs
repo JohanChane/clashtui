@@ -1,4 +1,3 @@
-use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
@@ -25,7 +24,7 @@ impl MsgPopup {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -56,7 +55,7 @@ impl MsgPopup {
 
         Ok(EventState::WorkDone)
     }
-    
+
     pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, _area: Ra::Rect) {
         //! area is only used to keep the args
         if !self.is_visible {

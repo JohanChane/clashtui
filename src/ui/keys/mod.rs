@@ -1,6 +1,9 @@
 mod key_list;
-pub mod symbols;
+mod symbols;
 
 pub use self::key_list::match_key;
 pub use self::key_list::KeyList;
-pub use self::key_list::SharedKeyList;
+pub use self::symbols::Symbols;
+
+pub type SharedKeyList = std::rc::Rc<KeyList>;
+pub type SharedSymbols = std::rc::Rc<Symbols>;

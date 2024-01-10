@@ -1,4 +1,3 @@
-use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
@@ -27,7 +26,7 @@ impl ClashTuiListPopup {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }

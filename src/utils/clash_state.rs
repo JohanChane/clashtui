@@ -56,9 +56,6 @@ impl State {
         // With update state
         self.st = self.ct.update_state(Some(profile));
     }
-    pub fn update_tun(&mut self) {
-        self.st = self.ct.update_state(None);
-    }
     #[cfg(target_os = "windows")]
     pub fn get_sysproxy(&self) -> bool {
         self.state.sysproxy
