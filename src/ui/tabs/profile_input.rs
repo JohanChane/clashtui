@@ -49,9 +49,9 @@ impl ProfileInputPopup {
                         EventState::WorkDone
                     }
                     _ => {
-                        event_state = self.name_input.event(ev)?;
+                        event_state = self.name_input.event(ev).unwrap();
                         if event_state.is_notconsumed() {
-                            event_state = self.uri_input.event(ev)?;
+                            event_state = self.uri_input.event(ev).unwrap();
                         }
                         event_state
                     }
@@ -63,6 +63,7 @@ impl ProfileInputPopup {
     }
 
     pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
+        //! will clear the area
         if !self.is_visible() {
             return;
         }

@@ -16,7 +16,7 @@ use super::clash::ClashUtil;
 use super::clash_state::_State;
 use super::configs::{ClashConfig, ClashTuiConfig, ClashTuiConfigLoadError};
 use super::utils as Utils;
-use super::ClashTuiOp;
+use super::{ClashTuiOp, ConfigOp};
 
 pub struct ClashTuiUtil {
     pub clashtui_dir: PathBuf,
@@ -66,6 +66,17 @@ impl ClashTuiUtil {
         {
             log::error!("Error while saving config: {}", x);
         }
+    }
+
+    pub fn update_config(&self, conf: &ConfigOp, data: String) {
+        let mut config = self.clashtui_config.borrow_mut();
+        match conf {
+            ConfigOp::ClashConfigDir => config.clash_cfg_dir = data,
+            ConfigOp::ClashCorePath => config.clash_core_path = data,
+            ConfigOp::ClashConfigFile => config.clash_cfg_path = data,
+            ConfigOp::ClashServiceName => config.clash_srv_name = data,
+        };
+        self.save_config();
     }
 
     fn fetch_remote(&self) {

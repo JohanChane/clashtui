@@ -1,12 +1,13 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyEventKind};
 use log;
+use ratatui::prelude as Ra;
 use std::{cell::RefCell, collections::HashMap, env, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
 use crate::ui::keys::{match_key, KeyList, SharedKeyList};
 use crate::ui::popups::{ClashTuiListPopup, MsgPopup};
-use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ProfileTab, Tabs};
+use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tabs};
 use crate::ui::utils::{helper, Theme};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState, SharedSymbols, Symbols};
 use crate::utils::{
@@ -83,6 +84,7 @@ impl App {
 
         let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
 
+        let mut tab: Vec<Tabs> = Vec::with_capacity(3);
         tab.push(Tabs::ProfileTab(RefCell::new(ProfileTab::new(
             key_list.clone(),
             names.clone(),
@@ -96,6 +98,12 @@ impl App {
             Rc::clone(&clashtui_util),
             Rc::clone(&theme),
         ))));
+        tab.push(Tabs::ConfigTab(RefCell::new(ConfigTab::new(
+            key_list.clone(),
+            names.clone(),
+            clashtui_util.clone(),
+            theme.clone(),
+        ))));
 
         let mut app = Self {
             title: "ClashTui".to_string(),
@@ -105,6 +113,7 @@ impl App {
                     .map(|x| match x {
                         Tabs::ProfileTab(v) => v.borrow().get_title().clone(),
                         Tabs::ClashsrvctlTab(v) => v.borrow().get_title().clone(),
+                        Tabs::ConfigTab(v) => v.borrow().get_title().clone(),
                     })
                     .collect(),
                 Rc::clone(&theme),
@@ -140,13 +149,20 @@ impl App {
         if event_state.is_notconsumed() {
             event_state = match self.tabs.get(0).unwrap() {
                 Tabs::ProfileTab(v) => v.borrow_mut().popup_event(ev).unwrap(),
-                Tabs::ClashsrvctlTab(_) => EventState::UnexpectedERROR,
+                _ => EventState::UnexpectedERROR,
             };
         }
         if event_state.is_notconsumed() {
             event_state = match self.tabs.get(1).unwrap() {
-                Tabs::ProfileTab(_) => EventState::UnexpectedERROR,
                 Tabs::ClashsrvctlTab(v) => v.borrow_mut().popup_event(ev).unwrap(),
+                _ => EventState::UnexpectedERROR,
+            };
+        }
+        if event_state.is_notconsumed() {
+            event_state = match self.tabs.get(2).unwrap() {
+                Tabs::ConfigTab(v) => v.borrow_mut().popup_event(ev).unwrap(),
+                Tabs::ClashsrvctlTab(_) => EventState::UnexpectedERROR,
+                Tabs::ProfileTab(_) => EventState::UnexpectedERROR,
             };
         }
 
@@ -237,6 +253,11 @@ impl App {
                         event_state = tab.borrow_mut().event(ev).unwrap();
                     }
                 }
+                if event_state.is_notconsumed() {
+                    if let Tabs::ConfigTab(tab) = self.tab("config_tab") {
+                        event_state = tab.borrow_mut().event(ev).unwrap();
+                    }
+                }
             }
         }
 
@@ -295,13 +316,13 @@ impl App {
         ev_state
     }
 
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>) {
-        let chunks = Layout::default()
+    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>) {
+        let chunks = Ra::Layout::default()
             .constraints(
                 [
-                    Constraint::Length(3),
-                    Constraint::Min(0),
-                    Constraint::Length(3),
+                    Ra::Constraint::Length(3),
+                    Ra::Constraint::Min(0),
+                    Ra::Constraint::Length(3),
                 ]
                 .as_ref(),
             )
@@ -316,6 +337,7 @@ impl App {
             .map(|v| match v {
                 Tabs::ProfileTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
                 Tabs::ClashsrvctlTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
+                Tabs::ConfigTab(k) => k.borrow_mut().draw(f, tabcontent_chunk),
             })
             .count();
 
@@ -350,6 +372,14 @@ impl App {
                         l.hide()
                     }
                 }
+                Tabs::ConfigTab(k) => {
+                    let mut l = k.borrow_mut();
+                    if tabname == Some(l.get_title()) {
+                        l.show()
+                    } else {
+                        l.hide()
+                    }
+                }
             })
             .count();
     }
@@ -360,6 +390,8 @@ impl App {
             idx = 0;
         } else if name == "clashsrvctl_tab" {
             idx = 1;
+        } else if name == "config_tab" {
+            idx = 2;
         } else {
             todo!();
         }

@@ -54,7 +54,7 @@ impl ClashTuiList {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible || !self.is_fouce {
             return Ok(EventState::NotConsumed);
         }

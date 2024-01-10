@@ -385,13 +385,13 @@ impl CommonTab for ProfileTab {
     }
 
     fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
-        use Ra::{Constraint, Layout};
         if !self.is_visible() {
             return;
         }
+        use Ra::{Constraint, Layout};
 
         let chunks = Layout::default()
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(area);
 
         self.profile_list.draw(f, chunks[0]);

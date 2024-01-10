@@ -12,6 +12,7 @@ impl ClashTuiKeyEvent {
     }
 }
 
+#[inline]
 pub fn match_key(ev: &KeyEvent, binding: &ClashTuiKeyEvent) -> bool {
     ev.code == binding.code
 }
@@ -32,6 +33,7 @@ pub struct KeyList {
     pub clashsrvctl_start: ClashTuiKeyEvent,
     pub clashsrvctl_restart: ClashTuiKeyEvent,
     pub clashsrvctl_stop: ClashTuiKeyEvent,
+    pub config_select: ClashTuiKeyEvent,
 
     //pub edit: ClashTuiKeyEvent,
     pub preview: ClashTuiKeyEvent,
@@ -60,6 +62,7 @@ impl Default for KeyList {
             clashsrvctl_start: ClashTuiKeyEvent::new(KeyCode::Char('S')),
             clashsrvctl_restart: ClashTuiKeyEvent::new(KeyCode::Char('R')),
             clashsrvctl_stop: ClashTuiKeyEvent::new(KeyCode::Char('T')),
+            config_select: ClashTuiKeyEvent::new(KeyCode::Enter),
 
             //edit: ClashTuiKeyEvent::new(KeyCode::Char('e')),
             preview: ClashTuiKeyEvent::new(KeyCode::Char('P')),

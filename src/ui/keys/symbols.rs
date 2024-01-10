@@ -6,6 +6,7 @@ pub struct Symbols {
     pub profile: String,
     pub template: String,
     pub clashsrvctl: String,
+    pub config: String,
 
     pub help: String,
     pub default_basic_clash_cfg_content: String,
@@ -57,6 +58,7 @@ external-controller: 127.0.0.1:9090"#
             profile: "Profile".to_string(),
             template: "Template".to_string(),
             clashsrvctl: "ClashSrvCtl".to_string(),
+            config: "Config".to_string(),
 
             help,
             default_basic_clash_cfg_content,

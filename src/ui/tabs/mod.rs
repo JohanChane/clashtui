@@ -1,9 +1,11 @@
 mod clashsrvctl_tab;
 mod profile_input;
 mod profile_tab;
+mod config_tab;
 
 pub use clashsrvctl_tab::ClashSrvCtlTab;
 pub use profile_tab::ProfileTab;
+pub use config_tab::ConfigTab;
 
 pub trait CommonTab {
     fn draw<B: ratatui::backend::Backend>(
@@ -21,4 +23,5 @@ pub trait CommonTab {
 pub enum Tabs {
     ProfileTab(std::cell::RefCell<ProfileTab>),
     ClashsrvctlTab(std::cell::RefCell<ClashSrvCtlTab>),
+    ConfigTab(std::cell::RefCell<ConfigTab>),
 }
