@@ -7,7 +7,7 @@ use std::{cell::RefCell, collections::HashMap, env, path::PathBuf, rc::Rc};
 use crate::msgpopup_methods;
 use crate::ui::keys::{match_key, KeyList, SharedKeyList};
 use crate::ui::popups::{ClashTuiListPopup, MsgPopup};
-use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tabs, Tab};
+use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tab, Tabs};
 use crate::ui::utils::{helper, Theme};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState, SharedSymbols, Symbols};
 use crate::utils::{
@@ -68,6 +68,9 @@ impl App {
         } else {
             flags.insert(Flags::FirstInit, false);
         }
+
+        #[cfg(debug_assertions)]
+        let _ = std::fs::remove_file(&clashtui_config_dir.join("clashtui.log"));
 
         Self::setup_logging(&clashtui_config_dir.join("clashtui.log").to_str().unwrap());
 
@@ -404,21 +407,19 @@ impl App {
         use log4rs::append::file::FileAppender;
         use log4rs::config::{Appender, Config, Root};
         use log4rs::encode::pattern::PatternEncoder;
+        let log_level = log::LevelFilter::Debug;
         let file_appender = FileAppender::builder()
-            .encoder(Box::new(PatternEncoder::new("{d} [{l}] {t} - {m}{n}")))
+            .encoder(Box::new(PatternEncoder::new("[{l}] {t} - {m}{n}")))
             .build(log_path)
             .unwrap();
 
         let config = Config::builder()
             .appender(Appender::builder().build("file", Box::new(file_appender)))
-            .build(
-                Root::builder()
-                    .appender("file")
-                    .build(log::LevelFilter::Debug),
-            )
+            .build(Root::builder().appender("file").build(log_level))
             .unwrap();
 
         log4rs::init_config(config).unwrap();
+        log::info!("Start Log, level: {}", log_level);
     }
 }
 

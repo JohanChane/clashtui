@@ -42,6 +42,7 @@ impl ClashTuiUtil {
             err_track.push(ClashTuiConfigLoadError::LoadClashConfig(
                 "Fail to load config from clash core. Is it Running?\n".into(),
             ));
+            log::warn!("Fail to connect to clash. Is it Running?");
         }
         Self {
             clashtui_dir: clashtui_dir.clone(),
@@ -64,21 +65,23 @@ impl ClashTuiUtil {
             .to_file(self.clashtui_dir.join("config.yaml").to_str().unwrap())
         {
             log::error!("Error while saving config: {}", x);
-        }
+        };
     }
 
     pub fn update_config(&self, conf: &ConfigOp, data: String) {
         let mut config = self.clashtui_config.borrow_mut();
+        log::debug!("Updated Config: {:?}:{}", conf, data);
         match conf {
             ConfigOp::ClashConfigDir => config.clash_cfg_dir = data,
             ConfigOp::ClashCorePath => config.clash_core_path = data,
             ConfigOp::ClashConfigFile => config.clash_cfg_path = data,
             ConfigOp::ClashServiceName => config.clash_srv_name = data,
         };
+        drop(config);
         self.save_config();
     }
 
-    fn fetch_remote(&self) -> Option<reqwest::Error>  {
+    fn fetch_remote(&self) -> Option<reqwest::Error> {
         let cur_remote = match self.clash_api.config_get() {
             Ok(v) => v,
             Err(e) => return Some(e),
@@ -615,9 +618,13 @@ impl ClashTuiUtil {
 
     #[cfg(target_os = "linux")]
     pub fn update_state(&self, new_pf: Option<String>) -> _State {
-        if let Some(e)=self.fetch_remote(){
-            log::warn!("{}", e);
-        };
+        if new_pf.is_none() { // act when app is initing.
+            if let Some(e) = self.fetch_remote() {
+                if !e.is_connect() {
+                    log::warn!("{}", e);
+                }
+            };
+        }
         let mut tuiconf = self.clashtui_config.borrow_mut();
         let pf = match new_pf {
             Some(v) => {
@@ -866,7 +873,7 @@ fn load_app_config(
                     err_collect.push(ClashTuiConfigLoadError::LoadAppConfig(
                         "Some Key Configs are missing, or Default\n".into(),
                     ));
-                    log::warn!("Empty Config ?");
+                    log::warn!("Empty Config?");
                     log::debug!("{:?}", v)
                 };
                 v

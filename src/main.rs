@@ -88,27 +88,25 @@ fn run_app<B: Backend>(
         if !err_tarck.is_empty() {
             let err: Option<ClashTuiConfigLoadError> = err_tarck.pop();
             let el;
-            showstr += match err {
+            showstr = match err {
                 Some(v) => {
                     el = match v {
                         ClashTuiConfigLoadError::LoadAppConfig(x) => x.into_string(),
                         ClashTuiConfigLoadError::LoadProfileConfig(x) => x.into_string(),
                         ClashTuiConfigLoadError::LoadClashConfig(x) => x.into_string(),
                     };
-                    el.as_str()
+                    el
                 }
                 None => panic!("Should not reached arm!!"),
             };
-        } else {
-            if showstr.is_empty() {
-                break;
-            }
-            app.popup_txt_msg(showstr);
+            app.popup_txt_msg(showstr.clone());
             terminal.draw(|f| app.draw(f))?;
-            drop(err_tarck);
+        } else {
             break;
         }
     }
+    drop(err_tarck);
+    drop(showstr);
     log::info!("App init finished");
     loop {
         terminal.draw(|f| app.draw(f))?;
@@ -128,6 +126,7 @@ fn run_app<B: Backend>(
         }
         if app.should_quit {
             app.clashtui_util.save_config();
+            log::info!("App Exit");
             return Ok(());
         }
     }

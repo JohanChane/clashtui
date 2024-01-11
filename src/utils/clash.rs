@@ -29,18 +29,7 @@ impl ClashUtil {
         .send();
         match response {
             Ok(r) => r.text(),
-            Err(e) => {
-                if e.is_body() {
-                    log::warn!(
-                        "[ClashUtil] {} exec {} failed! Is your api and proxy properly set?",
-                        "put",
-                        url
-                    )
-                } else {
-                    log::error!("[ClashUtil] {} exec {} failed! {}", "put", url, e);
-                }
-                Err(e)
-            }
+            Err(e) => Err(e),
         }
     }
     fn post(&self, url: &str, payload: Option<&String>) -> Result<String, reqwest::Error> {
@@ -52,10 +41,7 @@ impl ClashUtil {
         .send();
         match response {
             Ok(r) => r.text(),
-            Err(e) => {
-                log::error!("[ClashUtil] {} exec {} failed! {}", "post", url, e);
-                Err(e)
-            }
+            Err(e) => Err(e),
         }
     }
 
@@ -68,13 +54,10 @@ impl ClashUtil {
         .send();
         match response {
             Ok(r) => r.text(),
-            Err(e) => {
-                log::error!("[ClashUtil] {} exec {} failed! {}", "post", url, e);
-                Err(e)
-            }
+            Err(e) => Err(e),
         }
     }
-
+    
     pub fn restart(&self, payload: Option<&String>) -> Result<String, reqwest::Error> {
         match payload {
             Some(load) => self.post("/restart", Some(load)),

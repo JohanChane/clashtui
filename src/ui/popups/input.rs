@@ -128,18 +128,14 @@ impl ClashTuiInputPopup {
         self.cursor_position = 0;
     }
 
-    fn submit_message(&mut self) {
-        self.input_data = self.input.clone();
-        self.input.clear();
-        self.reset_cursor();
-    }
-
     pub fn get_input_data(&self) -> String {
         self.input_data.clone()
     }
 
     pub fn handle_enter_ev(&mut self) {
-        self.submit_message();
+        self.input_data = self.input.clone();
+        self.input.clear();
+        self.reset_cursor();
     }
     pub fn handle_esc_ev(&mut self) {
         self.input.clear();

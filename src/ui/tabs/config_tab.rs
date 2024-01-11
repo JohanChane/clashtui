@@ -54,11 +54,49 @@ impl ConfigTab {
     }
 
     pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ()> {
-        if !self.is_visible {
-            return Ok(EventState::NotConsumed);
+        let mut event_state = self.msgpopup.event(ev).unwrap();
+
+        if event_state.is_notconsumed() {
+            event_state = self.input.event(ev).unwrap();
+
+            if event_state == EventState::WorkDone {
+                // When key is catched by input
+                if let Event::Key(key) = ev {
+                    if key.kind == KeyEventKind::Press {
+                        match key.code {
+                            KeyCode::Enter => {
+                                if let Some(op) = &self.last_op {
+                                    let get = self.input.get_input_data();
+                                    self.clashtui_util.update_config(op, get);
+                                    self.last_op = None;
+                                }
+                            }
+                            KeyCode::Esc => {
+                                self.last_op = None;
+                            }
+                            _ => {}
+                        };
+                    }
+                }
+            }
         }
 
-        let event_state = self.msgpopup.event(ev).unwrap();
+        if event_state.is_notconsumed() {
+            if let Event::Key(key) = ev {
+                if key.kind == KeyEventKind::Press {
+                    event_state = match key.code {
+                        KeyCode::Enter => {
+                            self.last_op = Some(ConfigOp::from(
+                                self.setting_list.selected().unwrap().as_str(),
+                            ));
+                            self.input.show();
+                            EventState::WorkDone
+                        }
+                        _ => EventState::NotConsumed,
+                    }
+                }
+            }
+        }
 
         Ok(event_state)
     }
@@ -70,52 +108,7 @@ impl CommonTab for ConfigTab {
             return Ok(EventState::NotConsumed);
         }
 
-        let mut event_state = self.setting_list.event(ev).unwrap();
-        if event_state.is_consumed() {
-            return Ok(event_state);
-        }
-
-        event_state = self.input.event(ev).unwrap();
-        if event_state.is_consumed() {
-            return Ok(event_state);
-        }
-
-        if self.last_op.is_none() {
-            self.last_op = Some(ConfigOp::from(
-                self.setting_list.selected().unwrap().as_str(),
-            ));
-            log::debug!("Action: {:?}", self.last_op);
-            self.input.show();
-        }
-
-        if let Event::Key(key) = ev {
-            if key.kind == KeyEventKind::Press {
-                event_state = match key.code {
-                    KeyCode::Enter => {
-                        if let Some(op) = &self.last_op {
-                            self.input.handle_enter_ev();
-                            self.clashtui_util
-                                .update_config(op, self.input.get_input_data());
-                            self.hide();
-                            self.last_op = None;
-                        }
-
-                        EventState::WorkDone
-                    }
-                    KeyCode::Esc => {
-                        self.input.handle_esc_ev();
-                        self.last_op = None;
-                        self.hide();
-
-                        EventState::WorkDone
-                    }
-                    _ => {
-                        event_state = self.input.event(ev).unwrap();
-                        event_state
-                    }
-                };
-            }
-        }
+        let event_state = self.setting_list.event(ev).unwrap();
 
         Ok(event_state)
     }
