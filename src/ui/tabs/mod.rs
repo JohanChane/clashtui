@@ -25,10 +25,3 @@ pub enum Tabs {
     ClashSrvCtlTab(std::cell::RefCell<ClashSrvCtlTab>),
     ConfigTab(std::cell::RefCell<ConfigTab>),
 }
-
-#[derive(PartialEq)]
-pub enum Tab {
-    ProfileTab,
-    ClashSrvCtlTab,
-    ConfigTab,
-}

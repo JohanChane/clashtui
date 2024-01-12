@@ -13,7 +13,7 @@ use crate::ui::{
     keys::{match_key, SharedKeyList},
     popups::{ConfirmPopup, MsgPopup},
     utils::{ClashTuiList, SharedTheme},
-    EventState, SharedSymbols,
+    EventState,
 };
 use crate::utils::utils as Utils;
 use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
@@ -42,17 +42,17 @@ pub struct ProfileTab {
 
 impl ProfileTab {
     pub fn new(
+        title:String,
         key_list: SharedKeyList,
-        symbols: SharedSymbols,
         clashtui_util: SharedClashTuiUtil,
         clashtui_state: SharedClashTuiState,
         theme: SharedTheme,
     ) -> Self {
-        let profiles = ClashTuiList::new(symbols.profile.clone(), Rc::clone(&theme));
-        let templates = ClashTuiList::new(symbols.template.clone(), Rc::clone(&theme));
+        let profiles = ClashTuiList::new(title.clone(), Rc::clone(&theme));
+        let templates = ClashTuiList::new("Template".to_string(), Rc::clone(&theme));
 
         let mut instance = Self {
-            title: symbols.profile.clone(),
+            title: title,
             is_visible: true,
             profile_list: profiles,
             template_list: templates,

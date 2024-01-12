@@ -6,7 +6,7 @@ use crate::ui::{
     keys::{match_key, SharedKeyList},
     popups::MsgPopup,
     utils::{ClashTuiList, SharedTheme},
-    EventState, SharedSymbols,
+    EventState,
 };
 use crate::utils::{ClashTuiOp, SharedClashTuiUtil};
 use crate::{msgpopup_methods, title_methods, visible_methods};
@@ -25,13 +25,13 @@ pub struct ClashSrvCtlTab {
 
 impl ClashSrvCtlTab {
     pub fn new(
+        title:String,
         key_list: SharedKeyList,
-        symbols: SharedSymbols,
         clashtui_util: SharedClashTuiUtil,
 
         theme: SharedTheme,
     ) -> Self {
-        let mut operations = ClashTuiList::new(symbols.clashsrvctl.clone(), theme);
+        let mut operations = ClashTuiList::new(title.clone(), theme);
         operations.set_items(vec![
             ClashTuiOp::TestClashConfig.into(),
             #[cfg(target_os = "windows")]
@@ -47,7 +47,7 @@ impl ClashSrvCtlTab {
         ]);
 
         Self {
-            title: symbols.clashsrvctl.clone(),
+            title,
             is_visible: false,
             srvctl_list: operations,
             key_list,
@@ -62,7 +62,7 @@ impl ClashSrvCtlTab {
         }
 
         let event_state = self.msgpopup.event(ev).unwrap();
-
+        
         Ok(event_state)
     }
 }
@@ -72,7 +72,7 @@ impl CommonTab for ClashSrvCtlTab {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
-
+        
         let mut event_state = EventState::NotConsumed;
         if let Event::Key(key) = ev {
             if key.kind != KeyEventKind::Press {
@@ -97,7 +97,7 @@ impl CommonTab for ClashSrvCtlTab {
                         match self.clashtui_util.clash_srv_ctl(op) {
                             Ok(output) => {
                                 let list_msg: Vec<String> =
-                                    output.lines().map(|line| line.trim().to_string()).collect();
+                                output.lines().map(|line| line.trim().to_string()).collect();
                                 self.popup_list_msg(list_msg);
                             }
                             Err(err) => {

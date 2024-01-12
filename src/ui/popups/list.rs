@@ -4,7 +4,7 @@ use std::cmp::{max, min};
 
 use crate::ui::utils::{prelude, SharedTheme};
 
-pub struct ClashTuiListPopup {
+pub struct HelpPopUp {
     title: String,
     is_visible: bool,
     items: Vec<String>,
@@ -15,7 +15,7 @@ pub struct ClashTuiListPopup {
 use crate::ui::EventState;
 use crate::visible_methods;
 
-impl ClashTuiListPopup {
+impl HelpPopUp {
     pub fn new(title: String, theme: SharedTheme) -> Self {
         Self {
             title,
@@ -164,4 +164,4 @@ impl ClashTuiListPopup {
     }
 }
 
-visible_methods!(ClashTuiListPopup);
+visible_methods!(HelpPopUp);

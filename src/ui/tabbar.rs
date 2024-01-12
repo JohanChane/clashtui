@@ -92,7 +92,7 @@ impl ClashTuiTabBar {
     }
 
     pub fn selected(&self) -> Option<&String> {
-        return Some(&self.tab_titles[self.index]);
+        return self.tab_titles.get(self.index);
     }
 }
 

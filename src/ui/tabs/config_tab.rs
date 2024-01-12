@@ -5,7 +5,7 @@ use super::CommonTab;
 use crate::ui::{
     popups::{ClashTuiInputPopup, MsgPopup},
     utils::{ClashTuiList, SharedTheme},
-    EventState, SharedSymbols,
+    EventState,
 };
 use crate::utils::ConfigOp;
 use crate::utils::SharedClashTuiUtil;
@@ -26,12 +26,12 @@ pub struct ConfigTab {
 
 impl ConfigTab {
     pub fn new(
-        symbols: SharedSymbols,
+        title:String,
         clashtui_util: SharedClashTuiUtil,
 
         theme: SharedTheme,
     ) -> Self {
-        let mut operations = ClashTuiList::new(symbols.config.clone(), theme);
+        let mut operations = ClashTuiList::new(title.clone(), theme);
         operations.set_items(vec![
             ConfigOp::ClashConfigDir.into(),
             ConfigOp::ClashConfigFile.into(),
@@ -43,7 +43,7 @@ impl ConfigTab {
         inp.hide();
 
         Self {
-            title: symbols.config.clone(),
+            title,
             is_visible: false,
             setting_list: operations,
             clashtui_util,
@@ -54,6 +54,9 @@ impl ConfigTab {
     }
 
     pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ()> {
+        if !self.is_visible {
+            return Ok(EventState::NotConsumed);
+        }
         let mut event_state = self.msgpopup.event(ev).unwrap();
 
         if event_state.is_notconsumed() {
