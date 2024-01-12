@@ -7,7 +7,7 @@ use std::{cell::RefCell, collections::HashMap, env, path::PathBuf, rc::Rc};
 use crate::msgpopup_methods;
 use crate::ui::popups::{HelpPopUp, MsgPopup};
 use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tabs};
-use crate::ui::utils::{tools, Keys, SharedSymbols, Symbols, Theme};
+use crate::ui::utils::{tools, Keys, SharedSymbols, Symbols, Theme, Visibility};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState};
 use crate::utils::{ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
 
@@ -16,13 +16,13 @@ pub struct App {
     tabbar: ClashTuiTabBar,
     tabs: HashMap<String, Tabs>,
     pub should_quit: bool,
-    pub help_popup: HelpPopUp,
-    pub msgpopup: MsgPopup,
+    help_popup: HelpPopUp,
+    msgpopup: MsgPopup,
 
-    pub symbols: SharedSymbols,
-    pub clashtui_util: SharedClashTuiUtil,
+    symbols: SharedSymbols,
+    clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
-    pub statusbar: ClashTuiStatusBar,
+    statusbar: ClashTuiStatusBar,
     pub flags: HashMap<Flags, bool>,
 }
 
@@ -147,7 +147,7 @@ impl App {
         app
     }
 
-    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState> {
+    fn popup_event(&mut self, ev: &Event) -> Result<EventState> {
         // ## Self Popups
         let mut event_state = self.help_popup.event(ev).unwrap();
 
@@ -327,7 +327,7 @@ impl App {
 
     pub fn on_tick(&mut self) {}
 
-    pub fn update_tabbar(&mut self) {
+    fn update_tabbar(&self) {
         let tabname = self
             .tabbar
             .selected()
@@ -337,30 +337,9 @@ impl App {
             .iter()
             .map(|(n, v)| if n == tabname { (true, v) } else { (false, v) })
             .map(|(b, v)| match v {
-                Tabs::ProfileTab(k) => {
-                    let mut l = k.borrow_mut();
-                    if b {
-                        l.show()
-                    } else {
-                        l.hide()
-                    }
-                }
-                Tabs::ClashSrvCtlTab(k) => {
-                    let mut l = k.borrow_mut();
-                    if b {
-                        l.show()
-                    } else {
-                        l.hide()
-                    }
-                }
-                Tabs::ConfigTab(k) => {
-                    let mut l = k.borrow_mut();
-                    if b {
-                        l.show()
-                    } else {
-                        l.hide()
-                    }
-                }
+                Tabs::ProfileTab(k) => k.borrow_mut().set_visible(b),
+                Tabs::ClashSrvCtlTab(k) => k.borrow_mut().set_visible(b),
+                Tabs::ConfigTab(k) => k.borrow_mut().set_visible(b),
             })
             .count();
     }
@@ -382,6 +361,14 @@ impl App {
 
         log4rs::init_config(config).unwrap();
         log::info!("Start Log, level: {}", log_level);
+    }
+
+    pub fn save_config(&self) {
+        self.clashtui_util.save_config()
+    }
+
+    pub fn get_err_track(&self) -> Vec<crate::utils::ClashTuiConfigLoadError> {
+        self.clashtui_util.get_err_track()
     }
 }
 

@@ -4,7 +4,7 @@ use ratatui::{prelude as Ra, widgets as Raw};
 use super::CommonTab;
 use crate::ui::{
     popups::{ClashTuiInputPopup, MsgPopup},
-    utils::{ClashTuiList, Keys, SharedTheme},
+    utils::{ClashTuiList, Keys, SharedTheme, Visibility},
     EventState,
 };
 use crate::utils::{ConfigOp, SharedClashTuiUtil};

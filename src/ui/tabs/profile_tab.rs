@@ -11,7 +11,7 @@ use std::{
 use super::{profile_input::ProfileInputPopup, CommonTab};
 use crate::ui::{
     popups::{ConfirmPopup, MsgPopup},
-    utils::{ClashTuiList, Keys, SharedTheme},
+    utils::{ClashTuiList, Keys, SharedTheme, Visibility},
     EventState,
 };
 use crate::utils::utils as Utils;

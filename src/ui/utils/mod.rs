@@ -1,8 +1,8 @@
 mod key_list;
 mod list;
-pub mod tools;
 mod symbols;
 mod theme;
+pub mod tools;
 
 pub use self::key_list::Keys;
 pub use self::list::ClashTuiList;
@@ -23,18 +23,27 @@ macro_rules! title_methods {
     };
 }
 
+pub trait Visibility {
+    fn is_visible(&self) -> bool;
+    fn show(&mut self);
+    fn hide(&mut self);
+    fn set_visible(&mut self, b: bool);
+}
 #[macro_export]
 macro_rules! visible_methods {
     ($type:ident) => {
-        impl $type {
-            pub fn is_visible(&self) -> bool {
+        impl crate::ui::utils::Visibility for $type {
+            fn is_visible(&self) -> bool {
                 self.is_visible
             }
-            pub fn show(&mut self) {
+            fn show(&mut self) {
                 self.is_visible = true;
             }
-            pub fn hide(&mut self) {
+            fn hide(&mut self) {
                 self.is_visible = false;
+            }
+            fn set_visible(&mut self, b: bool) {
+                self.is_visible = b;
             }
         }
     };

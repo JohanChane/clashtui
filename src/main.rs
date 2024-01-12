@@ -75,7 +75,7 @@ fn run_app<B: Backend>(
     let mut last_tick = Instant::now();
     let mut last_ev = EventState::NotConsumed;
     let mut showstr = String::new();
-    let mut err_tarck = app.clashtui_util.get_err_track();
+    let mut err_tarck = app.get_err_track();
     if *app.flags.get(&utils::Flags::FirstInit).unwrap() {
         app.popup_txt_msg(
             "Welcome to ClashTui(forked)!\n
@@ -129,7 +129,7 @@ fn run_app<B: Backend>(
             last_tick = Instant::now();
         }
         if app.should_quit {
-            app.clashtui_util.save_config();
+            app.save_config();
             log::info!("App Exit");
             return Ok(());
         }

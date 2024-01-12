@@ -2,7 +2,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
-use crate::ui::utils::{tools, SharedTheme};
+use crate::ui::utils::{tools, SharedTheme, Visibility};
 
 pub struct HelpPopUp {
     title: String,

@@ -2,6 +2,7 @@ use crossterm::event::{Event, KeyEventKind};
 use ratatui::prelude as Ra;
 
 use super::CommonTab;
+use crate::ui::utils::Visibility;
 use crate::{msgpopup_methods, visible_methods};
 use crate::{
     ui::{
