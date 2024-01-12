@@ -14,7 +14,6 @@ use std::{
 use utils::ClashTuiConfigLoadError;
 
 mod app;
-mod clashtui_state;
 mod ui;
 mod utils;
 

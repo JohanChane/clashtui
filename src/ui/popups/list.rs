@@ -2,7 +2,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
-use crate::ui::utils::{helper, SharedTheme};
+use crate::ui::utils::{prelude, SharedTheme};
 
 pub struct ClashTuiListPopup {
     title: String,
@@ -75,7 +75,7 @@ impl ClashTuiListPopup {
         let dialog_width = max(min(max_item_width + 2, f.size().width as usize - 4), 60); // min_width = 60
         let dialog_height = min(item_len + 2, f.size().height as usize - 6);
         let area =
-            helper::centered_lenght_rect(dialog_width as u16, dialog_height as u16, f.size());
+            prelude::centered_lenght_rect(dialog_width as u16, dialog_height as u16, f.size());
 
         let list = Raw::List::new(items)
             .block(

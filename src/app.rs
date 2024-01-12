@@ -8,7 +8,7 @@ use crate::msgpopup_methods;
 use crate::ui::keys::{match_key, KeyList, SharedKeyList};
 use crate::ui::popups::{ClashTuiListPopup, MsgPopup};
 use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tab, Tabs};
-use crate::ui::utils::{helper, Theme};
+use crate::ui::utils::{prelude, Theme};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState, SharedSymbols, Symbols};
 use crate::utils::{
     ClashTuiOp, ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State,
@@ -345,7 +345,7 @@ impl App {
 
         self.statusbar.draw(f, chunks[2]);
 
-        let help_area = helper::centered_percent_rect(60, 60, f.size());
+        let help_area = prelude::centered_percent_rect(60, 60, f.size());
         self.help_popup.draw(f, help_area);
         self.msgpopup.draw(f, help_area);
     }

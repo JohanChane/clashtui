@@ -45,6 +45,10 @@ impl ClashTuiTabBar {
                         }
                         EventState::WorkDone
                     }
+                    KeyCode::Tab => {
+                        self.next();
+                        EventState::WorkDone
+                    }
                     _ => EventState::NotConsumed,
                 }
             }
@@ -78,7 +82,7 @@ impl ClashTuiTabBar {
     pub fn next(&mut self) {
         self.index = (self.index + 1) % self.tab_titles.len();
     }
-
+    #[allow(unused)]
     pub fn previous(&mut self) {
         if self.index > 0 {
             self.index -= 1;
