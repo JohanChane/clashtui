@@ -38,7 +38,12 @@ macro_rules! define_clashtui_operations {
 }
 
 #[cfg(target_os = "linux")]
-define_clashtui_operations!(StartClashService, StopClashService, TestClashConfig, SetPermission);
+define_clashtui_operations!(
+    StartClashService,
+    StopClashService,
+    TestClashConfig,
+    SetPermission
+);
 
 #[cfg(target_os = "windows")]
 define_clashtui_operations!(

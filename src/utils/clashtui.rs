@@ -531,7 +531,7 @@ impl ClashTuiUtil {
             ClashTuiOp::SetPermission => {
                 let output = match Command::new("setcap")
                     .arg("'cap_net_admin,cap_net_bind_service=+ep'")
-                    .arg(self.clashtui_config.borrow().clash_core_path.clone())
+                    .arg(tuiconf.clash_core_path.clone())
                     .output()
                 {
                     Ok(v) => v,
@@ -652,7 +652,7 @@ impl ClashTuiUtil {
         let ver = match self.clash_api.version() {
             Ok(v) => v,
             Err(e) => {
-                log::warn!("{}",e);
+                log::warn!("{}", e);
                 "Unknown".to_string()
             }
         };
@@ -818,18 +818,6 @@ impl ClashTuiUtil {
             .take(num_lines)
             .map(String::from)
             .collect()
-    }
-}
-
-trait MonkeyPatchVec {
-    // to make the code more 'beautiful'
-    fn push_if_not_exist(&mut self, value: ClashTuiConfigLoadError);
-}
-impl MonkeyPatchVec for Vec<ClashTuiConfigLoadError> {
-    fn push_if_not_exist(&mut self, value: ClashTuiConfigLoadError) {
-        if !self.contains(&value) {
-            self.push(value)
-        };
     }
 }
 

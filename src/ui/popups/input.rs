@@ -1,8 +1,8 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::ui::EventState;
 use crate::ui::utils::Visibility;
+use crate::ui::EventState;
 use crate::{fouce_methods, visible_methods};
 
 pub struct ClashTuiInputPopup {

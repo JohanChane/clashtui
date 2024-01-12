@@ -75,13 +75,17 @@ impl App {
         ));
         if *flags.get(&Flags::UpdateOnly).unwrap() {
             log::info!("Cron Mode!");
-            let profile_list:Vec<_> = clashtui_util
+            let profile_list: Vec<_> = clashtui_util
                 .get_profile_names()
                 .unwrap()
                 .iter()
-                .map(|v| clashtui_util.update_local_profile(v, false)).collect();
-            let mut x = std::fs::File::create(&clashtui_config_dir.join("CronUpdate.log")).map_err(|e|log::error!("Err while CronUpdate: {}", e)).unwrap();
-            let _ = std::io::Write::write_all(&mut x, format!("{:?}",profile_list).as_bytes()).map_err(|e|log::error!("Err while CronUpdate: {}", e));
+                .map(|v| clashtui_util.update_local_profile(v, false))
+                .collect();
+            let mut x = std::fs::File::create(&clashtui_config_dir.join("CronUpdate.log"))
+                .map_err(|e| log::error!("Err while CronUpdate: {}", e))
+                .unwrap();
+            let _ = std::io::Write::write_all(&mut x, format!("{:?}", profile_list).as_bytes())
+                .map_err(|e| log::error!("Err while CronUpdate: {}", e));
             drop(x);
             drop(profile_list);
             return None;

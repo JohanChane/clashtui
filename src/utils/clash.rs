@@ -57,7 +57,7 @@ impl ClashUtil {
             Err(e) => Err(e),
         }
     }
-    
+
     pub fn restart(&self, payload: Option<&String>) -> Result<String, reqwest::Error> {
         match payload {
             Some(load) => self.post("/restart", Some(load)),

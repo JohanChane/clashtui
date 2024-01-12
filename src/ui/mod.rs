@@ -4,13 +4,12 @@ mod tabbar;
 pub mod tabs;
 pub mod utils;
 
-pub use self::statusbar::ClashTuiStatusBar;
+pub use statusbar::ClashTuiStatusBar;
 
 pub use tabbar::ClashTuiTabBar;
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum EventState {
-    UnexpectedERROR,
     NotConsumed,
     WorkDone,
     ProfileUpdate,

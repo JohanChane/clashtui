@@ -19,7 +19,7 @@ pub enum Keys {
 }
 
 impl Keys {
-    pub fn bindto(self) -> KeyCode{
+    pub fn bindto(self) -> KeyCode {
         match self {
             Keys::ProfileSwitch => KeyCode::Char('P'),
             Keys::ProfileUpdate => KeyCode::Char('u'),
@@ -31,7 +31,7 @@ impl Keys {
             Keys::TemplateSwitch => KeyCode::Char('T'),
 
             Keys::ClashsrvctlRestart => KeyCode::Char('R'),
-            
+
             Keys::Select => KeyCode::Enter,
             //Keys::Edit => KeyCode::Char('e'),
             Keys::Preview => KeyCode::Char('p'),
@@ -40,7 +40,7 @@ impl Keys {
             Keys::AppHelp => KeyCode::Char('?'),
         }
     }
-    pub fn is(self, code:&KeyEvent) -> bool{
+    pub fn is(self, code: &KeyEvent) -> bool {
         self.bindto() == code.code
     }
 }

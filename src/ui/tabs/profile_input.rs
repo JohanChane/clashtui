@@ -1,7 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::ui::{popups::ClashTuiInputPopup, EventState, utils::Visibility};
+use crate::ui::{popups::ClashTuiInputPopup, utils::Visibility, EventState};
 
 pub struct ProfileInputPopup {
     pub name_input: ClashTuiInputPopup,

@@ -63,10 +63,7 @@ impl State {
         #[cfg(target_os = "linux")]
         let status_str = format!(
             "Profile: {}    Mode: {}    Tun: {}    ClashVer: {}    Help: ?",
-            self.st.profile,
-            self.st.mode,
-            self.st.tun,
-            self.st.ver
+            self.st.profile, self.st.mode, self.st.tun, self.st.ver
         );
         status_str
     }
