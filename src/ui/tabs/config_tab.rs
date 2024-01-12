@@ -3,13 +3,11 @@ use ratatui::{prelude as Ra, widgets as Raw};
 
 use super::CommonTab;
 use crate::ui::{
-    keys::Keys,
     popups::{ClashTuiInputPopup, MsgPopup},
-    utils::{ClashTuiList, SharedTheme},
+    utils::{ClashTuiList, Keys, SharedTheme},
     EventState,
 };
-use crate::utils::ConfigOp;
-use crate::utils::SharedClashTuiUtil;
+use crate::utils::{ConfigOp, SharedClashTuiUtil};
 use crate::{msgpopup_methods, visible_methods};
 
 pub struct ConfigTab {

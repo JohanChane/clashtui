@@ -5,7 +5,7 @@ pub struct Symbols {
     pub config: String,
 
     pub help: String,
-    pub default_basic_clash_cfg_content: String,
+    pub default_basic_clash_cfg_content: &'static str,
 }
 
 impl Default for Symbols {
@@ -46,8 +46,7 @@ impl Default for Symbols {
         let default_basic_clash_cfg_content = r#"mixed-port: 7890
 mode: rule
 log-level: info
-external-controller: 127.0.0.1:9090"#
-            .to_string();
+external-controller: 127.0.0.1:9090"#;
         Self {
             profile: "Profile".to_string(),
             template: "Template".to_string(),

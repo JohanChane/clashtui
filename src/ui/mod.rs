@@ -1,11 +1,9 @@
-pub mod keys;
 pub mod popups;
 mod statusbar;
 mod tabbar;
 pub mod tabs;
 pub mod utils;
 
-pub use self::keys::{SharedSymbols, Symbols};
 pub use self::statusbar::ClashTuiStatusBar;
 
 pub use tabbar::ClashTuiTabBar;

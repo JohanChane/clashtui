@@ -5,11 +5,10 @@ use ratatui::prelude as Ra;
 use std::{cell::RefCell, collections::HashMap, env, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
-use crate::ui::keys::Keys;
 use crate::ui::popups::{HelpPopUp, MsgPopup};
 use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tabs};
-use crate::ui::utils::{prelude, Theme};
-use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState, SharedSymbols, Symbols};
+use crate::ui::utils::{prelude, Keys, SharedSymbols, Symbols, Theme};
+use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState};
 use crate::utils::{ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
 
 pub struct App {

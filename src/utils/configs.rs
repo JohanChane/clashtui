@@ -161,7 +161,7 @@ pub enum ClashTuiConfigLoadError {
 
 pub fn init_config(
     clashtui_config_dir: &std::path::PathBuf,
-    symbols: &crate::ui::SharedSymbols,
+    symbols: &crate::ui::utils::SharedSymbols,
 ) -> Result<(), Error> {
     // just assume it's working, handle bug when bug occurs
     use std::fs;

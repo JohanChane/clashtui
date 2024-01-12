@@ -1,9 +1,16 @@
-pub mod prelude;
+mod key_list;
 mod list;
-pub mod style;
+pub mod prelude;
+mod symbols;
+mod theme;
+
+pub use self::key_list::Keys;
+pub use self::symbols::Symbols;
+
+pub type SharedSymbols = std::rc::Rc<Symbols>;
 
 pub use self::list::ClashTuiList;
-pub use self::style::{SharedTheme, Theme};
+pub use self::theme::{SharedTheme, Theme};
 
 #[macro_export]
 macro_rules! title_methods {
