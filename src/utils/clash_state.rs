@@ -5,14 +5,16 @@ pub struct _State {
     pub profile: String,
     pub mode: String,
     pub tun: String,
+    pub ver: String,
 }
 #[cfg(target_os = "linux")]
 impl _State {
-    pub fn new(pf: String, mode: String, tun: String) -> Self {
+    pub fn new(pf: String, mode: String, tun: String, ver: String) -> Self {
         Self {
             tun,
             mode,
             profile: pf,
+            ver,
         }
     }
 }
@@ -46,15 +48,27 @@ impl State {
     pub fn get_profile(&self) -> &String {
         &self.st.profile
     }
-    pub fn get_mode(&self) -> &String {
-        &self.st.mode
-    }
-    pub fn get_tun(&self) -> &String {
-        &self.st.tun
-    }
     pub fn set_profile(&mut self, profile: String) {
         // With update state
         self.st = self.ct.update_state(Some(profile));
+    }
+    pub fn render(&self) -> String {
+        #[cfg(target_os = "windows")]
+        let status_str = format!(
+            "Profile: {}    Tun: {}    SysProxy: {}    Help: ?",
+            self.get_profile(),
+            self.get_tun(),
+            self.get_sysproxy().to_string(),
+        );
+        #[cfg(target_os = "linux")]
+        let status_str = format!(
+            "Profile: {}    Mode: {}    Tun: {}    ClashVer: {}    Help: ?",
+            self.st.profile,
+            self.st.mode,
+            self.st.tun,
+            self.st.ver
+        );
+        status_str
     }
     #[cfg(target_os = "windows")]
     pub fn get_sysproxy(&self) -> bool {

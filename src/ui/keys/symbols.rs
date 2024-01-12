@@ -16,16 +16,16 @@ impl Default for Symbols {
                         u: Update proxy-providers only
                         U: Update all network resources in profile
                         i: Import
-                        D: Delete
-                        e: Edit
-                        T: Test
-                        P: Preview
+                        d: Delete
+                        e: Edit(todo)
+                        t: Test
+                        p: Preview
 
                         ## Tempalte
-                        t: Switch to template
+                        T: Switch to template
                         enter: Create yaml
-                        e: Edit
-                        P: Preview
+                        e: Edit(todo)
+                        p: Preview
 
                         ## ClashSrvCtl
                         enter: Action
@@ -35,10 +35,10 @@ impl Default for Symbols {
 
                         ## Global
                         R: Restart clash core
-                        H: Locate app home path
-                        G: Locate clash config dir
+                        H: Locate app home path(todo)
+                        G: Locate clash config dir(todo)
                         L: show recent log
-                        1,2,...,9: Switch tab
+                        1,2,...,9 OR Tab: Switch tabs
                         Esc: Close popup
                         Q: Quit
                         ?: help"#

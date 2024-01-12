@@ -27,21 +27,7 @@ impl ClashTuiStatusBar {
 
         f.render_widget(Raw::Clear, area);
         let state = self.clashtui_state.borrow();
-        #[cfg(target_os = "windows")]
-        let status_str = format!(
-            "Profile: {}    Tun: {}    SysProxy: {}    Help: ?",
-            state.get_profile(),
-            state.get_tun(),
-            state.get_sysproxy().to_string(),
-        );
-        #[cfg(target_os = "linux")]
-        let status_str = format!(
-            "Profile: {}    Mode: {}    Tun: {}    Help: ?",
-            state.get_profile(),
-            state.get_mode(),
-            state.get_tun(),
-        );
-
+        let status_str = state.render();
         let paragraph = Raw::Paragraph::new(Ra::Span::styled(
             status_str,
             Ra::Style::default().fg(self.theme.statusbar_txt_fg),

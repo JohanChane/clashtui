@@ -649,6 +649,13 @@ impl ClashTuiUtil {
             None => tuiconf.cur_profile.clone(),
         };
         let mode;
+        let ver = match self.clash_api.version() {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("{}",e);
+                "Unknown".to_string()
+            }
+        };
         let tun = match self.clash_remote_config.borrow().as_ref() {
             Some(v) => {
                 mode = v.mode.to_string();
@@ -663,7 +670,7 @@ impl ClashTuiUtil {
                 "Unknown".to_string()
             }
         };
-        _State::new(pf, mode, tun)
+        _State::new(pf, mode, tun, ver)
     }
 
     pub fn test_profile_config(&self, path: &Path, geodata_mode: bool) -> Result<String, Error> {

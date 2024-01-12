@@ -44,21 +44,22 @@ impl KeyList {}
 impl Default for KeyList {
     fn default() -> Self {
         Self {
-            profile_switch: ClashTuiKeyEvent::new(KeyCode::Char('p')),
+            profile_switch: ClashTuiKeyEvent::new(KeyCode::Char('P')),
             profile_select: ClashTuiKeyEvent::new(KeyCode::Enter),
             profile_update: ClashTuiKeyEvent::new(KeyCode::Char('u')),
             profile_update_all: ClashTuiKeyEvent::new(KeyCode::Char('U')),
             profile_import: ClashTuiKeyEvent::new(KeyCode::Char('i')),
-            profile_delete: ClashTuiKeyEvent::new(KeyCode::Char('D')),
-            profile_test_config: ClashTuiKeyEvent::new(KeyCode::Char('T')),
-            template_switch: ClashTuiKeyEvent::new(KeyCode::Char('t')),
+            profile_delete: ClashTuiKeyEvent::new(KeyCode::Char('d')),
+            profile_test_config: ClashTuiKeyEvent::new(KeyCode::Char('t')),
+
+            template_switch: ClashTuiKeyEvent::new(KeyCode::Char('T')),
             template_create: ClashTuiKeyEvent::new(KeyCode::Enter),
             clashsrvctl_select: ClashTuiKeyEvent::new(KeyCode::Enter),
             clashsrvctl_restart: ClashTuiKeyEvent::new(KeyCode::Char('R')),
             config_select: ClashTuiKeyEvent::new(KeyCode::Enter),
 
             //edit: ClashTuiKeyEvent::new(KeyCode::Char('e')),
-            preview: ClashTuiKeyEvent::new(KeyCode::Char('P')),
+            preview: ClashTuiKeyEvent::new(KeyCode::Char('p')),
             //app_home_open: ClashTuiKeyEvent::new(KeyCode::Char('H')),
             //clash_cfg_dir_open: ClashTuiKeyEvent::new(KeyCode::Char('G')),
             log_cat: ClashTuiKeyEvent::new(KeyCode::Char('L')),
