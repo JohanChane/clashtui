@@ -83,6 +83,11 @@ fn run_app<B: Backend>(
                 .to_string(),
         )
     };
+    if *app.flags.get(&utils::Flags::ErrorDuringInit).unwrap() {
+        app.popup_txt_msg(
+            "Some Error happened during app init, Check the log for detail".to_string(),
+        );
+    }
     loop {
         if !err_tarck.is_empty() {
             let err: Option<ClashTuiConfigLoadError> = err_tarck.pop();

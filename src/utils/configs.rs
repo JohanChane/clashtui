@@ -62,6 +62,7 @@ pub struct TunConfig {
 #[derive(Eq, Hash, PartialEq)]
 pub enum Flags {
     FirstInit,
+    ErrorDuringInit,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]

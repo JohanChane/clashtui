@@ -502,7 +502,7 @@ impl ClashTuiUtil {
     pub fn clash_srv_ctl(&self, op: ClashTuiOp) -> Result<String, Error> {
         let tuiconf = self.clashtui_config.borrow();
         match op {
-            ClashTuiOp::StartClash => {
+            ClashTuiOp::StartClashService => {
                 let output = match Command::new("systemctl")
                     .arg("restart")
                     .arg(tuiconf.clash_srv_name.as_str())
@@ -514,16 +514,30 @@ impl ClashTuiUtil {
 
                 return Utils::string_process_output(output);
             }
-            ClashTuiOp::StopClash => {
-                let output = Command::new("systemctl")
+            ClashTuiOp::StopClashService => {
+                let output = match Command::new("systemctl")
                     .arg("stop")
                     .arg(tuiconf.clash_srv_name.as_str())
                     .output()
-                    .unwrap();
+                {
+                    Ok(v) => v,
+                    Err(e) => return Err(e),
+                };
                 return Utils::string_process_output(output);
             }
             ClashTuiOp::TestClashConfig => {
                 return self.test_profile_config(&Path::new(&tuiconf.clash_cfg_path), false);
+            }
+            ClashTuiOp::SetPermission => {
+                let output = match Command::new("setcap")
+                    .arg("'cap_net_admin,cap_net_bind_service=+ep'")
+                    .arg(self.clashtui_config.borrow().clash_core_path.clone())
+                    .output()
+                {
+                    Ok(v) => v,
+                    Err(e) => return Err(e),
+                };
+                return Utils::string_process_output(output);
             }
         }
     }
@@ -539,7 +553,7 @@ impl ClashTuiUtil {
         let nssm_path_str = "nssm";
 
         let output = match op {
-            ClashTuiOp::StartClash => {
+            ClashTuiOp::StartClashService => {
                 Self::start_process_as_admin(
                     nssm_path_str,
                     format!("restart {}", self.clash_srv_name).as_str(),
@@ -552,7 +566,7 @@ impl ClashTuiUtil {
                     .output()?
             }
 
-            ClashTuiOp::StopClash => {
+            ClashTuiOp::StopClashService => {
                 Self::start_process_as_admin(
                     nssm_path_str,
                     &format!("stop {}", self.clash_srv_name),
@@ -618,7 +632,8 @@ impl ClashTuiUtil {
 
     #[cfg(target_os = "linux")]
     pub fn update_state(&self, new_pf: Option<String>) -> _State {
-        if new_pf.is_none() { // act when app is initing.
+        if new_pf.is_none() {
+            // act when app is initing.
             if let Some(e) = self.fetch_remote() {
                 if !e.is_connect() {
                     log::warn!("{}", e);

@@ -34,6 +34,9 @@ impl ClashSrvCtlTab {
         let mut operations = ClashTuiList::new(title.clone(), theme);
         operations.set_items(vec![
             ClashTuiOp::TestClashConfig.into(),
+            ClashTuiOp::SetPermission.into(),
+            ClashTuiOp::StartClashService.into(),
+            ClashTuiOp::StopClashService.into(),
             #[cfg(target_os = "windows")]
             ClashTuiOp::EnableSysProxy.into(),
             #[cfg(target_os = "windows")]

@@ -10,9 +10,7 @@ use crate::ui::popups::{HelpPopUp, MsgPopup};
 use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tabs};
 use crate::ui::utils::{prelude, Theme};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState, SharedSymbols, Symbols};
-use crate::utils::{
-    ClashTuiOp, ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State,
-};
+use crate::utils::{ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
 
 pub struct App {
     title: String,
@@ -63,6 +61,7 @@ impl App {
         if !clashtui_config_dir.join("config.yaml").exists() {
             flags.insert(Flags::FirstInit, true);
             if let Err(err) = crate::utils::init_config(&clashtui_config_dir, &names) {
+                flags.insert(Flags::ErrorDuringInit, true);
                 log::error!("{}", err);
             }
         } else {
@@ -88,39 +87,46 @@ impl App {
         let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
 
         let mut tabs: HashMap<String, Tabs> = HashMap::with_capacity(3);
-        tabs.insert(
-            names.profile.clone(),
-            Tabs::ProfileTab(RefCell::new(ProfileTab::new(
+        {
+            // Init the tabs
+            tabs.insert(
                 names.profile.clone(),
-                key_list.clone(),
-                clashtui_util.clone(),
-                clashtui_state.clone(),
-                theme.clone(),
-            ))),
-        );
-        tabs.insert(
-            names.clashsrvctl.clone(),
-            Tabs::ClashSrvCtlTab(RefCell::new(ClashSrvCtlTab::new(
+                Tabs::ProfileTab(RefCell::new(ProfileTab::new(
+                    names.profile.clone(),
+                    key_list.clone(),
+                    clashtui_util.clone(),
+                    clashtui_state.clone(),
+                    theme.clone(),
+                ))),
+            );
+            tabs.insert(
                 names.clashsrvctl.clone(),
-                key_list.clone(),
-                Rc::clone(&clashtui_util),
-                Rc::clone(&theme),
-            ))),
-        );
-        tabs.insert(
-            names.config.clone(),
-            Tabs::ConfigTab(RefCell::new(ConfigTab::new(
+                Tabs::ClashSrvCtlTab(RefCell::new(ClashSrvCtlTab::new(
+                    names.clashsrvctl.clone(),
+                    key_list.clone(),
+                    Rc::clone(&clashtui_util),
+                    Rc::clone(&theme),
+                ))),
+            );
+            tabs.insert(
                 names.config.clone(),
-                clashtui_util.clone(),
-                theme.clone(),
-            ))),
-        );
+                Tabs::ConfigTab(RefCell::new(ConfigTab::new(
+                    names.config.clone(),
+                    clashtui_util.clone(),
+                    theme.clone(),
+                ))),
+            );
+        }
 
         let mut app = Self {
             title: "ClashTui".to_string(),
             tabbar: ClashTuiTabBar::new(
                 "".to_string(),
-                vec![names.profile.clone(), names.clashsrvctl.clone(), names.config.to_string()],
+                vec![
+                    names.profile.clone(),
+                    names.clashsrvctl.clone(),
+                    names.config.to_string(),
+                ],
                 Rc::clone(&theme),
             ),
             should_quit: false,
@@ -142,6 +148,7 @@ impl App {
             .map(|line| line.trim().to_string())
             .collect();
         app.help_popup.set_items(help_text);
+        app.flags.insert(Flags::ErrorDuringInit, false);
 
         app
     }
@@ -200,32 +207,8 @@ impl App {
                 let log = self.clashtui_util.fetch_recent_logs(20);
                 self.popup_list_msg(log);
                 EventState::WorkDone
-            } else if match_key(key, &self.key_list.clashsrvctl_start) {
-                match self.clashtui_util.clash_srv_ctl(ClashTuiOp::StartClash) {
-                    Ok(output) => {
-                        let list_msg: Vec<String> =
-                            output.lines().map(|line| line.trim().to_string()).collect();
-                        self.popup_list_msg(list_msg);
-                    }
-                    Err(err) => {
-                        self.popup_txt_msg(err.to_string());
-                    }
-                }
-                EventState::WorkDone
             } else if match_key(key, &self.key_list.clashsrvctl_restart) {
                 match self.clashtui_util.restart_clash() {
-                    Ok(output) => {
-                        let list_msg: Vec<String> =
-                            output.lines().map(|line| line.trim().to_string()).collect();
-                        self.popup_list_msg(list_msg);
-                    }
-                    Err(err) => {
-                        self.popup_txt_msg(err.to_string());
-                    }
-                }
-                EventState::WorkDone
-            } else if match_key(key, &self.key_list.clashsrvctl_stop) {
-                match self.clashtui_util.clash_srv_ctl(ClashTuiOp::StopClash) {
                     Ok(output) => {
                         let list_msg: Vec<String> =
                             output.lines().map(|line| line.trim().to_string()).collect();
