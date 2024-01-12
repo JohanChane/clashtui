@@ -59,8 +59,9 @@ pub struct TunConfig {
     pub enable: bool,
     pub stack: TunStack,
 }
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq, Debug)]
 pub enum Flags {
+    UpdateOnly,
     FirstInit,
     ErrorDuringInit,
 }

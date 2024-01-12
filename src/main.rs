@@ -33,32 +33,45 @@ struct Cli {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli: Cli = argh::from_env();
+    let mut flags: std::collections::HashMap<utils::Flags, bool> =
+        std::collections::HashMap::with_capacity(3);
+    flags.insert(utils::Flags::UpdateOnly, false);
+    // When read something from cli , set UpdateOnly is true, otherwise false
     let tick_rate = Duration::from_millis(cli.tick_rate);
-    run(tick_rate, cli.enhanced_graphics)?;
+    run(flags, tick_rate, cli.enhanced_graphics)?;
 
     Ok(())
 }
 #[allow(unused_variables)]
-pub fn run(tick_rate: Duration, enhanced_graphics: bool) -> Result<()> {
-    // setup terminal
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+pub fn run(
+    flags: std::collections::HashMap<utils::Flags, bool>,
+    tick_rate: Duration,
+    enhanced_graphics: bool,
+) -> Result<()> {
+    let res;
+    log::debug!("Current flags: {:?}", flags);
+    if let Some(mut app) = App::new(flags) {
+        // setup terminal
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
 
-    // create app and run it
-    let mut app = App::new();
-    let res = run_app(&mut terminal, &mut app, tick_rate);
+        // create app and run it
+        res = run_app(&mut terminal, &mut app, tick_rate);
 
-    // restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+        // restore terminal
+        disable_raw_mode()?;
+        execute!(
+            terminal.backend_mut(),
+            LeaveAlternateScreen,
+            DisableMouseCapture
+        )?;
+        terminal.show_cursor()?;
+    } else {
+        res = Ok(());
+    }
 
     if let Err(err) = res {
         println!("{err:?}");

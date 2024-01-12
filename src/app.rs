@@ -27,10 +27,8 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Self {
-        let mut flags: HashMap<Flags, bool> = HashMap::with_capacity(2);
+    pub fn new(mut flags: HashMap<Flags, bool>) -> Option<Self> {
         let names = Rc::new(Symbols::default());
-        let theme = Rc::new(Theme::default());
 
         let exe_dir = std::env::current_exe()
             .unwrap()
@@ -75,6 +73,21 @@ impl App {
             &clashtui_config_dir.join("profiles"),
             *flags.get(&Flags::FirstInit).unwrap(),
         ));
+        if *flags.get(&Flags::UpdateOnly).unwrap() {
+            log::info!("Cron Mode!");
+            let profile_list:Vec<_> = clashtui_util
+                .get_profile_names()
+                .unwrap()
+                .iter()
+                .map(|v| clashtui_util.update_local_profile(v, false)).collect();
+            let mut x = std::fs::File::create(&clashtui_config_dir.join("CronUpdate.log")).map_err(|e|log::error!("Err while CronUpdate: {}", e)).unwrap();
+            let _ = std::io::Write::write_all(&mut x, format!("{:?}",profile_list).as_bytes()).map_err(|e|log::error!("Err while CronUpdate: {}", e));
+            drop(x);
+            drop(profile_list);
+            return None;
+        }
+
+        let theme = Rc::new(Theme::default());
 
         let help_popup = HelpPopUp::new("Help".to_string(), Rc::clone(&theme));
 
@@ -144,7 +157,7 @@ impl App {
         app.help_popup.set_items(help_text);
         app.flags.insert(Flags::ErrorDuringInit, false);
 
-        app
+        Some(app)
     }
 
     fn popup_event(&mut self, ev: &Event) -> Result<EventState> {
