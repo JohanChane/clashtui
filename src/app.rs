@@ -5,7 +5,7 @@ use ratatui::prelude as Ra;
 use std::{cell::RefCell, collections::HashMap, env, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
-use crate::ui::keys::{match_key, KeyList, SharedKeyList};
+use crate::ui::keys::Keys;
 use crate::ui::popups::{HelpPopUp, MsgPopup};
 use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tabs};
 use crate::ui::utils::{prelude, Theme};
@@ -20,7 +20,6 @@ pub struct App {
     pub help_popup: HelpPopUp,
     pub msgpopup: MsgPopup,
 
-    pub key_list: SharedKeyList,
     pub symbols: SharedSymbols,
     pub clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
@@ -30,8 +29,7 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        let mut flags: HashMap<Flags, bool> = HashMap::with_capacity(1);
-        let key_list = Rc::new(KeyList::default());
+        let mut flags: HashMap<Flags, bool> = HashMap::with_capacity(2);
         let names = Rc::new(Symbols::default());
         let theme = Rc::new(Theme::default());
 
@@ -93,7 +91,6 @@ impl App {
                 names.profile.clone(),
                 Tabs::ProfileTab(RefCell::new(ProfileTab::new(
                     names.profile.clone(),
-                    key_list.clone(),
                     clashtui_util.clone(),
                     clashtui_state.clone(),
                     theme.clone(),
@@ -103,7 +100,6 @@ impl App {
                 names.clashsrvctl.clone(),
                 Tabs::ClashSrvCtlTab(RefCell::new(ClashSrvCtlTab::new(
                     names.clashsrvctl.clone(),
-                    key_list.clone(),
                     Rc::clone(&clashtui_util),
                     Rc::clone(&theme),
                 ))),
@@ -130,7 +126,6 @@ impl App {
                 Rc::clone(&theme),
             ),
             should_quit: false,
-            key_list,
             symbols: names,
             help_popup,
             msgpopup: MsgPopup::new(),
@@ -189,10 +184,10 @@ impl App {
                 return Ok(EventState::NotConsumed);
             }
 
-            event_state = if match_key(key, &self.key_list.app_quit) {
+            event_state = if Keys::AppQuit.is(key) {
                 self.should_quit = true;
                 EventState::WorkDone
-            } else if match_key(key, &self.key_list.app_help) {
+            } else if Keys::AppHelp.is(key) {
                 self.help_popup.show();
                 EventState::WorkDone
             //} else if match_key(key, &self.key_list.app_home_open) {
@@ -203,11 +198,11 @@ impl App {
             //    self.clashtui_util
             //        .open_dir(self.clashtui_util.clashtui_config.clash_cfg_dir.as_path())?;
             //    EventState::WorkDone
-            } else if match_key(key, &self.key_list.log_cat) {
+            } else if Keys::LogCat.is(key) {
                 let log = self.clashtui_util.fetch_recent_logs(20);
                 self.popup_list_msg(log);
                 EventState::WorkDone
-            } else if match_key(key, &self.key_list.clashsrvctl_restart) {
+            } else if Keys::ClashsrvctlRestart.is(key) {
                 match self.clashtui_util.restart_clash() {
                     Ok(output) => {
                         let list_msg: Vec<String> =

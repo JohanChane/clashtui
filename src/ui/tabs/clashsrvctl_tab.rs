@@ -3,13 +3,13 @@ use ratatui::prelude as Ra;
 
 use super::CommonTab;
 use crate::ui::{
-    keys::{match_key, SharedKeyList},
+    keys::Keys,
     popups::MsgPopup,
     utils::{ClashTuiList, SharedTheme},
     EventState,
 };
 use crate::utils::{ClashTuiOp, SharedClashTuiUtil};
-use crate::{msgpopup_methods, title_methods, visible_methods};
+use crate::{msgpopup_methods, visible_methods};
 
 pub struct ClashSrvCtlTab {
     title: String,
@@ -18,15 +18,12 @@ pub struct ClashSrvCtlTab {
     srvctl_list: ClashTuiList,
     msgpopup: MsgPopup,
 
-    key_list: SharedKeyList,
-
     clashtui_util: SharedClashTuiUtil,
 }
 
 impl ClashSrvCtlTab {
     pub fn new(
         title:String,
-        key_list: SharedKeyList,
         clashtui_util: SharedClashTuiUtil,
 
         theme: SharedTheme,
@@ -53,7 +50,6 @@ impl ClashSrvCtlTab {
             title,
             is_visible: false,
             srvctl_list: operations,
-            key_list,
             clashtui_util,
             msgpopup: MsgPopup::new(),
         }
@@ -82,7 +78,7 @@ impl CommonTab for ClashSrvCtlTab {
                 return Ok(EventState::NotConsumed);
             }
 
-            event_state = if match_key(key, &self.key_list.clashsrvctl_select) {
+            event_state = if Keys::Select.is(key) {
                 let op_str = self.srvctl_list.selected().unwrap();
                 let op: ClashTuiOp = ClashTuiOp::from(op_str.as_ref());
                 match op {
@@ -132,6 +128,5 @@ impl CommonTab for ClashSrvCtlTab {
     }
 }
 
-title_methods!(ClashSrvCtlTab);
 visible_methods!(ClashSrvCtlTab);
 msgpopup_methods!(ClashSrvCtlTab);

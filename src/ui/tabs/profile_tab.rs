@@ -10,14 +10,14 @@ use std::{
 
 use super::{profile_input::ProfileInputPopup, CommonTab};
 use crate::ui::{
-    keys::{match_key, SharedKeyList},
+    keys::Keys,
     popups::{ConfirmPopup, MsgPopup},
     utils::{ClashTuiList, SharedTheme},
     EventState,
 };
 use crate::utils::utils as Utils;
 use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
-use crate::{msgpopup_methods, title_methods, visible_methods};
+use crate::{msgpopup_methods, visible_methods};
 
 enum Fouce {
     Profile,
@@ -35,15 +35,13 @@ pub struct ProfileTab {
     confirm_popup: ConfirmPopup,
     profile_input: ProfileInputPopup,
 
-    key_list: SharedKeyList,
     clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
 }
 
 impl ProfileTab {
     pub fn new(
-        title:String,
-        key_list: SharedKeyList,
+        title: String,
         clashtui_util: SharedClashTuiUtil,
         clashtui_state: SharedClashTuiState,
         theme: SharedTheme,
@@ -61,7 +59,6 @@ impl ProfileTab {
             fouce: Fouce::Profile,
             profile_input: ProfileInputPopup::new(),
 
-            key_list,
             clashtui_util,
             clashtui_state,
         };
@@ -257,22 +254,22 @@ impl CommonTab for ProfileTab {
 
             match self.fouce {
                 Fouce::Profile => {
-                    event_state = if match_key(key, &self.key_list.template_switch) {
+                    event_state = if Keys::TemplateSwitch.is(key) {
                         self.switch_fouce(Fouce::Template);
                         EventState::WorkDone
-                    } else if match_key(key, &self.key_list.profile_select) {
+                    } else if Keys::Select.is(key) {
                         self.popup_txt_msg("Selecting...".to_string());
                         EventState::ProfileSelect
-                    } else if match_key(key, &self.key_list.profile_update) {
+                    } else if Keys::ProfileUpdate.is(key) {
                         self.popup_txt_msg("Updating...".to_string());
                         EventState::ProfileUpdate
-                    } else if match_key(key, &self.key_list.profile_update_all) {
+                    } else if Keys::ProfileUpdateAll.is(key) {
                         self.popup_txt_msg("Updating...".to_string());
                         EventState::ProfileUpdateAll
-                    } else if match_key(key, &self.key_list.profile_import) {
+                    } else if Keys::ProfileImport.is(key) {
                         self.profile_input.show();
                         EventState::WorkDone
-                    } else if match_key(key, &self.key_list.profile_delete) {
+                    } else if Keys::ProfileDelete.is(key) {
                         self.confirm_popup.popup_msg(
                             EventState::ProfileDelete,
                             "`y` to Delete, `Esc` to cancel".to_string(),
@@ -289,7 +286,7 @@ impl CommonTab for ProfileTab {
                     //        }
                     //    }
                     //    EventState::WorkDone
-                    } else if match_key(key, &self.key_list.preview) {
+                    } else if Keys::Preview.is(key) {
                         if let Some(profile_name) = self.profile_list.selected() {
                             let profile_path = self.clashtui_util.profile_dir.join(profile_name);
                             let file_content = std::fs::read_to_string(&profile_path).unwrap();
@@ -316,7 +313,7 @@ impl CommonTab for ProfileTab {
                             self.popup_list_msg(lines);
                         }
                         EventState::WorkDone
-                    } else if match_key(key, &self.key_list.profile_test_config) {
+                    } else if Keys::ProfileTestConfig.is(key) {
                         if let Some(profile_name) = self.profile_list.selected() {
                             let path = self.clashtui_util.get_profile_yaml_path(profile_name);
                             match self.clashtui_util.test_profile_config(&path, false) {
@@ -336,13 +333,13 @@ impl CommonTab for ProfileTab {
                     };
                 }
                 Fouce::Template => {
-                    event_state = if match_key(key, &self.key_list.profile_switch) {
+                    event_state = if Keys::ProfileSwitch.is(key) {
                         self.switch_fouce(Fouce::Profile);
                         EventState::WorkDone
-                    } else if match_key(key, &self.key_list.template_create) {
+                    } else if Keys::Select.is(key) {
                         self.handle_create_template_ev();
                         EventState::WorkDone
-                    } else if match_key(key, &self.key_list.preview) {
+                    } else if Keys::Preview.is(key) {
                         if let Some(name) = self.template_list.selected() {
                             let path = self
                                 .clashtui_util
@@ -412,6 +409,5 @@ impl CommonTab for ProfileTab {
     }
 }
 
-title_methods!(ProfileTab);
 visible_methods!(ProfileTab);
 msgpopup_methods!(ProfileTab);

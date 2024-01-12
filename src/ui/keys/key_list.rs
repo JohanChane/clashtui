@@ -1,70 +1,46 @@
 use crossterm::event::{KeyCode, KeyEvent};
 
-pub struct ClashTuiKeyEvent {
-    pub code: KeyCode,
-    //pub modifiers: KeyModifiers,
+pub enum Keys {
+    ProfileSwitch,
+    ProfileUpdate,
+    ProfileUpdateAll,
+    ProfileImport,
+    ProfileDelete,
+    ProfileTestConfig,
+    TemplateSwitch,
+    ClashsrvctlRestart,
+
+    Select,
+    //Edit,
+    Preview,
+    LogCat,
+    AppQuit,
+    AppHelp,
 }
 
-impl ClashTuiKeyEvent {
-    pub const fn new(code: KeyCode) -> Self {
-        Self { code }
-    }
-}
+impl Keys {
+    pub fn bindto(self) -> KeyCode{
+        match self {
+            Keys::ProfileSwitch => KeyCode::Char('P'),
+            Keys::ProfileUpdate => KeyCode::Char('u'),
+            Keys::ProfileUpdateAll => KeyCode::Char('U'),
+            Keys::ProfileImport => KeyCode::Char('i'),
+            Keys::ProfileDelete => KeyCode::Char('d'),
+            Keys::ProfileTestConfig => KeyCode::Char('t'),
 
-#[inline]
-pub fn match_key(ev: &KeyEvent, binding: &ClashTuiKeyEvent) -> bool {
-    ev.code == binding.code
-}
+            Keys::TemplateSwitch => KeyCode::Char('T'),
 
-pub struct KeyList {
-    pub profile_switch: ClashTuiKeyEvent,
-    pub profile_select: ClashTuiKeyEvent,
-    pub profile_update: ClashTuiKeyEvent,
-    pub profile_update_all: ClashTuiKeyEvent,
-    pub profile_import: ClashTuiKeyEvent,
-    pub profile_delete: ClashTuiKeyEvent,
-    pub profile_test_config: ClashTuiKeyEvent,
-    pub template_switch: ClashTuiKeyEvent,
-    pub template_create: ClashTuiKeyEvent,
-    pub clashsrvctl_select: ClashTuiKeyEvent,
-    pub clashsrvctl_restart: ClashTuiKeyEvent,
-    pub config_select: ClashTuiKeyEvent,
-
-    //pub edit: ClashTuiKeyEvent,
-    pub preview: ClashTuiKeyEvent,
-    //pub app_home_open: ClashTuiKeyEvent,
-    //pub clash_cfg_dir_open: ClashTuiKeyEvent,
-    pub log_cat: ClashTuiKeyEvent,
-    pub app_quit: ClashTuiKeyEvent,
-    pub app_help: ClashTuiKeyEvent,
-}
-
-impl KeyList {}
-
-impl Default for KeyList {
-    fn default() -> Self {
-        Self {
-            profile_switch: ClashTuiKeyEvent::new(KeyCode::Char('P')),
-            profile_select: ClashTuiKeyEvent::new(KeyCode::Enter),
-            profile_update: ClashTuiKeyEvent::new(KeyCode::Char('u')),
-            profile_update_all: ClashTuiKeyEvent::new(KeyCode::Char('U')),
-            profile_import: ClashTuiKeyEvent::new(KeyCode::Char('i')),
-            profile_delete: ClashTuiKeyEvent::new(KeyCode::Char('d')),
-            profile_test_config: ClashTuiKeyEvent::new(KeyCode::Char('t')),
-
-            template_switch: ClashTuiKeyEvent::new(KeyCode::Char('T')),
-            template_create: ClashTuiKeyEvent::new(KeyCode::Enter),
-            clashsrvctl_select: ClashTuiKeyEvent::new(KeyCode::Enter),
-            clashsrvctl_restart: ClashTuiKeyEvent::new(KeyCode::Char('R')),
-            config_select: ClashTuiKeyEvent::new(KeyCode::Enter),
-
-            //edit: ClashTuiKeyEvent::new(KeyCode::Char('e')),
-            preview: ClashTuiKeyEvent::new(KeyCode::Char('p')),
-            //app_home_open: ClashTuiKeyEvent::new(KeyCode::Char('H')),
-            //clash_cfg_dir_open: ClashTuiKeyEvent::new(KeyCode::Char('G')),
-            log_cat: ClashTuiKeyEvent::new(KeyCode::Char('L')),
-            app_quit: ClashTuiKeyEvent::new(KeyCode::Char('Q')),
-            app_help: ClashTuiKeyEvent::new(KeyCode::Char('?')),
+            Keys::ClashsrvctlRestart => KeyCode::Char('R'),
+            
+            Keys::Select => KeyCode::Enter,
+            //Keys::Edit => KeyCode::Char('e'),
+            Keys::Preview => KeyCode::Char('p'),
+            Keys::LogCat => KeyCode::Char('L'),
+            Keys::AppQuit => KeyCode::Char('Q'),
+            Keys::AppHelp => KeyCode::Char('?'),
         }
+    }
+    pub fn is(self, code:&KeyEvent) -> bool{
+        self.bindto() == code.code
     }
 }

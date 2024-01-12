@@ -3,13 +3,14 @@ use ratatui::{prelude as Ra, widgets as Raw};
 
 use super::CommonTab;
 use crate::ui::{
+    keys::Keys,
     popups::{ClashTuiInputPopup, MsgPopup},
     utils::{ClashTuiList, SharedTheme},
     EventState,
 };
 use crate::utils::ConfigOp;
 use crate::utils::SharedClashTuiUtil;
-use crate::{msgpopup_methods, title_methods, visible_methods};
+use crate::{msgpopup_methods, visible_methods};
 
 pub struct ConfigTab {
     title: String,
@@ -25,12 +26,7 @@ pub struct ConfigTab {
 }
 
 impl ConfigTab {
-    pub fn new(
-        title:String,
-        clashtui_util: SharedClashTuiUtil,
-
-        theme: SharedTheme,
-    ) -> Self {
+    pub fn new(title: String, clashtui_util: SharedClashTuiUtil, theme: SharedTheme) -> Self {
         let mut operations = ClashTuiList::new(title.clone(), theme);
         operations.set_items(vec![
             ConfigOp::ClashConfigDir.into(),
@@ -86,17 +82,17 @@ impl ConfigTab {
 
         if event_state.is_notconsumed() {
             if let Event::Key(key) = ev {
-                if key.kind == KeyEventKind::Press {
-                    event_state = match key.code {
-                        KeyCode::Enter => {
-                            self.last_op = Some(ConfigOp::from(
-                                self.setting_list.selected().unwrap().as_str(),
-                            ));
-                            self.input.show();
-                            EventState::WorkDone
-                        }
-                        _ => EventState::NotConsumed,
-                    }
+                if key.kind != KeyEventKind::Press {
+                    return Ok(EventState::NotConsumed);
+                }
+                event_state = if Keys::Select.is(key) {
+                    self.last_op = Some(ConfigOp::from(
+                        self.setting_list.selected().unwrap().as_str(),
+                    ));
+                    self.input.show();
+                    EventState::WorkDone
+                } else {
+                    EventState::NotConsumed
                 }
             }
         }
@@ -154,6 +150,5 @@ impl CommonTab for ConfigTab {
     }
 }
 
-title_methods!(ConfigTab);
 visible_methods!(ConfigTab);
 msgpopup_methods!(ConfigTab);
