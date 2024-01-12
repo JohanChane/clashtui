@@ -2,7 +2,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
-use crate::ui::utils::prelude;
+use crate::ui::utils::tools;
 use crate::ui::EventState;
 
 pub struct MsgPopup {
@@ -78,7 +78,7 @@ impl MsgPopup {
         let dialog_width = max(min(max_item_width + 2, f.size().width as usize - 4), 60); // min_width = 60
         let dialog_height = min(text.len() + 2, f.size().height as usize - 6);
         let area =
-            prelude::centered_lenght_rect(dialog_width as u16, dialog_height as u16, f.size());
+            tools::centered_lenght_rect(dialog_width as u16, dialog_height as u16, f.size());
 
         let paragraph = if text.len() == 1 && max_item_width < area.width as usize {
             Raw::Paragraph::new(text)

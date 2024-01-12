@@ -2,7 +2,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
-use crate::ui::utils::{prelude, SharedTheme};
+use crate::ui::utils::{tools, SharedTheme};
 
 pub struct HelpPopUp {
     title: String,
@@ -75,7 +75,7 @@ impl HelpPopUp {
         let dialog_width = max(min(max_item_width + 2, f.size().width as usize - 4), 60); // min_width = 60
         let dialog_height = min(item_len + 2, f.size().height as usize - 6);
         let area =
-            prelude::centered_lenght_rect(dialog_width as u16, dialog_height as u16, f.size());
+            tools::centered_lenght_rect(dialog_width as u16, dialog_height as u16, f.size());
 
         let list = Raw::List::new(items)
             .block(

@@ -1,7 +1,4 @@
 use ratatui::style::Color;
-use std::{fs::File, rc::Rc};
-
-pub type SharedTheme = Rc<Theme>;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Theme {
@@ -19,7 +16,7 @@ pub struct Theme {
 
 impl Theme {
     pub fn load_theme(ph: &std::path::PathBuf) -> Result<Self, String> {
-        File::open(ph)
+        std::fs::File::open(ph)
             .map_err(|e| e.to_string())
             .and_then(|f| serde_yaml::from_reader(f).map_err(|e| e.to_string()))
     }
