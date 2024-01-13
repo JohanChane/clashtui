@@ -99,8 +99,8 @@ pub struct ClashTuiConfig {
     pub clash_cfg_path: String,
     pub clash_srv_name: String,
 
-    //#[serde(rename = "edit_cmd")]
-    //pub edit_command: String,
+    pub edit_cmd: String,
+    pub open_dir_cmd: String,
     #[serde(rename = "current_profile")]
     pub cur_profile: String,
 }

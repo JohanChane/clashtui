@@ -17,14 +17,14 @@ impl Default for Symbols {
                         U: Update all network resources in profile
                         i: Import
                         d: Delete
-                        e: Edit(todo)
+                        e: Edit
                         t: Test
                         p: Preview
 
                         ## Tempalte
                         T: Switch to template
                         enter: Create yaml
-                        e: Edit(todo)
+                        e: Edit
                         p: Preview
 
                         ## ClashSrvCtl
@@ -35,8 +35,8 @@ impl Default for Symbols {
 
                         ## Global
                         R: Restart clash core
-                        H: Locate app home path(todo)
-                        G: Locate clash config dir(todo)
+                        H: Locate app home path
+                        G: Locate clash config dir
                         L: show recent log
                         1,2,...,9 OR Tab: Switch tabs
                         Esc: Close popup

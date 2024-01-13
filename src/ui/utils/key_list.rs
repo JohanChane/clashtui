@@ -12,10 +12,12 @@ pub enum Keys {
 
     Select,
     ESC,
-    //Edit,
+    Edit,
     Preview,
     LogCat,
     AppQuit,
+    AppConfig,
+    ClashConfig,
     AppHelp,
 }
 
@@ -35,11 +37,13 @@ impl Keys {
 
             Keys::Select => KeyCode::Enter,
             Keys::ESC => KeyCode::Esc,
-            //Keys::Edit => KeyCode::Char('e'),
+            Keys::Edit => KeyCode::Char('e'),
             Keys::Preview => KeyCode::Char('p'),
             Keys::LogCat => KeyCode::Char('L'),
             Keys::AppQuit => KeyCode::Char('Q'),
             Keys::AppHelp => KeyCode::Char('?'),
+            Keys::AppConfig => KeyCode::Char('H'),
+            Keys::ClashConfig => KeyCode::Char('G'),
         }
     }
     pub fn is(self, code: &KeyEvent) -> bool {

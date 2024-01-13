@@ -207,14 +207,17 @@ impl App {
             } else if Keys::AppHelp.is(key) {
                 self.help_popup.show();
                 EventState::WorkDone
-            //} else if match_key(key, &self.key_list.app_home_open) {
-            //    self.clashtui_util
-            //        .open_dir(self.clashtui_util.clashtui_dir.as_path())?;
-            //    EventState::WorkDone
-            //} else if match_key(key, &self.key_list.clash_cfg_dir_open) {
-            //    self.clashtui_util
-            //        .open_dir(self.clashtui_util.clashtui_config.clash_cfg_dir.as_path())?;
-            //    EventState::WorkDone
+            } else if Keys::ClashConfig.is(key) {
+                let _ = self
+                    .clashtui_util
+                    .open_dir(self.clashtui_util.clashtui_dir.as_path())
+                    .map_err(|e| log::error!("ODIR: {}", e));
+                EventState::WorkDone
+            } else if Keys::AppConfig.is(key) {
+                let _ = self.clashtui_util
+                    .open_dir(&PathBuf::from(self.clashtui_util.get_self_cfg_dir()))
+                    .map_err(|e| log::error!("ODIR: {}", e));
+                EventState::WorkDone
             } else if Keys::LogCat.is(key) {
                 let log = self.clashtui_util.fetch_recent_logs(20);
                 self.popup_list_msg(log);
@@ -366,6 +369,7 @@ impl App {
         use log4rs::config::{Appender, Config, Root};
         use log4rs::encode::pattern::PatternEncoder;
         // No need to change. This is set to auto switch to Info level when build release
+        #[allow(unused_variables)]
         let log_level = log::LevelFilter::Info;
         #[cfg(debug_assertions)]
         let log_level = log::LevelFilter::Debug;

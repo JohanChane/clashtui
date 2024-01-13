@@ -493,6 +493,9 @@ impl ClashTuiUtil {
             Ok(v)
         })
     }
+    pub fn get_self_cfg_dir(&self) -> String{
+        self.clashtui_config.borrow().clash_cfg_dir.clone()
+    }
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ClashTuiOp) -> Result<String, Error> {
         let tuiconf = self.clashtui_config.borrow();
@@ -741,83 +744,76 @@ impl ClashTuiUtil {
 
         false
     }
-    pub fn edit_file(&self, path: &PathBuf) -> Result<String> {
-        if let Some(edit_cmd) = self
-            .get_clashtui_config()
-            .get("default")
-            .and_then(|default| default.get("edit_cmd"))
-            .and_then(|edit_cmd| edit_cmd.as_str())
-        {
+    */
+    pub fn edit_file(&self, path: &PathBuf) -> Result<String, Error> {
+        let edit_cmd = self.clashtui_config.borrow().edit_cmd.clone();
+        let output;
+        if !edit_cmd.is_empty() {
             let edit_cmd_with_path = edit_cmd.replace("%s", path.to_str().unwrap_or(""));
 
-            let output = if cfg!(target_os = "windows") {
-                Command::new("cmd")
+            if cfg!(target_os = "windows") {
+                output = Command::new("cmd")
                     .arg("/C")
                     .arg(&edit_cmd_with_path)
-                    .spawn()?;
+                    .spawn();
             } else {
-                Command::new("sh")
+                output = Command::new("sh")
                     .arg("-c")
                     .arg(&edit_cmd_with_path)
-                    .spawn()?;
+                    .spawn();
             };
 
-            return Ok("Done".to_string());
-        }
-
-        let output = if cfg!(target_os = "windows") {
-            Command::new("cmd")
-                .arg("/C")
-                .arg("start")
-                .arg(path.to_str().unwrap_or(""))
-                .spawn()?;
-        } else {
-            Command::new("xdg-open")
-                .arg(path.to_str().unwrap_or(""))
-                .spawn()?;
-        };
-
-        Ok("Done".to_string())
-    }
-    pub fn open_dir(&self, path: &Path) -> Result<String> {
-        if let Some(opendir_cmd) = self
-            .get_clashtui_config()
-            .get("default")
-            .and_then(|default| default.get("opendir_cmd"))
-            .and_then(|opendir_cmd| opendir_cmd.as_str())
-        {
-            let opendir_cmd_with_path = opendir_cmd.replace("%s", path.to_str().unwrap_or(""));
-
-            if cfg!(target_os = "windows") {
-                Command::new("cmd")
-                    .arg("/C")
-                    .arg("opendir_cmd_with_path")
-                    .spawn()?;
-            } else {
-                Command::new("sh")
-                    .arg("-c")
-                    .arg(&opendir_cmd_with_path)
-                    .spawn()?;
-            }
-
-            return Ok("Done".to_string());
+            return output.map(|_| "Done".to_string());
         }
 
         if cfg!(target_os = "windows") {
-            Command::new("cmd")
+            output = Command::new("cmd")
                 .arg("/C")
                 .arg("start")
                 .arg(path.to_str().unwrap_or(""))
-                .spawn()?;
+                .spawn();
         } else {
-            Command::new("xdg-open")
+            output = Command::new("xdg-open")
                 .arg(path.to_str().unwrap_or(""))
-                .spawn()?;
+                .spawn();
+        };
+        output.map(|_| "Done".to_string())
+    }
+    pub fn open_dir(&self, path: &Path) -> Result<String, Error> {
+        let opendir_cmd = self.clashtui_config.borrow().open_dir_cmd.clone();
+        let output;
+        if !opendir_cmd.is_empty() {
+            let opendir_cmd_with_path = opendir_cmd.replace("%s", path.to_str().unwrap_or(""));
+
+            if cfg!(target_os = "windows") {
+                output = Command::new("cmd")
+                    .arg("/C")
+                    .arg("opendir_cmd_with_path")
+                    .spawn();
+            } else {
+                output = Command::new("sh")
+                    .arg("-c")
+                    .arg(&opendir_cmd_with_path)
+                    .spawn();
+            }
+
+            return output.map(|_| "Done".to_string());
+        }
+
+        if cfg!(target_os = "windows") {
+            output = Command::new("cmd")
+                .arg("/C")
+                .arg("start")
+                .arg(path.to_str().unwrap_or(""))
+                .spawn();
+        } else {
+            output = Command::new("xdg-open")
+                .arg(path.to_str().unwrap_or(""))
+                .spawn();
         };
 
-        Ok("Done".to_string())
+        output.map(|_| "Done".to_string())
     }
-    */
 
     pub fn fetch_recent_logs(&self, num_lines: usize) -> Vec<String> {
         let log = std::fs::read_to_string(self.clashtui_dir.join("clashtui.log"))
