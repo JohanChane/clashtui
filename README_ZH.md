@@ -25,6 +25,7 @@
         * [配置打开文件和目录的命令](#配置打开文件和目录的命令)
         * [自定义配置模板](#自定义配置模板)
 * [clashtui 的文件结构](#clashtui-的文件结构)
+* [将要添加的功能](#将要添加的功能)
 * [项目免责声明](#项目免责声明)
 
 <!-- vim-markdown-toc -->
@@ -146,7 +147,7 @@ clash_srv_name = "mihomo"       # nssm {install | remove | restart | stop | edit
 -   scoop 安装 clashtui 的: scoop install nssm
 -   手动下载安装 clashtui 的: 将 `D:/PortableProgramFiles/clashtui` 加入 PATH。
 
-运行 clashtui。在 `ClashSrvCtl` Tab 选择 `InstallSrv`, 程序会根据上面的配置安装 `mihomo` 内核服务。该服务会开机启动。安装之后启动内核服务, 输入 `R` 即可。
+运行 clashtui。在 `ClashSrvCtl` Tab 选择 `InstallSrv`, 程序会根据上面的配置安装 `mihomo` 内核服务。该服务会开机启动。安装之后启动内核服务, 输入 `E` 即可。
 
 ### 配置 `basic_clash_config.yaml`
 
@@ -280,6 +281,10 @@ proxy-groups:
 
 -   basic_clash_config.yaml: mihomo 配置的基本字段, 会合并到 `clash_cfg_path`。
 -   config.yaml: clashtui 的配置。
+
+## 将要添加的功能
+
+查看[此处](./FeaturesToBeAdded.md)
 
 ## 项目免责声明
 

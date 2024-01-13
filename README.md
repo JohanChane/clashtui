@@ -26,6 +26,7 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
     * [Advanced Usage](#advanced-usage)
         * [Configuring Commands to Open Files and Directories](#configuring-commands-to-open-files-and-directories)
         * [Customizing Configuration Templates](#customizing-configuration-templates)
+* [Features to be added](#features-to-be-added)
 * [File Structure of clashtui](#file-structure-of-clashtui)
 * [Project Disclaimer](#project-disclaimer)
 
@@ -148,7 +149,7 @@ After editing, add clashtui and nssm to PATH:
 - For clashtui installed via scoop: `scoop install nssm`
 - For manually downloaded clashtui: Add `D:/PortableProgramFiles/clashtui` to PATH.
 
-Run clashtui. In `ClashSrvCtl`, select `InstallSrv`. The program will install the `mihomo` core service based on the configured settings. This service starts automatically at boot. After installation, start the core service, and input `R` to proceed.
+Run clashtui. In `ClashSrvCtl`, select `InstallSrv`. The program will install the `mihomo` core service based on the configured settings. This service starts automatically at boot. After installation, input `E` to start the core service.
 
 ### Configuring `basic_clash_config.yaml`
 
@@ -275,6 +276,10 @@ proxy-groups:
       - <Auto>
       - <Select>
 ```
+
+## Features to be added
+
+See [here](./FeaturesToBeAdded.md)
 
 ## File Structure of clashtui
 
