@@ -60,7 +60,7 @@ define_clashtui_operations!(
 
 macro_rules! define_config_operations {
     ($($variant:ident),*) => {
-        #[derive(Debug, PartialEq, Eq)]
+        #[derive(Debug, PartialEq, Eq, Clone)]
         pub enum ConfigOp {
             $($variant),*
         }

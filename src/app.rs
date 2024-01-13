@@ -214,8 +214,12 @@ impl App {
                     .map_err(|e| log::error!("ODIR: {}", e));
                 EventState::WorkDone
             } else if Keys::AppConfig.is(key) {
-                let _ = self.clashtui_util
-                    .open_dir(&PathBuf::from(self.clashtui_util.get_self_cfg_dir()))
+                let _ = self
+                    .clashtui_util
+                    .open_dir(&PathBuf::from(
+                        self.clashtui_util
+                            .get_self_cfg(crate::utils::ConfigOp::ClashConfigDir),
+                    ))
                     .map_err(|e| log::error!("ODIR: {}", e));
                 EventState::WorkDone
             } else if Keys::LogCat.is(key) {

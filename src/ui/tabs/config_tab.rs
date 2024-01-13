@@ -87,6 +87,10 @@ impl ConfigTab {
                     self.last_op = Some(ConfigOp::from(
                         self.setting_list.selected().unwrap().as_str(),
                     ));
+                    let info = self
+                        .clashtui_util
+                        .get_self_cfg(self.last_op.clone().unwrap());
+                    self.input.set_pre_data(info);
                     self.input.show();
                     EventState::WorkDone
                 } else {

@@ -493,8 +493,13 @@ impl ClashTuiUtil {
             Ok(v)
         })
     }
-    pub fn get_self_cfg_dir(&self) -> String{
-        self.clashtui_config.borrow().clash_cfg_dir.clone()
+    pub fn get_self_cfg(&self, typ: ConfigOp) -> String {
+        match typ {
+            ConfigOp::ClashConfigDir => self.clashtui_config.borrow().clash_cfg_dir.clone(),
+            ConfigOp::ClashCorePath => self.clashtui_config.borrow().clash_core_path.clone(),
+            ConfigOp::ClashConfigFile => self.clashtui_config.borrow().clash_cfg_path.clone(),
+            ConfigOp::ClashServiceName => self.clashtui_config.borrow().clash_srv_name.clone(),
+        }
     }
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ClashTuiOp) -> Result<String, Error> {

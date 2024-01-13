@@ -133,6 +133,10 @@ impl ClashTuiInputPopup {
         self.input_data.clone()
     }
 
+    pub fn set_pre_data(&mut self, info: String) {
+        self.input = info;
+    }
+
     pub fn handle_enter_ev(&mut self) {
         self.input_data = self.input.clone();
         self.input.clear();
