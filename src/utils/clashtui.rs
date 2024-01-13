@@ -95,16 +95,6 @@ impl ClashTuiUtil {
         self.clash_api.restart(None)
     }
 
-    pub fn patch_config(&self) -> Option<reqwest::Error> {
-        let body = serde_json::json!({
-            "path": self.clashtui_config.borrow().clash_cfg_path.as_str(),
-            "payload": ""
-        })
-        .to_string();
-
-        self.clash_api.config_reload(body)
-    }
-
     pub fn select_profile(&self, profile_name: &String) -> Result<(), Error> {
         if let Err(err) = self.merge_profile(profile_name) {
             log::error!(
@@ -115,7 +105,12 @@ impl ClashTuiUtil {
             return Err(Error::new(std::io::ErrorKind::Other, err));
         } else {
         };
-        if let Some(err) = self.patch_config() {
+        let body = serde_json::json!({
+            "path": self.clashtui_config.borrow().clash_cfg_path.as_str(),
+            "payload": ""
+        })
+        .to_string();
+        if let Some(err) = self.clash_api.config_reload(body) {
             log::error!(
                 "Failed to Patch Profile `{}`: {}",
                 profile_name,
@@ -539,6 +534,10 @@ impl ClashTuiUtil {
                 };
                 return Utils::string_process_output(output);
             }
+            _ => Err(Error::new(
+                std::io::ErrorKind::NotFound,
+                "No Support Adction",
+            )),
         }
     }
     #[cfg(target_os = "windows")]
@@ -631,15 +630,16 @@ impl ClashTuiUtil {
     }
 
     #[cfg(target_os = "linux")]
-    pub fn update_state(&self, new_pf: Option<String>) -> _State {
-        if new_pf.is_none() {
-            // act when app is initing.
-            if let Some(e) = self.fetch_remote() {
-                if !e.is_connect() {
-                    log::warn!("{}", e);
-                }
-            };
+    pub fn update_state(&self, new_pf: Option<String>, new_mode: Option<String>) -> _State {
+        let is_skip = new_pf.is_none() && new_mode.is_none();
+        if let Some(v) = new_mode {
+            let load = format!(r#"{{"mode": "{}"}}"#, v);
+            let _ = self
+                .clash_api
+                .config_patch(load)
+                .map_err(|e| log::error!("Patch Errr: {}", e));
         }
+
         let mut tuiconf = self.clashtui_config.borrow_mut();
         let pf = match new_pf {
             Some(v) => {
@@ -648,7 +648,7 @@ impl ClashTuiUtil {
             }
             None => tuiconf.cur_profile.clone(),
         };
-        let mode;
+
         let ver = match self.clash_api.version() {
             Ok(v) => v,
             Err(e) => {
@@ -656,6 +656,15 @@ impl ClashTuiUtil {
                 "Unknown".to_string()
             }
         };
+
+        if !is_skip {
+            if let Some(e) = self.fetch_remote() {
+                if !e.is_connect() {
+                    log::warn!("{}", e);
+                }
+            }
+        }
+        let mode;
         let tun = match self.clash_remote_config.borrow().as_ref() {
             Some(v) => {
                 mode = v.mode.to_string();

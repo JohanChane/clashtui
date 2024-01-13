@@ -116,8 +116,9 @@ impl App {
                 names.clashsrvctl.clone(),
                 Tabs::ClashSrvCtlTab(RefCell::new(ClashSrvCtlTab::new(
                     names.clashsrvctl.clone(),
-                    Rc::clone(&clashtui_util),
-                    Rc::clone(&theme),
+                    clashtui_util.clone(),
+                    clashtui_state.clone(),
+                    theme.clone(),
                 ))),
             );
             tabs.insert(
@@ -304,7 +305,6 @@ impl App {
                 self.clashtui_state.borrow_mut().set_sysproxy(false);
                 EventState::WorkDone
             }
-            _ => EventState::NotConsumed,
         };
 
         ev_state
@@ -365,6 +365,9 @@ impl App {
         use log4rs::append::file::FileAppender;
         use log4rs::config::{Appender, Config, Root};
         use log4rs::encode::pattern::PatternEncoder;
+        // No need to change. This is set to auto switch to Info level when build release
+        let log_level = log::LevelFilter::Info;
+        #[cfg(debug_assertions)]
         let log_level = log::LevelFilter::Debug;
         let file_appender = FileAppender::builder()
             .encoder(Box::new(PatternEncoder::new("[{l}] {t} - {m}{n}")))

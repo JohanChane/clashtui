@@ -41,7 +41,7 @@ pub struct State {
 impl State {
     pub fn new(ct: SharedClashTuiUtil) -> Self {
         Self {
-            st: ct.update_state(None),
+            st: ct.update_state(None, None),
             ct,
         }
     }
@@ -50,7 +50,10 @@ impl State {
     }
     pub fn set_profile(&mut self, profile: String) {
         // With update state
-        self.st = self.ct.update_state(Some(profile));
+        self.st = self.ct.update_state(Some(profile), None);
+    }
+    pub fn set_mode(&mut self, mode: String) {
+        self.st = self.ct.update_state(None, Some(mode));
     }
     pub fn render(&self) -> String {
         #[cfg(target_os = "windows")]

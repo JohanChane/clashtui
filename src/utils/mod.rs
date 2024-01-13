@@ -6,7 +6,7 @@ pub mod utils;
 
 pub use self::clash_state::State;
 pub use self::clashtui::ClashTuiUtil;
-pub use self::configs::{init_config, ClashTuiConfigLoadError, Flags};
+pub use self::configs::{init_config, ClashTuiConfigLoadError, Flags, Mode};
 
 pub type SharedClashTuiUtil = std::rc::Rc<ClashTuiUtil>;
 pub type SharedClashTuiState = std::rc::Rc<std::cell::RefCell<State>>;
@@ -42,7 +42,8 @@ define_clashtui_operations!(
     StartClashService,
     StopClashService,
     TestClashConfig,
-    SetPermission
+    SetPermission,
+    SwitchMode
 );
 
 #[cfg(target_os = "windows")]

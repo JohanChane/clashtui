@@ -106,16 +106,18 @@ impl ClashUtil {
         }
         response
     }
-    /*
-    pub fn config_patch(&self, payload:String) -> Result<String, reqwest::Error>{
-        match self.client.patch("/configs").body(payload).send() {
+    pub fn config_patch(&self, payload: String) -> Result<String, reqwest::Error> {
+        match self
+            .client
+            .patch(self.api.clone() + "/configs")
+            .body(payload)
+            .send()
+        {
             Ok(r) => r.text(),
-            Err(e) => {
-                log::error!("[ClashUtil] {} exec {} failed! {}", "patch", "/configs", e.status().unwrap());
-                Err(e)
-            }
+            Err(e) => Err(e),
         }
     }
+    /*
     pub fn update_geo(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
         match payload {
             Some(load) => self.post("/configs/geo", Some(load)),

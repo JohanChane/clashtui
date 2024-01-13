@@ -43,6 +43,11 @@ impl Display for Mode {
         write!(f, "{}", x)
     }
 }
+impl Into<String> for Mode {
+    fn into(self) -> String {
+        self.to_string()
+    }
+}
 // #[derive(Debug, Serialize, Deserialize, Default)]
 // #[serde(rename_all = "lowercase")]
 // pub enum LogLevel {
