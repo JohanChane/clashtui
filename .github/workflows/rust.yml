@@ -14,6 +14,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Download Mihomo
+      run: |
+        wget --output-document mihomo.gz https://github.com/MetaCubeX/mihomo/releases/download/v1.18.0/mihomo-linux-amd64-v1.18.0.gz
+        gunzip mihomo.gz
+        chmod +x mihomo
+    - name: Set up Mihomo
+      run: nohup ./mihomo -d test_conf &
+    - name: Download Dependencies
+      run: cargo fetch
     - name: Run tests
       run: cargo test --verbose
     - name: Build
