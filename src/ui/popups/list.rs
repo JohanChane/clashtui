@@ -54,7 +54,7 @@ impl HelpPopUp {
         Ok(EventState::WorkDone)
     }
     #[allow(unused_variables)]
-    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
         use Ra::Style;
         if !self.is_visible {
             return;

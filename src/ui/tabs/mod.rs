@@ -8,9 +8,9 @@ pub use config_tab::ConfigTab;
 pub use profile_tab::ProfileTab;
 
 pub trait CommonTab {
-    fn draw<B: ratatui::backend::Backend>(
+    fn draw(
         &mut self,
-        f: &mut ratatui::Frame<B>,
+        f: &mut ratatui::Frame,
         area: ratatui::layout::Rect,
     );
     // This should be impled, but rustc won't recognize it

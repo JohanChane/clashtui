@@ -78,7 +78,7 @@ impl ClashTuiList {
         Ok(event_state)
     }
 
-    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
         if !self.is_visible {
             return;
         }
@@ -118,7 +118,7 @@ impl ClashTuiList {
         f.render_stateful_widget(list, area, &mut self.list_state);
 
         if item_len > area.height as usize {
-            self.scrollbar = self.scrollbar.content_length(item_len as u16);
+            self.scrollbar = self.scrollbar.content_length(item_len as usize);
             f.render_stateful_widget(
                 Raw::Scrollbar::default()
                     .orientation(Raw::ScrollbarOrientation::VerticalRight)

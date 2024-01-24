@@ -61,7 +61,7 @@ impl ProfileInputPopup {
         Ok(event_state)
     }
 
-    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
         //! will clear the area
         if !self.is_visible() {
             return;

@@ -57,7 +57,7 @@ impl ClashTuiTabBar {
         Ok(event_stata)
     }
 
-    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
         let items = self
             .tab_titles
             .iter()

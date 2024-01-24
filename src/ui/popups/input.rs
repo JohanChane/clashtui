@@ -62,7 +62,7 @@ impl ClashTuiInputPopup {
         Ok(EventState::WorkDone)
     }
 
-    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
         if !self.is_visible {
             return;
         }

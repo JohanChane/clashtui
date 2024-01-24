@@ -64,8 +64,7 @@ impl App {
         }
 
         #[cfg(debug_assertions)]
-        let _ = std::fs::remove_file(&clashtui_config_dir.join("clashtui.log"));
-
+        let _ = std::fs::remove_file(&clashtui_config_dir.join("clashtui.log")); // auto rm old log for debug
         Self::setup_logging(&clashtui_config_dir.join("clashtui.log").to_str().unwrap());
 
         let clashtui_util = Rc::new(ClashTuiUtil::new(
@@ -89,7 +88,7 @@ impl App {
             drop(x);
             drop(profile_list);
             return None;
-        }
+        } // Finish cron
 
         let theme = Rc::new(Theme::default());
 
@@ -101,8 +100,8 @@ impl App {
         let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
 
         let mut tabs: HashMap<String, Tabs> = HashMap::with_capacity(3);
+        // Init the tabs
         {
-            // Init the tabs
             tabs.insert(
                 names.profile.clone(),
                 Tabs::ProfileTab(RefCell::new(ProfileTab::new(
@@ -160,7 +159,9 @@ impl App {
             .map(|line| line.trim().to_string())
             .collect();
         app.help_popup.set_items(help_text);
-        app.flags.insert(Flags::ErrorDuringInit, false);
+        if app.flags.get(&Flags::ErrorDuringInit).is_none() {
+            app.flags.insert(Flags::ErrorDuringInit, false);
+        }
 
         Some(app)
     }
@@ -317,7 +318,7 @@ impl App {
         ev_state
     }
 
-    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>) {
+    pub fn draw(&mut self, f: &mut Ra::Frame) {
         let chunks = Ra::Layout::default()
             .constraints(
                 [

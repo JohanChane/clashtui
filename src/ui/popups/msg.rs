@@ -56,7 +56,7 @@ impl MsgPopup {
         Ok(EventState::WorkDone)
     }
 
-    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, _area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, _area: Ra::Rect) {
         //! area is only used to keep the args
         if !self.is_visible {
             return;

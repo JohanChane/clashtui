@@ -114,7 +114,7 @@ impl CommonTab for ConfigTab {
         Ok(event_state)
     }
 
-    fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, area: Ra::Rect) {
+    fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
         //! make config name in pop. display old config content.
         if !self.is_visible() {
             return;

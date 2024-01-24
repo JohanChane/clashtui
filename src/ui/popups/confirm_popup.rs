@@ -41,7 +41,7 @@ impl ConfirmPopup {
         Ok(event_state)
     }
 
-    pub fn draw<B: Ra::Backend>(&mut self, f: &mut Ra::Frame<B>, _area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, _area: Ra::Rect) {
         //! area is only used to keep the args
         self.msgpopup.draw(f, _area);
     }
