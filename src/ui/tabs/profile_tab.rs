@@ -14,7 +14,7 @@ use crate::ui::{
     utils::{ClashTuiList, Keys, SharedTheme, Visibility},
     EventState,
 };
-use crate::utils::utils as Utils;
+use crate::utils::Utils;
 use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
 use crate::{msgpopup_methods, visible_methods};
 

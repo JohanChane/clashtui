@@ -219,7 +219,7 @@ impl App {
                     .clashtui_util
                     .open_dir(&PathBuf::from(
                         self.clashtui_util
-                            .get_self_cfg(crate::utils::ConfigOp::ClashConfigDir),
+                            .get_cfg(crate::utils::CfgOp::ClashConfigDir),
                     ))
                     .map_err(|e| log::error!("ODIR: {}", e));
                 EventState::WorkDone
@@ -393,7 +393,7 @@ impl App {
     }
 
     pub fn save_config(&self) {
-        self.clashtui_util.save_config()
+        self.clashtui_util.save_cfg()
     }
 
     pub fn get_err_track(&self) -> Vec<crate::utils::ClashTuiConfigLoadError> {

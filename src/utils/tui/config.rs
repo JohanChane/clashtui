@@ -1,99 +1,7 @@
 use serde_derive::{Deserialize, Serialize};
-use std::{fmt::Display, fs::File, io::Error};
-#[derive(Debug, Serialize, Deserialize, Default)]
-#[serde(rename_all = "kebab-case")]
-#[serde(default)]
-pub struct ClashConfig {
-    // pub mixed_port: usize,
-    pub mode: Mode,
-    // pub log_level: LogLevel,
-    // pub allow_lan: bool,
-    // bind_address: String,
-    // pub ipv6: bool,
-    // pub secret: String,
-    // tcp_concurrent: bool,
-    // pub external_controller: String,
-    // pub global_client_fingerprint: String,
-    pub tun: TunConfig,
-}
-impl ClashConfig {
-    pub fn from_str(s: &str) -> Option<Self> {
-        if s.is_empty() {
-            return None;
-        }
-        serde_json::from_str(s).unwrap()
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum Mode {
-    #[default]
-    Rule,
-    Global,
-    Direct,
-}
-impl Display for Mode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let x = match self {
-            Mode::Rule => "Rule",
-            Mode::Global => "Global",
-            Mode::Direct => "Direct",
-        };
-        write!(f, "{}", x)
-    }
-}
-impl Into<String> for Mode {
-    fn into(self) -> String {
-        self.to_string()
-    }
-}
-// #[derive(Debug, Serialize, Deserialize, Default)]
-// #[serde(rename_all = "lowercase")]
-// pub enum LogLevel {
-//     Silent,
-//     Error,
-//     Warning,
-//     #[default]
-//     Info,
-//     Debug,
-// }
-
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct TunConfig {
-    pub enable: bool,
-    pub stack: TunStack,
-}
-#[derive(Eq, Hash, PartialEq, Debug)]
-pub enum Flags {
-    UpdateOnly,
-    FirstInit,
-    ErrorDuringInit,
-}
-
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
-pub enum TunStack {
-    #[default]
-    #[serde(alias = "Mixed")]
-    Mixed,
-    #[serde(alias = "gVisor")]
-    Gvisor,
-    #[serde(alias = "System")]
-    System,
-}
-impl std::fmt::Display for TunStack {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let val = match self {
-            TunStack::Mixed => "Mixed",
-            TunStack::Gvisor => "gVisor",
-            TunStack::System => "System",
-        };
-        write!(f, "{}", val)
-    }
-}
-
+use std::{fs::File, io::Error};
 #[derive(Debug, Deserialize, Serialize, Default)]
-pub struct ClashTuiConfig {
+pub(super) struct ClashTuiConfig {
     pub clash_cfg_dir: String,
     pub clash_core_path: String,
     pub clash_cfg_path: String,
@@ -101,8 +9,7 @@ pub struct ClashTuiConfig {
 
     pub edit_cmd: String,
     pub open_dir_cmd: String,
-    #[serde(rename = "current_profile")]
-    pub cur_profile: String,
+    pub current_profile: String,
 }
 impl ClashTuiConfig {
     pub fn from_file(config_path: &str) -> Result<Self, String> {
@@ -131,7 +38,7 @@ impl ClashTuiConfig {
     }
 
     pub fn update_profile(&mut self, profile: String) {
-        self.cur_profile = profile;
+        self.current_profile = profile;
     }
 }
 
@@ -199,30 +106,4 @@ pub fn init_config(
         clashtui_config_dir.join("basic_clash_config.yaml"),
         &symbols.default_basic_clash_cfg_content,
     )
-}
-
-#[test]
-#[allow(unused)]
-fn config() {
-    use super::clash::ClashUtil;
-    let mut is = true;
-    let sym = ClashUtil::new(
-        "http://127.0.0.1:9090".to_string(),
-        "http://127.0.0.1:7890".to_string(),
-    );
-    match sym.config_get() {
-        Ok(r) => {
-            println!("{:?}", r);
-            let mut t: ClashConfig = serde_json::from_str(r.as_str()).unwrap();
-            let mut p = ClashConfig::default();
-
-            println!("{:?}", t);
-            println!("{:?}", p);
-        }
-        Err(e) => {
-            println!("{:?}", e);
-            is = false
-        }
-    }
-    assert!(is)
 }

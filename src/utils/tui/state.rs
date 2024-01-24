@@ -35,7 +35,7 @@ impl _State {
     }
 }
 pub struct State {
-    pub st: _State,
+    st: _State,
     ct: SharedClashTuiUtil,
 }
 impl State {

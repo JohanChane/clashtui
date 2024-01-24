@@ -11,7 +11,7 @@ use crate::{
         utils::{ClashTuiList, Keys, SharedTheme},
         EventState,
     },
-    utils::{ClashTuiOp, SharedClashTuiUtil},
+    utils::{SharedClashTuiUtil, ClashSrvOp},
 };
 
 pub struct ClashSrvCtlTab {
@@ -36,21 +36,21 @@ impl ClashSrvCtlTab {
     ) -> Self {
         let mut operations = ClashTuiList::new(title.clone(), theme.clone());
         operations.set_items(vec![
-            ClashTuiOp::TestClashConfig.into(),
-            ClashTuiOp::SetPermission.into(),
-            ClashTuiOp::StartClashService.into(),
-            ClashTuiOp::StopClashService.into(),
-            ClashTuiOp::SwitchMode.into(),
+            ClashSrvOp::TestClashConfig.into(),
+            ClashSrvOp::SetPermission.into(),
+            ClashSrvOp::StartClashService.into(),
+            ClashSrvOp::StopClashService.into(),
+            ClashSrvOp::SwitchMode.into(),
             #[cfg(target_os = "windows")]
-            ClashTuiOp::EnableSysProxy.into(),
+            ClashSrvOp::EnableSysProxy.into(),
             #[cfg(target_os = "windows")]
-            ClashTuiOp::DisableSysProxy.into(),
+            ClashSrvOp::DisableSysProxy.into(),
             #[cfg(target_os = "windows")]
-            ClashTuiOp::EnableLoopback.into(),
+            ClashSrvOp::EnableLoopback.into(),
             #[cfg(target_os = "windows")]
-            ClashTuiOp::InstallSrv.into(),
+            ClashSrvOp::InstallSrv.into(),
             #[cfg(target_os = "windows")]
-            ClashTuiOp::UnInstallSrv.into(),
+            ClashSrvOp::UnInstallSrv.into(),
         ]);
         let mut modes = ClashTuiList::new(title.clone(), theme);
         modes.set_items(vec![
@@ -116,19 +116,19 @@ impl CommonTab for ClashSrvCtlTab {
 
             event_state = if Keys::Select.is(key) {
                 let op_str = self.srvctl_list.selected().unwrap();
-                let op: ClashTuiOp = ClashTuiOp::from(op_str.as_ref());
+                let op: ClashSrvOp = ClashSrvOp::from(op_str.as_ref());
                 match op {
                     #[cfg(target_os = "windows")]
-                    ClashTuiOp::EnableSysProxy => {
+                    ClashSrvOp::EnableSysProxy => {
                         self.popup_txt_msg("EnableSysProxy...".to_string());
                         EventState::EnableSysProxy
                     }
                     #[cfg(target_os = "windows")]
-                    ClashTuiOp::DisableSysProxy => {
+                    ClashSrvOp::DisableSysProxy => {
                         self.popup_txt_msg("DisableSysProxy...".to_string());
                         EventState::DisableSysProxy
                     }
-                    ClashTuiOp::SwitchMode => {
+                    ClashSrvOp::SwitchMode => {
                         self.mode_selector.show();
                         EventState::WorkDone
                     }
