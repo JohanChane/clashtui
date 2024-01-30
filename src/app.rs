@@ -6,10 +6,10 @@ use std::{cell::RefCell, collections::HashMap, env, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
 use crate::ui::popups::{HelpPopUp, MsgPopup};
-use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tabs, Tab};
-use crate::ui::utils::{tools, Keys, symbols, Theme, Visibility};
+use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tab, Tabs};
+use crate::ui::utils::{symbols, tools, Keys, Theme, Visibility};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState};
-use crate::utils::{ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
+use crate::utils::{ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State, Utils};
 
 pub struct App {
     title: String,
@@ -27,7 +27,6 @@ pub struct App {
 
 impl App {
     pub fn new(mut flags: HashMap<Flags, bool>) -> Option<Self> {
-
         let exe_dir = std::env::current_exe()
             .unwrap()
             .parent()
@@ -53,7 +52,10 @@ impl App {
 
         if !clashtui_config_dir.join("config.yaml").exists() {
             flags.insert(Flags::FirstInit, true);
-            if let Err(err) = crate::utils::init_config(&clashtui_config_dir, symbols::DEFAULT_BASIC_CLASH_CFG_CONTENT) {
+            if let Err(err) = crate::utils::init_config(
+                &clashtui_config_dir,
+                symbols::DEFAULT_BASIC_CLASH_CFG_CONTENT,
+            ) {
                 flags.insert(Flags::ErrorDuringInit, true);
                 log::error!("{}", err);
             }
@@ -84,8 +86,18 @@ impl App {
             let mut x = std::fs::File::create(log_path)
                 .map_err(|e| log::error!("Err while CronUpdate: {}", e))
                 .unwrap();
-            let _ = std::io::Write::write_all(&mut x, format!("{:?}", profile_list).as_bytes())
-                .map_err(|e| log::error!("Err while CronUpdate: {}", e));
+            let _ = std::io::Write::write_all(
+                &mut x,
+                format!(
+                    "{:?}",
+                    profile_list.into_iter().map(|v| match v {
+                        Ok(v) => Utils::concat_update_profile_result(v),
+                        Err(e) => [e.to_string()].to_vec(),
+                    }).flatten().collect::<Vec<String>>()
+                )
+                .as_bytes(),
+            )
+            .map_err(|e| log::error!("Err while CronUpdate: {}", e));
             return None;
         } // Finish cron
 
@@ -265,8 +277,7 @@ impl App {
         let ev_state = match last_ev {
             EventState::NotConsumed | EventState::WorkDone => EventState::NotConsumed,
             EventState::ProfileUpdate | EventState::ProfileUpdateAll => {
-                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap()
-                {
+                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap() {
                     profile_tab.borrow_mut().hide_msgpopup();
                     if last_ev == &EventState::ProfileUpdate {
                         profile_tab.borrow_mut().handle_update_profile_ev(false);
@@ -277,8 +288,7 @@ impl App {
                 EventState::WorkDone
             }
             EventState::ProfileSelect => {
-                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap()
-                {
+                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap() {
                     profile_tab.borrow_mut().hide_msgpopup();
                     match profile_tab.borrow_mut().handle_select_profile_ev() {
                         Some(v) => self.clashtui_state.borrow_mut().set_profile(v),
@@ -288,8 +298,7 @@ impl App {
                 EventState::WorkDone
             }
             EventState::ProfileDelete => {
-                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap()
-                {
+                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap() {
                     profile_tab.borrow_mut().hide_msgpopup();
                     profile_tab.borrow_mut().handle_delete_profile_ev();
                 };

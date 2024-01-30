@@ -289,44 +289,43 @@ impl ClashTuiUtil {
         let mut yaml_content = String::new();
         file.read_to_string(&mut yaml_content)?;
 
-        let parsed_yaml: serde_yaml::Value = serde_yaml::from_str(yaml_content.as_str()).unwrap();
-
-        for key in &net_res_keys {
-            let providers =
-                if let Some(serde_yaml::Value::Mapping(providers)) = parsed_yaml.get(key) {
-                    providers
-                } else {
-                    continue;
-                };
-
-            for (_, provider_value) in providers {
-                let provider_content =
-                    if let serde_yaml::Value::Mapping(provider_content) = provider_value {
-                        provider_content
+        if let Ok(parsed_yaml) = serde_yaml::from_str::<serde_yaml::Value>(yaml_content.as_str()) {
+            for key in &net_res_keys {
+                let providers =
+                    if let Some(serde_yaml::Value::Mapping(providers)) = parsed_yaml.get(key) {
+                        providers
                     } else {
                         continue;
                     };
 
-                let t = if let Some(serde_yaml::Value::String(t)) = provider_content.get("type") {
-                    t
-                } else {
-                    continue;
-                };
+                for (_, provider_value) in providers {
+                    let provider_content =
+                        if let serde_yaml::Value::Mapping(provider_content) = provider_value {
+                            provider_content
+                        } else {
+                            continue;
+                        };
 
-                if t != "http" {
-                    continue;
-                }
+                    if let Some(serde_yaml::Value::String(t)) = provider_content.get("type") {
+                        if t != "http" {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    };
 
-                if let (
-                    Some(serde_yaml::Value::String(url)),
-                    Some(serde_yaml::Value::String(path)),
-                ) = (provider_content.get("url"), provider_content.get("path"))
-                {
-                    net_res.push((url.clone(), path.clone()))
+                    if let (
+                        Some(serde_yaml::Value::String(url)),
+                        Some(serde_yaml::Value::String(path)),
+                    ) = (provider_content.get("url"), provider_content.get("path"))
+                    {
+                        net_res.push((url.clone(), path.clone()))
+                    }
                 }
             }
+        } else {
+            return Err(anyhow::anyhow!("Not yaml?"));
         }
-
         let mut updated_res = vec![];
         let mut not_updated_res = vec![];
         for (url, path) in &net_res {
@@ -453,7 +452,7 @@ impl ClashTuiUtil {
         let cmd = format!(
             "{} {} -d {} -f {} -t",
             self.get_cfg(CfgOp::ClashCorePath),
-            if geodata_mode{"-m"} else{""},
+            if geodata_mode { "-m" } else { "" },
             self.get_cfg(CfgOp::ClashConfigDir),
             path,
         );
@@ -479,8 +478,7 @@ impl ClashTuiUtil {
                 );
             }
             ClashSrvOp::TestClashConfig => {
-                return self
-                    .test_profile_config(&self.get_cfg(CfgOp::ClashConfigFile), false);
+                return self.test_profile_config(&self.get_cfg(CfgOp::ClashConfigFile), false);
             }
             ClashSrvOp::SetPermission => {
                 return exec_ipc(

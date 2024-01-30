@@ -143,7 +143,7 @@ impl ProfileTab {
 
                     if profile_name == self.clashtui_state.borrow().get_profile() {
                         if let Err(err) = self.clashtui_util.select_profile(profile_name) {
-                            log::debug!("{:?}", err);
+                            log::error!("{:?}", err);
                             msg.push(err.to_string());
                         } else {
                             msg.push("Update and selected".to_string());
