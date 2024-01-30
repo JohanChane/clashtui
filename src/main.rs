@@ -20,23 +20,25 @@ mod utils;
 use crate::app::App;
 use crate::ui::EventState;
 
-/// Demo
+/// Mihomo (Clash.Meta) TUI Client
 #[derive(Debug, FromArgs)]
-struct Cli {
+struct CliEnv {
     /// time in ms between two ticks.
     #[argh(option, default = "250")]
     tick_rate: u64,
     /// whether unicode symbols are used to improve the overall look of the app
     #[argh(option, default = "true")]
     enhanced_graphics: bool,
+    /// only update all profiles
+    #[argh(switch, short = 'u')]
+    update:bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let cli: Cli = argh::from_env();
+    let cli: CliEnv = argh::from_env();
     let mut flags: std::collections::HashMap<utils::Flags, bool> =
         std::collections::HashMap::with_capacity(3);
-    flags.insert(utils::Flags::UpdateOnly, false);
-    // When read something from cli , set UpdateOnly is true, otherwise false
+    flags.insert(utils::Flags::UpdateOnly, cli.update);
     let tick_rate = Duration::from_millis(cli.tick_rate);
     run(flags, tick_rate, cli.enhanced_graphics)?;
 

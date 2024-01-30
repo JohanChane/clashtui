@@ -71,14 +71,17 @@ impl App {
             *flags.get(&Flags::FirstInit).unwrap(),
         ));
         if *flags.get(&Flags::UpdateOnly).unwrap() {
+            let log_path = &clashtui_config_dir.join("CronUpdate.log");
+            let _ = std::fs::remove_file(log_path); // clear old logs
             log::info!("Cron Mode!");
+            println!("Log saved to CronUpdate.log");
             let profile_list: Vec<_> = clashtui_util
                 .get_profile_names()
                 .unwrap()
                 .iter()
                 .map(|v| clashtui_util.update_local_profile(v, false))
                 .collect();
-            let mut x = std::fs::File::create(&clashtui_config_dir.join("CronUpdate.log"))
+            let mut x = std::fs::File::create(log_path)
                 .map_err(|e| log::error!("Err while CronUpdate: {}", e))
                 .unwrap();
             let _ = std::io::Write::write_all(&mut x, format!("{:?}", profile_list).as_bytes())
