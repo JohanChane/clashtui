@@ -1,15 +1,13 @@
 mod key_list;
 mod list;
-mod symbols;
 mod theme;
+pub mod symbols;
 pub mod tools;
 
 pub use self::key_list::Keys;
 pub use self::list::ClashTuiList;
-pub use self::symbols::Symbols;
 pub use self::theme::Theme;
 
-pub type SharedSymbols = std::rc::Rc<Symbols>;
 pub type SharedTheme = std::rc::Rc<Theme>;
 
 #[macro_export]

@@ -74,7 +74,7 @@ pub enum ClashTuiConfigLoadError {
 
 pub fn init_config(
     clashtui_config_dir: &std::path::PathBuf,
-    symbols: &crate::ui::utils::SharedSymbols,
+    default_basic_clash_cfg_content: &str,
 ) -> Result<(), Error> {
     // just assume it's working, handle bug when bug occurs
     use std::fs;
@@ -104,6 +104,6 @@ pub fn init_config(
 
     fs::write(
         clashtui_config_dir.join("basic_clash_config.yaml"),
-        &symbols.default_basic_clash_cfg_content,
+        default_basic_clash_cfg_content,
     )
 }

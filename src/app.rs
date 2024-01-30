@@ -6,20 +6,19 @@ use std::{cell::RefCell, collections::HashMap, env, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
 use crate::ui::popups::{HelpPopUp, MsgPopup};
-use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tabs};
-use crate::ui::utils::{tools, Keys, SharedSymbols, Symbols, Theme, Visibility};
+use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tabs, Tab};
+use crate::ui::utils::{tools, Keys, symbols, Theme, Visibility};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState};
 use crate::utils::{ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
 
 pub struct App {
     title: String,
     tabbar: ClashTuiTabBar,
-    tabs: HashMap<String, Tabs>,
+    tabs: HashMap<Tab, Tabs>,
     pub should_quit: bool,
     help_popup: HelpPopUp,
     msgpopup: MsgPopup,
 
-    symbols: SharedSymbols,
     clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
     statusbar: ClashTuiStatusBar,
@@ -28,7 +27,6 @@ pub struct App {
 
 impl App {
     pub fn new(mut flags: HashMap<Flags, bool>) -> Option<Self> {
-        let names = Rc::new(Symbols::default());
 
         let exe_dir = std::env::current_exe()
             .unwrap()
@@ -55,7 +53,7 @@ impl App {
 
         if !clashtui_config_dir.join("config.yaml").exists() {
             flags.insert(Flags::FirstInit, true);
-            if let Err(err) = crate::utils::init_config(&clashtui_config_dir, &names) {
+            if let Err(err) = crate::utils::init_config(&clashtui_config_dir, symbols::DEFAULT_BASIC_CLASH_CFG_CONTENT) {
                 flags.insert(Flags::ErrorDuringInit, true);
                 log::error!("{}", err);
             }
@@ -85,8 +83,6 @@ impl App {
                 .unwrap();
             let _ = std::io::Write::write_all(&mut x, format!("{:?}", profile_list).as_bytes())
                 .map_err(|e| log::error!("Err while CronUpdate: {}", e));
-            drop(x);
-            drop(profile_list);
             return None;
         } // Finish cron
 
@@ -99,31 +95,31 @@ impl App {
 
         let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
 
-        let mut tabs: HashMap<String, Tabs> = HashMap::with_capacity(3);
+        let mut tabs: HashMap<Tab, Tabs> = HashMap::with_capacity(3);
         // Init the tabs
         {
             tabs.insert(
-                names.profile.clone(),
+                Tab::ProfileTab,
                 Tabs::ProfileTab(RefCell::new(ProfileTab::new(
-                    names.profile.clone(),
+                    symbols::PROFILE.to_string(),
                     clashtui_util.clone(),
                     clashtui_state.clone(),
                     theme.clone(),
                 ))),
             );
             tabs.insert(
-                names.clashsrvctl.clone(),
+                Tab::ClashSrvCtlTab,
                 Tabs::ClashSrvCtlTab(RefCell::new(ClashSrvCtlTab::new(
-                    names.clashsrvctl.clone(),
+                    symbols::CLASHSRVCTL.to_string(),
                     clashtui_util.clone(),
                     clashtui_state.clone(),
                     theme.clone(),
                 ))),
             );
             tabs.insert(
-                names.config.clone(),
+                Tab::ConfigTab,
                 Tabs::ConfigTab(RefCell::new(ConfigTab::new(
-                    names.config.clone(),
+                    symbols::CONFIG.to_string(),
                     clashtui_util.clone(),
                     theme.clone(),
                 ))),
@@ -135,14 +131,13 @@ impl App {
             tabbar: ClashTuiTabBar::new(
                 "".to_string(),
                 vec![
-                    names.profile.clone(),
-                    names.clashsrvctl.clone(),
-                    names.config.to_string(),
+                    symbols::PROFILE.to_string(),
+                    symbols::CLASHSRVCTL.to_string(),
+                    symbols::CONFIG.to_string(),
                 ],
                 Rc::clone(&theme),
             ),
             should_quit: false,
-            symbols: names,
             help_popup,
             msgpopup: MsgPopup::new(),
             statusbar,
@@ -152,9 +147,7 @@ impl App {
             flags,
         };
 
-        let help_text: Vec<String> = app
-            .symbols
-            .help
+        let help_text: Vec<String> = symbols::HELP // TODO
             .lines()
             .map(|line| line.trim().to_string())
             .collect();
@@ -269,7 +262,7 @@ impl App {
         let ev_state = match last_ev {
             EventState::NotConsumed | EventState::WorkDone => EventState::NotConsumed,
             EventState::ProfileUpdate | EventState::ProfileUpdateAll => {
-                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&self.symbols.profile).unwrap()
+                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap()
                 {
                     profile_tab.borrow_mut().hide_msgpopup();
                     if last_ev == &EventState::ProfileUpdate {
@@ -281,7 +274,7 @@ impl App {
                 EventState::WorkDone
             }
             EventState::ProfileSelect => {
-                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&self.symbols.profile).unwrap()
+                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap()
                 {
                     profile_tab.borrow_mut().hide_msgpopup();
                     match profile_tab.borrow_mut().handle_select_profile_ev() {
@@ -292,7 +285,7 @@ impl App {
                 EventState::WorkDone
             }
             EventState::ProfileDelete => {
-                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&self.symbols.profile).unwrap()
+                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap()
                 {
                     profile_tab.borrow_mut().hide_msgpopup();
                     profile_tab.borrow_mut().handle_delete_profile_ev();
