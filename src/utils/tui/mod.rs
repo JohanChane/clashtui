@@ -3,6 +3,7 @@ mod flags;
 mod state;
 mod tui;
 mod tui_impl;
+mod ipc;
 pub mod utils;
 
 pub type SharedClashTuiUtil = std::rc::Rc<tui::ClashTuiUtil>;
@@ -12,6 +13,7 @@ pub use config::{init_config, ClashTuiConfigLoadError};
 pub use flags::Flags;
 pub use state::State;
 pub use tui::ClashTuiUtil;
+pub(self) use ipc::exec_ipc;
 
 macro_rules! define_enum {
     ($name: ident, [$($variant:ident),*]) => {

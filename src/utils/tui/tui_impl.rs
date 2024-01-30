@@ -7,7 +7,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::{tui::parse_yaml, utils as Utils, ClashSrvOp, ClashTuiUtil, CfgOp};
+use super::exec_ipc;
+use super::{tui::parse_yaml, utils as Utils, CfgOp, ClashSrvOp, ClashTuiUtil};
 
 impl ClashTuiUtil {
     pub fn create_yaml_with_template(&self, template_name: &String) -> anyhow::Result<()> {
@@ -448,71 +449,48 @@ impl ClashTuiUtil {
 
         output.map(|_| "Done".to_string())
     }
-    pub fn test_profile_config(&self, path: &Path, geodata_mode: bool) -> Result<String, Error> {
-        let cmd = if geodata_mode {
-            format!(
-                "{} -m -d {} -f {} -t",
-                self.get_cfg(CfgOp::ClashCorePath).as_str(),
-                self.get_cfg(CfgOp::ClashConfigDir).as_str(),
-                path.to_str().unwrap(),
-            )
-        } else {
-            format!(
-                "{} -d {} -f {} -t",
-                self.get_cfg(CfgOp::ClashCorePath).as_str(),
-                self.get_cfg(CfgOp::ClashConfigDir).as_str(),
-                path.to_str().unwrap(),
-            )
-        };
-        #[cfg(target_os = "linux")]
-        let output = Command::new("sh").arg("-c").arg(&cmd).output().unwrap();
+    pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> Result<String, Error> {
+        let cmd = format!(
+            "{} {} -d {} -f {} -t",
+            self.get_cfg(CfgOp::ClashCorePath),
+            if geodata_mode{"-m"} else{""},
+            self.get_cfg(CfgOp::ClashConfigDir),
+            path,
+        );
         #[cfg(target_os = "windows")]
-        let output = Command::new("cmd").arg("/C").arg(&cmd).output()?;
-        return Utils::string_process_output(output);
+        return exec_ipc("cmd".to_string(), format!("/C {}", cmd));
+        #[cfg(target_os = "linux")]
+        exec_ipc("sh".to_string(), ["-c".to_string(), cmd].to_vec())
     }
 
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
         match op {
             ClashSrvOp::StartClashService => {
-                let output = match Command::new("systemctl")
-                    .arg("restart")
-                    .arg(self.get_cfg(CfgOp::ClashServiceName).as_str())
-                    .output()
-                {
-                    Ok(v) => v,
-                    Err(e) => return Err(e),
-                };
-
-                return Utils::string_process_output(output);
-            }
-            ClashSrvOp::StopClashService => {
-                let output = match Command::new("systemctl")
-                    .arg("stop")
-                    .arg(self.get_cfg(CfgOp::ClashServiceName).as_str())
-                    .output()
-                {
-                    Ok(v) => v,
-                    Err(e) => return Err(e),
-                };
-                return Utils::string_process_output(output);
-            }
-            ClashSrvOp::TestClashConfig => {
-                return self.test_profile_config(
-                    &Path::new(&self.get_cfg(CfgOp::ClashConfigFile)),
-                    false,
+                return exec_ipc(
+                    "systemctl".to_string(),
+                    ["restart".to_string(), self.get_cfg(CfgOp::ClashServiceName)].to_vec(),
                 );
             }
+            ClashSrvOp::StopClashService => {
+                return exec_ipc(
+                    "systemctl".to_string(),
+                    ["stop".to_string(), self.get_cfg(CfgOp::ClashServiceName)].to_vec(),
+                );
+            }
+            ClashSrvOp::TestClashConfig => {
+                return self
+                    .test_profile_config(&self.get_cfg(CfgOp::ClashConfigFile), false);
+            }
             ClashSrvOp::SetPermission => {
-                let output = match Command::new("setcap")
-                    .arg("'cap_net_admin,cap_net_bind_service=+ep'")
-                    .arg(self.get_cfg(CfgOp::ClashCorePath))
-                    .output()
-                {
-                    Ok(v) => v,
-                    Err(e) => return Err(e),
-                };
-                return Utils::string_process_output(output);
+                return exec_ipc(
+                    "setcap".to_string(),
+                    [
+                        "'cap_net_admin,cap_net_bind_service=+ep'".to_string(),
+                        self.get_cfg(CfgOp::ClashCorePath),
+                    ]
+                    .to_vec(),
+                );
             }
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,

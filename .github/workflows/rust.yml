@@ -20,7 +20,7 @@ jobs:
         gunzip mihomo.gz
         chmod +x mihomo
     - name: Set up Mihomo
-      run: nohup ./mihomo -d test_conf &
+      run: nohup ./mihomo -d Example -f Example/basic_clash_config.yaml &
       
     - name: Download Dependencies
       run: cargo fetch

@@ -315,7 +315,7 @@ impl CommonTab for ProfileTab {
                     } else if Keys::ProfileTestConfig.is(key) {
                         if let Some(profile_name) = self.profile_list.selected() {
                             let path = self.clashtui_util.get_profile_yaml_path(profile_name);
-                            match self.clashtui_util.test_profile_config(&path, false) {
+                            match self.clashtui_util.test_profile_config(path.to_str().unwrap(), false) {
                                 Ok(output) => {
                                     let list_msg: Vec<String> = output
                                         .lines()
