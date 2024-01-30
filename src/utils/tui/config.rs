@@ -42,28 +42,29 @@ impl ClashTuiConfig {
     }
 }
 
-// #[test]
-// fn test_save_and_load() {
-//     let mut flag = true;
-//     let path = "config.yaml";
-//     let conf = match ClashTuiConfig::from_file(path) {
-//         Ok(v) => v,
-//         Err(e) => {
-//             flag = false;
-//             println!("{}", e);
-//             ClashTuiConfig::default()
-//         }
-//     };
-//     assert!(flag);
-//     flag = false;
-//     println!("{:?}", conf);
-//     let e = conf.to_file(path);
-//     match e {
-//         Ok(_) => flag = true,
-//         Err(v) => println!("{}", v),
-//     };
-//     assert!(flag);
-// }
+#[test]
+#[ignore = "Not testable in Github Action, need to be fixed"]
+fn test_save_and_load() {
+    let mut flag = true;
+    let path = "config.yaml";
+    let conf = match ClashTuiConfig::from_file(path) {
+        Ok(v) => v,
+        Err(e) => {
+            flag = false;
+            println!("{}", e);
+            ClashTuiConfig::default()
+        }
+    };
+    assert!(flag);
+    flag = false;
+    println!("{:?}", conf);
+    let e = conf.to_file(path);
+    match e {
+        Ok(_) => flag = true,
+        Err(v) => println!("{}", v),
+    };
+    assert!(flag);
+}
 
 #[derive(PartialEq, Clone)]
 pub enum ClashTuiConfigLoadError {
