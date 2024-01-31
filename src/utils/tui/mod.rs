@@ -1,9 +1,9 @@
 mod config;
 mod flags;
+mod ipc;
 mod state;
 mod tui;
 mod tui_impl;
-mod ipc;
 pub mod utils;
 
 pub type SharedClashTuiUtil = std::rc::Rc<tui::ClashTuiUtil>;
@@ -11,9 +11,9 @@ pub type SharedClashTuiState = std::rc::Rc<std::cell::RefCell<State>>;
 
 pub use config::{init_config, ClashTuiConfigLoadError};
 pub use flags::Flags;
+pub(self) use ipc::exec_ipc;
 pub use state::State;
 pub use tui::ClashTuiUtil;
-pub(self) use ipc::exec_ipc;
 
 macro_rules! define_enum {
     ($name: ident, [$($variant:ident),*]) => {

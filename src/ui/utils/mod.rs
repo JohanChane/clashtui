@@ -1,7 +1,7 @@
 mod key_list;
 mod list;
-mod theme;
 pub mod symbols;
+mod theme;
 pub mod tools;
 
 pub use self::key_list::Keys;

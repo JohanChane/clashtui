@@ -8,7 +8,7 @@ use std::{
     rc::Rc,
 };
 
-use super::{profile_input::ProfileInputPopup, CommonTab};
+use super::profile_input::ProfileInputPopup;
 use crate::ui::{
     popups::{ConfirmPopup, MsgPopup},
     utils::{ClashTuiList, Keys, SharedTheme, Visibility},
@@ -236,10 +236,7 @@ impl ProfileTab {
         let profile_names: Vec<String> = self.clashtui_util.get_profile_names().unwrap();
         self.profile_list.set_items(profile_names);
     }
-}
-
-impl CommonTab for ProfileTab {
-    fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -315,7 +312,10 @@ impl CommonTab for ProfileTab {
                     } else if Keys::ProfileTestConfig.is(key) {
                         if let Some(profile_name) = self.profile_list.selected() {
                             let path = self.clashtui_util.get_profile_yaml_path(profile_name);
-                            match self.clashtui_util.test_profile_config(path.to_str().unwrap(), false) {
+                            match self
+                                .clashtui_util
+                                .test_profile_config(path.to_str().unwrap(), false)
+                            {
                                 Ok(output) => {
                                     let list_msg: Vec<String> = output
                                         .lines()
@@ -379,7 +379,7 @@ impl CommonTab for ProfileTab {
         Ok(event_state)
     }
 
-    fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
         if !self.is_visible() {
             return;
         }

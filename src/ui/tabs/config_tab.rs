@@ -1,7 +1,6 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use super::CommonTab;
 use crate::ui::{
     popups::{ClashTuiInputPopup, MsgPopup},
     utils::{ClashTuiList, Keys, SharedTheme, Visibility},
@@ -84,12 +83,9 @@ impl ConfigTab {
                     return Ok(EventState::NotConsumed);
                 }
                 event_state = if Keys::Select.is(key) {
-                    self.last_op = Some(CfgOp::from(
-                        self.setting_list.selected().unwrap().as_str(),
-                    ));
-                    let info = self
-                        .clashtui_util
-                        .get_cfg(self.last_op.clone().unwrap());
+                    self.last_op =
+                        Some(CfgOp::from(self.setting_list.selected().unwrap().as_str()));
+                    let info = self.clashtui_util.get_cfg(self.last_op.clone().unwrap());
                     self.input.set_pre_data(info);
                     self.input.show();
                     EventState::WorkDone
@@ -101,10 +97,7 @@ impl ConfigTab {
 
         Ok(event_state)
     }
-}
-
-impl CommonTab for ConfigTab {
-    fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -114,7 +107,7 @@ impl CommonTab for ConfigTab {
         Ok(event_state)
     }
 
-    fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
         //! make config name in pop. display old config content.
         if !self.is_visible() {
             return;

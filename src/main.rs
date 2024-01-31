@@ -31,7 +31,7 @@ struct CliEnv {
     enhanced_graphics: bool,
     /// only update all profiles
     #[argh(switch, short = 'u')]
-    update:bool,
+    update: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

@@ -1,7 +1,6 @@
 use crossterm::event::{Event, KeyEventKind};
 use ratatui::prelude as Ra;
 
-use super::CommonTab;
 use crate::ui::utils::{tools, Visibility};
 use crate::utils::{Mode, SharedClashTuiState};
 use crate::{msgpopup_methods, visible_methods};
@@ -11,7 +10,7 @@ use crate::{
         utils::{ClashTuiList, Keys, SharedTheme},
         EventState,
     },
-    utils::{SharedClashTuiUtil, ClashSrvOp},
+    utils::{ClashSrvOp, SharedClashTuiUtil},
 };
 
 pub struct ClashSrvCtlTab {
@@ -100,10 +99,7 @@ impl ClashSrvCtlTab {
 
         Ok(event_state)
     }
-}
-
-impl CommonTab for ClashSrvCtlTab {
-    fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -158,7 +154,7 @@ impl CommonTab for ClashSrvCtlTab {
         Ok(event_state)
     }
 
-    fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
         if !self.is_visible() {
             return;
         }

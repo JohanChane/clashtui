@@ -1,15 +1,14 @@
-use anyhow::Result;
 use crossterm::event::{Event, KeyEventKind};
 use log;
 use ratatui::prelude as Ra;
-use std::{cell::RefCell, collections::HashMap, env, path::PathBuf, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
 use crate::ui::popups::{HelpPopUp, MsgPopup};
-use crate::ui::tabs::{ClashSrvCtlTab, CommonTab, ConfigTab, ProfileTab, Tab, Tabs};
+use crate::ui::tabs::{ClashSrvCtlTab,  ConfigTab, ProfileTab, Tab, Tabs};
 use crate::ui::utils::{symbols, tools, Keys, Theme, Visibility};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState};
-use crate::utils::{ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State, Utils};
+use crate::utils::{ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
 
 pub struct App {
     title: String,
@@ -27,27 +26,25 @@ pub struct App {
 
 impl App {
     pub fn new(mut flags: HashMap<Flags, bool>) -> Option<Self> {
-        let exe_dir = std::env::current_exe()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .to_path_buf();
-
-        let data_dir = exe_dir.join("data");
-        let clashtui_config_dir = if data_dir.exists() && data_dir.is_dir() {
-            // portable mode
-            log::info!("Portable Mode!");
-            data_dir
-        } else {
-            #[cfg(target_os = "linux")]
-            let clashtui_config_dir_str = env::var("XDG_CONFIG_HOME")
-                .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)))
-                .unwrap();
-            #[cfg(target_os = "windows")]
-            let clashtui_config_dir_str = env::var("APPDATA")
-                .map(|appdata| format!("{}/clashtui", appdata))
-                .unwrap();
-            PathBuf::from(&clashtui_config_dir_str)
+        let clashtui_config_dir = {
+            use std::env;
+            let exe_dir = env::current_exe().unwrap().parent().unwrap().to_path_buf();
+            let data_dir = exe_dir.join("data");
+            if data_dir.exists() && data_dir.is_dir() {
+                // portable mode
+                log::info!("Portable Mode!");
+                data_dir
+            } else {
+                #[cfg(target_os = "linux")]
+                let clashtui_config_dir_str = env::var("XDG_CONFIG_HOME")
+                    .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)))
+                    .unwrap();
+                #[cfg(target_os = "windows")]
+                let clashtui_config_dir_str = env::var("APPDATA")
+                    .map(|appdata| format!("{}/clashtui", appdata))
+                    .unwrap();
+                PathBuf::from(&clashtui_config_dir_str)
+            }
         };
 
         if !clashtui_config_dir.join("config.yaml").exists() {
@@ -86,14 +83,19 @@ impl App {
             let mut x = std::fs::File::create(log_path)
                 .map_err(|e| log::error!("Err while CronUpdate: {}", e))
                 .unwrap();
+            use crate::utils::Utils;
             let _ = std::io::Write::write_all(
                 &mut x,
                 format!(
                     "{:?}",
-                    profile_list.into_iter().map(|v| match v {
-                        Ok(v) => Utils::concat_update_profile_result(v),
-                        Err(e) => [e.to_string()].to_vec(),
-                    }).flatten().collect::<Vec<String>>()
+                    profile_list
+                        .into_iter()
+                        .map(|v| match v {
+                            Ok(v) => Utils::concat_update_profile_result(v),
+                            Err(e) => [e.to_string()].to_vec(),
+                        })
+                        .flatten()
+                        .collect::<Vec<String>>()
                 )
                 .as_bytes(),
             )
@@ -101,19 +103,22 @@ impl App {
             return None;
         } // Finish cron
 
-        let theme = Rc::new(Theme::default());
-
-        let help_popup = HelpPopUp::new("Help".to_string(), Rc::clone(&theme));
-
         let clashtui_state =
             SharedClashTuiState::new(RefCell::new(State::new(clashtui_util.clone())));
-
+        let theme = Rc::new(Theme::default());
+        let help_popup = HelpPopUp::new("Help".to_string(), Rc::clone(&theme));
+        let tabbar = ClashTuiTabBar::new(
+            "".to_string(),
+            vec![
+                symbols::PROFILE.to_string(),
+                symbols::CLASHSRVCTL.to_string(),
+                symbols::CONFIG.to_string(),
+            ],
+            Rc::clone(&theme),
+        );
         let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
-
-        let mut tabs: HashMap<Tab, Tabs> = HashMap::with_capacity(3);
-        // Init the tabs
-        {
-            tabs.insert(
+        let tabs: HashMap<Tab, Tabs> = HashMap::from_iter([
+            (
                 Tab::ProfileTab,
                 Tabs::ProfileTab(RefCell::new(ProfileTab::new(
                     symbols::PROFILE.to_string(),
@@ -121,8 +126,8 @@ impl App {
                     clashtui_state.clone(),
                     theme.clone(),
                 ))),
-            );
-            tabs.insert(
+            ),
+            (
                 Tab::ClashSrvCtlTab,
                 Tabs::ClashSrvCtlTab(RefCell::new(ClashSrvCtlTab::new(
                     symbols::CLASHSRVCTL.to_string(),
@@ -130,28 +135,20 @@ impl App {
                     clashtui_state.clone(),
                     theme.clone(),
                 ))),
-            );
-            tabs.insert(
+            ),
+            (
                 Tab::ConfigTab,
                 Tabs::ConfigTab(RefCell::new(ConfigTab::new(
                     symbols::CONFIG.to_string(),
                     clashtui_util.clone(),
                     theme.clone(),
                 ))),
-            );
-        }
+            ),
+        ]); // Init the tabs
 
         let mut app = Self {
             title: "ClashTui".to_string(),
-            tabbar: ClashTuiTabBar::new(
-                "".to_string(),
-                vec![
-                    symbols::PROFILE.to_string(),
-                    symbols::CLASHSRVCTL.to_string(),
-                    symbols::CONFIG.to_string(),
-                ],
-                Rc::clone(&theme),
-            ),
+            tabbar,
             should_quit: false,
             help_popup,
             msgpopup: MsgPopup::new(),
@@ -162,7 +159,7 @@ impl App {
             flags,
         };
 
-        let help_text: Vec<String> = symbols::HELP // TODO
+        let help_text: Vec<String> = symbols::HELP
             .lines()
             .map(|line| line.trim().to_string())
             .collect();
@@ -174,7 +171,7 @@ impl App {
         Some(app)
     }
 
-    fn popup_event(&mut self, ev: &Event) -> Result<EventState> {
+    fn popup_event(&mut self, ev: &Event) -> anyhow::Result<EventState> {
         // ## Self Popups
         let mut event_state = self.help_popup.event(ev).unwrap();
 
@@ -196,7 +193,7 @@ impl App {
         Ok(event_state)
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState> {
+    pub fn event(&mut self, ev: &Event) -> anyhow::Result<EventState> {
         let mut event_state = self.msgpopup.event(ev).unwrap();
         if event_state.is_notconsumed() {
             event_state = self.popup_event(ev)?;
