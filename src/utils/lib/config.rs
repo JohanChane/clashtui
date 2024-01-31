@@ -1,4 +1,4 @@
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 #[serde(default)]

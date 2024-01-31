@@ -195,8 +195,8 @@ impl ClashTuiList {
         }
     }
 
-    pub fn select(&mut self, profile_name: &str) {
-        if let Some(index) = self.items.iter().position(|item| item == profile_name) {
+    pub fn select(&mut self, name: &str) {
+        if let Some(index) = self.items.iter().position(|item| item == name) {
             self.list_state.select(Some(index));
         }
     }

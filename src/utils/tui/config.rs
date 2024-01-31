@@ -1,4 +1,4 @@
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Error};
 #[derive(Debug, Deserialize, Serialize, Default)]
 pub(super) struct ClashTuiConfig {

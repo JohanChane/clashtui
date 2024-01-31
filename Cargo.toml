@@ -14,18 +14,18 @@ readme = "README.md"
 exclude = [
   "PKGBUILD",
   "Scoop/*",
-  "App/*"
+  "Example/*",
+  ".github/*"
 ]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ratatui = { version = "0.25.0", features = ["all-widgets", "serde"] }
+ratatui = { version = "0.25.0", features = ["serde"] }
 crossterm = { version = "0.27" }
 serde = { version = "1.0", features = ["derive"] }
-argh = { version = "0.1.0" }
-reqwest = { version = "0.11.22", features = ["blocking"] } #"socks"
-serde_derive = "1.0"
+argh = { version = "0.1" }
+reqwest = { version = "0.11", features = ["blocking"] } 
 serde_yaml = "0.9"
 serde_json = "1.0"
 #toml = "0.8.8"

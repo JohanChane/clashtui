@@ -457,7 +457,7 @@ impl ClashTuiUtil {
             path,
         );
         #[cfg(target_os = "windows")]
-        return exec_ipc("cmd".to_string(), format!("/C {}", cmd));
+        return exec_ipc("cmd".to_string(), ["/C".to_string(), cmd].to_vec());
         #[cfg(target_os = "linux")]
         exec_ipc("sh".to_string(), ["-c".to_string(), cmd].to_vec())
     }

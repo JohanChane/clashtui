@@ -5,7 +5,7 @@ use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
 use crate::ui::popups::{HelpPopUp, MsgPopup};
-use crate::ui::tabs::{ClashSrvCtlTab,  ConfigTab, ProfileTab, Tab, Tabs};
+use crate::ui::tabs::{ClashSrvCtlTab, ConfigTab, ProfileTab, Tab, Tabs};
 use crate::ui::utils::{symbols, tools, Keys, Theme, Visibility};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState};
 use crate::utils::{ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
