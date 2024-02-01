@@ -64,9 +64,6 @@ impl ClashUtil {
             None => self.post("/restart", Some(&self.default_payload)),
         }
     }
-    pub fn flush_fakeip(&self) -> Result<String, reqwest::Error> {
-        self.post("/cache/fakeip/flush", None)
-    }
     pub fn version(&self) -> Result<String, reqwest::Error> {
         self.get(&"/version", None)
     }
@@ -114,6 +111,9 @@ impl ClashUtil {
         }
     }
     /*
+    pub fn flush_fakeip(&self) -> Result<String, reqwest::Error> {
+        self.post("/cache/fakeip/flush", None)
+    }
     pub fn update_geo(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
         match payload {
             Some(load) => self.post("/configs/geo", Some(load)),
@@ -220,17 +220,6 @@ fn test() {
         Err(_) => is = false,
     }
     assert!(is)
-}
-
-#[test]
-#[allow(unused)]
-fn test_clash_mock() {
-    let stru = ClashUtil::new(
-        "http://127.0.0.1:9090".to_string(),
-        "http://127.0.0.1:7890".to_string(),
-    );
-    let r1 = stru.mock_clash_core("");
-    let r2 = stru.mock_clash_core("");
 }
 
 #[test]
