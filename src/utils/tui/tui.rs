@@ -23,14 +23,12 @@ pub struct ClashTuiUtil {
     clash_api: ClashUtil,
     clashtui_config: RefCell<ClashTuiConfig>,
     clash_remote_config: RefCell<Option<ClashConfig>>,
-
-    err_track: Vec<ClashTuiConfigLoadError>,
 }
 
 // Misc
 impl ClashTuiUtil {
-    pub fn new(clashtui_dir: &PathBuf, profile_dir: &PathBuf, is_init: bool) -> Self {
-        let ret = load_app_config(clashtui_dir, is_init);
+    pub fn new(clashtui_dir: &PathBuf, profile_dir: &PathBuf, is_inited: bool) -> (Self, Vec<ClashTuiConfigLoadError>)  {
+        let ret = load_app_config(clashtui_dir, is_inited);
         let mut err_track = ret.3;
         let clash_api = ClashUtil::new(ret.1, ret.2);
         let cur_remote = match clash_api.config_get() {
@@ -40,22 +38,17 @@ impl ClashTuiUtil {
         let remote = ClashConfig::from_str(cur_remote.as_str());
         if remote.is_none() {
             err_track.push(ClashTuiConfigLoadError::LoadClashConfig(
-                "Fail to load config from clash core. Is it Running?\n".into(),
+                "Fail to load config from clash core. Is it Running?".to_string(),
             ));
             log::warn!("Fail to connect to clash. Is it Running?");
         }
-        Self {
+        (Self {
             clashtui_dir: clashtui_dir.clone(),
             profile_dir: profile_dir.clone(),
             clash_api,
             clashtui_config: RefCell::new(ret.0),
             clash_remote_config: RefCell::new(remote),
-            err_track,
-        }
-    }
-
-    pub fn get_err_track(&self) -> Vec<ClashTuiConfigLoadError> {
-        return self.err_track.clone();
+        }, err_track)
     }
 
     pub fn fetch_recent_logs(&self, num_lines: usize) -> Vec<String> {

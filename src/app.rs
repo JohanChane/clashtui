@@ -8,7 +8,7 @@ use crate::ui::popups::{HelpPopUp, MsgPopup};
 use crate::ui::tabs::{ClashSrvCtlTab, ConfigTab, ProfileTab, Tab, Tabs};
 use crate::ui::utils::{symbols, tools, Keys, Theme, Visibility};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState};
-use crate::utils::{ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
+use crate::utils::{ClashTuiConfigLoadError, ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
 
 pub struct App {
     title: String,
@@ -25,7 +25,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(mut flags: HashMap<Flags, bool>) -> Option<Self> {
+    pub fn new(mut flags: HashMap<Flags, bool>) -> (Option<Self>, Vec<ClashTuiConfigLoadError>) {
         let clashtui_config_dir = {
             use std::env;
             let exe_dir = env::current_exe().unwrap().parent().unwrap().to_path_buf();
@@ -63,12 +63,12 @@ impl App {
         #[cfg(debug_assertions)]
         let _ = std::fs::remove_file(&clashtui_config_dir.join("clashtui.log")); // auto rm old log for debug
         Self::setup_logging(&clashtui_config_dir.join("clashtui.log").to_str().unwrap());
-
-        let clashtui_util = Rc::new(ClashTuiUtil::new(
+        let (util, mut err_track) = ClashTuiUtil::new(
             &clashtui_config_dir,
             &clashtui_config_dir.join("profiles"),
             *flags.get(&Flags::FirstInit).unwrap(),
-        ));
+        );
+        let clashtui_util = Rc::new(util);
         if *flags.get(&Flags::UpdateOnly).unwrap() {
             let log_path = &clashtui_config_dir.join("CronUpdate.log");
             let _ = std::fs::remove_file(log_path); // clear old logs
@@ -80,9 +80,14 @@ impl App {
                 .iter()
                 .map(|v| clashtui_util.update_local_profile(v, false))
                 .collect();
-            let mut x = std::fs::File::create(log_path)
-                .map_err(|e| log::error!("Err while CronUpdate: {}", e))
-                .unwrap();
+            let mut x = match std::fs::File::create(log_path) {
+                Err(e) => {
+                    log::error!("Err while CronUpdate: {}", e);
+                    err_track.push(crate::utils::ClashTuiConfigLoadError::CronUpdateProfile(e.to_string().into()));
+                    return (None, err_track);
+                }
+                Ok(v) => v,
+            };
             use crate::utils::Utils;
             let _ = std::io::Write::write_all(
                 &mut x,
@@ -100,7 +105,7 @@ impl App {
                 .as_bytes(),
             )
             .map_err(|e| log::error!("Err while CronUpdate: {}", e));
-            return None;
+            return (None, err_track);
         } // Finish cron
 
         let clashtui_state =
@@ -168,7 +173,7 @@ impl App {
             app.flags.insert(Flags::ErrorDuringInit, false);
         }
 
-        Some(app)
+        (Some(app), err_track)
     }
 
     fn popup_event(&mut self, ev: &Event) -> anyhow::Result<EventState> {
@@ -396,10 +401,6 @@ impl App {
 
     pub fn save_config(&self) {
         self.clashtui_util.save_cfg()
-    }
-
-    pub fn get_err_track(&self) -> Vec<crate::utils::ClashTuiConfigLoadError> {
-        self.clashtui_util.get_err_track()
     }
 }
 

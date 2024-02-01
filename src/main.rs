@@ -1,4 +1,6 @@
-use anyhow::Result;
+#[cfg(not(target_os = "linux"))]
+compile_error!("only linux is supported");
+
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
@@ -42,10 +44,11 @@ pub fn run(
     flags: std::collections::HashMap<utils::Flags, bool>,
     tick_rate: Duration,
     enhanced_graphics: bool,
-) -> Result<()> {
+) -> anyhow::Result<()> {
     let res;
     log::debug!("Current flags: {:?}", flags);
-    if let Some(mut app) = App::new(flags) {
+    let (app, err_track) = App::new(flags);
+    if let Some(mut app) = app {
         use crossterm::{
             event::{DisableMouseCapture, EnableMouseCapture},
             execute,
@@ -61,7 +64,7 @@ pub fn run(
         let mut terminal = Terminal::new(backend)?;
 
         // create app and run it
-        res = run_app(&mut terminal, &mut app, tick_rate);
+        res = run_app(&mut terminal, &mut app, tick_rate, err_track);
 
         // restore terminal
         disable_raw_mode()?;
@@ -72,6 +75,9 @@ pub fn run(
         )?;
         terminal.show_cursor()?;
     } else {
+        if !err_track.is_empty() {
+            err_track.into_iter().map(|v| println!("{v}")).count();
+        }
         res = Ok(());
     }
 
@@ -82,43 +88,34 @@ pub fn run(
     Ok(())
 }
 
+use utils::ClashTuiConfigLoadError;
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
     tick_rate: Duration,
-) -> Result<()> {
+    mut err_track: Vec<ClashTuiConfigLoadError>,
+) -> anyhow::Result<()> {
     {
-        let mut err_tarck = app.get_err_track();
         if *app.flags.get(&utils::Flags::FirstInit).unwrap() {
+            app.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
             app.popup_txt_msg(
-                "Welcome to ClashTui(forked)!\n
-        Please go to Config Tab to set configs so that program can work properly"
+                "Please go to Config Tab to set configs so that program can work properly"
                     .to_string(),
-            )
+            );
         };
         if *app.flags.get(&utils::Flags::ErrorDuringInit).unwrap() {
             app.popup_txt_msg(
                 "Some Error happened during app init, Check the log for detail".to_string(),
             );
         }
-        use utils::ClashTuiConfigLoadError;
         loop {
-            if !err_tarck.is_empty() {
-                let err: Option<ClashTuiConfigLoadError> = err_tarck.pop();
-                let el;
+            if !err_track.is_empty() {
+                let err: Option<ClashTuiConfigLoadError> = err_track.pop();
                 let showstr = match err {
-                    Some(v) => {
-                        el = match v {
-                            ClashTuiConfigLoadError::LoadAppConfig(x) => x.into_string(),
-                            ClashTuiConfigLoadError::LoadProfileConfig(x) => x.into_string(),
-                            ClashTuiConfigLoadError::LoadClashConfig(x) => x.into_string(),
-                        };
-                        el
-                    }
+                    Some(v) => v.to_string(),
                     None => panic!("Should not reached arm!!"),
                 };
                 app.popup_txt_msg(showstr);
-                terminal.draw(|f| app.draw(f))?;
             } else {
                 break;
             }

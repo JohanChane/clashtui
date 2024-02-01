@@ -25,16 +25,7 @@ impl ClashTuiConfig {
     }
 
     pub fn check(&self) -> bool {
-        if self.clash_cfg_dir == "" {
-            return false;
-        }
-        if self.clash_cfg_path == "" {
-            return false;
-        }
-        if self.clash_core_path == "" {
-            return false;
-        }
-        true
+        self.clash_cfg_dir != "" && self.clash_cfg_path != "" && self.clash_core_path != ""
     }
 
     pub fn update_profile(&mut self, profile: String) {
@@ -68,9 +59,21 @@ fn test_save_and_load() {
 
 #[derive(PartialEq, Clone)]
 pub enum ClashTuiConfigLoadError {
-    LoadAppConfig(Box<str>),
-    LoadProfileConfig(Box<str>),
-    LoadClashConfig(Box<str>),
+    LoadAppConfig(String),
+    LoadProfileConfig(String),
+    LoadClashConfig(String),
+    CronUpdateProfile(String),
+}
+impl std::fmt::Display for ClashTuiConfigLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let x = match self {
+            ClashTuiConfigLoadError::LoadAppConfig(v) => v,
+            ClashTuiConfigLoadError::LoadProfileConfig(v) => v,
+            ClashTuiConfigLoadError::LoadClashConfig(v) => v,
+            ClashTuiConfigLoadError::CronUpdateProfile(v) => v,
+        };
+        write!(f, "{}", x)
+    }
 }
 
 pub fn init_config(
@@ -79,28 +82,28 @@ pub fn init_config(
 ) -> Result<(), Error> {
     // just assume it's working, handle bug when bug occurs
     use std::fs;
-    let r = fs::create_dir_all(&clashtui_config_dir);
-    if r.is_err() {
-        return r;
-    }
-    let r = ClashTuiConfig::default()
-        .to_file(clashtui_config_dir.join("config.yaml").to_str().unwrap());
-    if r.is_err() {
-        return Err(Error::new(std::io::ErrorKind::Other, r.err().unwrap()));
-    }
-    let r = fs::create_dir(clashtui_config_dir.join("profiles"));
-    if r.is_err() {
-        return r;
-    }
+    if let Err(r) = fs::create_dir_all(&clashtui_config_dir) {
+        return Err(r);
+    };
+
+    if let Err(r) =
+        ClashTuiConfig::default().to_file(clashtui_config_dir.join("config.yaml").to_str().unwrap())
+    {
+        return Err(Error::new(std::io::ErrorKind::Other, r));
+    };
+
+    if let Err(r) = fs::create_dir(clashtui_config_dir.join("profiles")) {
+        return Err(r);
+    };
+
     // Well, just keep them before I remove the template function or what
-    let r = fs::create_dir_all(clashtui_config_dir.join("templates"));
-    if r.is_err() {
-        return r;
-    }
-    let r = fs::File::create(clashtui_config_dir.join("templates/template_proxy_providers"));
-    match r {
-        Err(e) => return Err(e),
-        Ok(_) => (),
+    if let Err(r) = fs::create_dir_all(clashtui_config_dir.join("templates")) {
+        return Err(r);
+    };
+
+    if let Err(r) = fs::File::create(clashtui_config_dir.join("templates/template_proxy_providers"))
+    {
+        return Err(r);
     };
 
     fs::write(
