@@ -1,3 +1,4 @@
+# Recorded by [vhs](https://github.com/charmbracelet/vhs)
 # Where should we write the GIF?
 Output demo.gif
 
@@ -6,12 +7,15 @@ Set FontSize 20
 Set Width 1200
 Set Height 1000
 
-Type "clashtui"
+Type "./target/release/clashtui"
 Sleep 500ms
 Enter
 Sleep 1s
 
 Set TypingSpeed 1s
+
+# ## Close Welcome
+Escape 
 
 # ## Help
 Type "?"
@@ -65,10 +69,29 @@ Escape
 Sleep 2s
 
 # ## ClashSrvCtl
+Set TypingSpeed 300ms
 Type "2"
-Type "jjj"
-Sleep 2s
+Type "jjjj"
+Enter
+Type "j"
+Enter
+
+# ## Config
+Tab
+Enter
+Type "the path to clash config dir"
+Enter
+Sleep 1s
+Enter
+Escape
 
 # ## Global
 Type "H"
-Sleep 2s
+Sleep 500ms
+
+# ## Exit And Rerun
+Type "Q"
+Sleep 1s
+Type "./target/release/clashtui"
+Sleep 500ms
+Escape
