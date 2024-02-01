@@ -34,5 +34,6 @@ anyhow = "1.0"
 log = "0.4"
 #env_logger = "0.10"
 log4rs = "1.2"
-#[cfg(target_os = "windows")]
+
+[target.'cfg(target_os = "windows")'.dependencies]
 encoding = "0.2.33"
