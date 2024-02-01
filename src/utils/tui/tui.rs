@@ -249,7 +249,7 @@ pub(super) fn parse_yaml(yaml_path: &Path) -> anyhow::Result<serde_yaml::Value> 
 
 fn load_app_config(
     clashtui_dir: &PathBuf,
-    skip_load_conf: bool,
+    skip_init_conf: bool,
 ) -> (ClashTuiConfig, String, String, Vec<ClashTuiConfigLoadError>) {
     let mut err_collect = Vec::new();
     let basic_clash_config_path = Path::new(clashtui_dir).join("basic_clash_config.yaml");
@@ -277,7 +277,7 @@ fn load_app_config(
     log::debug!("proxy_addr: {}", proxy_addr);
 
     let configs;
-    if !skip_load_conf {
+    if skip_init_conf {
         let config_path = clashtui_dir.join("config.yaml");
         configs = match ClashTuiConfig::from_file(config_path.to_str().unwrap()) {
             Ok(v) => {

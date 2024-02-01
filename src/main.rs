@@ -13,6 +13,7 @@ mod utils;
 
 use crate::app::App;
 use crate::ui::EventState;
+use crate::utils::{Flag,Flags};
 
 /// Mihomo (Clash.Meta) TUI Client
 #[derive(Debug, argh::FromArgs)]
@@ -31,9 +32,11 @@ struct CliEnv {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli: CliEnv = argh::from_env();
-    let mut flags: std::collections::HashMap<utils::Flags, bool> =
-        std::collections::HashMap::with_capacity(3);
-    flags.insert(utils::Flags::UpdateOnly, cli.update);
+    let mut flags =
+        Flags::with_capacity(3);
+    if cli.update {
+        flags.insert(utils::Flag::UpdateOnly);
+    };
     let tick_rate = Duration::from_millis(cli.tick_rate);
     run(flags, tick_rate, cli.enhanced_graphics)?;
 
@@ -41,13 +44,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 #[allow(unused_variables)]
 pub fn run(
-    flags: std::collections::HashMap<utils::Flags, bool>,
+    mut flags: Flags,
     tick_rate: Duration,
     enhanced_graphics: bool,
 ) -> anyhow::Result<()> {
     let res;
+    let config_dir = load_app_dir(&mut flags);
     log::debug!("Current flags: {:?}", flags);
-    let (app, err_track) = App::new(flags);
+    let (app, err_track) = App::new(flags, config_dir);
     if let Some(mut app) = app {
         use crossterm::{
             event::{DisableMouseCapture, EnableMouseCapture},
@@ -96,14 +100,14 @@ fn run_app<B: Backend>(
     mut err_track: Vec<ClashTuiConfigLoadError>,
 ) -> anyhow::Result<()> {
     {
-        if *app.flags.get(&utils::Flags::FirstInit).unwrap() {
+        if app.flags.contains_key(utils::Flag::FirstInit) {
             app.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
             app.popup_txt_msg(
                 "Please go to Config Tab to set configs so that program can work properly"
                     .to_string(),
             );
         };
-        if *app.flags.get(&utils::Flags::ErrorDuringInit).unwrap() {
+        if app.flags.contains_key(utils::Flag::ErrorDuringInit) {
             app.popup_txt_msg(
                 "Some Error happened during app init, Check the log for detail".to_string(),
             );
@@ -148,4 +152,41 @@ fn run_app<B: Backend>(
             return Ok(());
         }
     }
+}
+
+fn load_app_dir(flags: &mut Flags) -> std::path::PathBuf {
+    let clashtui_config_dir = {
+        use std::{env, path::PathBuf};
+        let exe_dir = env::current_exe().unwrap().parent().unwrap().to_path_buf();
+        let data_dir = exe_dir.join("data");
+        if data_dir.exists() && data_dir.is_dir() {
+            // portable mode
+            flags.insert(Flag::PortableMode);
+            data_dir
+        } else {
+            #[cfg(target_os = "linux")]
+            let clashtui_config_dir_str = env::var("XDG_CONFIG_HOME")
+                .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)))
+                .unwrap();
+            #[cfg(target_os = "windows")]
+            let clashtui_config_dir_str = env::var("APPDATA")
+                .map(|appdata| format!("{}/clashtui", appdata))
+                .unwrap();
+            PathBuf::from(&clashtui_config_dir_str)
+        }
+    };
+
+    if !clashtui_config_dir.join("config.yaml").exists() {
+        use ui::utils::symbols;
+        flags.insert(Flag::FirstInit);
+        if let Err(err) = crate::utils::init_config(
+            &clashtui_config_dir,
+            symbols::DEFAULT_BASIC_CLASH_CFG_CONTENT,
+        ) {
+            flags.insert(Flag::ErrorDuringInit);
+            log::error!("{}", err);
+        }
+    } else {
+    }
+    clashtui_config_dir
 }

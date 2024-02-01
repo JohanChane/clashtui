@@ -8,7 +8,7 @@ use crate::ui::popups::{HelpPopUp, MsgPopup};
 use crate::ui::tabs::{ClashSrvCtlTab, ConfigTab, ProfileTab, Tab, Tabs};
 use crate::ui::utils::{symbols, tools, Keys, Theme, Visibility};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState};
-use crate::utils::{ClashTuiConfigLoadError, ClashTuiUtil, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
+use crate::utils::{ClashTuiConfigLoadError, ClashTuiUtil, Flag, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
 
 pub struct App {
     title: String,
@@ -21,55 +21,22 @@ pub struct App {
     clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
     statusbar: ClashTuiStatusBar,
-    pub flags: HashMap<Flags, bool>,
+    pub flags: Flags,
 }
 
 impl App {
-    pub fn new(mut flags: HashMap<Flags, bool>) -> (Option<Self>, Vec<ClashTuiConfigLoadError>) {
-        let clashtui_config_dir = {
-            use std::env;
-            let exe_dir = env::current_exe().unwrap().parent().unwrap().to_path_buf();
-            let data_dir = exe_dir.join("data");
-            if data_dir.exists() && data_dir.is_dir() {
-                // portable mode
-                log::info!("Portable Mode!");
-                data_dir
-            } else {
-                #[cfg(target_os = "linux")]
-                let clashtui_config_dir_str = env::var("XDG_CONFIG_HOME")
-                    .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)))
-                    .unwrap();
-                #[cfg(target_os = "windows")]
-                let clashtui_config_dir_str = env::var("APPDATA")
-                    .map(|appdata| format!("{}/clashtui", appdata))
-                    .unwrap();
-                PathBuf::from(&clashtui_config_dir_str)
-            }
-        };
-
-        if !clashtui_config_dir.join("config.yaml").exists() {
-            flags.insert(Flags::FirstInit, true);
-            if let Err(err) = crate::utils::init_config(
-                &clashtui_config_dir,
-                symbols::DEFAULT_BASIC_CLASH_CFG_CONTENT,
-            ) {
-                flags.insert(Flags::ErrorDuringInit, true);
-                log::error!("{}", err);
-            }
-        } else {
-            flags.insert(Flags::FirstInit, false);
-        }
-
+    pub fn new(flags: Flags, clashtui_config_dir:PathBuf) -> (Option<Self>, Vec<ClashTuiConfigLoadError>) {
         #[cfg(debug_assertions)]
         let _ = std::fs::remove_file(&clashtui_config_dir.join("clashtui.log")); // auto rm old log for debug
         Self::setup_logging(&clashtui_config_dir.join("clashtui.log").to_str().unwrap());
+
         let (util, mut err_track) = ClashTuiUtil::new(
             &clashtui_config_dir,
             &clashtui_config_dir.join("profiles"),
-            *flags.get(&Flags::FirstInit).unwrap(),
+            !flags.contains_key(Flag::FirstInit),
         );
         let clashtui_util = Rc::new(util);
-        if *flags.get(&Flags::UpdateOnly).unwrap() {
+        if flags.contains_key(Flag::UpdateOnly) {
             let log_path = &clashtui_config_dir.join("CronUpdate.log");
             let _ = std::fs::remove_file(log_path); // clear old logs
             log::info!("Cron Mode!");
@@ -169,9 +136,6 @@ impl App {
             .map(|line| line.trim().to_string())
             .collect();
         app.help_popup.set_items(help_text);
-        if app.flags.get(&Flags::ErrorDuringInit).is_none() {
-            app.flags.insert(Flags::ErrorDuringInit, false);
-        }
 
         (Some(app), err_track)
     }
