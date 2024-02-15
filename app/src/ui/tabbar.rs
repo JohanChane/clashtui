@@ -60,7 +60,7 @@ impl TabBar {
     }
 
     pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
-        let items = self
+        let items:Vec<Ra::text::Line> = self
             .tab_titles
             .iter()
             .map(|t| {
