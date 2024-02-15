@@ -1,18 +1,18 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::ui::{popups::ClashTuiInputPopup, utils::Visibility, EventState};
+use crate::ui::{utils::Visibility, widgets::InputPopup, EventState};
 
 pub struct ProfileInputPopup {
-    pub name_input: ClashTuiInputPopup,
-    pub uri_input: ClashTuiInputPopup,
+    pub name_input: InputPopup,
+    pub uri_input: InputPopup,
 }
 
 impl ProfileInputPopup {
     pub fn new() -> Self {
         let mut obj = Self {
-            name_input: ClashTuiInputPopup::new("Name".to_string()),
-            uri_input: ClashTuiInputPopup::new("Uri".to_string()),
+            name_input: InputPopup::new("Name".to_string()),
+            uri_input: InputPopup::new("Uri".to_string()),
         };
         obj.name_input.set_fouce(true);
         obj.uri_input.set_fouce(false);

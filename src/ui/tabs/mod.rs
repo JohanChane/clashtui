@@ -1,11 +1,11 @@
-mod clashsrvctl_tab;
-mod config_tab;
+mod clashsrvctl;
+mod config;
+mod profile;
 mod profile_input;
-mod profile_tab;
 
-pub use clashsrvctl_tab::ClashSrvCtlTab;
-pub use config_tab::ConfigTab;
-pub use profile_tab::ProfileTab;
+pub use clashsrvctl::ClashSrvCtlTab;
+pub use config::ConfigTab;
+pub use profile::ProfileTab;
 
 pub enum Tabs {
     Profile(std::cell::RefCell<ProfileTab>),

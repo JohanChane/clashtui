@@ -1,11 +1,10 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::ui::utils::Visibility;
-use crate::ui::EventState;
+use super::{utils::Visibility, EventState};
 use crate::{fouce_methods, visible_methods};
 
-pub struct ClashTuiInputPopup {
+pub struct InputPopup {
     title: String,
     is_visible: bool,
     is_fouce: bool,
@@ -14,7 +13,7 @@ pub struct ClashTuiInputPopup {
     input_data: String,
 }
 
-impl ClashTuiInputPopup {
+impl InputPopup {
     pub fn new(title: String) -> Self {
         Self {
             title,
@@ -149,5 +148,5 @@ impl ClashTuiInputPopup {
     }
 }
 
-visible_methods!(ClashTuiInputPopup);
-fouce_methods!(ClashTuiInputPopup);
+visible_methods!(InputPopup);
+fouce_methods!(InputPopup);

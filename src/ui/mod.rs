@@ -1,12 +1,11 @@
-pub mod popups;
 mod statusbar;
 mod tabbar;
 pub mod tabs;
 pub mod utils;
+pub mod widgets;
 
-pub use statusbar::ClashTuiStatusBar;
-
-pub use tabbar::ClashTuiTabBar;
+pub use statusbar::StatusBar;
+pub use tabbar::TabBar;
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum EventState {
@@ -29,23 +28,4 @@ impl EventState {
     pub fn is_notconsumed(&self) -> bool {
         *self == Self::NotConsumed
     }
-}
-
-#[macro_export]
-macro_rules! msgpopup_methods {
-    ($type:ident) => {
-        impl $type {
-            pub fn popup_txt_msg(&mut self, msg: String) {
-                self.msgpopup.push_txt_msg(msg);
-                self.msgpopup.show();
-            }
-            pub fn popup_list_msg(&mut self, msg: Vec<String>) {
-                self.msgpopup.push_list_msg(msg);
-                self.msgpopup.show();
-            }
-            pub fn hide_msgpopup(&mut self) {
-                self.msgpopup.hide();
-            }
-        }
-    };
 }

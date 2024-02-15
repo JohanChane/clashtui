@@ -3,10 +3,10 @@ use ratatui::prelude as Ra;
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
-use crate::ui::popups::{HelpPopUp, MsgPopup};
 use crate::ui::tabs::{ClashSrvCtlTab, ConfigTab, ProfileTab, Tab, Tabs};
 use crate::ui::utils::{symbols, tools, Keys, Theme, Visibility};
-use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState};
+use crate::ui::widgets::{HelpPopUp, MsgPopup};
+use crate::ui::{EventState, StatusBar, TabBar};
 use crate::utils::{
     ClashTuiConfigLoadError, ClashTuiUtil, Flag, Flags, SharedClashTuiState, SharedClashTuiUtil,
     State,
@@ -14,7 +14,7 @@ use crate::utils::{
 
 pub struct App {
     title: String,
-    tabbar: ClashTuiTabBar,
+    tabbar: TabBar,
     tabs: HashMap<Tab, Tabs>,
     pub should_quit: bool,
     help_popup: HelpPopUp,
@@ -22,7 +22,7 @@ pub struct App {
 
     clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
-    statusbar: ClashTuiStatusBar,
+    statusbar: StatusBar,
     pub flags: Flags,
 }
 
@@ -85,7 +85,7 @@ impl App {
             SharedClashTuiState::new(RefCell::new(State::new(clashtui_util.clone())));
         let theme = Rc::new(Theme::default());
         let help_popup = HelpPopUp::new("Help".to_string(), Rc::clone(&theme));
-        let tabbar = ClashTuiTabBar::new(
+        let tabbar = TabBar::new(
             "".to_string(),
             vec![
                 symbols::PROFILE.to_string(),
@@ -94,7 +94,7 @@ impl App {
             ],
             Rc::clone(&theme),
         );
-        let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
+        let statusbar = StatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
         let tabs: HashMap<Tab, Tabs> = HashMap::from_iter([
             (
                 Tab::Profile,

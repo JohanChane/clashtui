@@ -2,8 +2,8 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
 use crate::ui::{
-    popups::{ClashTuiInputPopup, MsgPopup},
     utils::{ClashTuiList, Keys, SharedTheme, Visibility},
+    widgets::{InputPopup, MsgPopup},
     EventState,
 };
 use crate::utils::{CfgOp, SharedClashTuiUtil};
@@ -18,7 +18,7 @@ pub struct ConfigTab {
 
     clashtui_util: SharedClashTuiUtil,
 
-    input: ClashTuiInputPopup,
+    input: InputPopup,
     last_op: Option<CfgOp>,
 }
 
@@ -32,7 +32,7 @@ impl ConfigTab {
             CfgOp::ClashServiceName.into(),
         ]);
 
-        let mut inp = ClashTuiInputPopup::new("Config Set".to_string());
+        let mut inp = InputPopup::new("Config Set".to_string());
         inp.hide();
 
         Self {

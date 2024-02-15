@@ -12,7 +12,7 @@ pub struct HelpPopUp {
     theme: SharedTheme,
 }
 
-use crate::ui::EventState;
+use super::EventState;
 use crate::visible_methods;
 
 impl HelpPopUp {

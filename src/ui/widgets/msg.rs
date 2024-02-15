@@ -2,8 +2,8 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
+use super::EventState;
 use crate::ui::utils::tools;
-use crate::ui::EventState;
 
 pub struct MsgPopup {
     title: String,

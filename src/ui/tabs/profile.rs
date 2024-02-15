@@ -10,8 +10,8 @@ use std::{
 
 use super::profile_input::ProfileInputPopup;
 use crate::ui::{
-    popups::{ConfirmPopup, MsgPopup},
     utils::{ClashTuiList, Keys, SharedTheme, Visibility},
+    widgets::{ConfirmPopup, MsgPopup},
     EventState,
 };
 use crate::utils::Utils;

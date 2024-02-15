@@ -5,7 +5,7 @@ use super::utils::SharedTheme;
 use crate::ui::EventState;
 // use crate::visible_methods;
 
-pub struct ClashTuiTabBar {
+pub struct TabBar {
     title: String,
     is_visible: bool,
     pub tab_titles: Vec<String>,
@@ -14,7 +14,7 @@ pub struct ClashTuiTabBar {
     pub theme: SharedTheme,
 }
 
-impl ClashTuiTabBar {
+impl TabBar {
     pub fn new(title: String, tab_titles: Vec<String>, theme: SharedTheme) -> Self {
         Self {
             title,

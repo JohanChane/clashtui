@@ -6,8 +6,8 @@ use crate::utils::{Mode, SharedClashTuiState};
 use crate::{msgpopup_methods, visible_methods};
 use crate::{
     ui::{
-        popups::MsgPopup,
         utils::{ClashTuiList, Keys, SharedTheme},
+        widgets::MsgPopup,
         EventState,
     },
     utils::{ClashSrvOp, SharedClashTuiUtil},

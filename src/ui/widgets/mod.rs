@@ -2,8 +2,10 @@ mod confirm_popup;
 mod input;
 mod list;
 mod msg;
+use super::utils;
+use super::EventState;
 
 pub use self::confirm_popup::ConfirmPopup;
-pub use self::input::ClashTuiInputPopup;
+pub use self::input::InputPopup;
 pub use self::list::HelpPopUp;
 pub use self::msg::MsgPopup;

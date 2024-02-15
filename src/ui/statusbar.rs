@@ -4,14 +4,14 @@ use crate::ui::utils::SharedTheme;
 use crate::utils::SharedClashTuiState;
 // use crate::visible_methods;
 
-pub struct ClashTuiStatusBar {
+pub struct StatusBar {
     is_visible: bool,
     clashtui_state: SharedClashTuiState,
 
     theme: SharedTheme,
 }
 
-impl ClashTuiStatusBar {
+impl StatusBar {
     pub fn new(clashtui_state: SharedClashTuiState, theme: SharedTheme) -> Self {
         Self {
             is_visible: true,
