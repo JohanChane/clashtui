@@ -49,7 +49,7 @@ impl ProfileTab {
         let templates = ClashTuiList::new("Template".to_string(), Rc::clone(&theme));
 
         let mut instance = Self {
-            title: title,
+            title,
             is_visible: true,
             profile_list: profiles,
             template_list: templates,
@@ -91,12 +91,8 @@ impl ProfileTab {
                     if key.kind != KeyEventKind::Press {
                         return Ok(EventState::NotConsumed);
                     }
-
-                    match key.code {
-                        KeyCode::Enter => {
-                            self.handle_import_profile_ev();
-                        }
-                        _ => {}
+                    if key.code == KeyCode::Enter {
+                        self.handle_import_profile_ev();
                     }
                 }
             }
@@ -155,7 +151,7 @@ impl ProfileTab {
                     self.popup_list_msg(msg);
                 }
                 Err(err) => {
-                    self.popup_txt_msg(format!("Failed to Update: {}", err.to_string()));
+                    self.popup_txt_msg(format!("Failed to Update: {}", err));
                 }
             }
         }
@@ -285,7 +281,7 @@ impl ProfileTab {
                     } else if Keys::Preview.is(key) {
                         if let Some(profile_name) = self.profile_list.selected() {
                             let profile_path = self.clashtui_util.profile_dir.join(profile_name);
-                            let file_content = std::fs::read_to_string(&profile_path).unwrap();
+                            let file_content = std::fs::read_to_string(profile_path).unwrap();
                             let mut lines: Vec<String> =
                                 file_content.lines().map(|s| s.to_string()).collect();
 
@@ -344,7 +340,7 @@ impl ProfileTab {
                                 .clashtui_util
                                 .clashtui_dir
                                 .join(format!("templates/{}", name));
-                            let content = std::fs::read_to_string(&path).unwrap();
+                            let content = std::fs::read_to_string(path).unwrap();
                             let lines: Vec<String> =
                                 content.lines().map(|s| s.to_string()).collect();
 

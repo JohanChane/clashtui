@@ -1,5 +1,4 @@
 use crossterm::event::{Event, KeyEventKind};
-use log;
 use ratatui::prelude as Ra;
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 
@@ -8,7 +7,10 @@ use crate::ui::popups::{HelpPopUp, MsgPopup};
 use crate::ui::tabs::{ClashSrvCtlTab, ConfigTab, ProfileTab, Tab, Tabs};
 use crate::ui::utils::{symbols, tools, Keys, Theme, Visibility};
 use crate::ui::{ClashTuiStatusBar, ClashTuiTabBar, EventState};
-use crate::utils::{ClashTuiConfigLoadError, ClashTuiUtil, Flag, Flags, SharedClashTuiState, SharedClashTuiUtil, State};
+use crate::utils::{
+    ClashTuiConfigLoadError, ClashTuiUtil, Flag, Flags, SharedClashTuiState, SharedClashTuiUtil,
+    State,
+};
 
 pub struct App {
     title: String,
@@ -25,18 +27,21 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(flags: Flags, clashtui_config_dir:PathBuf) -> (Option<Self>, Vec<ClashTuiConfigLoadError>) {
+    pub fn new(
+        flags: Flags,
+        clashtui_config_dir: PathBuf,
+    ) -> (Option<Self>, Vec<ClashTuiConfigLoadError>) {
         #[cfg(debug_assertions)]
-        let _ = std::fs::remove_file(&clashtui_config_dir.join("clashtui.log")); // auto rm old log for debug
-        Self::setup_logging(&clashtui_config_dir.join("clashtui.log").to_str().unwrap());
+        let _ = std::fs::remove_file(clashtui_config_dir.join("clashtui.log")); // auto rm old log for debug
+        Self::setup_logging(clashtui_config_dir.join("clashtui.log").to_str().unwrap());
 
         let (util, mut err_track) = ClashTuiUtil::new(
             &clashtui_config_dir,
             &clashtui_config_dir.join("profiles"),
-            !flags.contains_key(Flag::FirstInit),
+            !flags.contains(Flag::FirstInit),
         );
         let clashtui_util = Rc::new(util);
-        if flags.contains_key(Flag::UpdateOnly) {
+        if flags.contains(Flag::UpdateOnly) {
             let log_path = &clashtui_config_dir.join("CronUpdate.log");
             let _ = std::fs::remove_file(log_path); // clear old logs
             log::info!("Cron Mode!");
@@ -50,7 +55,9 @@ impl App {
             let mut x = match std::fs::File::create(log_path) {
                 Err(e) => {
                     log::error!("Err while CronUpdate: {}", e);
-                    err_track.push(crate::utils::ClashTuiConfigLoadError::CronUpdateProfile(e.to_string().into()));
+                    err_track.push(crate::utils::ClashTuiConfigLoadError::CronUpdateProfile(
+                        e.to_string(),
+                    ));
                     return (None, err_track);
                 }
                 Ok(v) => v,
@@ -62,11 +69,10 @@ impl App {
                     "{:?}",
                     profile_list
                         .into_iter()
-                        .map(|v| match v {
+                        .flat_map(|v| match v {
                             Ok(v) => Utils::concat_update_profile_result(v),
                             Err(e) => [e.to_string()].to_vec(),
                         })
-                        .flatten()
                         .collect::<Vec<String>>()
                 )
                 .as_bytes(),
@@ -91,8 +97,8 @@ impl App {
         let statusbar = ClashTuiStatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
         let tabs: HashMap<Tab, Tabs> = HashMap::from_iter([
             (
-                Tab::ProfileTab,
-                Tabs::ProfileTab(RefCell::new(ProfileTab::new(
+                Tab::Profile,
+                Tabs::Profile(RefCell::new(ProfileTab::new(
                     symbols::PROFILE.to_string(),
                     clashtui_util.clone(),
                     clashtui_state.clone(),
@@ -100,8 +106,8 @@ impl App {
                 ))),
             ),
             (
-                Tab::ClashSrvCtlTab,
-                Tabs::ClashSrvCtlTab(RefCell::new(ClashSrvCtlTab::new(
+                Tab::ClashSrvCtl,
+                Tabs::ClashSrvCtl(RefCell::new(ClashSrvCtlTab::new(
                     symbols::CLASHSRVCTL.to_string(),
                     clashtui_util.clone(),
                     clashtui_state.clone(),
@@ -109,8 +115,8 @@ impl App {
                 ))),
             ),
             (
-                Tab::ConfigTab,
-                Tabs::ConfigTab(RefCell::new(ConfigTab::new(
+                Tab::Config,
+                Tabs::Config(RefCell::new(ConfigTab::new(
                     symbols::CONFIG.to_string(),
                     clashtui_util.clone(),
                     theme.clone(),
@@ -146,9 +152,9 @@ impl App {
 
         // ## Tab Popups
         let mut iter = self.tabs.values().map(|v| match v {
-            Tabs::ProfileTab(v) => v.borrow_mut().popup_event(ev).unwrap(),
-            Tabs::ClashSrvCtlTab(v) => v.borrow_mut().popup_event(ev).unwrap(),
-            Tabs::ConfigTab(v) => v.borrow_mut().popup_event(ev).unwrap(),
+            Tabs::Profile(v) => v.borrow_mut().popup_event(ev).unwrap(),
+            Tabs::ClashSrvCtl(v) => v.borrow_mut().popup_event(ev).unwrap(),
+            Tabs::Config(v) => v.borrow_mut().popup_event(ev).unwrap(),
         });
         let mut tmp;
         while event_state.is_notconsumed() {
@@ -220,9 +226,9 @@ impl App {
             if event_state == EventState::NotConsumed {
                 event_state = self.tabbar.event(ev)?;
                 let mut iter = self.tabs.values().map(|v| match v {
-                    Tabs::ProfileTab(v) => v.borrow_mut().event(ev).unwrap(),
-                    Tabs::ClashSrvCtlTab(v) => v.borrow_mut().event(ev).unwrap(),
-                    Tabs::ConfigTab(v) => v.borrow_mut().event(ev).unwrap(),
+                    Tabs::Profile(v) => v.borrow_mut().event(ev).unwrap(),
+                    Tabs::ClashSrvCtl(v) => v.borrow_mut().event(ev).unwrap(),
+                    Tabs::Config(v) => v.borrow_mut().event(ev).unwrap(),
                 });
                 let mut tmp;
                 while event_state.is_notconsumed() {
@@ -243,7 +249,7 @@ impl App {
         let ev_state = match last_ev {
             EventState::NotConsumed | EventState::WorkDone => EventState::NotConsumed,
             EventState::ProfileUpdate | EventState::ProfileUpdateAll => {
-                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap() {
+                if let Tabs::Profile(profile_tab) = self.tabs.get(&Tab::Profile).unwrap() {
                     profile_tab.borrow_mut().hide_msgpopup();
                     if last_ev == &EventState::ProfileUpdate {
                         profile_tab.borrow_mut().handle_update_profile_ev(false);
@@ -254,17 +260,16 @@ impl App {
                 EventState::WorkDone
             }
             EventState::ProfileSelect => {
-                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap() {
+                if let Tabs::Profile(profile_tab) = self.tabs.get(&Tab::Profile).unwrap() {
                     profile_tab.borrow_mut().hide_msgpopup();
-                    match profile_tab.borrow_mut().handle_select_profile_ev() {
-                        Some(v) => self.clashtui_state.borrow_mut().set_profile(v),
-                        None => (),
-                    };
+                    if let Some(v) = profile_tab.borrow_mut().handle_select_profile_ev() {
+                        self.clashtui_state.borrow_mut().set_profile(v)
+                    }
                 };
                 EventState::WorkDone
             }
             EventState::ProfileDelete => {
-                if let Tabs::ProfileTab(profile_tab) = self.tabs.get(&Tab::ProfileTab).unwrap() {
+                if let Tabs::Profile(profile_tab) = self.tabs.get(&Tab::Profile).unwrap() {
                     profile_tab.borrow_mut().hide_msgpopup();
                     profile_tab.borrow_mut().handle_delete_profile_ev();
                 };
@@ -308,9 +313,9 @@ impl App {
         self.tabs
             .values()
             .map(|v| match v {
-                Tabs::ProfileTab(v) => v.borrow_mut().draw(f, tab_chunk),
-                Tabs::ClashSrvCtlTab(v) => v.borrow_mut().draw(f, tab_chunk),
-                Tabs::ConfigTab(v) => v.borrow_mut().draw(f, tab_chunk),
+                Tabs::Profile(v) => v.borrow_mut().draw(f, tab_chunk),
+                Tabs::ClashSrvCtl(v) => v.borrow_mut().draw(f, tab_chunk),
+                Tabs::Config(v) => v.borrow_mut().draw(f, tab_chunk),
             })
             .count();
 
@@ -333,9 +338,9 @@ impl App {
             .iter()
             .map(|(n, v)| if n == tabname { (true, v) } else { (false, v) })
             .map(|(b, v)| match v {
-                Tabs::ProfileTab(k) => k.borrow_mut().set_visible(b),
-                Tabs::ClashSrvCtlTab(k) => k.borrow_mut().set_visible(b),
-                Tabs::ConfigTab(k) => k.borrow_mut().set_visible(b),
+                Tabs::Profile(k) => k.borrow_mut().set_visible(b),
+                Tabs::ClashSrvCtl(k) => k.borrow_mut().set_visible(b),
+                Tabs::Config(k) => k.borrow_mut().set_visible(b),
             })
             .count();
     }

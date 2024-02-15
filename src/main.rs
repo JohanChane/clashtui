@@ -13,7 +13,7 @@ mod utils;
 
 use crate::app::App;
 use crate::ui::EventState;
-use crate::utils::{Flag,Flags};
+use crate::utils::{Flag, Flags};
 
 /// Mihomo (Clash.Meta) TUI Client
 #[derive(Debug, argh::FromArgs)]
@@ -32,8 +32,7 @@ struct CliEnv {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli: CliEnv = argh::from_env();
-    let mut flags =
-        Flags::with_capacity(3);
+    let mut flags = Flags::with_capacity(3);
     if cli.update {
         flags.insert(utils::Flag::UpdateOnly);
     };
@@ -43,11 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 #[allow(unused_variables)]
-pub fn run(
-    mut flags: Flags,
-    tick_rate: Duration,
-    enhanced_graphics: bool,
-) -> anyhow::Result<()> {
+pub fn run(mut flags: Flags, tick_rate: Duration, enhanced_graphics: bool) -> anyhow::Result<()> {
     let res;
     let config_dir = load_app_dir(&mut flags);
     log::debug!("Current flags: {:?}", flags);
@@ -100,14 +95,14 @@ fn run_app<B: Backend>(
     mut err_track: Vec<ClashTuiConfigLoadError>,
 ) -> anyhow::Result<()> {
     {
-        if app.flags.contains_key(utils::Flag::FirstInit) {
+        if app.flags.contains(utils::Flag::FirstInit) {
             app.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
             app.popup_txt_msg(
                 "Please go to Config Tab to set configs so that program can work properly"
                     .to_string(),
             );
         };
-        if app.flags.contains_key(utils::Flag::ErrorDuringInit) {
+        if app.flags.contains(utils::Flag::ErrorDuringInit) {
             app.popup_txt_msg(
                 "Some Error happened during app init, Check the log for detail".to_string(),
             );
@@ -186,7 +181,6 @@ fn load_app_dir(flags: &mut Flags) -> std::path::PathBuf {
             flags.insert(Flag::ErrorDuringInit);
             log::error!("{}", err);
         }
-    } else {
     }
     clashtui_config_dir
 }

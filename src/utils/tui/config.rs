@@ -25,7 +25,9 @@ impl ClashTuiConfig {
     }
 
     pub fn check(&self) -> bool {
-        self.clash_cfg_dir != "" && self.clash_cfg_path != "" && self.clash_core_path != ""
+        !self.clash_cfg_dir.is_empty()
+            && !self.clash_cfg_path.is_empty()
+            && !self.clash_core_path.is_empty()
     }
 
     pub fn update_profile(&mut self, profile: String) {
@@ -82,9 +84,7 @@ pub fn init_config(
 ) -> Result<(), Error> {
     // just assume it's working, handle bug when bug occurs
     use std::fs;
-    if let Err(r) = fs::create_dir_all(&clashtui_config_dir) {
-        return Err(r);
-    };
+    fs::create_dir_all(clashtui_config_dir)?;
 
     if let Err(r) =
         ClashTuiConfig::default().to_file(clashtui_config_dir.join("config.yaml").to_str().unwrap())
@@ -92,19 +92,10 @@ pub fn init_config(
         return Err(Error::new(std::io::ErrorKind::Other, r));
     };
 
-    if let Err(r) = fs::create_dir(clashtui_config_dir.join("profiles")) {
-        return Err(r);
-    };
-
+    fs::create_dir(clashtui_config_dir.join("profiles"))?;
     // Well, just keep them before I remove the template function or what
-    if let Err(r) = fs::create_dir_all(clashtui_config_dir.join("templates")) {
-        return Err(r);
-    };
-
-    if let Err(r) = fs::File::create(clashtui_config_dir.join("templates/template_proxy_providers"))
-    {
-        return Err(r);
-    };
+    fs::create_dir_all(clashtui_config_dir.join("templates"))?;
+    fs::File::create(clashtui_config_dir.join("templates/template_proxy_providers"))?;
 
     fs::write(
         clashtui_config_dir.join("basic_clash_config.yaml"),

@@ -42,9 +42,9 @@ impl std::fmt::Display for Mode {
         write!(f, "{}", x)
     }
 }
-impl Into<String> for Mode {
-    fn into(self) -> String {
-        self.to_string()
+impl From<Mode> for String {
+    fn from(val: Mode) -> Self {
+        val.to_string()
     }
 }
 // #[derive(Debug, Serialize, Deserialize, Default)]

@@ -87,7 +87,7 @@ impl ClashSrvCtlTab {
                         }
                         self.mode_selector.hide();
                     }
-                    if Keys::ESC.is(key) {
+                    if Keys::Esc.is(key) {
                         self.mode_selector.hide();
                     }
                 }

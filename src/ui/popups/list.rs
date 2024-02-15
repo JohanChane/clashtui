@@ -94,7 +94,7 @@ impl HelpPopUp {
     }
 
     pub fn selected(&self) -> Option<&String> {
-        if self.items.len() == 0 {
+        if self.items.is_empty() {
             return None;
         }
 
@@ -105,7 +105,7 @@ impl HelpPopUp {
     }
 
     fn next(&mut self) {
-        if self.items.len() == 0 {
+        if self.items.is_empty() {
             return;
         }
 
@@ -123,7 +123,7 @@ impl HelpPopUp {
     }
 
     fn previous(&mut self) {
-        if self.items.len() == 0 {
+        if self.items.is_empty() {
             return;
         }
 
@@ -153,7 +153,7 @@ impl HelpPopUp {
         }
         self.items = items;
 
-        if self.list_state.selected() == None && self.items.len() > 0 {
+        if self.list_state.selected().is_none() && !self.items.is_empty() {
             self.list_state.select(Some(0));
         }
     }

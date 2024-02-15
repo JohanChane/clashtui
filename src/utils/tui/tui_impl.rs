@@ -1,4 +1,3 @@
-use log;
 use std::collections::HashMap;
 use std::process::Command;
 use std::{
@@ -41,7 +40,7 @@ impl ClashTuiUtil {
         };
 
         for (pp_key, pp_value) in pp_mapping {
-            if pp_value.get("tpl_param") == None {
+            if pp_value.get("tpl_param").is_none() {
                 new_proxy_providers.insert(pp_key.clone(), pp_value.clone());
                 continue;
             }
@@ -60,7 +59,7 @@ impl ClashTuiUtil {
                 let the_pp_name = format!("{}{}", pp_key.as_str().unwrap(), i);
                 pp_names
                     .entry(pp_key.as_str().unwrap().to_string())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(the_pp_name.clone());
 
                 new_pp.insert(
@@ -92,7 +91,7 @@ impl ClashTuiUtil {
         };
 
         for the_pg_value in pg_value {
-            if the_pg_value.get("tpl_param") == None {
+            if the_pg_value.get("tpl_param").is_none() {
                 new_proxy_groups.push(the_pg_value.clone());
                 continue;
             }
@@ -142,7 +141,7 @@ impl ClashTuiUtil {
 
                     pg_names
                         .entry(the_pg_name.clone())
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(new_pg_name.clone());
 
                     new_pg["name"] = serde_yaml::Value::String(new_pg_name.clone());
@@ -220,28 +219,26 @@ impl ClashTuiUtil {
     }
 
     pub fn get_profile_names(&self) -> anyhow::Result<Vec<String>> {
-        Utils::get_file_names(self.profile_dir.as_path()).and_then(|mut v| {
+        Utils::get_file_names(self.profile_dir.as_path()).map(|mut v| {
             v.sort();
-            Ok(v)
+            v
         })
     }
     pub fn get_template_names(&self) -> anyhow::Result<Vec<String>> {
-        Utils::get_file_names(self.clashtui_dir.join("templates").as_path()).and_then(|mut v| {
+        Utils::get_file_names(self.clashtui_dir.join("templates").as_path()).map(|mut v| {
             v.sort();
-            Ok(v)
+            v
         })
     }
     pub fn get_profile_yaml_path(&self, profile_name: &String) -> PathBuf {
         let profile_path = self.profile_dir.join(profile_name);
 
         if self.is_profile_yaml(profile_name) {
-            return profile_path;
+            profile_path
         } else {
             let profile_cache_dir = self.clashtui_dir.join("profile_cache");
             let profile_yaml_name = Path::new(profile_name).with_extension("yaml");
-            let profile_yaml_path = profile_cache_dir.join(profile_yaml_name);
-
-            return profile_yaml_path;
+            profile_cache_dir.join(profile_yaml_name)
         }
     }
 
@@ -346,7 +343,7 @@ impl ClashTuiUtil {
         Ok((updated_res, not_updated_res))
     }
 
-    fn download_file(&self, url: &String, path: &PathBuf) -> anyhow::Result<()> {
+    fn download_file(&self, url: &str, path: &PathBuf) -> anyhow::Result<()> {
         let mut response = self.dl_remote_profile(url)?;
 
         let directory = path
@@ -364,22 +361,18 @@ impl ClashTuiUtil {
     pub fn is_profile_yaml(&self, profile_name: &String) -> bool {
         let profile_path = self.profile_dir.join(profile_name);
         let extension = profile_path.extension();
-        if extension == Some("yaml".as_ref()) || extension == Some("yml".as_ref()) {
-            return true;
-        }
-
-        return false;
+        extension == Some("yaml".as_ref()) || extension == Some("yml".as_ref())
     }
     pub fn is_yaml(path: &Path) -> bool {
-        if let Ok(file_content) = std::fs::read_to_string(&path) {
-            if let Ok(_) = serde_yaml::from_str::<serde_yaml::Value>(&file_content) {
+        if let Ok(file_content) = std::fs::read_to_string(path) {
+            if serde_yaml::from_str::<serde_yaml::Value>(&file_content).is_ok() {
                 return true;
             }
         }
         false
     }
 
-    pub fn edit_file(&self, path: &PathBuf) -> Result<String, Error> {
+    pub fn edit_file(&self, path: &Path) -> Result<String, Error> {
         let edit_cmd = self.get_cfg(CfgOp::TuiEdit);
         let output;
         if !edit_cmd.is_empty() {
@@ -465,31 +458,25 @@ impl ClashTuiUtil {
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
         match op {
-            ClashSrvOp::StartClashService => {
-                return exec_ipc(
-                    "systemctl".to_string(),
-                    ["restart".to_string(), self.get_cfg(CfgOp::ClashServiceName)].to_vec(),
-                );
-            }
-            ClashSrvOp::StopClashService => {
-                return exec_ipc(
-                    "systemctl".to_string(),
-                    ["stop".to_string(), self.get_cfg(CfgOp::ClashServiceName)].to_vec(),
-                );
-            }
+            ClashSrvOp::StartClashService => exec_ipc(
+                "systemctl".to_string(),
+                ["restart".to_string(), self.get_cfg(CfgOp::ClashServiceName)].to_vec(),
+            ),
+            ClashSrvOp::StopClashService => exec_ipc(
+                "systemctl".to_string(),
+                ["stop".to_string(), self.get_cfg(CfgOp::ClashServiceName)].to_vec(),
+            ),
             ClashSrvOp::TestClashConfig => {
-                return self.test_profile_config(&self.get_cfg(CfgOp::ClashConfigFile), false);
+                self.test_profile_config(&self.get_cfg(CfgOp::ClashConfigFile), false)
             }
-            ClashSrvOp::SetPermission => {
-                return exec_ipc(
-                    "setcap".to_string(),
-                    [
-                        "'cap_net_admin,cap_net_bind_service=+ep'".to_string(),
-                        self.get_cfg(CfgOp::ClashCorePath),
-                    ]
-                    .to_vec(),
-                );
-            }
+            ClashSrvOp::SetPermission => exec_ipc(
+                "setcap".to_string(),
+                [
+                    "'cap_net_admin,cap_net_bind_service=+ep'".to_string(),
+                    self.get_cfg(CfgOp::ClashCorePath),
+                ]
+                .to_vec(),
+            ),
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
                 "No Support Adction",

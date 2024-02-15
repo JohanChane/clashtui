@@ -11,7 +11,7 @@ pub enum Keys {
     ClashsrvctlRestart,
 
     Select,
-    ESC,
+    Esc,
     Edit,
     Preview,
     LogCat,
@@ -36,7 +36,7 @@ impl Keys {
             Keys::ClashsrvctlRestart => KeyCode::Char('R'),
 
             Keys::Select => KeyCode::Enter,
-            Keys::ESC => KeyCode::Esc,
+            Keys::Esc => KeyCode::Esc,
             Keys::Edit => KeyCode::Char('e'),
             Keys::Preview => KeyCode::Char('p'),
             Keys::LogCat => KeyCode::Char('L'),

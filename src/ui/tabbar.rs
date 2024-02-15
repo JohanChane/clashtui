@@ -36,6 +36,8 @@ impl ClashTuiTabBar {
             if key.kind == KeyEventKind::Press {
                 event_stata = match key.code {
                     // 1..=9
+                    // need to kown the range
+                    #[allow(clippy::is_digit_ascii_radix)]
                     KeyCode::Char(c) if c.is_digit(10) && c != '0' => {
                         let digit = c.to_digit(10);
                         if let Some(d) = digit {

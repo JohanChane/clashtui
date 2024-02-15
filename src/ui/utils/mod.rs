@@ -30,7 +30,8 @@ pub trait Visibility {
 #[macro_export]
 macro_rules! visible_methods {
     ($type:ident) => {
-        impl crate::ui::utils::Visibility for $type {
+        // In fact out-date, consider rm it
+        impl $crate::ui::utils::Visibility for $type {
             fn is_visible(&self) -> bool {
                 self.is_visible
             }

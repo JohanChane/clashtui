@@ -118,7 +118,7 @@ impl ClashTuiList {
         f.render_stateful_widget(list, area, &mut self.list_state);
 
         if item_len > area.height as usize {
-            self.scrollbar = self.scrollbar.content_length(item_len as usize);
+            self.scrollbar = self.scrollbar.content_length(item_len);
             f.render_stateful_widget(
                 Raw::Scrollbar::default()
                     .orientation(Raw::ScrollbarOrientation::VerticalRight)
@@ -131,7 +131,7 @@ impl ClashTuiList {
     }
 
     pub fn selected(&self) -> Option<&String> {
-        if self.items.len() == 0 {
+        if self.items.is_empty() {
             return None;
         }
 
@@ -142,7 +142,7 @@ impl ClashTuiList {
     }
 
     fn next(&mut self) {
-        if self.items.len() == 0 {
+        if self.items.is_empty() {
             return;
         }
 
@@ -160,7 +160,7 @@ impl ClashTuiList {
     }
 
     fn previous(&mut self) {
-        if self.items.len() == 0 {
+        if self.items.is_empty() {
             return;
         }
 
@@ -190,7 +190,7 @@ impl ClashTuiList {
         }
         self.items = items;
 
-        if self.list_state.selected() == None && self.items.len() > 0 {
+        if self.list_state.selected().is_none() && !self.items.is_empty() {
             self.list_state.select(Some(0));
         }
     }

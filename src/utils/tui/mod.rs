@@ -10,8 +10,8 @@ pub type SharedClashTuiUtil = std::rc::Rc<tui::ClashTuiUtil>;
 pub type SharedClashTuiState = std::rc::Rc<std::cell::RefCell<State>>;
 
 pub use config::{init_config, ClashTuiConfigLoadError};
-pub use flags::{Flag,Flags};
-pub(self) use ipc::exec_ipc;
+pub use flags::{Flag, Flags};
+use ipc::exec_ipc;
 pub use state::State;
 pub use tui::ClashTuiUtil;
 
@@ -31,9 +31,9 @@ macro_rules! define_enum {
             }
         }
 
-        impl Into<String> for $name {
-            fn into(self) -> String {
-                match self {
+        impl From<$name> for String {
+            fn from(value: $name) -> Self {
+                match value {
                     $($name::$variant => String::from(stringify!($variant)),)*
                 }
             }
