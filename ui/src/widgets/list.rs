@@ -1,27 +1,51 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
-use std::cmp::{max, min};
 
-use crate::ui::utils::{tools, SharedTheme, Visibility};
+use crate::{utils::SharedTheme, EventState, Visibility};
 
-pub struct HelpPopUp {
+// struct ClashTuiScrollBar {
+//     pub state: ScrollbarState,
+//     pub pos: usize,
+// }
+//
+// impl ClashTuiScrollBar {
+//     pub fn new(pos: usize) -> Self {
+//         Self {
+//             state: ScrollbarState::default(),
+//             pos,
+//         }
+//     }
+//     pub fn next(&mut self) {
+//         self.pos = self.pos.saturating_add(1);
+//         self.state = self.state.position(self.pos as u16)
+//     }
+//
+//     pub fn previous(&mut self) {
+//         self.pos = self.pos.saturating_sub(1);
+//         self.state = self.state.position(self.pos as u16)
+//     }
+// }
+
+#[derive(Visibility)]
+pub struct List {
     title: String,
     is_visible: bool,
     items: Vec<String>,
     list_state: Raw::ListState,
+    scrollbar: Raw::ScrollbarState,
+
     theme: SharedTheme,
 }
 
-use super::EventState;
-use crate::visible_methods;
-
-impl HelpPopUp {
+impl List {
     pub fn new(title: String, theme: SharedTheme) -> Self {
         Self {
             title,
-            is_visible: false,
+            is_visible: true,
             items: vec![],
             list_state: Raw::ListState::default(),
+            scrollbar: Raw::ScrollbarState::default(),
+
             theme,
         }
     }
@@ -31,31 +55,27 @@ impl HelpPopUp {
             return Ok(EventState::NotConsumed);
         }
 
+        let mut event_state = EventState::NotConsumed;
         if let Event::Key(key) = ev {
             if key.kind == KeyEventKind::Press {
-                match key.code {
+                event_state = match key.code {
                     KeyCode::Down | KeyCode::Char('j') => {
                         self.next();
+                        EventState::WorkDone
                     }
                     KeyCode::Up | KeyCode::Char('k') => {
                         self.previous();
+                        EventState::WorkDone
                     }
-                    KeyCode::Esc => {
-                        self.hide();
-                    }
-                    KeyCode::Enter => {
-                        self.hide();
-                    }
-                    _ => {}
+                    _ => EventState::NotConsumed,
                 };
             }
         }
 
-        Ok(EventState::WorkDone)
+        Ok(event_state)
     }
-    #[allow(unused_variables)]
-    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
-        use Ra::Style;
+
+    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect, is_fouced: bool) {
         if !self.is_visible {
             return;
         }
@@ -65,32 +85,46 @@ impl HelpPopUp {
             .iter()
             .map(|i| {
                 let lines = vec![Ra::Line::from(i.clone())];
-                Raw::ListItem::new(lines).style(Style::default())
+                Raw::ListItem::new(lines).style(Ra::Style::default())
             })
             .collect();
 
-        // 自适应
         let item_len = items.len();
-        let max_item_width = items.iter().map(|i| i.width()).max().unwrap_or(0);
-        let dialog_width = max(min(max_item_width + 2, f.size().width as usize - 4), 60); // min_width = 60
-        let dialog_height = min(item_len + 2, f.size().height as usize - 6);
-        let area = tools::centered_lenght_rect(dialog_width as u16, dialog_height as u16, f.size());
 
         let list = Raw::List::new(items)
             .block(
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
-                    .border_style(Style::default().fg(self.theme.list_block_fg_fouced))
+                    .border_style(Ra::Style::default().fg(if is_fouced {
+                        self.theme.list_block_fg_fouced
+                    } else {
+                        self.theme.list_block_fg_unfouced
+                    }))
                     .title(self.title.clone()),
             )
             .highlight_style(
-                Style::default()
-                    .bg(self.theme.list_hl_bg_fouced)
+                Ra::Style::default()
+                    .bg(if is_fouced {
+                        self.theme.list_hl_bg_fouced
+                    } else {
+                        Ra::Color::default()
+                    })
                     .add_modifier(Ra::Modifier::BOLD),
             );
 
-        f.render_widget(Raw::Clear, area);
         f.render_stateful_widget(list, area, &mut self.list_state);
+
+        if item_len > area.height as usize {
+            self.scrollbar = self.scrollbar.content_length(item_len);
+            f.render_stateful_widget(
+                Raw::Scrollbar::default()
+                    .orientation(Raw::ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(Some("↑"))
+                    .end_symbol(Some("↓")),
+                area,
+                &mut self.scrollbar,
+            );
+        }
     }
 
     pub fn selected(&self) -> Option<&String> {
@@ -158,9 +192,9 @@ impl HelpPopUp {
         }
     }
 
-    pub fn get_items(&self) -> &Vec<String> {
-        &self.items
+    pub fn select(&mut self, name: &str) {
+        if let Some(index) = self.items.iter().position(|item| item == name) {
+            self.list_state.select(Some(index));
+        }
     }
 }
-
-visible_methods!(HelpPopUp);

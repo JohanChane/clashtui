@@ -45,16 +45,6 @@ impl ConfirmPopup {
         self.msgpopup.draw(f, _area);
     }
 
-    //pub fn is_visible(&self) -> bool {
-    //    self.msgpopup.is_visible()
-    //}
-    //pub fn show(&mut self) {
-    //    self.msgpopup.show()
-    //}
-    //pub fn hide(&mut self) {
-    //    self.msgpopup.hide();
-    //}
-
     pub fn popup_msg(&mut self, event_state: EventState, confirm_str: String) {
         self.event_state = event_state;
         self.msgpopup.push_txt_msg(confirm_str);

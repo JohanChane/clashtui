@@ -1,19 +1,20 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::ui::{
-    utils::{ClashTuiList, Keys, SharedTheme, Visibility},
-    widgets::{InputPopup, MsgPopup},
-    EventState,
+use crate::msgpopup_methods;
+use crate::tui::{
+    utils::Keys,
+    widgets::{InputPopup, List, MsgPopup},
+    EventState, SharedTheme, Visibility,
 };
 use crate::utils::{CfgOp, SharedClashTuiUtil};
-use crate::{msgpopup_methods, visible_methods};
 
+#[derive(Visibility)]
 pub struct ConfigTab {
     title: String,
     is_visible: bool,
 
-    setting_list: ClashTuiList,
+    setting_list: List,
     msgpopup: MsgPopup,
 
     clashtui_util: SharedClashTuiUtil,
@@ -24,7 +25,7 @@ pub struct ConfigTab {
 
 impl ConfigTab {
     pub fn new(title: String, clashtui_util: SharedClashTuiUtil, theme: SharedTheme) -> Self {
-        let mut operations = ClashTuiList::new(title.clone(), theme);
+        let mut operations = List::new(title.clone(), theme);
         operations.set_items(vec![
             CfgOp::ClashConfigDir.into(),
             CfgOp::ClashConfigFile.into(),
@@ -114,7 +115,7 @@ impl ConfigTab {
         }
         use Ra::{Constraint, Layout};
 
-        self.setting_list.draw(f, area);
+        self.setting_list.draw(f, area, true);
 
         if self.input.is_visible() {
             let input_area = Layout::default()
@@ -132,7 +133,7 @@ impl ConfigTab {
                 .constraints([Constraint::Percentage(50)])
                 .margin(1)
                 .split(input_area);
-            self.input.draw(f, chunks[0]);
+            self.input.draw(f, chunks[0], true);
 
             let block = Raw::Block::new()
                 .borders(Raw::Borders::ALL)
@@ -145,5 +146,4 @@ impl ConfigTab {
     }
 }
 
-visible_methods!(ConfigTab);
 msgpopup_methods!(ConfigTab);

@@ -1,6 +1,6 @@
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::ui::utils::SharedTheme;
+use super::SharedTheme;
 use crate::utils::SharedClashTuiState;
 // use crate::visible_methods;
 

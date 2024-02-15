@@ -1,6 +1,6 @@
 use ratatui::style::Color;
 
-#[derive(serde::Serialize, serde::Deserialize)]
+// #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Theme {
     pub popup_block_fg: Color,
 
@@ -14,13 +14,13 @@ pub struct Theme {
     pub statusbar_txt_fg: Color,
 }
 
-impl Theme {
-    pub fn load_theme(ph: &std::path::PathBuf) -> Result<Self, String> {
-        std::fs::File::open(ph)
-            .map_err(|e| e.to_string())
-            .and_then(|f| serde_yaml::from_reader(f).map_err(|e| e.to_string()))
-    }
-}
+// impl Theme {
+//     pub fn load_theme(ph: &std::path::PathBuf) -> Result<Self, String> {
+//         std::fs::File::open(ph)
+//             .map_err(|e| e.to_string())
+//             .and_then(|f| serde_yaml::from_reader(f).map_err(|e| e.to_string()))
+//     }
+// }
 
 impl Default for Theme {
     fn default() -> Self {

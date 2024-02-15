@@ -9,27 +9,29 @@ use std::{
 };
 
 use super::profile_input::ProfileInputPopup;
-use crate::ui::{
-    utils::{ClashTuiList, Keys, SharedTheme, Visibility},
-    widgets::{ConfirmPopup, MsgPopup},
-    EventState,
+use crate::msgpopup_methods;
+use crate::tui::{
+    utils::Keys,
+    widgets::{ConfirmPopup, List, MsgPopup},
+    EventState, SharedTheme, Visibility,
 };
 use crate::utils::Utils;
 use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
-use crate::{msgpopup_methods, visible_methods};
 
+#[derive(PartialEq)]
 enum Fouce {
     Profile,
     Template,
 }
 
+#[derive(Visibility)]
 pub struct ProfileTab {
     title: String,
     is_visible: bool,
     fouce: Fouce,
 
-    profile_list: ClashTuiList,
-    template_list: ClashTuiList,
+    profile_list: List,
+    template_list: List,
     msgpopup: MsgPopup,
     confirm_popup: ConfirmPopup,
     profile_input: ProfileInputPopup,
@@ -45,8 +47,8 @@ impl ProfileTab {
         clashtui_state: SharedClashTuiState,
         theme: SharedTheme,
     ) -> Self {
-        let profiles = ClashTuiList::new(title.clone(), Rc::clone(&theme));
-        let templates = ClashTuiList::new("Template".to_string(), Rc::clone(&theme));
+        let profiles = List::new(title.clone(), Rc::clone(&theme));
+        let templates = List::new("Template".to_string(), Rc::clone(&theme));
 
         let mut instance = Self {
             title,
@@ -68,8 +70,6 @@ impl ProfileTab {
             .select(instance.clashtui_state.borrow().get_profile());
         let template_names: Vec<String> = instance.clashtui_util.get_template_names().unwrap();
         instance.template_list.set_items(template_names);
-
-        instance.switch_fouce(Fouce::Profile);
 
         instance
     }
@@ -102,17 +102,6 @@ impl ProfileTab {
     }
 
     fn switch_fouce(&mut self, fouce: Fouce) {
-        self.profile_list.set_fouce(false);
-        self.template_list.set_fouce(false);
-
-        match fouce {
-            Fouce::Profile => {
-                self.profile_list.set_fouce(true);
-            }
-            Fouce::Template => {
-                self.template_list.set_fouce(true);
-            }
-        }
         self.fouce = fouce;
     }
 
@@ -365,10 +354,10 @@ impl ProfileTab {
             }
 
             if event_state == EventState::NotConsumed {
-                event_state = self.profile_list.event(ev).unwrap();
-                if event_state.is_notconsumed() {
-                    event_state = self.template_list.event(ev).unwrap();
-                }
+                event_state = match self.fouce {
+                    Fouce::Profile => self.profile_list.event(ev)?,
+                    Fouce::Template => self.template_list.event(ev)?,
+                };
             }
         }
 
@@ -384,9 +373,9 @@ impl ProfileTab {
         let chunks = Layout::default()
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(area);
-
-        self.profile_list.draw(f, chunks[0]);
-        self.template_list.draw(f, chunks[1]);
+        let fouce = self.fouce == Fouce::Profile;
+        self.profile_list.draw(f, chunks[0], fouce);
+        self.template_list.draw(f, chunks[1], !fouce);
 
         let input_area = Layout::default()
             .constraints([
@@ -404,5 +393,4 @@ impl ProfileTab {
     }
 }
 
-visible_methods!(ProfileTab);
 msgpopup_methods!(ProfileTab);

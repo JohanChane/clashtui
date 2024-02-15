@@ -1,11 +1,7 @@
-mod statusbar;
-mod tabbar;
-pub mod tabs;
-pub mod utils;
-pub mod widgets;
-
-pub use statusbar::StatusBar;
-pub use tabbar::TabBar;
+mod theme;
+pub mod tools;
+pub use theme::Theme;
+pub type SharedTheme = std::rc::Rc<Theme>;
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum EventState {
@@ -26,6 +22,6 @@ impl EventState {
         !self.is_notconsumed()
     }
     pub fn is_notconsumed(&self) -> bool {
-        *self == Self::NotConsumed
+        self == &Self::NotConsumed
     }
 }

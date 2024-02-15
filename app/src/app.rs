@@ -3,10 +3,12 @@ use ratatui::prelude as Ra;
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
-use crate::ui::tabs::{ClashSrvCtlTab, ConfigTab, ProfileTab, Tab, Tabs};
-use crate::ui::utils::{symbols, tools, Keys, Theme, Visibility};
-use crate::ui::widgets::{HelpPopUp, MsgPopup};
-use crate::ui::{EventState, StatusBar, TabBar};
+use crate::tui::{
+    tabs::{ClashSrvCtlTab, ConfigTab, ProfileTab, Tab, Tabs},
+    utils::{symbols, tools, HelpPopUp, Keys},
+    widgets::MsgPopup,
+    EventState, StatusBar, TabBar, Theme, Visibility,
+};
 use crate::utils::{
     ClashTuiConfigLoadError, ClashTuiUtil, Flag, Flags, SharedClashTuiState, SharedClashTuiUtil,
     State,

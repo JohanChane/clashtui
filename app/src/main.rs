@@ -8,11 +8,11 @@ use ratatui::{
 use std::time::{Duration, Instant};
 
 mod app;
-mod ui;
+mod tui;
 mod utils;
 
 use crate::app::App;
-use crate::ui::EventState;
+use crate::tui::EventState;
 use crate::utils::{Flag, Flags};
 
 /// Mihomo (Clash.Meta) TUI Client
@@ -172,7 +172,7 @@ fn load_app_dir(flags: &mut Flags) -> std::path::PathBuf {
     };
 
     if !clashtui_config_dir.join("config.yaml").exists() {
-        use ui::utils::symbols;
+        use tui::utils::symbols;
         flags.insert(Flag::FirstInit);
         if let Err(err) = crate::utils::init_config(
             &clashtui_config_dir,

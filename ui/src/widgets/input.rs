@@ -1,13 +1,13 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use super::{utils::Visibility, EventState};
-use crate::{fouce_methods, visible_methods};
+use super::EventState;
+use crate::Visibility;
 
+#[derive(Visibility)]
 pub struct InputPopup {
     title: String,
     is_visible: bool,
-    is_fouce: bool,
     input: String,
     cursor_position: usize,
     input_data: String,
@@ -18,7 +18,6 @@ impl InputPopup {
         Self {
             title,
             is_visible: false,
-            is_fouce: true,
             input: String::new(),
             cursor_position: 0,
             input_data: String::new(),
@@ -26,7 +25,7 @@ impl InputPopup {
     }
 
     pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
-        if !self.is_visible || !self.is_fouce {
+        if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
 
@@ -61,7 +60,7 @@ impl InputPopup {
         Ok(EventState::WorkDone)
     }
 
-    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect, is_selected: bool) {
         if !self.is_visible {
             return;
         }
@@ -69,7 +68,7 @@ impl InputPopup {
         f.render_widget(Raw::Clear, area);
 
         let input = Raw::Paragraph::new(self.input.as_str())
-            .style(Ra::Style::default().fg(if self.is_fouce {
+            .style(Ra::Style::default().fg(if is_selected {
                 Ra::Color::Yellow
             } else {
                 Ra::Color::default()
@@ -148,5 +147,4 @@ impl InputPopup {
     }
 }
 
-visible_methods!(InputPopup);
-fouce_methods!(InputPopup);
+//fouce_methods!(InputPopup);

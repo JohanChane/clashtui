@@ -1,8 +1,8 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use super::utils::SharedTheme;
-use crate::ui::EventState;
+use super::SharedTheme;
+use crate::tui::EventState;
 // use crate::visible_methods;
 
 pub struct TabBar {
@@ -60,7 +60,7 @@ impl TabBar {
     }
 
     pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
-        let items:Vec<Ra::text::Line> = self
+        let items: Vec<Ra::text::Line> = self
             .tab_titles
             .iter()
             .map(|t| {

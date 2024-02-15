@@ -1,26 +1,25 @@
 use crossterm::event::{Event, KeyEventKind};
 use ratatui::prelude as Ra;
 
-use crate::ui::utils::{tools, Visibility};
-use crate::utils::{Mode, SharedClashTuiState};
-use crate::{msgpopup_methods, visible_methods};
+use crate::msgpopup_methods;
 use crate::{
-    ui::{
-        utils::{ClashTuiList, Keys, SharedTheme},
-        widgets::MsgPopup,
-        EventState,
+    tui::{
+        utils::{tools, Keys},
+        widgets::{List, MsgPopup},
+        EventState, SharedTheme, Visibility,
     },
-    utils::{ClashSrvOp, SharedClashTuiUtil},
+    utils::{ClashSrvOp, Mode, SharedClashTuiState, SharedClashTuiUtil},
 };
 
+#[derive(Visibility)]
 pub struct ClashSrvCtlTab {
     title: String,
     is_visible: bool,
 
-    srvctl_list: ClashTuiList,
+    srvctl_list: List,
     msgpopup: MsgPopup,
 
-    mode_selector: ClashTuiList,
+    mode_selector: List,
 
     clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
@@ -33,7 +32,7 @@ impl ClashSrvCtlTab {
         clashtui_state: SharedClashTuiState,
         theme: SharedTheme,
     ) -> Self {
-        let mut operations = ClashTuiList::new(title.clone(), theme.clone());
+        let mut operations = List::new(title.clone(), theme.clone());
         operations.set_items(vec![
             ClashSrvOp::TestClashConfig.into(),
             ClashSrvOp::SetPermission.into(),
@@ -51,7 +50,7 @@ impl ClashSrvCtlTab {
             #[cfg(target_os = "windows")]
             ClashSrvOp::UnInstallSrv.into(),
         ]);
-        let mut modes = ClashTuiList::new(title.clone(), theme);
+        let mut modes = List::new(title.clone(), theme);
         modes.set_items(vec![
             Mode::Rule.into(),
             Mode::Direct.into(),
@@ -159,12 +158,11 @@ impl ClashSrvCtlTab {
             return;
         }
 
-        self.srvctl_list.draw(f, area);
+        self.srvctl_list.draw(f, area, true);
         let select_area = tools::centered_percent_rect(60, 30, f.size());
-        self.mode_selector.draw(f, select_area);
+        self.mode_selector.draw(f, select_area, true);
         self.msgpopup.draw(f, area);
     }
 }
 
-visible_methods!(ClashSrvCtlTab);
 msgpopup_methods!(ClashSrvCtlTab);

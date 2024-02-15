@@ -1,23 +1,27 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::ui::{utils::Visibility, widgets::InputPopup, EventState};
+use crate::tui::{widgets::InputPopup, EventState, Visibility};
+
+#[derive(PartialEq)]
+enum Fouce {
+    Name,
+    Url,
+}
 
 pub struct ProfileInputPopup {
     pub name_input: InputPopup,
     pub uri_input: InputPopup,
+    fouce: Fouce,
 }
 
 impl ProfileInputPopup {
     pub fn new() -> Self {
-        let mut obj = Self {
+        Self {
             name_input: InputPopup::new("Name".to_string()),
             uri_input: InputPopup::new("Uri".to_string()),
-        };
-        obj.name_input.set_fouce(true);
-        obj.uri_input.set_fouce(false);
-
-        obj
+            fouce: Fouce::Name,
+        }
     }
 
     pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
@@ -47,13 +51,10 @@ impl ProfileInputPopup {
 
                         EventState::WorkDone
                     }
-                    _ => {
-                        event_state = self.name_input.event(ev).unwrap();
-                        if event_state.is_notconsumed() {
-                            event_state = self.uri_input.event(ev).unwrap();
-                        }
-                        event_state
-                    }
+                    _ => match self.fouce {
+                        Fouce::Name => self.name_input.event(ev)?,
+                        Fouce::Url => self.uri_input.event(ev)?,
+                    },
                 };
             }
         }
@@ -76,9 +77,9 @@ impl ProfileInputPopup {
             .split(area);
 
         f.render_widget(Raw::Clear, area);
-
-        self.name_input.draw(f, chunks[0]);
-        self.uri_input.draw(f, chunks[1]);
+        let sel = self.fouce == Fouce::Name;
+        self.name_input.draw(f, chunks[0], sel);
+        self.uri_input.draw(f, chunks[1], !sel);
 
         let block = Raw::Block::new()
             .borders(Raw::Borders::ALL)
@@ -88,12 +89,10 @@ impl ProfileInputPopup {
     }
 
     pub fn switch_fouce(&mut self) {
-        if self.name_input.is_fouce() {
-            self.name_input.set_fouce(false);
-            self.uri_input.set_fouce(true);
+        if self.fouce == Fouce::Name {
+            self.fouce = Fouce::Url;
         } else {
-            self.name_input.set_fouce(true);
-            self.uri_input.set_fouce(false);
+            self.fouce = Fouce::Name;
         }
     }
 
@@ -101,10 +100,9 @@ impl ProfileInputPopup {
         self.name_input.is_visible() && self.uri_input.is_visible()
     }
     pub fn show(&mut self) {
+        self.fouce = Fouce::Name;
         self.name_input.show();
         self.uri_input.show();
-        self.name_input.set_fouce(true);
-        self.uri_input.set_fouce(false);
     }
     pub fn hide(&mut self) {
         self.name_input.hide();

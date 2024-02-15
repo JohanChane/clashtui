@@ -6,6 +6,10 @@ pub trait Visibility {
     fn hide(&mut self);
     fn set_visible(&mut self, b: bool);
 }
+pub mod utils;
+pub mod widgets;
+pub use utils::EventState;
+
 #[cfg(test)]
 mod tests {
     use super::Visibility;
