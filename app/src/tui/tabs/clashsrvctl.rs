@@ -4,7 +4,8 @@ use ratatui::prelude as Ra;
 use crate::msgpopup_methods;
 use crate::{
     tui::{
-        utils::{tools, Keys},
+        tools,
+        utils::Keys,
         widgets::{List, MsgPopup},
         EventState, SharedTheme, Visibility,
     },

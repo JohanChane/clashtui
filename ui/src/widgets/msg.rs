@@ -6,7 +6,6 @@ use super::utils::tools;
 use super::EventState;
 
 pub struct MsgPopup {
-    title: String,
     is_visible: bool,
     msg: Vec<String>,
     scroll_v: u16,
@@ -16,9 +15,8 @@ pub struct MsgPopup {
 impl MsgPopup {
     pub fn new() -> Self {
         Self {
-            title: String::new(),
             is_visible: false,
-            msg: vec![],
+            msg: Vec::new(),
             scroll_v: 0,
             scroll_h: 0,
         }

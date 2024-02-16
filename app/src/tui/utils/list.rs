@@ -1,4 +1,4 @@
-use crate::tui::{utils::tools, EventState, SharedTheme, Visibility};
+use crate::tui::{tools, EventState, SharedTheme, Visibility};
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};

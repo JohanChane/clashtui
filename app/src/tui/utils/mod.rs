@@ -1,6 +1,5 @@
 mod key_list;
 mod list;
-pub mod symbols;
 
 pub use self::key_list::Keys;
 pub use self::list::HelpPopUp;

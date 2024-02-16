@@ -1,7 +1,8 @@
 mod statusbar;
 mod tabbar;
 pub mod tabs;
-mod util;
+pub mod utils;
+pub mod symbols;
 extern crate ui;
 pub use ui::utils::{SharedTheme, Theme};
 pub use ui::{widgets, EventState, Visibility};
@@ -9,7 +10,4 @@ pub use ui::{widgets, EventState, Visibility};
 pub use statusbar::StatusBar;
 pub use tabbar::TabBar;
 
-pub mod utils {
-    pub use super::ui::utils::tools;
-    pub use super::util::*;
-}
+pub use ui::utils::tools;

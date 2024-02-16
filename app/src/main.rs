@@ -172,7 +172,7 @@ fn load_app_dir(flags: &mut Flags) -> std::path::PathBuf {
     };
 
     if !clashtui_config_dir.join("config.yaml").exists() {
-        use tui::utils::symbols;
+        use tui::symbols;
         flags.insert(Flag::FirstInit);
         if let Err(err) = crate::utils::init_config(
             &clashtui_config_dir,

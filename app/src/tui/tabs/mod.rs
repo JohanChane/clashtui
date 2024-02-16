@@ -20,7 +20,7 @@ pub enum Tab {
 }
 impl std::cmp::PartialEq<std::string::String> for Tab {
     fn eq(&self, other: &std::string::String) -> bool {
-        use super::utils::symbols;
+        use super::symbols;
         let fmtd = match self {
             Tab::Profile => symbols::PROFILE.to_string(),
             Tab::ClashSrvCtl => symbols::CLASHSRVCTL.to_string(),

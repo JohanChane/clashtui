@@ -4,9 +4,10 @@ use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
 use crate::tui::{
+    symbols,
     tabs::{ClashSrvCtlTab, ConfigTab, ProfileTab, Tab, Tabs},
-    utils::{symbols, tools, HelpPopUp, Keys},
-    widgets::MsgPopup,
+    utils::{ HelpPopUp, Keys},
+    widgets::MsgPopup,tools,
     EventState, StatusBar, TabBar, Theme, Visibility,
 };
 use crate::utils::{
