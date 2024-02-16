@@ -1,3 +1,3 @@
 [workspace]
 resolver = '2'
-members = [ "api","app", "ui", "ui-derive"]
+members = [ "api","clashtui", "ui", "ui-derive"]

@@ -71,17 +71,17 @@ impl ProfileTab {
         instance
     }
 
-    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
 
-        let mut event_state = self.msgpopup.event(ev).unwrap();
+        let mut event_state = self.msgpopup.event(ev)?;
         if event_state.is_notconsumed() {
-            event_state = self.confirm_popup.event(ev).unwrap();
+            event_state = self.confirm_popup.event(ev)?;
         }
         if event_state.is_notconsumed() {
-            event_state = self.profile_input.event(ev).unwrap();
+            event_state = self.profile_input.event(ev)?;
 
             if event_state == EventState::WorkDone {
                 if let Event::Key(key) = ev {
@@ -218,7 +218,7 @@ impl ProfileTab {
         let profile_names: Vec<String> = self.clashtui_util.get_profile_names().unwrap();
         self.profile_list.set_items(profile_names);
     }
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, std::io::Error> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -267,7 +267,7 @@ impl ProfileTab {
                     } else if Keys::Preview.is(key) {
                         if let Some(profile_name) = self.profile_list.selected() {
                             let profile_path = self.clashtui_util.profile_dir.join(profile_name);
-                            let file_content = std::fs::read_to_string(profile_path).unwrap();
+                            let file_content = std::fs::read_to_string(profile_path)?;
                             let mut lines: Vec<String> =
                                 file_content.lines().map(|s| s.to_string()).collect();
 
@@ -275,7 +275,7 @@ impl ProfileTab {
                                 let yaml_path =
                                     self.clashtui_util.get_profile_yaml_path(profile_name);
                                 if yaml_path.is_file() {
-                                    let yaml_content = std::fs::read_to_string(&yaml_path).unwrap();
+                                    let yaml_content = std::fs::read_to_string(&yaml_path)?;
                                     let yaml_lines: Vec<String> =
                                         yaml_content.lines().map(|s| s.to_string()).collect();
                                     lines.push("".to_string());
@@ -326,7 +326,7 @@ impl ProfileTab {
                                 .clashtui_util
                                 .clashtui_dir
                                 .join(format!("templates/{}", name));
-                            let content = std::fs::read_to_string(path).unwrap();
+                            let content = std::fs::read_to_string(path)?;
                             let lines: Vec<String> =
                                 content.lines().map(|s| s.to_string()).collect();
 
@@ -352,9 +352,9 @@ impl ProfileTab {
 
             if event_state == EventState::NotConsumed {
                 event_state = match self.fouce {
-                    Fouce::Profile => self.profile_list.event(ev)?,
-                    Fouce::Template => self.template_list.event(ev)?,
-                };
+                    Fouce::Profile => self.profile_list.event(ev),
+                    Fouce::Template => self.template_list.event(ev),
+                }?;
             }
         }
 

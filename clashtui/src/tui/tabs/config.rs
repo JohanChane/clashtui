@@ -1,7 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::msgpopup_methods;
+//use crate::msgpopup_methods;
 use crate::tui::{
     symbols::CONFIG,
     utils::Keys,
@@ -14,7 +14,7 @@ use crate::utils::{CfgOp, SharedClashTuiUtil};
 pub struct ConfigTab {
     is_visible: bool,
 
-    setting_list: List,
+    main_list: List,
     msgpopup: MsgPopup,
 
     clashtui_util: SharedClashTuiUtil,
@@ -38,7 +38,7 @@ impl ConfigTab {
 
         Self {
             is_visible: false,
-            setting_list: operations,
+            main_list: operations,
             clashtui_util,
             msgpopup: MsgPopup::new(),
             input: inp,
@@ -46,14 +46,14 @@ impl ConfigTab {
         }
     }
 
-    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
-        let mut event_state = self.msgpopup.event(ev).unwrap();
+        let mut event_state = self.msgpopup.event(ev)?;
 
         if event_state.is_notconsumed() {
-            event_state = self.input.event(ev).unwrap();
+            event_state = self.input.event(ev)?;
 
             if event_state == EventState::WorkDone {
                 // When key is catched by input
@@ -83,8 +83,7 @@ impl ConfigTab {
                     return Ok(EventState::NotConsumed);
                 }
                 event_state = if Keys::Select.is(key) {
-                    self.last_op =
-                        Some(CfgOp::from(self.setting_list.selected().unwrap().as_str()));
+                    self.last_op = Some(CfgOp::from(self.main_list.selected().unwrap().as_str()));
                     let info = self.clashtui_util.get_cfg(self.last_op.clone().unwrap());
                     self.input.set_pre_data(info);
                     self.input.show();
@@ -97,12 +96,12 @@ impl ConfigTab {
 
         Ok(event_state)
     }
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
 
-        let event_state = self.setting_list.event(ev).unwrap();
+        let event_state = self.main_list.event(ev)?;
 
         Ok(event_state)
     }
@@ -114,7 +113,7 @@ impl ConfigTab {
         }
         use Ra::{Constraint, Layout};
 
-        self.setting_list.draw(f, area, true);
+        self.main_list.draw(f, area, true);
 
         if self.input.is_visible() {
             let input_area = Layout::default()
@@ -137,7 +136,7 @@ impl ConfigTab {
             let block = Raw::Block::new()
                 .borders(Raw::Borders::ALL)
                 .border_style(Ra::Style::default().fg(Ra::Color::Rgb(135, 206, 236)))
-                .title("InputProfile");
+                .title(self.main_list.selected().unwrap().to_string());
             f.render_widget(block, input_area);
         }
 
@@ -145,4 +144,4 @@ impl ConfigTab {
     }
 }
 
-msgpopup_methods!(ConfigTab);
+//msgpopup_methods!(ConfigTab);

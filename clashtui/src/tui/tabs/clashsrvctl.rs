@@ -17,7 +17,7 @@ use crate::{
 pub struct ClashSrvCtlTab {
     is_visible: bool,
 
-    srvctl_list: List,
+    main_list: List,
     msgpopup: MsgPopup,
 
     mode_selector: List,
@@ -33,7 +33,7 @@ impl ClashSrvCtlTab {
         theme: SharedTheme,
     ) -> Self {
         let title = CLASHSRVCTL.to_string();
-        let mut operations = List::new(title.clone(), theme.clone());
+        let mut operations = List::new(title, theme.clone());
         operations.set_items(vec![
             ClashSrvOp::TestClashConfig.into(),
             ClashSrvOp::SetPermission.into(),
@@ -51,7 +51,7 @@ impl ClashSrvCtlTab {
             #[cfg(target_os = "windows")]
             ClashSrvOp::UnInstallSrv.into(),
         ]);
-        let mut modes = List::new(title, theme);
+        let mut modes = List::new("Mode".to_string(), theme);
         modes.set_items(vec![
             Mode::Rule.into(),
             Mode::Direct.into(),
@@ -61,7 +61,7 @@ impl ClashSrvCtlTab {
 
         Self {
             is_visible: false,
-            srvctl_list: operations,
+            main_list: operations,
             mode_selector: modes,
             clashtui_util,
             clashtui_state,
@@ -69,13 +69,13 @@ impl ClashSrvCtlTab {
         }
     }
 
-    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
         let mut event_state;
         if self.mode_selector.is_visible() {
-            event_state = self.mode_selector.event(ev).unwrap();
+            event_state = self.mode_selector.event(ev)?;
             if event_state == EventState::WorkDone {
                 return Ok(event_state);
             } else if self.mode_selector.is_visible() {
@@ -94,11 +94,11 @@ impl ClashSrvCtlTab {
             }
         }
 
-        event_state = self.msgpopup.event(ev).unwrap();
+        event_state = self.msgpopup.event(ev)?;
 
         Ok(event_state)
     }
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -110,7 +110,7 @@ impl ClashSrvCtlTab {
             }
 
             event_state = if Keys::Select.is(key) {
-                let op_str = self.srvctl_list.selected().unwrap();
+                let op_str = self.main_list.selected().unwrap();
                 let op: ClashSrvOp = ClashSrvOp::from(op_str.as_ref());
                 match op {
                     #[cfg(target_os = "windows")]
@@ -146,7 +146,7 @@ impl ClashSrvCtlTab {
             };
 
             if event_state == EventState::NotConsumed {
-                event_state = self.srvctl_list.event(ev).unwrap();
+                event_state = self.main_list.event(ev)?;
             }
         }
 
@@ -158,9 +158,12 @@ impl ClashSrvCtlTab {
             return;
         }
 
-        self.srvctl_list.draw(f, area, true);
-        let select_area = tools::centered_percent_rect(60, 30, f.size());
-        self.mode_selector.draw(f, select_area, true);
+        self.main_list.draw(f, area, true);
+        if self.mode_selector.is_visible() {
+            let select_area = tools::centered_percent_rect(60, 30, f.size());
+            f.render_widget(ratatui::widgets::Clear, select_area);
+            self.mode_selector.draw(f, select_area, true);
+        }
         self.msgpopup.draw(f, area);
     }
 }

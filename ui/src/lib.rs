@@ -8,7 +8,7 @@ pub trait Visibility {
 }
 pub mod utils;
 pub mod widgets;
-pub use utils::EventState;
+pub use utils::{EventState, Infallable};
 
 #[cfg(test)]
 mod tests {

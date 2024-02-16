@@ -219,16 +219,20 @@ impl ClashTuiUtil {
     }
 
     pub fn get_profile_names(&self) -> anyhow::Result<Vec<String>> {
-        Utils::get_file_names(self.profile_dir.as_path()).map(|mut v| {
-            v.sort();
-            v
-        })
+        Ok(
+            Utils::get_file_names(self.profile_dir.as_path()).map(|mut v| {
+                v.sort();
+                v
+            })?,
+        )
     }
     pub fn get_template_names(&self) -> anyhow::Result<Vec<String>> {
-        Utils::get_file_names(self.clashtui_dir.join("templates").as_path()).map(|mut v| {
-            v.sort();
-            v
-        })
+        Ok(
+            Utils::get_file_names(self.clashtui_dir.join("templates").as_path()).map(|mut v| {
+                v.sort();
+                v
+            })?,
+        )
     }
     pub fn get_profile_yaml_path(&self, profile_name: &String) -> PathBuf {
         let profile_path = self.profile_dir.join(profile_name);

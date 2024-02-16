@@ -25,7 +25,7 @@ impl TabBar {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, std::io::Error> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }

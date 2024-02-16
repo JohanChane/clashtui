@@ -2,7 +2,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
 use super::EventState;
-use crate::Visibility;
+use crate::{Infallable, Visibility};
 
 #[derive(Visibility)]
 pub struct InputPopup {
@@ -24,7 +24,7 @@ impl InputPopup {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, Infallable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }

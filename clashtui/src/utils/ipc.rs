@@ -4,13 +4,10 @@ use std::process::{Command, Output};
 pub fn exec_ipc(pgm: String, args: Vec<String>) -> Result<String, Error> {
     log::debug!("IPC: {} {:?}", pgm, args);
     #[cfg(target_os = "linux")]
-    let output = Command::new(pgm).args(args).output();
+    let output = Command::new(pgm).args(args).output()?;
     #[cfg(target_os = "windows")]
-    let output = Command::new(pgm).args(args).output();
-    match output {
-        Ok(v) => string_process_output(v),
-        Err(e) => Err(e),
-    }
+    let output = Command::new(pgm).args(args).output()?;
+    string_process_output(output)
 }
 
 #[cfg(target_os = "windows")]

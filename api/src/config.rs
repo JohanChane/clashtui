@@ -15,12 +15,14 @@ pub struct ClashConfig {
     // pub global_client_fingerprint: String,
     pub tun: TunConfig,
 }
-impl ClashConfig {
-    pub fn from_str(s: &str) -> Option<Self> {
+impl std::str::FromStr for ClashConfig {
+    type Err = std::fmt::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {
-            return None;
-        }
-        serde_json::from_str(s).unwrap()
+            return Err(std::fmt::Error);
+        };
+        serde_json::from_str(s).map_err(|_| std::fmt::Error)
     }
 }
 

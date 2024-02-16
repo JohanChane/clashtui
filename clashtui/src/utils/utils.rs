@@ -15,12 +15,11 @@ pub fn concat_update_profile_result(
     concatenated_result
 }
 
-pub fn get_file_names(dir: &std::path::Path) -> anyhow::Result<Vec<String>> {
+pub fn get_file_names(dir: &std::path::Path) -> Result<Vec<String>, std::io::Error> {
     let mut file_names: Vec<String> = Vec::new();
 
     for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
+        let path = entry?.path();
         if path.is_file() {
             if let Some(file_name) = path.file_name() {
                 if let Some(file_name_str) = file_name.to_str() {

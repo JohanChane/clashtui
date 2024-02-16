@@ -2,6 +2,8 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
+use crate::Infallable;
+
 use super::utils::tools;
 use super::EventState;
 
@@ -22,7 +24,7 @@ impl MsgPopup {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, Infallable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }

@@ -24,7 +24,7 @@ impl ProfileInputPopup {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
         if !self.is_visible() {
             return Ok(EventState::NotConsumed);
         }

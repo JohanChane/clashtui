@@ -1,7 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::{utils::SharedTheme, EventState, Visibility};
+use crate::{utils::SharedTheme, EventState, Infallable, Visibility};
 
 // struct ClashTuiScrollBar {
 //     pub state: ScrollbarState,
@@ -50,7 +50,7 @@ impl List {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, Infallable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }

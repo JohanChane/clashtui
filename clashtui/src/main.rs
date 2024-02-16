@@ -87,12 +87,12 @@ pub fn run(mut flags: Flags, tick_rate: Duration, enhanced_graphics: bool) -> an
     Ok(())
 }
 
-use utils::ClashTuiConfigLoadError;
+use utils::CfgError;
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
     tick_rate: Duration,
-    mut err_track: Vec<ClashTuiConfigLoadError>,
+    mut err_track: Vec<CfgError>,
 ) -> anyhow::Result<()> {
     {
         if app.flags.contains(utils::Flag::FirstInit) {
@@ -107,17 +107,13 @@ fn run_app<B: Backend>(
                 "Some Error happened during app init, Check the log for detail".to_string(),
             );
         }
-        loop {
-            if !err_track.is_empty() {
-                let err: Option<ClashTuiConfigLoadError> = err_track.pop();
-                let showstr = match err {
-                    Some(v) => v.to_string(),
-                    None => panic!("Should not reached arm!!"),
-                };
-                app.popup_txt_msg(showstr);
-            } else {
-                break;
-            }
+        while !err_track.is_empty() {
+            let err: Option<CfgError> = err_track.pop();
+            let showstr = match err {
+                Some(v) => v.reason.to_string(),
+                None => panic!("Should not reached arm!!"),
+            };
+            app.popup_txt_msg(showstr);
         }
     }
     log::info!("App init finished");

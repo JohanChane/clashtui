@@ -1,6 +1,8 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::prelude as Ra;
 
+use crate::Infallable;
+
 use super::{EventState, MsgPopup};
 
 pub struct ConfirmPopup {
@@ -16,7 +18,7 @@ impl ConfirmPopup {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ()> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, Infallable> {
         if !self.msgpopup.is_visible() {
             return Ok(EventState::NotConsumed);
         }
@@ -32,7 +34,7 @@ impl ConfirmPopup {
                     return Ok(self.event_state.clone());
                 }
                 _ => {
-                    event_state = self.msgpopup.event(ev).unwrap();
+                    event_state = self.msgpopup.event(ev)?;
                 }
             }
         }

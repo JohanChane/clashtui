@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::str::FromStr as _;
 use std::{
     fs::File,
     io::{Error, Read},
@@ -9,7 +10,7 @@ use std::{
 use encoding::all::GBK;
 
 use super::{
-    config::{ClashTuiConfig, ClashTuiConfigLoadError},
+    config::{CfgError, ClashTuiConfig, ErrKind},
     state::_State,
     CfgOp,
 };
@@ -30,7 +31,7 @@ impl ClashTuiUtil {
         clashtui_dir: &PathBuf,
         profile_dir: &Path,
         is_inited: bool,
-    ) -> (Self, Vec<ClashTuiConfigLoadError>) {
+    ) -> (Self, Vec<CfgError>) {
         let ret = load_app_config(clashtui_dir, is_inited);
         let mut err_track = ret.3;
         let clash_api = ClashUtil::new(ret.1, ret.2);
@@ -38,13 +39,17 @@ impl ClashTuiUtil {
             Ok(v) => v,
             Err(_) => String::new(),
         };
-        let remote = ClashConfig::from_str(cur_remote.as_str());
-        if remote.is_none() {
-            err_track.push(ClashTuiConfigLoadError::LoadClashConfig(
-                "Fail to load config from clash core. Is it Running?".to_string(),
-            ));
-            log::warn!("Fail to connect to clash. Is it Running?");
-        }
+        let remote = match ClashConfig::from_str(cur_remote.as_str()) {
+            Ok(v) => Some(v),
+            Err(_) => {
+                err_track.push(CfgError::new(
+                    ErrKind::LoadClashConfig,
+                    "Fail to load config from clash core. Is it Running?".to_string(),
+                ));
+                log::warn!("Fail to connect to clash. Is it Running?");
+                None
+            }
+        };
         (
             Self {
                 clashtui_dir: clashtui_dir.clone(),
@@ -113,8 +118,9 @@ impl ClashTuiUtil {
             Ok(v) => v,
             Err(e) => return Err(e),
         };
-        let remote = ClashConfig::from_str(cur_remote.as_str());
-        *self.clash_remote_config.borrow_mut() = remote;
+        let remote = ClashConfig::from_str(cur_remote.as_str())
+            .map_err(|_| Error::new(std::io::ErrorKind::InvalidData, "Failed to prase str"))?;
+        self.clash_remote_config.borrow_mut().replace(remote);
         Ok(())
     }
 
@@ -215,7 +221,7 @@ impl ClashTuiUtil {
 
         if !is_skip {
             if let Err(e) = self.fetch_remote() {
-                if !(e.kind() == std::io::ErrorKind::ConnectionRefused) {
+                if e.kind() != std::io::ErrorKind::ConnectionRefused {
                     log::warn!("{}", e);
                 }
             }
@@ -251,15 +257,16 @@ pub(super) fn parse_yaml(yaml_path: &Path) -> anyhow::Result<serde_yaml::Value> 
 fn load_app_config(
     clashtui_dir: &PathBuf,
     skip_init_conf: bool,
-) -> (ClashTuiConfig, String, String, Vec<ClashTuiConfigLoadError>) {
+) -> (ClashTuiConfig, String, String, Vec<CfgError>) {
     let mut err_collect = Vec::new();
     let basic_clash_config_path = Path::new(clashtui_dir).join("basic_clash_config.yaml");
     let basic_clash_config_value: serde_yaml::Value =
         match parse_yaml(basic_clash_config_path.as_path()) {
             Ok(r) => r,
             Err(_) => {
-                err_collect.push(ClashTuiConfigLoadError::LoadProfileConfig(
-                    "Fail to load User Defined Config\n".into(),
+                err_collect.push(CfgError::new(
+                    ErrKind::LoadProfileConfig,
+                    "Fail to load User Defined Config".to_string(),
                 ));
                 serde_yaml::Value::from("")
             }
@@ -282,8 +289,9 @@ fn load_app_config(
         match ClashTuiConfig::from_file(config_path.to_str().unwrap()) {
             Ok(v) => {
                 if !v.check() {
-                    err_collect.push(ClashTuiConfigLoadError::LoadAppConfig(
-                        "Some Key Configs are missing, or Default\n".into(),
+                    err_collect.push(CfgError::new(
+                        ErrKind::LoadAppConfig,
+                        "Some Key Configs are missing, or Default".to_string(),
                     ));
                     log::warn!("Empty Config?");
                     log::debug!("{:?}", v)
@@ -291,8 +299,9 @@ fn load_app_config(
                 v
             }
             Err(e) => {
-                err_collect.push(ClashTuiConfigLoadError::LoadAppConfig(
-                    "Fail to load configs, using Default\n".into(),
+                err_collect.push(CfgError::new(
+                    ErrKind::LoadAppConfig,
+                    "Fail to load configs, using Default".to_string(),
                 ));
                 log::error!("Unable to load config file. {}", e);
                 ClashTuiConfig::default()

@@ -12,8 +12,7 @@ use crate::tui::{
     EventState, StatusBar, TabBar, Theme, Visibility,
 };
 use crate::utils::{
-    ClashTuiConfigLoadError, ClashTuiUtil, Flag, Flags, SharedClashTuiState, SharedClashTuiUtil,
-    State,
+    CfgError, ClashTuiUtil, Flag, Flags, SharedClashTuiState, SharedClashTuiUtil, State,
 };
 
 pub struct App {
@@ -30,10 +29,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(
-        flags: Flags,
-        clashtui_config_dir: PathBuf,
-    ) -> (Option<Self>, Vec<ClashTuiConfigLoadError>) {
+    pub fn new(flags: Flags, clashtui_config_dir: PathBuf) -> (Option<Self>, Vec<CfgError>) {
         #[cfg(debug_assertions)]
         let _ = std::fs::remove_file(clashtui_config_dir.join("clashtui.log")); // auto rm old log for debug
         Self::setup_logging(clashtui_config_dir.join("clashtui.log").to_str().unwrap());
@@ -58,7 +54,8 @@ impl App {
             let mut x = match std::fs::File::create(log_path) {
                 Err(e) => {
                     log::error!("Err while CronUpdate: {}", e);
-                    err_track.push(crate::utils::ClashTuiConfigLoadError::CronUpdateProfile(
+                    err_track.push(CfgError::new(
+                        crate::utils::ErrKind::CronUpdateProfile,
                         e.to_string(),
                     ));
                     return (None, err_track);
@@ -138,21 +135,21 @@ impl App {
         (Some(app), err_track)
     }
 
-    fn popup_event(&mut self, ev: &Event) -> anyhow::Result<EventState> {
+    fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
         // ## Self Popups
-        let mut event_state = self.help_popup.event(ev).unwrap();
+        let mut event_state = self.help_popup.event(ev)?;
 
         // ## Tab Popups
         let mut iter = self.tabs.values().map(|v| match v {
-            Tabs::Profile(v) => v.borrow_mut().popup_event(ev).unwrap(),
-            Tabs::ClashSrvCtl(v) => v.borrow_mut().popup_event(ev).unwrap(),
-            Tabs::Config(v) => v.borrow_mut().popup_event(ev).unwrap(),
+            Tabs::Profile(v) => v.borrow_mut().popup_event(ev),
+            Tabs::ClashSrvCtl(v) => v.borrow_mut().popup_event(ev),
+            Tabs::Config(v) => v.borrow_mut().popup_event(ev),
         });
         let mut tmp;
         while event_state.is_notconsumed() {
             tmp = iter.next();
             match tmp {
-                Some(v) => event_state = v,
+                Some(v) => event_state = v?,
                 None => break,
             }
         }
@@ -160,8 +157,8 @@ impl App {
         Ok(event_state)
     }
 
-    pub fn event(&mut self, ev: &Event) -> anyhow::Result<EventState> {
-        let mut event_state = self.msgpopup.event(ev).unwrap();
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, std::io::Error> {
+        let mut event_state = self.msgpopup.event(ev)?;
         if event_state.is_notconsumed() {
             event_state = self.popup_event(ev)?;
         }
@@ -216,17 +213,20 @@ impl App {
             };
 
             if event_state == EventState::NotConsumed {
-                event_state = self.tabbar.event(ev)?;
+                event_state = self
+                    .tabbar
+                    .event(ev)
+                    .map_err(|()| std::io::Error::new(std::io::ErrorKind::Other, "Undefined"))?;
                 let mut iter = self.tabs.values().map(|v| match v {
-                    Tabs::Profile(v) => v.borrow_mut().event(ev).unwrap(),
-                    Tabs::ClashSrvCtl(v) => v.borrow_mut().event(ev).unwrap(),
-                    Tabs::Config(v) => v.borrow_mut().event(ev).unwrap(),
+                    Tabs::Profile(v) => v.borrow_mut().event(ev),
+                    Tabs::ClashSrvCtl(v) => v.borrow_mut().event(ev).map_err(|e| e.into()),
+                    Tabs::Config(v) => v.borrow_mut().event(ev).map_err(|e| e.into()),
                 });
                 let mut tmp;
                 while event_state.is_notconsumed() {
                     tmp = iter.next();
                     match tmp {
-                        Some(v) => event_state = v,
+                        Some(v) => event_state = v?,
                         None => break,
                     }
                 }
