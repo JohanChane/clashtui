@@ -6,8 +6,9 @@ use crate::msgpopup_methods;
 use crate::tui::{
     symbols,
     tabs::{ClashSrvCtlTab, ConfigTab, ProfileTab, Tab, Tabs},
-    utils::{ HelpPopUp, Keys},
-    widgets::MsgPopup,tools,
+    tools,
+    utils::{HelpPopUp, Keys},
+    widgets::MsgPopup,
     EventState, StatusBar, TabBar, Theme, Visibility,
 };
 use crate::utils::{
@@ -16,7 +17,6 @@ use crate::utils::{
 };
 
 pub struct App {
-    title: String,
     tabbar: TabBar,
     tabs: HashMap<Tab, Tabs>,
     pub should_quit: bool,
@@ -65,7 +65,6 @@ impl App {
                 }
                 Ok(v) => v,
             };
-            use crate::utils::Utils;
             let _ = std::io::Write::write_all(
                 &mut x,
                 format!(
@@ -73,7 +72,7 @@ impl App {
                     profile_list
                         .into_iter()
                         .flat_map(|v| match v {
-                            Ok(v) => Utils::concat_update_profile_result(v),
+                            Ok(v) => crate::utils::concat_update_profile_result(v),
                             Err(e) => [e.to_string()].to_vec(),
                         })
                         .collect::<Vec<String>>()
@@ -102,7 +101,6 @@ impl App {
             (
                 Tab::Profile,
                 Tabs::Profile(RefCell::new(ProfileTab::new(
-                    symbols::PROFILE.to_string(),
                     clashtui_util.clone(),
                     clashtui_state.clone(),
                     theme.clone(),
@@ -111,7 +109,6 @@ impl App {
             (
                 Tab::ClashSrvCtl,
                 Tabs::ClashSrvCtl(RefCell::new(ClashSrvCtlTab::new(
-                    symbols::CLASHSRVCTL.to_string(),
                     clashtui_util.clone(),
                     clashtui_state.clone(),
                     theme.clone(),
@@ -120,15 +117,13 @@ impl App {
             (
                 Tab::Config,
                 Tabs::Config(RefCell::new(ConfigTab::new(
-                    symbols::CONFIG.to_string(),
                     clashtui_util.clone(),
                     theme.clone(),
                 ))),
             ),
         ]); // Init the tabs
 
-        let mut app = Self {
-            title: "ClashTui".to_string(),
+        let app = Self {
             tabbar,
             should_quit: false,
             help_popup,
@@ -139,12 +134,6 @@ impl App {
             tabs,
             flags,
         };
-
-        let help_text: Vec<String> = symbols::HELP
-            .lines()
-            .map(|line| line.trim().to_string())
-            .collect();
-        app.help_popup.set_items(help_text);
 
         (Some(app), err_track)
     }

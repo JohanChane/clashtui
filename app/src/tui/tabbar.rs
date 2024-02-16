@@ -3,7 +3,6 @@ use ratatui::{prelude as Ra, widgets as Raw};
 
 use super::SharedTheme;
 use crate::tui::EventState;
-// use crate::visible_methods;
 
 pub struct TabBar {
     title: String,
@@ -97,5 +96,3 @@ impl TabBar {
         return self.tab_titles.get(self.index);
     }
 }
-
-// visible_methods!(ClashTuiTabBar);

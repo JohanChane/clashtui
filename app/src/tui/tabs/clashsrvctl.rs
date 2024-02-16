@@ -4,6 +4,7 @@ use ratatui::prelude as Ra;
 use crate::msgpopup_methods;
 use crate::{
     tui::{
+        symbols::CLASHSRVCTL,
         tools,
         utils::Keys,
         widgets::{List, MsgPopup},
@@ -14,7 +15,6 @@ use crate::{
 
 #[derive(Visibility)]
 pub struct ClashSrvCtlTab {
-    title: String,
     is_visible: bool,
 
     srvctl_list: List,
@@ -28,11 +28,11 @@ pub struct ClashSrvCtlTab {
 
 impl ClashSrvCtlTab {
     pub fn new(
-        title: String,
         clashtui_util: SharedClashTuiUtil,
         clashtui_state: SharedClashTuiState,
         theme: SharedTheme,
     ) -> Self {
+        let title = CLASHSRVCTL.to_string();
         let mut operations = List::new(title.clone(), theme.clone());
         operations.set_items(vec![
             ClashSrvOp::TestClashConfig.into(),
@@ -51,7 +51,7 @@ impl ClashSrvCtlTab {
             #[cfg(target_os = "windows")]
             ClashSrvOp::UnInstallSrv.into(),
         ]);
-        let mut modes = List::new(title.clone(), theme);
+        let mut modes = List::new(title, theme);
         modes.set_items(vec![
             Mode::Rule.into(),
             Mode::Direct.into(),
@@ -60,7 +60,6 @@ impl ClashSrvCtlTab {
         modes.hide();
 
         Self {
-            title,
             is_visible: false,
             srvctl_list: operations,
             mode_selector: modes,

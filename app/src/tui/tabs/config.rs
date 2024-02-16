@@ -3,6 +3,7 @@ use ratatui::{prelude as Ra, widgets as Raw};
 
 use crate::msgpopup_methods;
 use crate::tui::{
+    symbols::CONFIG,
     utils::Keys,
     widgets::{InputPopup, List, MsgPopup},
     EventState, SharedTheme, Visibility,
@@ -11,7 +12,6 @@ use crate::utils::{CfgOp, SharedClashTuiUtil};
 
 #[derive(Visibility)]
 pub struct ConfigTab {
-    title: String,
     is_visible: bool,
 
     setting_list: List,
@@ -24,8 +24,8 @@ pub struct ConfigTab {
 }
 
 impl ConfigTab {
-    pub fn new(title: String, clashtui_util: SharedClashTuiUtil, theme: SharedTheme) -> Self {
-        let mut operations = List::new(title.clone(), theme);
+    pub fn new(clashtui_util: SharedClashTuiUtil, theme: SharedTheme) -> Self {
+        let mut operations = List::new(CONFIG.to_string(), theme);
         operations.set_items(vec![
             CfgOp::ClashConfigDir.into(),
             CfgOp::ClashConfigFile.into(),
@@ -37,7 +37,6 @@ impl ConfigTab {
         inp.hide();
 
         Self {
-            title,
             is_visible: false,
             setting_list: operations,
             clashtui_util,

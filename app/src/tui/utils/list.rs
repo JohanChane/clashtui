@@ -1,4 +1,4 @@
-use crate::tui::{tools, EventState, SharedTheme, Visibility};
+use crate::tui::{symbols::HELP, tools, EventState, SharedTheme, Visibility};
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
@@ -17,8 +17,8 @@ impl HelpPopUp {
         Self {
             title,
             is_visible: false,
-            items: vec![],
-            list_state: Raw::ListState::default(),
+            items: HELP.lines().map(|line| line.trim().to_string()).collect(),
+            list_state: Raw::ListState::default().with_selected(Some(0)),
             theme,
         }
     }

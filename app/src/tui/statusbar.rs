@@ -2,7 +2,6 @@ use ratatui::{prelude as Ra, widgets as Raw};
 
 use super::SharedTheme;
 use crate::utils::SharedClashTuiState;
-// use crate::visible_methods;
 
 pub struct StatusBar {
     is_visible: bool,
@@ -38,5 +37,3 @@ impl StatusBar {
         f.render_widget(paragraph.block(block), area);
     }
 }
-
-// visible_methods!(ClashTuiStatusBar);

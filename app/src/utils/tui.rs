@@ -8,12 +8,12 @@ use std::{
 #[cfg(target_os = "windows")]
 use encoding::all::GBK;
 
-use super::super::lib::{ClashConfig, ClashUtil};
 use super::{
     config::{ClashTuiConfig, ClashTuiConfigLoadError},
     state::_State,
     CfgOp,
 };
+use api::{ClashConfig, ClashUtil, Resp};
 
 pub struct ClashTuiUtil {
     pub clashtui_dir: PathBuf,
@@ -108,17 +108,17 @@ impl ClashTuiUtil {
 }
 // Web
 impl ClashTuiUtil {
-    fn fetch_remote(&self) -> Option<reqwest::Error> {
+    fn fetch_remote(&self) -> Result<(), Error> {
         let cur_remote = match self.clash_api.config_get() {
             Ok(v) => v,
-            Err(e) => return Some(e),
+            Err(e) => return Err(e),
         };
         let remote = ClashConfig::from_str(cur_remote.as_str());
         *self.clash_remote_config.borrow_mut() = remote;
-        None
+        Ok(())
     }
 
-    pub fn restart_clash(&self) -> Result<String, reqwest::Error> {
+    pub fn restart_clash(&self) -> Result<String, Error> {
         self.clash_api.restart(None)
     }
 
@@ -136,7 +136,7 @@ impl ClashTuiUtil {
             "payload": ""
         })
         .to_string();
-        if let Some(err) = self.clash_api.config_reload(body) {
+        if let Err(err) = self.clash_api.config_reload(body) {
             log::error!(
                 "Failed to Patch Profile `{}`: {}",
                 profile_name,
@@ -181,10 +181,7 @@ impl ClashTuiUtil {
         Ok(())
     }
 
-    pub fn dl_remote_profile(
-        &self,
-        url: &str,
-    ) -> Result<reqwest::blocking::Response, reqwest::Error> {
+    pub fn dl_remote_profile(&self, url: &str) -> Result<Resp, Error> {
         self.clash_api.mock_clash_core(url)
     }
 
@@ -217,8 +214,8 @@ impl ClashTuiUtil {
         };
 
         if !is_skip {
-            if let Some(e) = self.fetch_remote() {
-                if !e.is_connect() {
+            if let Err(e) = self.fetch_remote() {
+                if !(e.kind() == std::io::ErrorKind::ConnectionRefused) {
                     log::warn!("{}", e);
                 }
             }

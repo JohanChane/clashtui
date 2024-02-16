@@ -263,7 +263,7 @@ impl ClashTuiUtil {
             file.read_to_string(&mut file_content)?;
 
             let sub_url = file_content.trim();
-            let mut response = self.dl_remote_profile(sub_url)?;
+            let response = self.dl_remote_profile(sub_url)?;
 
             profile_yaml_path = self.get_profile_yaml_path(profile_name);
             let directory = profile_yaml_path
@@ -344,7 +344,7 @@ impl ClashTuiUtil {
     }
 
     fn download_file(&self, url: &str, path: &PathBuf) -> anyhow::Result<()> {
-        let mut response = self.dl_remote_profile(url)?;
+        let response = self.dl_remote_profile(url)?;
 
         let directory = path
             .parent()

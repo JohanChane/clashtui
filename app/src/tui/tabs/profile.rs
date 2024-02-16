@@ -11,11 +11,11 @@ use std::{
 use super::profile_input::ProfileInputPopup;
 use crate::msgpopup_methods;
 use crate::tui::{
+    symbols::{PROFILE, TEMPALTE},
     utils::Keys,
     widgets::{ConfirmPopup, List, MsgPopup},
     EventState, SharedTheme, Visibility,
 };
-use crate::utils::Utils;
 use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
 
 #[derive(PartialEq)]
@@ -26,7 +26,6 @@ enum Fouce {
 
 #[derive(Visibility)]
 pub struct ProfileTab {
-    title: String,
     is_visible: bool,
     fouce: Fouce,
 
@@ -42,16 +41,14 @@ pub struct ProfileTab {
 
 impl ProfileTab {
     pub fn new(
-        title: String,
         clashtui_util: SharedClashTuiUtil,
         clashtui_state: SharedClashTuiState,
         theme: SharedTheme,
     ) -> Self {
-        let profiles = List::new(title.clone(), Rc::clone(&theme));
-        let templates = List::new("Template".to_string(), Rc::clone(&theme));
+        let profiles = List::new(PROFILE.to_string(), Rc::clone(&theme));
+        let templates = List::new(TEMPALTE.to_string(), Rc::clone(&theme));
 
         let mut instance = Self {
-            title,
             is_visible: true,
             profile_list: profiles,
             template_list: templates,
@@ -124,7 +121,7 @@ impl ProfileTab {
                 .update_local_profile(profile_name, does_update_all)
             {
                 Ok(res) => {
-                    let mut msg = Utils::concat_update_profile_result(res);
+                    let mut msg = crate::utils::concat_update_profile_result(res);
 
                     if profile_name == self.clashtui_state.borrow().get_profile() {
                         if let Err(err) = self.clashtui_util.select_profile(profile_name) {

@@ -22,13 +22,13 @@ exclude = [
 
 [dependencies]
 ui = {path = "../ui"}
+api ={ path = "../api"}
 ratatui = "*"
 crossterm = "*"
-serde = { version = "1.0", features = ["derive"] }
+serde = "*"
 argh = { version = "0.1" }
-reqwest = { version = "0.11", features = ["blocking"] } 
 serde_yaml = "0.9"
-serde_json = "1.0"
+serde_json = "*"
 anyhow = "1.0"
 log = "0.4"
 log4rs = "1.2"
