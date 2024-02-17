@@ -7,10 +7,10 @@ use crate::Infailable;
 use super::utils::tools;
 use super::{tmp, EventState};
 /// Pop a Message Window
-/// 
+///
 /// Using arrow keys or j\k\h\l(vim-like) to navigate.
 /// Press Esc to close, do nothing for others
-/// 
+///
 /// Not impl [Visibility][crate::Visibility] but impl the functions
 pub struct MsgPopup {
     is_visible: bool,
@@ -60,7 +60,12 @@ impl MsgPopup {
         let text: Vec<Ra::Line> = self
             .msg
             .iter()
-            .map(|s| Ra::Line::from(Ra::Span::styled(s, Ra::Style::default().fg(tmp::MSG_TEXT_FG))))
+            .map(|s| {
+                Ra::Line::from(Ra::Span::styled(
+                    s,
+                    Ra::Style::default().fg(tmp::MSG_TEXT_FG),
+                ))
+            })
             .collect();
 
         // 自适应

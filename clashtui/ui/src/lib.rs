@@ -1,3 +1,4 @@
+#![allow(clippy::new_without_default)]
 extern crate ui_derive;
 pub use ui_derive::Visibility;
 /// Visibility-related functions, can be impl using `derive`

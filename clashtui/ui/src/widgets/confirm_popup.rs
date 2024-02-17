@@ -7,7 +7,7 @@ use super::{EventState, MsgPopup};
 /// Modified [MsgPopup]
 ///
 /// Add 'y', 'n'/Esc to close
-/// 
+///
 /// Not impl [Visibility][crate::Visibility] since [MsgPopup] does
 pub struct ConfirmPopup(MsgPopup);
 

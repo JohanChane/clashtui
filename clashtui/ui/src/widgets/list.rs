@@ -27,7 +27,7 @@ use crate::{utils::SharedTheme, EventState, Infailable, Visibility};
 // }
 
 /// Interactive list, mainly used as basic interface
-/// 
+///
 /// Using arrow keys or j\k(vim-like) to navigate.
 #[derive(Visibility)]
 pub struct List {
