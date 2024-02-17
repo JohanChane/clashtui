@@ -1,5 +1,4 @@
-/target
-Cargo.lock
+clashtui/target
 /test
 /vendor
 /.vscode
