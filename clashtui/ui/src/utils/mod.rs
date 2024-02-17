@@ -1,7 +1,7 @@
 mod error;
 mod theme;
 pub mod tools;
-pub use error::Infallable;
+pub use error::Infailable;
 pub use theme::Theme;
 pub type SharedTheme = std::rc::Rc<Theme>;
 

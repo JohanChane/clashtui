@@ -1,7 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::{utils::SharedTheme, EventState, Infallable, Visibility};
+use crate::{utils::SharedTheme, EventState, Infailable, Visibility};
 
 // struct ClashTuiScrollBar {
 //     pub state: ScrollbarState,
@@ -26,6 +26,9 @@ use crate::{utils::SharedTheme, EventState, Infallable, Visibility};
 //     }
 // }
 
+/// Interactive list, mainly used as basic interface
+/// 
+/// Using arrow keys or j\k(vim-like) to navigate.
 #[derive(Visibility)]
 pub struct List {
     title: String,
@@ -50,29 +53,23 @@ impl List {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, Infallable> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
 
-        let mut event_state = EventState::NotConsumed;
         if let Event::Key(key) = ev {
             if key.kind == KeyEventKind::Press {
-                event_state = match key.code {
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        self.next();
-                        EventState::WorkDone
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        self.previous();
-                        EventState::WorkDone
-                    }
-                    _ => EventState::NotConsumed,
+                match key.code {
+                    KeyCode::Down | KeyCode::Char('j') => self.next(),
+                    KeyCode::Up | KeyCode::Char('k') => self.previous(),
+                    _ => return Ok(EventState::NotConsumed),
                 };
+                return Ok(EventState::WorkDone);
             }
         }
 
-        Ok(event_state)
+        Ok(EventState::NotConsumed)
     }
 
     pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect, is_fouced: bool) {

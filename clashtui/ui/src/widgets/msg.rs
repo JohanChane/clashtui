@@ -2,11 +2,16 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
-use crate::Infallable;
+use crate::Infailable;
 
 use super::utils::tools;
-use super::EventState;
-
+use super::{tmp, EventState};
+/// Pop a Message Window
+/// 
+/// Using arrow keys or j\k\h\l(vim-like) to navigate.
+/// Press Esc to close, do nothing for others
+/// 
+/// Not impl [Visibility][crate::Visibility] but impl the functions
 pub struct MsgPopup {
     is_visible: bool,
     msg: Vec<String>,
@@ -24,7 +29,7 @@ impl MsgPopup {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, Infallable> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -34,21 +39,11 @@ impl MsgPopup {
                 return Ok(EventState::NotConsumed);
             }
             match key.code {
-                KeyCode::Esc => {
-                    self.hide();
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    self.scroll_down();
-                }
-                KeyCode::Up | KeyCode::Char('k') => {
-                    self.scroll_up();
-                }
-                KeyCode::Left | KeyCode::Char('h') => {
-                    self.scroll_left();
-                }
-                KeyCode::Right | KeyCode::Char('l') => {
-                    self.scroll_right();
-                }
+                KeyCode::Esc => self.hide(),
+                KeyCode::Down | KeyCode::Char('j') => self.scroll_down(),
+                KeyCode::Up | KeyCode::Char('k') => self.scroll_up(),
+                KeyCode::Left | KeyCode::Char('h') => self.scroll_left(),
+                KeyCode::Right | KeyCode::Char('l') => self.scroll_right(),
                 _ => {}
             }
         }
@@ -65,12 +60,7 @@ impl MsgPopup {
         let text: Vec<Ra::Line> = self
             .msg
             .iter()
-            .map(|s| {
-                Ra::Line::from(Ra::Span::styled(
-                    s,
-                    Ra::Style::default().fg(Ra::Color::Rgb(46, 204, 113)),
-                ))
-            })
+            .map(|s| Ra::Line::from(Ra::Span::styled(s, Ra::Style::default().fg(tmp::MSG_TEXT_FG))))
             .collect();
 
         // 自适应
@@ -89,7 +79,7 @@ impl MsgPopup {
 
         let block = Raw::Block::new()
             .borders(Raw::Borders::ALL)
-            .border_style(Ra::Style::default().fg(Ra::Color::Rgb(0, 102, 102)));
+            .border_style(Ra::Style::default().fg(tmp::MSG_BLOCK_FG));
 
         f.render_widget(Raw::Clear, area);
         f.render_widget(paragraph.clone().block(block), area);
@@ -126,10 +116,6 @@ impl MsgPopup {
     }
     pub fn set_msg(&mut self, msg: Vec<String>) {
         self.msg = msg;
-    }
-
-    fn get_msg(&self) -> &Vec<String> {
-        &self.msg
     }
 
     pub fn clear_msg(&mut self) {

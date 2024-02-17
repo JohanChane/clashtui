@@ -133,7 +133,7 @@ impl App {
         (Some(app), err_track)
     }
 
-    fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
+    fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
         // ## Self Popups
         let mut event_state = self.help_popup.event(ev)?;
 

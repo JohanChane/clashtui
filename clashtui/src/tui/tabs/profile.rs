@@ -71,7 +71,7 @@ impl ProfileTab {
         instance
     }
 
-    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
+    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -248,10 +248,8 @@ impl ProfileTab {
                         self.profile_input.show();
                         EventState::WorkDone
                     } else if Keys::ProfileDelete.is(key) {
-                        self.confirm_popup.popup_msg(
-                            EventState::ProfileDelete,
-                            "`y` to Delete, `Esc` to cancel".to_string(),
-                        );
+                        self.confirm_popup
+                            .popup_msg("`y` to Delete, `Esc` to cancel".to_string());
                         EventState::WorkDone
                     } else if Keys::Edit.is(key) {
                         if let Some(profile_name) = self.profile_list.selected() {
@@ -278,10 +276,10 @@ impl ProfileTab {
                                     let yaml_content = std::fs::read_to_string(&yaml_path)?;
                                     let yaml_lines: Vec<String> =
                                         yaml_content.lines().map(|s| s.to_string()).collect();
-                                    lines.push("".to_string());
+                                    lines.push(String::new());
                                     lines.extend(yaml_lines);
                                 } else {
-                                    lines.push("".to_string());
+                                    lines.push(String::new());
                                     lines.push(
                                         "yaml file isn't exists. Please update it.".to_string(),
                                     );

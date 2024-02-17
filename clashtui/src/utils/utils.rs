@@ -22,12 +22,9 @@ pub fn get_file_names(dir: &std::path::Path) -> Result<Vec<String>, std::io::Err
         let path = entry?.path();
         if path.is_file() {
             if let Some(file_name) = path.file_name() {
-                if let Some(file_name_str) = file_name.to_str() {
-                    file_names.push(file_name_str.to_string());
-                }
+                file_names.push(file_name.to_string_lossy().to_string());
             }
         }
     }
-
     Ok(file_names)
 }

@@ -27,7 +27,7 @@ pub fn start_process_as_admin(
 ) -> Result<std::process::Output> {
     let wait_op = if does_wait { "-Wait" } else { "" };
     let arg_op = if arg_list.is_empty() {
-        "".to_string()
+        String::new()
     } else {
         format!("-ArgumentList '{}'", arg_list)
     };
@@ -49,7 +49,7 @@ pub fn execute_powershell_script_as_admin(
 ) -> Result<std::process::Output> {
     let wait_op = if does_wait { "-Wait" } else { "" };
     let cmd_op: String = if cmd.is_empty() {
-        "".to_string()
+        String::new()
     } else {
         format!("-ArgumentList '-Command {}'", cmd)
     };

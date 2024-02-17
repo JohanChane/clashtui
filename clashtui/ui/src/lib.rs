@@ -1,5 +1,8 @@
 extern crate ui_derive;
 pub use ui_derive::Visibility;
+/// Visibility-related functions, can be impl using `derive`
+///
+/// Require `is_visible:bool` in the struct
 pub trait Visibility {
     fn is_visible(&self) -> bool;
     fn show(&mut self);
@@ -8,7 +11,7 @@ pub trait Visibility {
 }
 pub mod utils;
 pub mod widgets;
-pub use utils::{EventState, Infallable};
+pub use utils::{EventState, Infailable};
 
 #[cfg(test)]
 mod tests {

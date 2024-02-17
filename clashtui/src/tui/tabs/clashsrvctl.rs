@@ -69,7 +69,7 @@ impl ClashSrvCtlTab {
         }
     }
 
-    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
+    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -82,7 +82,7 @@ impl ClashSrvCtlTab {
                 if let Event::Key(key) = ev {
                     if Keys::Select.is(key) {
                         if let Some(new) = self.mode_selector.selected() {
-                            self.clashtui_state.borrow_mut().set_mode(new.to_string());
+                            self.clashtui_state.borrow_mut().set_mode(new.clone());
                         }
                         self.mode_selector.hide();
                     }
@@ -98,7 +98,7 @@ impl ClashSrvCtlTab {
 
         Ok(event_state)
     }
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }

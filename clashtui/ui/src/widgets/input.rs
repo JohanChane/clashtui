@@ -1,9 +1,10 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
+use super::tmp;
 use super::EventState;
-use crate::{Infallable, Visibility};
-
+use crate::{Infailable, Visibility};
+/// Collect input and cache as [String]
 #[derive(Visibility)]
 pub struct InputPopup {
     title: String,
@@ -24,7 +25,7 @@ impl InputPopup {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, Infallable> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -32,18 +33,11 @@ impl InputPopup {
         if let Event::Key(key) = ev {
             if key.kind == KeyEventKind::Press {
                 match key.code {
-                    KeyCode::Char(to_insert) => {
-                        self.enter_char(to_insert);
-                    }
-                    KeyCode::Backspace => {
-                        self.delete_char();
-                    }
-                    KeyCode::Left => {
-                        self.move_cursor_left();
-                    }
-                    KeyCode::Right => {
-                        self.move_cursor_right();
-                    }
+                    KeyCode::Char(to_insert) => self.enter_char(to_insert),
+                    KeyCode::Backspace => self.delete_char(),
+
+                    KeyCode::Left => self.move_cursor_left(),
+                    KeyCode::Right => self.move_cursor_right(),
                     KeyCode::Enter => {
                         self.hide();
                         self.handle_enter_ev();
@@ -69,9 +63,9 @@ impl InputPopup {
 
         let input = Raw::Paragraph::new(self.input.as_str())
             .style(Ra::Style::default().fg(if is_selected {
-                Ra::Color::Yellow
+                tmp::IPT_TEXT_SEL_FG
             } else {
-                Ra::Color::default()
+                tmp::IPT_TEXT_NOSEL_FG
             }))
             .block(
                 Raw::Block::default()
@@ -81,6 +75,26 @@ impl InputPopup {
         f.render_widget(input, area);
     }
 
+    pub fn get_input_data(&self) -> String {
+        self.input_data.clone()
+    }
+
+    pub fn set_pre_data(&mut self, info: String) {
+        self.input = info;
+    }
+
+    pub fn handle_enter_ev(&mut self) {
+        self.input_data = self.input.clone();
+        self.input.clear();
+        self.reset_cursor();
+    }
+    pub fn handle_esc_ev(&mut self) {
+        self.input.clear();
+        self.input_data.clear();
+        self.reset_cursor();
+    }
+}
+impl InputPopup {
     fn move_cursor_left(&mut self) {
         let cursor_moved_left = self.cursor_position.saturating_sub(1);
         self.cursor_position = self.clamp_cursor(cursor_moved_left);
@@ -93,7 +107,6 @@ impl InputPopup {
 
     fn enter_char(&mut self, new_char: char) {
         self.input.insert(self.cursor_position, new_char);
-
         self.move_cursor_right();
     }
 
@@ -126,25 +139,4 @@ impl InputPopup {
     fn reset_cursor(&mut self) {
         self.cursor_position = 0;
     }
-
-    pub fn get_input_data(&self) -> String {
-        self.input_data.clone()
-    }
-
-    pub fn set_pre_data(&mut self, info: String) {
-        self.input = info;
-    }
-
-    pub fn handle_enter_ev(&mut self) {
-        self.input_data = self.input.clone();
-        self.input.clear();
-        self.reset_cursor();
-    }
-    pub fn handle_esc_ev(&mut self) {
-        self.input.clear();
-        self.input_data.clear();
-        self.reset_cursor();
-    }
 }
-
-//fouce_methods!(InputPopup);

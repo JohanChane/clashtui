@@ -1,7 +1,6 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-//use crate::msgpopup_methods;
 use crate::tui::{
     symbols::CONFIG,
     utils::Keys,
@@ -46,7 +45,7 @@ impl ConfigTab {
         }
     }
 
-    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
+    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -96,7 +95,7 @@ impl ConfigTab {
 
         Ok(event_state)
     }
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -136,12 +135,10 @@ impl ConfigTab {
             let block = Raw::Block::new()
                 .borders(Raw::Borders::ALL)
                 .border_style(Ra::Style::default().fg(Ra::Color::Rgb(135, 206, 236)))
-                .title(self.main_list.selected().unwrap().to_string());
+                .title(self.main_list.selected().unwrap().clone());
             f.render_widget(block, input_area);
         }
 
         self.msgpopup.draw(f, area);
     }
 }
-
-//msgpopup_methods!(ConfigTab);

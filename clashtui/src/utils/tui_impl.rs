@@ -196,15 +196,15 @@ impl ClashTuiUtil {
                     if g_str.starts_with('<') && g_str.ends_with('>') {
                         let trimmed_g_str = g_str.trim_matches(|c| c == '<' || c == '>');
                         let group_names = pg_names.get(trimmed_g_str).unwrap();
-                        new_groups.extend(group_names.iter().cloned());
+                        new_groups.extend(group_names.clone().into_iter());
                     } else {
-                        new_groups.push(g_str.to_string().clone());
+                        new_groups.push(g_str.to_string());
                     }
                 }
                 the_pg_seq["proxies"] = serde_yaml::Value::Sequence(
                     new_groups
-                        .iter()
-                        .map(|g| serde_yaml::Value::String(g.clone()))
+                        .into_iter()
+                        .map(|g| serde_yaml::Value::String(g))
                         .collect(),
                 );
             }

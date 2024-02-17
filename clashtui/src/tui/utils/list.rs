@@ -23,7 +23,7 @@ impl HelpPopUp {
         }
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infallable> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
