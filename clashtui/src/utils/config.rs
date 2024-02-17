@@ -69,12 +69,12 @@ pub enum ErrKind {
 type Result<T> = std::result::Result<T, CfgError>;
 #[derive(Debug)]
 pub struct CfgError {
-    kind: ErrKind,
+    _kind: ErrKind,
     pub reason: String,
 }
 impl CfgError {
-    pub fn new(kind: ErrKind, reason: String) -> Self {
-        Self { kind, reason }
+    pub fn new(_kind: ErrKind, reason: String) -> Self {
+        Self { _kind, reason }
     }
 }
 impl std::fmt::Display for CfgError {
@@ -83,11 +83,10 @@ impl std::fmt::Display for CfgError {
     }
 }
 impl std::error::Error for CfgError {}
-
 impl From<std::io::Error> for CfgError {
     fn from(value: std::io::Error) -> Self {
         Self {
-            kind: ErrKind::IO,
+            _kind: ErrKind::IO,
             reason: value.to_string(),
         }
     }
@@ -95,7 +94,7 @@ impl From<std::io::Error> for CfgError {
 impl From<serde_yaml::Error> for CfgError {
     fn from(value: serde_yaml::Error) -> Self {
         Self {
-            kind: ErrKind::Serde,
+            _kind: ErrKind::Serde,
             reason: value.to_string(),
         }
     }

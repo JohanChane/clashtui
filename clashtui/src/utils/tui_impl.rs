@@ -218,21 +218,17 @@ impl ClashTuiUtil {
         Ok(())
     }
 
-    pub fn get_profile_names(&self) -> anyhow::Result<Vec<String>> {
-        Ok(
-            Utils::get_file_names(self.profile_dir.as_path()).map(|mut v| {
-                v.sort();
-                v
-            })?,
-        )
+    pub fn get_profile_names(&self) -> Result<Vec<String>, Error> {
+        Utils::get_file_names(self.profile_dir.as_path()).map(|mut v| {
+            v.sort();
+            v
+        })
     }
-    pub fn get_template_names(&self) -> anyhow::Result<Vec<String>> {
-        Ok(
-            Utils::get_file_names(self.clashtui_dir.join("templates").as_path()).map(|mut v| {
-                v.sort();
-                v
-            })?,
-        )
+    pub fn get_template_names(&self) -> Result<Vec<String>, Error> {
+        Utils::get_file_names(self.clashtui_dir.join("templates").as_path()).map(|mut v| {
+            v.sort();
+            v
+        })
     }
     pub fn get_profile_yaml_path(&self, profile_name: &String) -> PathBuf {
         let profile_path = self.profile_dir.join(profile_name);
@@ -347,12 +343,12 @@ impl ClashTuiUtil {
         Ok((updated_res, not_updated_res))
     }
 
-    fn download_file(&self, url: &str, path: &PathBuf) -> anyhow::Result<()> {
+    fn download_file(&self, url: &str, path: &PathBuf) -> Result<(), Error> {
         let response = self.dl_remote_profile(url)?;
 
         let directory = path
             .parent()
-            .ok_or_else(|| anyhow::anyhow!("Invalid file path"))?;
+            .ok_or_else(|| Error::new(std::io::ErrorKind::NotFound, "Invalid file path"))?;
         if !directory.exists() {
             create_dir_all(directory)?;
         }
@@ -364,16 +360,14 @@ impl ClashTuiUtil {
     // 目前是根据文件后缀来判断, 而不是文件内容。这样可以减少 io。
     pub fn is_profile_yaml(&self, profile_name: &String) -> bool {
         let profile_path = self.profile_dir.join(profile_name);
-        let extension = profile_path.extension();
-        extension == Some("yaml".as_ref()) || extension == Some("yml".as_ref())
+        Self::is_yaml(&profile_path)
     }
-    pub fn is_yaml(path: &Path) -> bool {
-        if let Ok(file_content) = std::fs::read_to_string(path) {
-            if serde_yaml::from_str::<serde_yaml::Value>(&file_content).is_ok() {
-                return true;
-            }
+    fn is_yaml(path: &Path) -> bool {
+        if let Ok(f) = std::fs::File::open(path) {
+            serde_yaml::from_reader::<std::fs::File, serde_yaml::Value>(f).is_ok()
+        } else {
+            false
         }
-        false
     }
 
     pub fn edit_file(&self, path: &Path) -> Result<String, Error> {

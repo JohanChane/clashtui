@@ -25,11 +25,10 @@ pub struct App {
     clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
     statusbar: StatusBar,
-    pub flags: Flags,
 }
 
 impl App {
-    pub fn new(flags: Flags, clashtui_config_dir: PathBuf) -> (Option<Self>, Vec<CfgError>) {
+    pub fn new(flags: &Flags, clashtui_config_dir: PathBuf) -> (Option<Self>, Vec<CfgError>) {
         #[cfg(debug_assertions)]
         let _ = std::fs::remove_file(clashtui_config_dir.join("clashtui.log")); // auto rm old log for debug
         Self::setup_logging(clashtui_config_dir.join("clashtui.log").to_str().unwrap());
@@ -129,7 +128,6 @@ impl App {
             clashtui_util,
             clashtui_state,
             tabs,
-            flags,
         };
 
         (Some(app), err_track)

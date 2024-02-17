@@ -46,7 +46,7 @@ pub fn run(mut flags: Flags, tick_rate: Duration, enhanced_graphics: bool) -> an
     let res;
     let config_dir = load_app_dir(&mut flags);
     log::debug!("Current flags: {:?}", flags);
-    let (app, err_track) = App::new(flags, config_dir);
+    let (app, err_track) = App::new(&flags, config_dir);
     if let Some(mut app) = app {
         use crossterm::{
             event::{DisableMouseCapture, EnableMouseCapture},
@@ -63,7 +63,7 @@ pub fn run(mut flags: Flags, tick_rate: Duration, enhanced_graphics: bool) -> an
         let mut terminal = Terminal::new(backend)?;
 
         // create app and run it
-        res = run_app(&mut terminal, &mut app, tick_rate, err_track);
+        res = run_app(&mut terminal, &mut app, tick_rate, err_track, flags);
 
         // restore terminal
         disable_raw_mode()?;
@@ -93,16 +93,17 @@ fn run_app<B: Backend>(
     app: &mut App,
     tick_rate: Duration,
     mut err_track: Vec<CfgError>,
+    flags: Flags,
 ) -> anyhow::Result<()> {
     {
-        if app.flags.contains(utils::Flag::FirstInit) {
+        if flags.contains(utils::Flag::FirstInit) {
             app.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
             app.popup_txt_msg(
                 "Please go to Config Tab to set configs so that program can work properly"
                     .to_string(),
             );
         };
-        if app.flags.contains(utils::Flag::ErrorDuringInit) {
+        if flags.contains(utils::Flag::ErrorDuringInit) {
             app.popup_txt_msg(
                 "Some Error happened during app init, Check the log for detail".to_string(),
             );
@@ -116,12 +117,13 @@ fn run_app<B: Backend>(
             app.popup_txt_msg(showstr);
         }
     }
+    drop(flags);
     log::info!("App init finished");
 
     let mut last_tick = Instant::now();
     let mut last_ev = EventState::NotConsumed;
     use crossterm::event;
-    loop {
+    while !app.should_quit {
         terminal.draw(|f| app.draw(f))?;
 
         last_ev = app.handle_last_ev(&last_ev);
@@ -137,12 +139,10 @@ fn run_app<B: Backend>(
             app.on_tick();
             last_tick = Instant::now();
         }
-        if app.should_quit {
-            app.save_config();
-            log::info!("App Exit");
-            return Ok(());
-        }
     }
+    app.save_config();
+    log::info!("App Exit");
+    Ok(())
 }
 
 fn load_app_dir(flags: &mut Flags) -> std::path::PathBuf {
