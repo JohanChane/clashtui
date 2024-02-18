@@ -448,9 +448,9 @@ impl ClashTuiUtil {
             path,
         );
         #[cfg(target_os = "windows")]
-        return exec_ipc("cmd".to_string(), ["/C".to_string(), cmd].to_vec());
+        return exec_ipc("cmd".to_string(), vec!["/C".to_string(), cmd]);
         #[cfg(target_os = "linux")]
-        exec_ipc("sh".to_string(), ["-c".to_string(), cmd].to_vec())
+        exec_ipc("sh".to_string(), vec!["-c".to_string(), cmd])
     }
 
     #[cfg(target_os = "linux")]
@@ -458,22 +458,21 @@ impl ClashTuiUtil {
         match op {
             ClashSrvOp::StartClashService => exec_ipc(
                 "systemctl".to_string(),
-                ["restart".to_string(), self.get_cfg(CfgOp::ClashServiceName)].to_vec(),
+                vec!["restart".to_string(), self.get_cfg(CfgOp::ClashServiceName)],
             ),
             ClashSrvOp::StopClashService => exec_ipc(
                 "systemctl".to_string(),
-                ["stop".to_string(), self.get_cfg(CfgOp::ClashServiceName)].to_vec(),
+                vec!["stop".to_string(), self.get_cfg(CfgOp::ClashServiceName)],
             ),
             ClashSrvOp::TestClashConfig => {
                 self.test_profile_config(&self.get_cfg(CfgOp::ClashConfigFile), false)
             }
             ClashSrvOp::SetPermission => exec_ipc(
                 "setcap".to_string(),
-                [
+                vec![
                     "'cap_net_admin,cap_net_bind_service=+ep'".to_string(),
                     self.get_cfg(CfgOp::ClashCorePath),
-                ]
-                .to_vec(),
+                ],
             ),
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,

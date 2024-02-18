@@ -69,7 +69,7 @@ impl App {
                         .into_iter()
                         .flat_map(|v| match v {
                             Ok(v) => crate::utils::concat_update_profile_result(v),
-                            Err(e) => [e.to_string()].to_vec(),
+                            Err(e) => vec![e.to_string()],
                         })
                         .collect::<Vec<String>>()
                 )
