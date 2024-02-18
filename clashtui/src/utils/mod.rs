@@ -12,7 +12,6 @@ pub type SharedClashTuiState = std::rc::Rc<std::cell::RefCell<State>>;
 pub use api::Mode;
 pub use config::{init_config, CfgError, ErrKind};
 pub use flags::{Flag, Flags};
-use ipc::exec_ipc;
 pub use state::State;
 pub use tui::ClashTuiUtil;
 pub use utils::*;

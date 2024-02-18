@@ -90,16 +90,16 @@ impl HelpPopUp {
         f.render_stateful_widget(list, area, &mut self.list_state);
     }
 
-    pub fn selected(&self) -> Option<&String> {
-        if self.items.is_empty() {
-            return None;
-        }
-
-        match self.list_state.selected() {
-            Some(i) => Some(&self.items[i]),
-            None => None,
-        }
-    }
+    // pub fn selected(&self) -> Option<&String> {
+    //     if self.items.is_empty() {
+    //         return None;
+    //     }
+    //
+    //     match self.list_state.selected() {
+    //         Some(i) => Some(&self.items[i]),
+    //         None => None,
+    //     }
+    // }
 
     fn next(&mut self) {
         if self.items.is_empty() {
@@ -137,25 +137,25 @@ impl HelpPopUp {
         self.list_state.select(Some(i));
     }
 
-    pub fn set_items(&mut self, items: Vec<String>) {
-        match self.list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.list_state.select(None);
-                } else if i >= items.len() {
-                    self.list_state.select(Some(items.len() - 1));
-                }
-            }
-            None => self.list_state.select(None),
-        }
-        self.items = items;
+    // pub fn set_items(&mut self, items: Vec<String>) {
+    //     match self.list_state.selected() {
+    //         Some(i) => {
+    //             if i == 0 {
+    //                 self.list_state.select(None);
+    //             } else if i >= items.len() {
+    //                 self.list_state.select(Some(items.len() - 1));
+    //             }
+    //         }
+    //         None => self.list_state.select(None),
+    //     }
+    //     self.items = items;
+    // 
+    //     if self.list_state.selected().is_none() && !self.items.is_empty() {
+    //         self.list_state.select(Some(0));
+    //     }
+    // }
 
-        if self.list_state.selected().is_none() && !self.items.is_empty() {
-            self.list_state.select(Some(0));
-        }
-    }
-
-    pub fn get_items(&self) -> &Vec<String> {
-        &self.items
-    }
+    // pub fn get_items(&self) -> &Vec<String> {
+    //     &self.items
+    // }
 }

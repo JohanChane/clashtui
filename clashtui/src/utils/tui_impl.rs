@@ -1,31 +1,32 @@
-use std::collections::HashMap;
-use std::process::Command;
 use std::{
     fs::{create_dir_all, File},
-    io::{BufRead, BufReader, Error, Read},
+    io::Error,
     path::{Path, PathBuf},
 };
 
-use super::exec_ipc;
 use super::{tui::parse_yaml, utils as Utils, CfgOp, ClashSrvOp, ClashTuiUtil};
 
 impl ClashTuiUtil {
     pub fn create_yaml_with_template(&self, template_name: &String) -> anyhow::Result<()> {
+        use std::borrow::Cow;
+        use std::collections::HashMap;
+        use std::io::{BufRead, BufReader};
         let template_dir = self.clashtui_dir.join("templates");
         let template_path = template_dir.join(template_name);
         let tpl_parsed_yaml = parse_yaml(&template_path)?;
-        let mut out_parsed_yaml = tpl_parsed_yaml.clone();
+        let mut out_parsed_yaml = Cow::Borrowed(&tpl_parsed_yaml);
 
         let proxy_url_file =
-            File::open(self.clashtui_dir.join("templates/template_proxy_providers")).unwrap();
-        let proxy_url_reader = BufReader::new(proxy_url_file);
+            File::open(self.clashtui_dir.join("templates/template_proxy_providers"))?;
         let mut proxy_urls = Vec::new();
-        for line in proxy_url_reader.lines() {
-            let line = line.as_ref().unwrap().trim();
-            if !line.is_empty() && !line.starts_with('#') {
-                proxy_urls.push(line.to_string());
-            }
-        }
+        BufReader::new(proxy_url_file)
+            .lines()
+            .map_while(Result::ok)
+            .filter(|v| {
+                let val = v.trim();
+                !(val.is_empty() || val.starts_with('#'))
+            })
+            .for_each(|v| proxy_urls.push(v));
 
         // ## proxy-providers
         // e.g. {provider: [provider0, provider1, ...]}
@@ -76,7 +77,8 @@ impl ClashTuiUtil {
                 );
             }
         }
-        out_parsed_yaml["proxy-providers"] = serde_yaml::to_value(new_proxy_providers).unwrap();
+        out_parsed_yaml.to_mut()["proxy-providers"] =
+            serde_yaml::to_value(new_proxy_providers).unwrap();
 
         // ## proxy-groups
         // e.g. {Auto: [Auto-provider0, Auto-provider1, ...], Select: [Select-provider0, ...]}
@@ -154,14 +156,14 @@ impl ClashTuiUtil {
                 }
             }
         }
-        out_parsed_yaml["proxy-groups"] = serde_yaml::Value::Sequence(new_proxy_groups);
+        out_parsed_yaml.to_mut()["proxy-groups"] = serde_yaml::Value::Sequence(new_proxy_groups);
 
         // ### replace special keys in group-providers
         // e.g. <provider> => provider0, provider1
         // e.g. <Auto> => Auto-provider0, Auto-provider1
         // e.g. <Select> => Select-provider0, Select-provider1
         let pg_sequence = if let Some(serde_yaml::Value::Sequence(pg_sequence)) =
-            out_parsed_yaml.get_mut("proxy-groups")
+            out_parsed_yaml.to_mut().get_mut("proxy-groups")
         {
             pg_sequence
         } else {
@@ -178,13 +180,13 @@ impl ClashTuiUtil {
                         let provider_names = pp_names.get(trimmed_p_str).unwrap();
                         new_providers.extend(provider_names.iter().cloned());
                     } else {
-                        new_providers.push(p_str.to_string().clone());
+                        new_providers.push(p_str.to_string());
                     }
                 }
                 the_pg_seq["use"] = serde_yaml::Value::Sequence(
                     new_providers
-                        .iter()
-                        .map(|p| serde_yaml::Value::String(p.clone()))
+                        .into_iter()
+                        .map(serde_yaml::Value::String)
                         .collect(),
                 );
             }
@@ -196,7 +198,7 @@ impl ClashTuiUtil {
                     if g_str.starts_with('<') && g_str.ends_with('>') {
                         let trimmed_g_str = g_str.trim_matches(|c| c == '<' || c == '>');
                         let group_names = pg_names.get(trimmed_g_str).unwrap();
-                        new_groups.extend(group_names.clone().into_iter());
+                        new_groups.extend(group_names.iter().cloned());
                     } else {
                         new_groups.push(g_str.to_string());
                     }
@@ -204,7 +206,7 @@ impl ClashTuiUtil {
                 the_pg_seq["proxies"] = serde_yaml::Value::Sequence(
                     new_groups
                         .into_iter()
-                        .map(|g| serde_yaml::Value::String(g))
+                        .map(serde_yaml::Value::String)
                         .collect(),
                 );
             }
@@ -212,7 +214,7 @@ impl ClashTuiUtil {
 
         log::error!("testssdfs");
         let out_yaml_path = self.profile_dir.join(template_name);
-        let out_yaml_file = File::create(out_yaml_path).unwrap();
+        let out_yaml_file = File::create(out_yaml_path)?;
         serde_yaml::to_writer(out_yaml_file, &out_parsed_yaml)?;
 
         Ok(())
@@ -247,6 +249,7 @@ impl ClashTuiUtil {
         profile_name: &String,
         does_update_all: bool,
     ) -> anyhow::Result<(Vec<(String, String)>, Vec<(String, String)>)> {
+        use std::io::Read;
         let net_res_keys = if !does_update_all {
             vec!["proxy-providers"]
         } else {
@@ -357,11 +360,12 @@ impl ClashTuiUtil {
         response.copy_to(&mut output_file)?;
         Ok(())
     }
-    // 目前是根据文件后缀来判断, 而不是文件内容。这样可以减少 io。
+    /// Judging by format
     pub fn is_profile_yaml(&self, profile_name: &String) -> bool {
         let profile_path = self.profile_dir.join(profile_name);
         Self::is_yaml(&profile_path)
     }
+    /// Judging by format
     fn is_yaml(path: &Path) -> bool {
         if let Ok(f) = std::fs::File::open(path) {
             serde_yaml::from_reader::<std::fs::File, serde_yaml::Value>(f).is_ok()
@@ -369,75 +373,36 @@ impl ClashTuiUtil {
             false
         }
     }
-
-    pub fn edit_file(&self, path: &Path) -> Result<String, Error> {
-        let edit_cmd = self.get_cfg(CfgOp::TuiEdit);
-        let output;
-        if !edit_cmd.is_empty() {
-            let edit_cmd_with_path = edit_cmd.replace("%s", path.to_str().unwrap_or(""));
-
-            if cfg!(target_os = "windows") {
-                output = Command::new("cmd")
-                    .arg("/C")
-                    .arg(&edit_cmd_with_path)
-                    .spawn();
-            } else {
-                output = Command::new("sh")
-                    .arg("-c")
-                    .arg(&edit_cmd_with_path)
-                    .spawn();
-            };
-
-            return output.map(|_| "Done".to_string());
-        }
-
-        if cfg!(target_os = "windows") {
-            output = Command::new("cmd")
-                .arg("/C")
-                .arg("start")
-                .arg(path.to_str().unwrap_or(""))
-                .spawn();
+}
+use super::ipc::exec_ipc;
+// IPC Related
+impl ClashTuiUtil {
+    /// Exec `cmd` for given `path`
+    ///
+    /// Auto detect `cmd` is_empty and use system default app to open `path`
+    fn spawn_open(cmd: &String, path: &Path) -> Result<(), Error> {
+        use super::ipc::spawn;
+        if !cmd.is_empty() {
+            let opendir_cmd_with_path = cmd.replace("%s", path.to_str().unwrap_or(""));
+            #[cfg(target_os = "windows")]
+            return spawn("cmd", vec!["/C", opendir_cmd_with_path.as_str()]);
+            #[cfg(target_os = "linux")]
+            spawn("sh", vec!["-c", opendir_cmd_with_path.as_str()])
         } else {
-            output = Command::new("xdg-open")
-                .arg(path.to_str().unwrap_or(""))
-                .spawn();
-        };
-        output.map(|_| "Done".to_string())
+            #[cfg(target_os = "windows")]
+            return spawn("cmd", vec!["/C", "start", path.to_str().unwrap_or("")]);
+            #[cfg(target_os = "linux")]
+            spawn("xdg-open", vec![path.to_str().unwrap_or("")])
+        }
     }
-    pub fn open_dir(&self, path: &Path) -> Result<String, Error> {
+
+    pub fn edit_file(&self, path: &Path) -> Result<(), Error> {
+        let edit_cmd = self.get_cfg(CfgOp::TuiEdit);
+        Self::spawn_open(&edit_cmd, path)
+    }
+    pub fn open_dir(&self, path: &Path) -> Result<(), Error> {
         let opendir_cmd = self.get_cfg(CfgOp::TuiOpen);
-        let output;
-        if !opendir_cmd.is_empty() {
-            let opendir_cmd_with_path = opendir_cmd.replace("%s", path.to_str().unwrap_or(""));
-
-            if cfg!(target_os = "windows") {
-                output = Command::new("cmd")
-                    .arg("/C")
-                    .arg("opendir_cmd_with_path")
-                    .spawn();
-            } else {
-                output = Command::new("sh")
-                    .arg("-c")
-                    .arg(&opendir_cmd_with_path)
-                    .spawn();
-            }
-
-            return output.map(|_| "Done".to_string());
-        }
-
-        if cfg!(target_os = "windows") {
-            output = Command::new("cmd")
-                .arg("/C")
-                .arg("start")
-                .arg(path.to_str().unwrap_or(""))
-                .spawn();
-        } else {
-            output = Command::new("xdg-open")
-                .arg(path.to_str().unwrap_or(""))
-                .spawn();
-        };
-
-        output.map(|_| "Done".to_string())
+        Self::spawn_open(&opendir_cmd, path)
     }
     pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> Result<String, Error> {
         let cmd = format!(
@@ -448,30 +413,30 @@ impl ClashTuiUtil {
             path,
         );
         #[cfg(target_os = "windows")]
-        return exec_ipc("cmd".to_string(), vec!["/C".to_string(), cmd]);
+        return exec_ipc("cmd", vec!["/C", cmd.as_str()]);
         #[cfg(target_os = "linux")]
-        exec_ipc("sh".to_string(), vec!["-c".to_string(), cmd])
+        exec_ipc("sh", vec!["-c", cmd.as_str()])
     }
 
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
         match op {
             ClashSrvOp::StartClashService => exec_ipc(
-                "systemctl".to_string(),
-                vec!["restart".to_string(), self.get_cfg(CfgOp::ClashServiceName)],
+                "systemctl",
+                vec!["restart", self.get_cfg(CfgOp::ClashServiceName).as_str()],
             ),
             ClashSrvOp::StopClashService => exec_ipc(
-                "systemctl".to_string(),
-                vec!["stop".to_string(), self.get_cfg(CfgOp::ClashServiceName)],
+                "systemctl",
+                vec!["stop", self.get_cfg(CfgOp::ClashServiceName).as_str()],
             ),
             ClashSrvOp::TestClashConfig => {
-                self.test_profile_config(&self.get_cfg(CfgOp::ClashConfigFile), false)
+                self.test_profile_config(self.get_cfg(CfgOp::ClashConfigFile).as_str(), false)
             }
             ClashSrvOp::SetPermission => exec_ipc(
-                "setcap".to_string(),
+                "setcap",
                 vec![
-                    "'cap_net_admin,cap_net_bind_service=+ep'".to_string(),
-                    self.get_cfg(CfgOp::ClashCorePath),
+                    "'cap_net_admin,cap_net_bind_service=+ep'",
+                    self.get_cfg(CfgOp::ClashCorePath).as_str(),
                 ],
             ),
             _ => Err(Error::new(

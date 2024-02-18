@@ -1,13 +1,22 @@
 use std::io::Error;
 use std::process::{Command, Output};
 
-pub fn exec_ipc(pgm: String, args: Vec<String>) -> Result<String, Error> {
+pub fn exec_ipc(pgm: &str, args: Vec<&str>) -> Result<String, Error> {
     log::debug!("IPC: {} {:?}", pgm, args);
     #[cfg(target_os = "linux")]
     let output = Command::new(pgm).args(args).output()?;
     #[cfg(target_os = "windows")]
     let output = Command::new(pgm).args(args).output()?;
     string_process_output(output)
+}
+
+pub fn spawn(pgm: &str, args: Vec<&str>) -> Result<(), Error> {
+    log::debug!("SPW: {} {:?}", pgm, args);
+    #[cfg(target_os = "linux")]
+    Command::new(pgm).args(args).spawn()?;
+    #[cfg(target_os = "windows")]
+    Command::new(pgm).args(args).spawn()?;
+    Ok(())
 }
 
 #[cfg(target_os = "windows")]

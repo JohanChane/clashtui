@@ -143,10 +143,8 @@ impl App {
             Tabs::ClashSrvCtl(v) => v.borrow_mut().popup_event(ev),
             Tabs::Config(v) => v.borrow_mut().popup_event(ev),
         });
-        let mut tmp;
         while event_state.is_notconsumed() {
-            tmp = iter.next();
-            match tmp {
+            match iter.next() {
                 Some(v) => event_state = v?,
                 None => break,
             }
@@ -220,10 +218,8 @@ impl App {
                     Tabs::ClashSrvCtl(v) => v.borrow_mut().event(ev).map_err(|e| e.into()),
                     Tabs::Config(v) => v.borrow_mut().event(ev).map_err(|e| e.into()),
                 });
-                let mut tmp;
                 while event_state.is_notconsumed() {
-                    tmp = iter.next();
-                    match tmp {
+                    match iter.next() {
                         Some(v) => event_state = v?,
                         None => break,
                     }
@@ -302,12 +298,11 @@ impl App {
         let tab_chunk = chunks[1];
         self.tabs
             .values()
-            .map(|v| match v {
+            .for_each(|v| match v {
                 Tabs::Profile(v) => v.borrow_mut().draw(f, tab_chunk),
                 Tabs::ClashSrvCtl(v) => v.borrow_mut().draw(f, tab_chunk),
                 Tabs::Config(v) => v.borrow_mut().draw(f, tab_chunk),
-            })
-            .count();
+            });
 
         self.statusbar.draw(f, chunks[2]);
 
@@ -326,13 +321,12 @@ impl App {
         let _ = self
             .tabs
             .iter()
-            .map(|(n, v)| if n == tabname { (true, v) } else { (false, v) })
-            .map(|(b, v)| match v {
+            .map(|(n, v)| (n == tabname, v))
+            .for_each(|(b, v)| match v {
                 Tabs::Profile(k) => k.borrow_mut().set_visible(b),
                 Tabs::ClashSrvCtl(k) => k.borrow_mut().set_visible(b),
                 Tabs::Config(k) => k.borrow_mut().set_visible(b),
-            })
-            .count();
+            });
     }
 
     fn setup_logging(log_path: &str) {

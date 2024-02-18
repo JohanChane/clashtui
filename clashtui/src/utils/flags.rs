@@ -18,7 +18,7 @@ impl Flags {
     pub fn insert(&mut self, k: Flag) {
         // current, flag should not be add more than once
         if !self.inner.insert(k) {
-            panic!();
+            unreachable!()
         }
     }
     pub fn contains(&self, k: Flag) -> bool {

@@ -87,7 +87,7 @@ impl MsgPopup {
             .border_style(Ra::Style::default().fg(tmp::MSG_BLOCK_FG));
 
         f.render_widget(Raw::Clear, area);
-        f.render_widget(paragraph.clone().block(block), area);
+        f.render_widget(paragraph.block(block), area);
     }
 
     pub fn scroll_up(&mut self) {

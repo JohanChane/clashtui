@@ -75,7 +75,7 @@ pub fn run(mut flags: Flags, tick_rate: Duration, enhanced_graphics: bool) -> an
         terminal.show_cursor()?;
     } else {
         if !err_track.is_empty() {
-            err_track.into_iter().map(|v| println!("{v}")).count();
+            err_track.into_iter().for_each(|v| println!("{v}"));
         }
         res = Ok(());
     }
@@ -112,7 +112,7 @@ fn run_app<B: Backend>(
             let err: Option<CfgError> = err_track.pop();
             let showstr = match err {
                 Some(v) => v.reason.to_string(),
-                None => panic!("Should not reached arm!!"),
+                None => unreachable!(),
             };
             app.popup_txt_msg(showstr);
         }
