@@ -23,14 +23,15 @@ jobs:
       run: nohup ./mihomo -d Example -f Example/basic_clash_config.yaml &
       
     - name: Download Dependencies
-      run: cargo fetch
+      run: cd clashtui && cargo fetch
     - name: Run tests
-      run: cargo test --verbose
+      run: cd clashtui && cargo test --verbose
     - name: Build
-      run: cargo build --verbose
+      run: cd clashtui && cargo build --verbose
 
     - name: Build Release
       run: |
+        cd clashtui
         cargo build --release
         mkdir artifacts
         mv ./target/release/clashtui ./artifacts/clashtui
