@@ -33,7 +33,8 @@ jobs:
       run: |
         cd clashtui && cargo build --release
         cd .. && mkdir artifacts
-        mv ./clashtui/target/release/clashtui ./artifacts/clashtui
+        mv ./clashtui/target/release/clashtui ./artifacts/clashtui_r
+        mv ./clashtui/target/debug/clashtui ./artifacts/clashtui_d
 
     - name: upload artifacts
       uses: actions/upload-artifact@v3
