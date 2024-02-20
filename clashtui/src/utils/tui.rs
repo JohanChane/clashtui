@@ -74,6 +74,7 @@ impl ClashTuiUtil {
 }
 // Config Related
 impl ClashTuiUtil {
+    #[deprecated]
     pub fn get_cfg(&self, typ: CfgOp) -> String {
         let config = self.clashtui_config.borrow();
         match typ {
@@ -85,7 +86,8 @@ impl ClashTuiUtil {
             CfgOp::TuiOpen => config.open_dir_cmd.clone(),
         }
     }
-
+    
+    #[deprecated]
     pub fn update_cfg(&self, conf: &CfgOp, data: String) {
         let mut config = self.clashtui_config.borrow_mut();
         log::debug!("Updated Config: {:?}:{}", conf, data);
@@ -100,7 +102,8 @@ impl ClashTuiUtil {
         drop(config);
         self.save_cfg();
     }
-
+    
+    #[deprecated]
     pub fn save_cfg(&self) {
         if let Err(x) = self
             .clashtui_config

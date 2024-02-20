@@ -9,6 +9,7 @@ use crate::tui::{
 };
 use crate::utils::{CfgOp, SharedClashTuiUtil};
 
+#[deprecated]
 #[derive(Visibility)]
 pub struct ConfigTab {
     is_visible: bool,
