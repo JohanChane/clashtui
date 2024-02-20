@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::{tui::parse_yaml, utils as Utils, CfgOp, ClashSrvOp, ClashTuiUtil};
+use super::{tui::parse_yaml, utils as Utils, ClashSrvOp, ClashTuiUtil};
 
 impl ClashTuiUtil {
     pub fn create_yaml_with_template(&self, template_name: &String) -> anyhow::Result<()> {
@@ -331,7 +331,7 @@ impl ClashTuiUtil {
         for (url, path) in &net_res {
             match self.download_file(
                 url,
-                &Path::new(&self.get_cfg(super::CfgOp::ClashConfigDir)).join(path),
+                &Path::new(&self.tui_cfg.clash_cfg_dir).join(path),
             ) {
                 Ok(_) => {
                     updated_res.push((url.clone(), path.clone()));
@@ -397,19 +397,17 @@ impl ClashTuiUtil {
     }
 
     pub fn edit_file(&self, path: &Path) -> Result<(), Error> {
-        let edit_cmd = self.get_cfg(CfgOp::TuiEdit);
-        Self::spawn_open(&edit_cmd, path)
+        Self::spawn_open(&self.tui_cfg.edit_cmd, path)
     }
     pub fn open_dir(&self, path: &Path) -> Result<(), Error> {
-        let opendir_cmd = self.get_cfg(CfgOp::TuiOpen);
-        Self::spawn_open(&opendir_cmd, path)
+        Self::spawn_open(&self.tui_cfg.open_dir_cmd, path)
     }
     pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> Result<String, Error> {
         let cmd = format!(
             "{} {} -d {} -f {} -t",
-            self.get_cfg(CfgOp::ClashCorePath),
+            self.tui_cfg.clash_core_path,
             if geodata_mode { "-m" } else { "" },
-            self.get_cfg(CfgOp::ClashConfigDir),
+            self.tui_cfg.clash_cfg_dir,
             path,
         );
         #[cfg(target_os = "windows")]
@@ -423,20 +421,20 @@ impl ClashTuiUtil {
         match op {
             ClashSrvOp::StartClashService => exec_ipc(
                 "systemctl",
-                vec!["restart", self.get_cfg(CfgOp::ClashServiceName).as_str()],
+                vec!["restart", self.tui_cfg.clash_srv_name.as_str()],
             ),
             ClashSrvOp::StopClashService => exec_ipc(
                 "systemctl",
-                vec!["stop", self.get_cfg(CfgOp::ClashServiceName).as_str()],
+                vec!["stop", self.tui_cfg.clash_srv_name.as_str()],
             ),
             ClashSrvOp::TestClashConfig => {
-                self.test_profile_config(self.get_cfg(CfgOp::ClashConfigFile).as_str(), false)
+                self.test_profile_config(self.tui_cfg.clash_cfg_path.as_str(), false)
             }
             ClashSrvOp::SetPermission => exec_ipc(
                 "setcap",
                 vec![
                     "'cap_net_admin,cap_net_bind_service=+ep'",
-                    self.get_cfg(CfgOp::ClashCorePath).as_str(),
+                    self.tui_cfg.clash_core_path.as_str(),
                 ],
             ),
             _ => Err(Error::new(

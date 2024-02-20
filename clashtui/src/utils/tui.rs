@@ -12,7 +12,6 @@ use encoding::all::GBK;
 use super::{
     config::{CfgError, ClashTuiConfig, ErrKind},
     state::_State,
-    CfgOp,
 };
 use api::{ClashConfig, ClashUtil, Resp};
 
@@ -21,7 +20,7 @@ pub struct ClashTuiUtil {
     pub profile_dir: PathBuf,
 
     clash_api: ClashUtil,
-    clashtui_config: RefCell<ClashTuiConfig>,
+    pub tui_cfg: ClashTuiConfig,
     clash_remote_config: RefCell<Option<ClashConfig>>,
 }
 
@@ -55,7 +54,7 @@ impl ClashTuiUtil {
                 clashtui_dir: clashtui_dir.clone(),
                 profile_dir: profile_dir.to_path_buf(),
                 clash_api,
-                clashtui_config: RefCell::new(ret.0),
+                tui_cfg: ret.0,
                 clash_remote_config: RefCell::new(remote),
             },
             err_track,
@@ -70,48 +69,6 @@ impl ClashTuiUtil {
             .take(num_lines)
             .map(String::from)
             .collect()
-    }
-}
-// Config Related
-impl ClashTuiUtil {
-    #[deprecated]
-    pub fn get_cfg(&self, typ: CfgOp) -> String {
-        let config = self.clashtui_config.borrow();
-        match typ {
-            CfgOp::ClashConfigDir => config.clash_cfg_dir.clone(),
-            CfgOp::ClashCorePath => config.clash_core_path.clone(),
-            CfgOp::ClashConfigFile => config.clash_cfg_path.clone(),
-            CfgOp::ClashServiceName => config.clash_srv_name.clone(),
-            CfgOp::TuiEdit => config.edit_cmd.clone(),
-            CfgOp::TuiOpen => config.open_dir_cmd.clone(),
-        }
-    }
-    
-    #[deprecated]
-    pub fn update_cfg(&self, conf: &CfgOp, data: String) {
-        let mut config = self.clashtui_config.borrow_mut();
-        log::debug!("Updated Config: {:?}:{}", conf, data);
-        match conf {
-            CfgOp::ClashConfigDir => config.clash_cfg_dir = data,
-            CfgOp::ClashCorePath => config.clash_core_path = data,
-            CfgOp::ClashConfigFile => config.clash_cfg_path = data,
-            CfgOp::ClashServiceName => config.clash_srv_name = data,
-            CfgOp::TuiEdit => config.edit_cmd = data,
-            CfgOp::TuiOpen => config.open_dir_cmd = data,
-        };
-        drop(config);
-        self.save_cfg();
-    }
-    
-    #[deprecated]
-    pub fn save_cfg(&self) {
-        if let Err(x) = self
-            .clashtui_config
-            .borrow()
-            .to_file(self.clashtui_dir.join("config.yaml").to_str().unwrap())
-        {
-            log::error!("Error while saving config: {}", x);
-        };
     }
 }
 // Web
@@ -141,7 +98,7 @@ impl ClashTuiUtil {
             return Err(Error::new(std::io::ErrorKind::Other, err));
         };
         let body = serde_json::json!({
-            "path": self.clashtui_config.borrow().clash_cfg_path.as_str(),
+            "path": self.tui_cfg.clash_cfg_path.as_str(),
             "payload": ""
         })
         .to_string();
@@ -184,7 +141,7 @@ impl ClashTuiUtil {
             }
         }
 
-        let final_clash_cfg_file = File::create(&self.clashtui_config.borrow().clash_cfg_path)?;
+        let final_clash_cfg_file = File::create(&self.tui_cfg.clash_cfg_path)?;
         serde_yaml::to_writer(final_clash_cfg_file, &dst_parsed_yaml)?;
 
         Ok(())
@@ -205,13 +162,13 @@ impl ClashTuiUtil {
                 .map_err(|e| log::error!("Patch Errr: {}", e));
         }
 
-        let mut tuiconf = self.clashtui_config.borrow_mut();
+        let tuiconf = &self.tui_cfg;
         let pf = match new_pf {
             Some(v) => {
                 tuiconf.update_profile(v.clone());
                 v
             }
-            None => tuiconf.current_profile.clone(),
+            None => tuiconf.current_profile.borrow().clone(),
         };
 
         let ver = match self.clash_api.version() {

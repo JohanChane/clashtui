@@ -68,15 +68,3 @@ define_enum!(
         UnInstallSrv
     ]
 );
-
-define_enum!(
-    CfgOp,
-    [
-        ClashConfigDir,
-        ClashCorePath,
-        ClashConfigFile,
-        ClashServiceName,
-        TuiEdit,
-        TuiOpen
-    ]
-);

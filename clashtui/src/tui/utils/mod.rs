@@ -5,17 +5,6 @@ pub use self::key_list::Keys;
 pub use self::list::HelpPopUp;
 
 #[macro_export]
-macro_rules! title_methods {
-    ($type:ident) => {
-        impl $type {
-            pub fn get_title(&self) -> &String {
-                &self.title
-            }
-        }
-    };
-}
-
-#[macro_export]
 macro_rules! msgpopup_methods {
     ($type:ident) => {
         impl $type {

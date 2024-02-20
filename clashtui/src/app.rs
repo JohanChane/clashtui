@@ -173,10 +173,7 @@ impl App {
             } else if Keys::AppConfig.is(key) {
                 let _ = self
                     .clashtui_util
-                    .open_dir(&PathBuf::from(
-                        self.clashtui_util
-                            .get_cfg(crate::utils::CfgOp::ClashConfigDir),
-                    ))
+                    .open_dir(&PathBuf::from(&self.clashtui_util.tui_cfg.clash_cfg_dir))
                     .map_err(|e| log::error!("ODIR: {}", e));
                 EventState::WorkDone
             } else if Keys::LogCat.is(key) {
@@ -286,12 +283,10 @@ impl App {
         self.tabbar.draw(f, chunks[0]);
 
         let tab_chunk = chunks[1];
-        self.tabs
-            .values()
-            .for_each(|v| match v {
-                Tabs::Profile(v) => v.borrow_mut().draw(f, tab_chunk),
-                Tabs::ClashSrvCtl(v) => v.borrow_mut().draw(f, tab_chunk),
-            });
+        self.tabs.values().for_each(|v| match v {
+            Tabs::Profile(v) => v.borrow_mut().draw(f, tab_chunk),
+            Tabs::ClashSrvCtl(v) => v.borrow_mut().draw(f, tab_chunk),
+        });
 
         self.statusbar.draw(f, chunks[2]);
 
