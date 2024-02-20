@@ -38,17 +38,16 @@ impl App {
             &clashtui_config_dir.join("profiles"),
             !flags.contains(Flag::FirstInit),
         );
-        let clashtui_util = Rc::new(util);
         if flags.contains(Flag::UpdateOnly) {
             let log_path = &clashtui_config_dir.join("CronUpdate.log");
             let _ = std::fs::remove_file(log_path); // clear old logs
             log::info!("Cron Mode!");
             println!("Log saved to CronUpdate.log");
-            let profile_list: Vec<_> = clashtui_util
+            let profile_list: Vec<_> = util
                 .get_profile_names()
                 .unwrap()
                 .iter()
-                .map(|v| clashtui_util.update_local_profile(v, false))
+                .map(|v| util.update_local_profile(v, false))
                 .collect();
             let mut x = match std::fs::File::create(log_path) {
                 Err(e) => {
@@ -78,6 +77,7 @@ impl App {
             .map_err(|e| log::error!("Err while CronUpdate: {}", e));
             return (None, err_track);
         } // Finish cron
+        let clashtui_util = Rc::new(util);
 
         let clashtui_state =
             SharedClashTuiState::new(RefCell::new(State::new(clashtui_util.clone())));

@@ -1,7 +1,9 @@
 use std::{
-    cell::RefCell,
+    cell::OnceCell,
     io::{Error, ErrorKind},
 };
+
+use reqwest::blocking::Client;
 
 const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
 
@@ -27,26 +29,29 @@ impl Resp {
     }
 }
 pub struct ClashUtil {
-    client: reqwest::blocking::Client,
+    client: OnceCell<Client>,
     api: String,
     proxy_addr: String,
-    clash_client: RefCell<Option<reqwest::blocking::Client>>,
+    clash_client: OnceCell<Client>,
 }
 
 impl ClashUtil {
     pub fn new(controller_api: String, proxy_addr: String) -> Self {
         Self {
-            client: reqwest::blocking::Client::new(),
+            client: OnceCell::new(),
             api: controller_api,
             proxy_addr,
-            clash_client: None.into(),
+            clash_client: OnceCell::new(),
         }
     }
     fn get(&self, url: &str, payload: Option<String>) -> Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
-            Some(kv) => self.client.get(format!("{}{}", api, kv)),
-            None => self.client.get(api),
+            Some(kv) => self
+                .client
+                .get_or_init(Client::new)
+                .get(format!("{}{}", api, kv)),
+            None => self.client.get_or_init(Client::new).get(api),
         }
         .send();
         match response {
@@ -57,8 +62,8 @@ impl ClashUtil {
     fn post(&self, url: &str, payload: Option<String>) -> Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
-            Some(kv) => self.client.post(api).body(kv),
-            None => self.client.post(api),
+            Some(kv) => self.client.get_or_init(Client::new).post(api).body(kv),
+            None => self.client.get_or_init(Client::new).post(api),
         }
         .send();
         match response {
@@ -70,8 +75,8 @@ impl ClashUtil {
     fn put(&self, url: &str, payload: Option<String>) -> Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
-            Some(kv) => self.client.put(api).body(kv),
-            None => self.client.put(api),
+            Some(kv) => self.client.get_or_init(Client::new).put(api).body(kv),
+            None => self.client.get_or_init(Client::new).put(api),
         }
         .send();
         match response {
@@ -100,18 +105,19 @@ impl ClashUtil {
         }
     }
     pub fn mock_clash_core(&self, url: &str) -> Result<Resp, Error> {
-        let mut hmap = self.clash_client.borrow_mut();
-        if hmap.is_none() {
-            let proxy = reqwest::Proxy::http(&self.proxy_addr).map_err(process_err)?;
-            let client = reqwest::blocking::Client::builder()
-                .user_agent("clash.meta")
-                .proxy(proxy)
-                .build()
-                .map_err(process_err)?;
-            hmap.replace(client);
-        }
-        hmap.as_ref()
-            .unwrap()
+        self.clash_client
+            .get_or_init(|| {
+                // [TODO] When get_or_try_init is stable...
+                let proxy = reqwest::Proxy::http(&self.proxy_addr)
+                    .map_err(process_err)
+                    .unwrap(); //?;
+                Client::builder()
+                    .user_agent("clash.meta")
+                    .proxy(proxy)
+                    .build()
+                    .unwrap()
+                //.map_err(process_err)?
+            })
             .get(url)
             .send()
             .map(|v| Resp { inner: v })
@@ -119,6 +125,7 @@ impl ClashUtil {
     }
     pub fn config_patch(&self, payload: String) -> Result<String, Error> {
         self.client
+            .get_or_init(Client::new)
             .patch(self.api.clone() + "/configs")
             .body(payload)
             .send()
