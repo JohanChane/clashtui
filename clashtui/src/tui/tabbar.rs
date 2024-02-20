@@ -7,10 +7,10 @@ use crate::tui::EventState;
 pub struct TabBar {
     title: String,
     is_visible: bool,
-    pub tab_titles: Vec<String>,
-    pub index: usize,
+    tab_titles: Vec<String>,
+    index: usize,
 
-    pub theme: SharedTheme,
+    theme: SharedTheme,
 }
 
 impl TabBar {

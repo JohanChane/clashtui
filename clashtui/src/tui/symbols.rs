@@ -39,4 +39,3 @@ external-controller: 127.0.0.1:9090"#;
 pub const PROFILE: &str = "Profile";
 pub const TEMPALTE: &str = "Template";
 pub const CLASHSRVCTL: &str = "ClashSrvCtl";
-pub const CONFIG: &str = "Config";

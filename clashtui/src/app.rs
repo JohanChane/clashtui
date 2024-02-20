@@ -5,7 +5,7 @@ use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 use crate::msgpopup_methods;
 use crate::tui::{
     symbols,
-    tabs::{ClashSrvCtlTab, ConfigTab, ProfileTab, Tab, Tabs},
+    tabs::{ClashSrvCtlTab, ProfileTab, Tab, Tabs},
     tools,
     utils::{HelpPopUp, Keys},
     widgets::MsgPopup,
@@ -88,7 +88,6 @@ impl App {
             vec![
                 symbols::PROFILE.to_string(),
                 symbols::CLASHSRVCTL.to_string(),
-                symbols::CONFIG.to_string(),
             ],
             Rc::clone(&theme),
         );
@@ -107,13 +106,6 @@ impl App {
                 Tabs::ClashSrvCtl(RefCell::new(ClashSrvCtlTab::new(
                     clashtui_util.clone(),
                     clashtui_state.clone(),
-                    theme.clone(),
-                ))),
-            ),
-            (
-                Tab::Config,
-                Tabs::Config(RefCell::new(ConfigTab::new(
-                    clashtui_util.clone(),
                     theme.clone(),
                 ))),
             ),
@@ -141,7 +133,6 @@ impl App {
         let mut iter = self.tabs.values().map(|v| match v {
             Tabs::Profile(v) => v.borrow_mut().popup_event(ev),
             Tabs::ClashSrvCtl(v) => v.borrow_mut().popup_event(ev),
-            Tabs::Config(v) => v.borrow_mut().popup_event(ev),
         });
         while event_state.is_notconsumed() {
             match iter.next() {
@@ -216,7 +207,6 @@ impl App {
                 let mut iter = self.tabs.values().map(|v| match v {
                     Tabs::Profile(v) => v.borrow_mut().event(ev),
                     Tabs::ClashSrvCtl(v) => v.borrow_mut().event(ev).map_err(|e| e.into()),
-                    Tabs::Config(v) => v.borrow_mut().event(ev).map_err(|e| e.into()),
                 });
                 while event_state.is_notconsumed() {
                     match iter.next() {
@@ -301,7 +291,6 @@ impl App {
             .for_each(|v| match v {
                 Tabs::Profile(v) => v.borrow_mut().draw(f, tab_chunk),
                 Tabs::ClashSrvCtl(v) => v.borrow_mut().draw(f, tab_chunk),
-                Tabs::Config(v) => v.borrow_mut().draw(f, tab_chunk),
             });
 
         self.statusbar.draw(f, chunks[2]);
@@ -325,7 +314,6 @@ impl App {
             .for_each(|(b, v)| match v {
                 Tabs::Profile(k) => k.borrow_mut().set_visible(b),
                 Tabs::ClashSrvCtl(k) => k.borrow_mut().set_visible(b),
-                Tabs::Config(k) => k.borrow_mut().set_visible(b),
             });
     }
 
@@ -350,10 +338,6 @@ impl App {
 
         log4rs::init_config(config).unwrap();
         log::info!("Start Log, level: {}", log_level);
-    }
-
-    pub fn save_config(&self) {
-        self.clashtui_util.save_cfg()
     }
 }
 

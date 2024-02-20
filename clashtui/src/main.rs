@@ -140,7 +140,6 @@ fn run_app<B: Backend>(
             last_tick = Instant::now();
         }
     }
-    app.save_config();
     log::info!("App Exit");
     Ok(())
 }
