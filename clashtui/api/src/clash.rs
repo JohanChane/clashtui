@@ -31,7 +31,7 @@ impl Resp {
 pub struct ClashUtil {
     client: OnceCell<Client>,
     api: String,
-    proxy_addr: String,
+    pub proxy_addr: String,
     clash_client: OnceCell<Client>,
 }
 

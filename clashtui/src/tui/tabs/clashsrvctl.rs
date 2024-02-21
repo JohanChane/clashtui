@@ -36,14 +36,13 @@ impl ClashSrvCtlTab {
         let mut operations = List::new(title, theme.clone());
         operations.set_items(vec![
             ClashSrvOp::TestClashConfig.into(),
+            #[cfg(target_os = "linux")]
             ClashSrvOp::SetPermission.into(),
             ClashSrvOp::StartClashService.into(),
             ClashSrvOp::StopClashService.into(),
             ClashSrvOp::SwitchMode.into(),
             #[cfg(target_os = "windows")]
-            ClashSrvOp::EnableSysProxy.into(),
-            #[cfg(target_os = "windows")]
-            ClashSrvOp::DisableSysProxy.into(),
+            ClashSrvOp::SwitchSysProxy.into(),
             #[cfg(target_os = "windows")]
             ClashSrvOp::EnableLoopback.into(),
             #[cfg(target_os = "windows")]
@@ -73,25 +72,24 @@ impl ClashSrvCtlTab {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
-        let mut event_state;
+        let event_state;
         if self.mode_selector.is_visible() {
             event_state = self.mode_selector.event(ev)?;
             if event_state == EventState::WorkDone {
                 return Ok(event_state);
-            } else if self.mode_selector.is_visible() {
-                if let Event::Key(key) = ev {
-                    if Keys::Select.is(key) {
-                        if let Some(new) = self.mode_selector.selected() {
-                            self.clashtui_state.borrow_mut().set_mode(new.clone());
-                        }
-                        self.mode_selector.hide();
-                    }
-                    if Keys::Esc.is(key) {
-                        self.mode_selector.hide();
-                    }
-                }
-                return Ok(EventState::WorkDone);
             }
+            if let Event::Key(key) = ev {
+                if Keys::Select.is(key) {
+                    if let Some(new) = self.mode_selector.selected() {
+                        self.clashtui_state.borrow_mut().set_mode(new.clone());
+                    }
+                    self.mode_selector.hide();
+                }
+                if Keys::Esc.is(key) {
+                    self.mode_selector.hide();
+                }
+            }
+            return Ok(EventState::WorkDone);
         }
 
         event_state = self.msgpopup.event(ev)?;
@@ -103,7 +101,7 @@ impl ClashSrvCtlTab {
             return Ok(EventState::NotConsumed);
         }
 
-        let mut event_state = EventState::NotConsumed;
+        let mut event_state;
         if let Event::Key(key) = ev {
             if key.kind != KeyEventKind::Press {
                 return Ok(EventState::NotConsumed);
@@ -111,17 +109,12 @@ impl ClashSrvCtlTab {
 
             event_state = if Keys::Select.is(key) {
                 let op_str = self.main_list.selected().unwrap();
-                let op: ClashSrvOp = ClashSrvOp::from(op_str.as_ref());
+                let op = ClashSrvOp::from(op_str.as_str());
                 match op {
                     #[cfg(target_os = "windows")]
-                    ClashSrvOp::EnableSysProxy => {
-                        self.popup_txt_msg("EnableSysProxy...".to_string());
-                        EventState::EnableSysProxy
-                    }
-                    #[cfg(target_os = "windows")]
-                    ClashSrvOp::DisableSysProxy => {
-                        self.popup_txt_msg("DisableSysProxy...".to_string());
-                        EventState::DisableSysProxy
+                    ClashSrvOp::SwitchSysProxy => {
+                        self.popup_txt_msg("SwitchSysProxy...".to_string());
+                        EventState::SwitchSysProxy
                     }
                     ClashSrvOp::SwitchMode => {
                         self.mode_selector.show();
@@ -148,6 +141,8 @@ impl ClashSrvCtlTab {
             if event_state == EventState::NotConsumed {
                 event_state = self.main_list.event(ev)?;
             }
+        } else {
+            event_state = EventState::NotConsumed
         }
 
         Ok(event_state)

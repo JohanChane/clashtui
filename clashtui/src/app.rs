@@ -249,17 +249,13 @@ impl App {
                 EventState::WorkDone
             }
             #[cfg(target_os = "windows")]
-            EventState::EnableSysProxy => {
-                self.clashsrvctl_tab.hide_msgpopup();
-                self.clashtui_util.enable_system_proxy();
-                self.clashtui_state.borrow_mut().set_sysproxy(true);
-                EventState::WorkDone
-            }
-            #[cfg(target_os = "windows")]
-            EventState::DisableSysProxy => {
-                self.clashsrvctl_tab.hide_msgpopup();
-                ClashTuiUtil::disable_system_proxy();
-                self.clashtui_state.borrow_mut().set_sysproxy(false);
+            EventState::SwitchSysProxy => {
+                let cur = self
+                    .clashtui_state
+                    .borrow()
+                    .get_sysproxy()
+                    .map_or(true, |b| !b);
+                self.clashtui_state.borrow_mut().set_sysproxy(cur);
                 EventState::WorkDone
             }
         };

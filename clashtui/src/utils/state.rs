@@ -1,15 +1,17 @@
 use super::SharedClashTuiUtil;
+use api::{Mode, TunStack};
 
-#[cfg(target_os = "linux")]
 pub struct _State {
     pub profile: String,
-    pub mode: String,
-    pub tun: String,
+    pub mode: Option<Mode>,
+    pub tun: Option<TunStack>,
+    #[cfg(target_os = "windows")]
+    pub sysproxy: Option<bool>,
     pub ver: String,
 }
-#[cfg(target_os = "linux")]
 impl _State {
-    pub fn new(pf: String, mode: String, tun: String, ver: String) -> Self {
+    #[cfg(target_os = "linux")]
+    pub fn new(pf: String, mode: Option<Mode>, tun: Option<TunStack>, ver: String) -> Self {
         Self {
             tun,
             mode,
@@ -17,20 +19,20 @@ impl _State {
             ver,
         }
     }
-}
-#[cfg(target_os = "windows")]
-pub struct State {
-    pub profile: String,
-    pub tun: String,
-    pub sysproxy: bool,
-}
-#[cfg(target_os = "windows")]
-impl _State {
-    pub fn new(pf: String, tun: String, syp: bool) -> Self {
+    #[cfg(target_os = "windows")]
+    pub fn new(
+        profile: String,
+        mode: Option<Mode>,
+        tun: Option<TunStack>,
+        ver: String,
+        sysproxy: Option<bool>,
+    ) -> Self {
         Self {
+            profile,
+            mode,
             tun,
-            profile: pf,
-            sysproxy: syp,
+            sysproxy,
+            ver,
         }
     }
 }
@@ -40,6 +42,12 @@ pub struct State {
 }
 impl State {
     pub fn new(ct: SharedClashTuiUtil) -> Self {
+        #[cfg(target_os = "windows")]
+        return Self {
+            st: ct.update_state(None, None, None),
+            ct,
+        };
+        #[cfg(target_os = "linux")]
         Self {
             st: ct.update_state(None, None),
             ct,
@@ -50,32 +58,65 @@ impl State {
     }
     pub fn set_profile(&mut self, profile: String) {
         // With update state
-        self.st = self.ct.update_state(Some(profile), None);
+        #[cfg(target_os = "windows")]
+        {
+            self.st = self.ct.update_state(Some(profile), None, None)
+        }
+        #[cfg(target_os = "linux")]
+        {
+            self.st = self.ct.update_state(Some(profile), None)
+        }
     }
     pub fn set_mode(&mut self, mode: String) {
-        self.st = self.ct.update_state(None, Some(mode));
+        #[cfg(target_os = "windows")]
+        {
+            self.st = self.ct.update_state(None, Some(mode), None)
+        }
+        #[cfg(target_os = "linux")]
+        {
+            self.st = self.ct.update_state(Some(mode), None)
+        }
     }
     pub fn render(&self) -> String {
         #[cfg(target_os = "windows")]
         let status_str = format!(
-            "Profile: {}    Tun: {}    SysProxy: {}    Help: ?",
-            self.get_profile(),
-            self.get_tun(),
-            self.get_sysproxy().to_string(),
+            "Profile: {}    Mode: {}    SysProxy: {}    Tun: {}    ClashVer: {}    Help: ?",
+            self.st.profile,
+            self.st
+                .mode
+                .as_ref()
+                .map_or("Unknown".to_string(), |v| format!("{}", v)),
+            self.st
+                .sysproxy
+                .map_or("Unknown".to_string(), |v| format!("{}", v)),
+            self.st
+                .tun
+                .as_ref()
+                .map_or("Unknown".to_string(), |v| format!("{}", v)),
+            self.st.ver
         );
         #[cfg(target_os = "linux")]
         let status_str = format!(
             "Profile: {}    Mode: {}    Tun: {}    ClashVer: {}    Help: ?",
-            self.st.profile, self.st.mode, self.st.tun, self.st.ver
+            self.st.profile,
+            self.st
+                .mode
+                .as_ref()
+                .map_or("Unknown".to_string(), |v| format!("{}", v)),
+            self.st
+                .tun
+                .as_ref()
+                .map_or("Unknown".to_string(), |v| format!("{}", v)),
+            self.st.ver
         );
         status_str
     }
     #[cfg(target_os = "windows")]
-    pub fn get_sysproxy(&self) -> bool {
-        self.state.sysproxy
+    pub fn get_sysproxy(&self) -> Option<bool> {
+        self.st.sysproxy
     }
     #[cfg(target_os = "windows")]
     pub fn set_sysproxy(&mut self, sysproxy: bool) {
-        self.state.sysproxy = sysproxy;
+        self.st = self.ct.update_state(None, None, Some(sysproxy));
     }
 }

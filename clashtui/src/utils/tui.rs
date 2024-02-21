@@ -6,9 +6,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-#[cfg(target_os = "windows")]
-use encoding::all::GBK;
-
 use super::{
     config::{CfgError, ClashTuiConfig, ErrKind},
     state::_State,
@@ -59,6 +56,93 @@ impl ClashTuiUtil {
             },
             err_track,
         )
+    }
+
+    fn _update_state(
+        &self,
+        new_pf: Option<String>,
+        new_mode: Option<String>,
+    ) -> (String, Option<api::Mode>, Option<api::TunStack>, String) {
+        if let Some(v) = new_mode {
+            let load = format!(r#"{{"mode": "{}"}}"#, v);
+            let _ = self
+                .clash_api
+                .config_patch(load)
+                .map_err(|e| log::error!("Patch Errr: {}", e));
+        }
+
+        let pf = match new_pf {
+            Some(v) => {
+                self.tui_cfg.update_profile(v.clone());
+                v
+            }
+            None => self.tui_cfg.current_profile.borrow().clone(),
+        };
+
+        let ver = match self.clash_api.version() {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("{}", e);
+                "Unknown".to_string()
+            }
+        };
+        let (mode, tun) = match self.clash_remote_config.borrow().as_ref() {
+            Some(v) => (
+                Some(v.mode),
+                if v.tun.enable {
+                    Some(v.tun.stack)
+                } else {
+                    None
+                },
+            ),
+            None => (None, None),
+        };
+        (pf, mode, tun, ver)
+    }
+
+    #[cfg(target_os = "windows")]
+    pub fn update_state(
+        &self,
+        new_pf: Option<String>,
+        new_mode: Option<String>,
+        new_sysp: Option<bool>,
+    ) -> _State {
+        if new_mode.is_none() && new_pf.is_none() && new_sysp.is_none() {
+            if let Err(e) = self.fetch_remote() {
+                if e.kind() != std::io::ErrorKind::ConnectionRefused {
+                    log::warn!("{}", e);
+                }
+            }
+        }
+        if let Some(b) = new_sysp {
+            let _ = if b {
+                super::ipc::enable_system_proxy(&self.clash_api.proxy_addr)
+            } else {
+                super::ipc::disable_system_proxy()
+            };
+        }
+        let (pf, mode, tun, ver) = self._update_state(new_pf, new_mode);
+        let sysp = super::ipc::is_system_proxy_enabled().map_or_else(
+            |v| {
+                log::error!("{}", v);
+                None
+            },
+            Some,
+        );
+        _State::new(pf, mode, tun, ver, sysp)
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn update_state(&self, new_pf: Option<String>, new_mode: Option<String>) -> _State {
+        if new_mode.is_none() && new_pf.is_none() {
+            if let Err(e) = self.fetch_remote() {
+                if e.kind() != std::io::ErrorKind::ConnectionRefused {
+                    log::warn!("{}", e);
+                }
+            }
+        }
+        let (pf, mode, tun, ver) = self._update_state(new_pf, new_mode);
+        _State::new(pf, mode, tun, ver)
     }
 
     pub fn fetch_recent_logs(&self, num_lines: usize) -> Vec<String> {
@@ -149,59 +233,6 @@ impl ClashTuiUtil {
 
     pub fn dl_remote_profile(&self, url: &str) -> Result<Resp, Error> {
         self.clash_api.mock_clash_core(url)
-    }
-
-    #[cfg(target_os = "linux")]
-    pub fn update_state(&self, new_pf: Option<String>, new_mode: Option<String>) -> _State {
-        let is_skip = new_pf.is_none() && new_mode.is_none();
-        if let Some(v) = new_mode {
-            let load = format!(r#"{{"mode": "{}"}}"#, v);
-            let _ = self
-                .clash_api
-                .config_patch(load)
-                .map_err(|e| log::error!("Patch Errr: {}", e));
-        }
-
-        let tuiconf = &self.tui_cfg;
-        let pf = match new_pf {
-            Some(v) => {
-                tuiconf.update_profile(v.clone());
-                v
-            }
-            None => tuiconf.current_profile.borrow().clone(),
-        };
-
-        let ver = match self.clash_api.version() {
-            Ok(v) => v,
-            Err(e) => {
-                log::warn!("{}", e);
-                "Unknown".to_string()
-            }
-        };
-
-        if !is_skip {
-            if let Err(e) = self.fetch_remote() {
-                if e.kind() != std::io::ErrorKind::ConnectionRefused {
-                    log::warn!("{}", e);
-                }
-            }
-        }
-        let mode;
-        let tun = match self.clash_remote_config.borrow().as_ref() {
-            Some(v) => {
-                mode = v.mode.to_string();
-                if v.tun.enable {
-                    v.tun.stack.to_string()
-                } else {
-                    "False".to_string()
-                }
-            }
-            None => {
-                mode = "UnKnown".to_string();
-                "Unknown".to_string()
-            }
-        };
-        _State::new(pf, mode, tun, ver)
     }
 }
 

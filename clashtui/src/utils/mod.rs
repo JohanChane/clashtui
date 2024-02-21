@@ -61,10 +61,10 @@ define_enum!(
         StartClashService,
         StopClashService,
         TestClashConfig,
-        EnableSysProxy,
-        DisableSysProxy,
+        SwitchSysProxy,
         EnableLoopback,
         InstallSrv,
-        UnInstallSrv
+        UnInstallSrv,
+        SwitchMode
     ]
 );

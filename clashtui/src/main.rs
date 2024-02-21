@@ -1,6 +1,3 @@
-#[cfg(not(target_os = "linux"))]
-compile_error!("only linux is supported");
-
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,

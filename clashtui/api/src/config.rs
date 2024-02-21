@@ -26,7 +26,7 @@ impl std::str::FromStr for ClashConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
     #[default]
@@ -66,7 +66,7 @@ pub struct TunConfig {
     pub stack: TunStack,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Copy)]
 pub enum TunStack {
     #[default]
     #[serde(alias = "Mixed")]

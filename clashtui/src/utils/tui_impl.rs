@@ -329,10 +329,7 @@ impl ClashTuiUtil {
         let mut updated_res = vec![];
         let mut not_updated_res = vec![];
         for (url, path) in &net_res {
-            match self.download_file(
-                url,
-                &Path::new(&self.tui_cfg.clash_cfg_dir).join(path),
-            ) {
+            match self.download_file(url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(path)) {
                 Ok(_) => {
                     updated_res.push((url.clone(), path.clone()));
                 }
@@ -445,90 +442,83 @@ impl ClashTuiUtil {
     }
     #[cfg(target_os = "windows")]
     pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
-        let exe_dir = std::env::current_exe()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .to_path_buf();
+        //let exe_dir = std::env::current_exe()
+        //    .unwrap()
+        //    .parent()
+        //    .unwrap()
+        //    .to_path_buf();
         //let nssm_path = exe_dir.join("nssm");
         //let nssm_path_str = nssm_path.to_str().unwrap();
-        let nssm_path_str = "nssm";
+        let nssm_pgm = "nssm";
+        use super::ipc::start_process_as_admin;
 
-        let output = match op {
+        match op {
             ClashSrvOp::StartClashService => {
-                Self::start_process_as_admin(
-                    nssm_path_str,
-                    format!("restart {}", self.clash_srv_name).as_str(),
+                start_process_as_admin(
+                    nssm_pgm,
+                    format!("restart {}", self.tui_cfg.clash_srv_name).as_str(),
                     true,
                 )?;
-
-                Command::new(nssm_path_str)
-                    .arg("status")
-                    .arg(self.clash_srv_name.as_str())
-                    .output()?
+                exec_ipc(
+                    nssm_pgm,
+                    vec!["status", self.tui_cfg.clash_srv_name.as_str()],
+                )
             }
 
             ClashSrvOp::StopClashService => {
-                Self::start_process_as_admin(
-                    nssm_path_str,
-                    &format!("stop {}", self.clash_srv_name),
+                start_process_as_admin(
+                    nssm_pgm,
+                    &format!("stop {}", self.tui_cfg.clash_srv_name),
                     true,
                 )?;
-
-                Command::new(nssm_path_str)
-                    .arg("status")
-                    .arg(self.clash_srv_name.as_str())
-                    .output()?
+                exec_ipc(
+                    nssm_pgm,
+                    vec!["status", self.tui_cfg.clash_srv_name.as_str()],
+                )
             }
 
             ClashSrvOp::TestClashConfig => {
-                return self.test_profile_config(&self.clash_cfg_path, false);
+                return self.test_profile_config(self.tui_cfg.clash_cfg_path.as_str(), false);
             }
 
             ClashSrvOp::InstallSrv => {
-                Self::start_process_as_admin(
-                    nssm_path_str,
+                start_process_as_admin(
+                    nssm_pgm,
                     &format!(
                         "install {} \"{}\" -d \"{}\" -f \"{}\"",
-                        self.clash_srv_name,
-                        self.clash_core_path.to_str().unwrap(),
-                        self.clash_cfg_dir.to_str().unwrap(),
-                        self.clash_cfg_path.to_str().unwrap()
+                        self.tui_cfg.clash_srv_name,
+                        self.tui_cfg.clash_core_path,
+                        self.tui_cfg.clash_cfg_dir,
+                        self.tui_cfg.clash_cfg_path
                     ),
                     true,
                 )?;
 
-                Command::new(nssm_path_str)
-                    .arg("status")
-                    .arg(self.clash_srv_name.as_str())
-                    .output()?
+                exec_ipc(
+                    nssm_pgm,
+                    vec!["status", self.tui_cfg.clash_srv_name.as_str()],
+                )
             }
 
-            ClashSrvOp::UnInstallSrv => Self::execute_powershell_script_as_admin(
+            ClashSrvOp::UnInstallSrv => super::ipc::execute_powershell_script_as_admin(
                 &format!(
                     "{0} stop {1}; {0} remove {1}",
-                    nssm_path_str, self.clash_srv_name
+                    nssm_pgm, self.tui_cfg.clash_srv_name
                 ),
                 true,
-            )?,
+            ),
 
             ClashSrvOp::EnableLoopback => {
-                let exe_dir = std::env::current_exe()
-                    .unwrap()
+                let exe_dir = std::env::current_exe()?
                     .parent()
-                    .unwrap()
+                    .expect("Exec at / ?")
                     .to_path_buf();
-                Self::start_process_as_admin(
-                    exe_dir.join("EnableLoopback").to_str().unwrap(),
-                    "",
-                    false,
-                )?
+                start_process_as_admin(exe_dir.join("EnableLoopback").to_str().unwrap(), "", false)
             }
-            _ => {
-                bail!("Do nothing for the ClashTuiOp.")
-            }
-        };
-
-        Self::string_process_output(output)
+            _ => Err(Error::new(
+                std::io::ErrorKind::NotFound,
+                "No Support Adction",
+            )),
+        }
     }
 }

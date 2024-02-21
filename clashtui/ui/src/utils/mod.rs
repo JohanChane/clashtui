@@ -14,9 +14,7 @@ pub enum EventState {
     ProfileSelect,
     ProfileDelete,
     #[cfg(target_os = "windows")]
-    EnableSysProxy,
-    #[cfg(target_os = "windows")]
-    DisableSysProxy,
+    SwitchSysProxy,
 }
 
 impl EventState {
