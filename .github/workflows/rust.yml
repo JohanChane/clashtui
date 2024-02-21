@@ -21,16 +21,16 @@ jobs:
         chmod +x mihomo
         nohup ./mihomo -d Example -f Example/basic_clash_config.yaml &
       
-    - name: Cache Crates
+    - name: Cache Target
       uses: actions/cache@v4
       with:
         path: |
-          ./target
+          ./clashtui/target
           ~/.cargo            
-        key: debug-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('Cargo.lock') }}
+        key: debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-${{ hashFiles('./clashtui/rust-toolchain.toml') }}
         restore-keys: |
-          debug-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-
-          debug-${{ runner.os }}-  
+          debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-
+          debug-${{ runner.os }}-   
 
     - name: Download Dependencies
       run: cd clashtui && cargo fetch
@@ -39,31 +39,32 @@ jobs:
     - name: Build
       run: cd clashtui && cargo build --verbose && cargo build --release
 
-    - name: Build Release
+    - name: Pre Upload
       run: |
-        mkdir artifacts_linux
-        mv ./clashtui/target/release/clashtui ./artifacts_linux/clashtui_r
-        mv ./clashtui/target/debug/clashtui ./artifacts_linux/clashtui_d
+        mkdir artifacts
+        mv ./clashtui/target/release/clashtui ./artifacts/clashtui_r
+        mv ./clashtui/target/debug/clashtui ./artifacts/clashtui_d
 
     - name: upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        path: artifacts_linux
+        name: Linux_Build
+        path: artifacts
 
   build-windows:
     runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
 
-    - name: Cache Crates
+    - name: Cache Target
       uses: actions/cache@v4
       with:
         path: |
           ./clashtui/target
           ~/.cargo            
-        key: debug-${{ runner.os }}-${{ hashFiles('./clashtui/rust-toolchain.toml') }}-${{ hashFiles('./clashtui/Cargo.lock') }}
+        key: debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-${{ hashFiles('./clashtui/rust-toolchain.toml') }}
         restore-keys: |
-          debug-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml') }}-
+          debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-
           debug-${{ runner.os }}-   
 
     - name: Download Dependencies
@@ -73,17 +74,18 @@ jobs:
     - name: Build
       run: cd clashtui && cargo build --verbose && cargo build --release
 
-    - name: Build Release
+    - name: Pre Upload
       run: |
         tree
-      # mkdir artifacts_windows
-      # mv ./target/release/clashtui ./artifacts_windows/clashtui_r
-      # mv ./target/debug/clashtui ./artifacts_windows/clashtui_d
+        mkdir artifacts
+        mv ./clashtui/target/release/clashtui.exe ./artifacts/clashtui_r.exe
+        mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui_d.exe
 
     - name: upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        path: artifacts_windows
+        name: Windows_Build
+        path: artifacts
 
   release:
     runs-on: ubuntu-latest
