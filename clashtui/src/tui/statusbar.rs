@@ -1,21 +1,18 @@
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use super::SharedTheme;
+use super::Theme;
 use crate::utils::SharedClashTuiState;
 
 pub struct StatusBar {
     is_visible: bool,
     clashtui_state: SharedClashTuiState,
-
-    theme: SharedTheme,
 }
 
 impl StatusBar {
-    pub fn new(clashtui_state: SharedClashTuiState, theme: SharedTheme) -> Self {
+    pub fn new(clashtui_state: SharedClashTuiState) -> Self {
         Self {
             is_visible: true,
             clashtui_state,
-            theme,
         }
     }
 
@@ -29,7 +26,7 @@ impl StatusBar {
         let status_str = state.render();
         let paragraph = Raw::Paragraph::new(Ra::Span::styled(
             status_str,
-            Ra::Style::default().fg(self.theme.statusbar_txt_fg),
+            Ra::Style::default().fg(Theme::get().statusbar_txt_fg),
         ))
         //.alignment(ratatui::prelude::Alignment::Right)
         .wrap(Raw::Wrap { trim: true });

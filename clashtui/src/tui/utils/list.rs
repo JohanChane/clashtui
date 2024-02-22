@@ -1,4 +1,4 @@
-use crate::tui::{symbols::HELP, tools, EventState, SharedTheme, Visibility};
+use crate::tui::{symbols::HELP, tools, EventState, Theme, Visibility};
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
@@ -9,17 +9,15 @@ pub struct HelpPopUp {
     is_visible: bool,
     items: Vec<String>,
     list_state: Raw::ListState,
-    theme: SharedTheme,
 }
 
 impl HelpPopUp {
-    pub fn new(title: String, theme: SharedTheme) -> Self {
+    pub fn new(title: String) -> Self {
         Self {
             title,
             is_visible: false,
             items: HELP.lines().map(|line| line.trim().to_string()).collect(),
             list_state: Raw::ListState::default().with_selected(Some(0)),
-            theme,
         }
     }
 
@@ -77,12 +75,12 @@ impl HelpPopUp {
             .block(
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
-                    .border_style(Style::default().fg(self.theme.list_block_fg_fouced))
+                    .border_style(Style::default().fg(Theme::get().list_block_fg_fouced))
                     .title(self.title.clone()),
             )
             .highlight_style(
                 Style::default()
-                    .bg(self.theme.list_hl_bg_fouced)
+                    .bg(Theme::get().list_hl_bg_fouced)
                     .add_modifier(Ra::Modifier::BOLD),
             );
 
@@ -149,7 +147,7 @@ impl HelpPopUp {
     //         None => self.list_state.select(None),
     //     }
     //     self.items = items;
-    // 
+    //
     //     if self.list_state.selected().is_none() && !self.items.is_empty() {
     //         self.list_state.select(Some(0));
     //     }

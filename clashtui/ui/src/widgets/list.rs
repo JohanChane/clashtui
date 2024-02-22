@@ -1,30 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::{utils::SharedTheme, EventState, Infailable, Visibility};
-
-// struct ClashTuiScrollBar {
-//     pub state: ScrollbarState,
-//     pub pos: usize,
-// }
-//
-// impl ClashTuiScrollBar {
-//     pub fn new(pos: usize) -> Self {
-//         Self {
-//             state: ScrollbarState::default(),
-//             pos,
-//         }
-//     }
-//     pub fn next(&mut self) {
-//         self.pos = self.pos.saturating_add(1);
-//         self.state = self.state.position(self.pos as u16)
-//     }
-//
-//     pub fn previous(&mut self) {
-//         self.pos = self.pos.saturating_sub(1);
-//         self.state = self.state.position(self.pos as u16)
-//     }
-// }
+use crate::{utils::Theme, EventState, Infailable, Visibility};
 
 /// Interactive list, mainly used as basic interface
 ///
@@ -36,20 +13,16 @@ pub struct List {
     items: Vec<String>,
     list_state: Raw::ListState,
     scrollbar: Raw::ScrollbarState,
-
-    theme: SharedTheme,
 }
 
 impl List {
-    pub fn new(title: String, theme: SharedTheme) -> Self {
+    pub fn new(title: String) -> Self {
         Self {
             title,
             is_visible: true,
             items: vec![],
             list_state: Raw::ListState::default(),
             scrollbar: Raw::ScrollbarState::default(),
-
-            theme,
         }
     }
 
@@ -85,16 +58,16 @@ impl List {
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
                     .border_style(Ra::Style::default().fg(if is_fouced {
-                        self.theme.list_block_fg_fouced
+                        Theme::get().list_block_fg_fouced
                     } else {
-                        self.theme.list_block_fg_unfouced
+                        Theme::get().list_block_fg_unfouced
                     }))
                     .title(self.title.as_str()),
             )
             .highlight_style(
                 Ra::Style::default()
                     .bg(if is_fouced {
-                        self.theme.list_hl_bg_fouced
+                        Theme::get().list_hl_bg_fouced
                     } else {
                         Ra::Color::default()
                     })

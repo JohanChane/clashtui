@@ -1,8 +1,8 @@
+use core::time::Duration;
 use ratatui::{
     backend::{Backend, CrosstermBackend},
     Terminal,
 };
-use core::time::Duration;
 use std::time::Instant;
 mod app;
 mod tui;

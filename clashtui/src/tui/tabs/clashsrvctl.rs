@@ -8,7 +8,7 @@ use crate::{
         tools,
         utils::Keys,
         widgets::{List, MsgPopup},
-        EventState, SharedTheme, Visibility,
+        EventState, Visibility,
     },
     utils::{ClashSrvOp, Mode, SharedClashTuiState, SharedClashTuiUtil},
 };
@@ -27,13 +27,9 @@ pub struct ClashSrvCtlTab {
 }
 
 impl ClashSrvCtlTab {
-    pub fn new(
-        clashtui_util: SharedClashTuiUtil,
-        clashtui_state: SharedClashTuiState,
-        theme: SharedTheme,
-    ) -> Self {
+    pub fn new(clashtui_util: SharedClashTuiUtil, clashtui_state: SharedClashTuiState) -> Self {
         let title = CLASHSRVCTL.to_string();
-        let mut operations = List::new(title, theme.clone());
+        let mut operations = List::new(title);
         operations.set_items(vec![
             ClashSrvOp::TestClashConfig.into(),
             #[cfg(target_os = "linux")]
@@ -50,7 +46,7 @@ impl ClashSrvCtlTab {
             #[cfg(target_os = "windows")]
             ClashSrvOp::UnInstallSrv.into(),
         ]);
-        let mut modes = List::new("Mode".to_string(), theme);
+        let mut modes = List::new("Mode".to_string());
         modes.set_items(vec![
             Mode::Rule.into(),
             Mode::Direct.into(),

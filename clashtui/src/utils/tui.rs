@@ -73,7 +73,7 @@ impl ClashTuiUtil {
 
         let pf = match new_pf {
             Some(v) => {
-                self.tui_cfg.update_profile(v.clone());
+                self.tui_cfg.update_profile(&v);
                 v
             }
             None => self.tui_cfg.current_profile.borrow().clone(),

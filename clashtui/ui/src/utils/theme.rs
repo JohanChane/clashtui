@@ -1,4 +1,7 @@
 use ratatui::style::Color;
+use std::sync::OnceLock;
+
+static GLOBAL_THEME: OnceLock<Theme> = OnceLock::new();
 
 // #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Theme {
@@ -14,13 +17,25 @@ pub struct Theme {
     pub statusbar_txt_fg: Color,
 }
 
-// impl Theme {
-//     pub fn load_theme(ph: &std::path::PathBuf) -> Result<Self, String> {
-//         std::fs::File::open(ph)
-//             .map_err(|e| e.to_string())
-//             .and_then(|f| serde_yaml::from_reader(f).map_err(|e| e.to_string()))
-//     }
-// }
+impl Theme {
+    pub fn load(_ph: Option<&std::path::PathBuf>) -> Result<(), String> {
+        let _ = GLOBAL_THEME.set(Self::default());
+        Ok(())
+    }
+    pub fn get() -> &'static Self {
+        GLOBAL_THEME.get_or_init(Self::default)
+    }
+    //pub fn load(ph: Option<&std::path::PathBuf>) -> Result<Self, String> {
+    //    ph.map_or_else(
+    //        || Ok(Self::default()),
+    //        |ph| {
+    //            std::fs::File::open(ph)
+    //                .map_err(|e| e.to_string())
+    //                .and_then(|f| serde_yaml::from_reader(f).map_err(|e| e.to_string()))
+    //        },
+    //    )
+    //}
+}
 
 impl Default for Theme {
     fn default() -> Self {

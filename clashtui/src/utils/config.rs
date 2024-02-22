@@ -1,7 +1,7 @@
+use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use core::cell::RefCell;
-#[derive(Debug, Default,Serialize,Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ClashTuiConfig {
     pub clash_cfg_dir: String,
     pub clash_core_path: String,
@@ -30,8 +30,8 @@ impl ClashTuiConfig {
             && !self.clash_core_path.is_empty()
     }
 
-    pub fn update_profile(&self, profile: String) {
-        self.current_profile.replace(profile);
+    pub fn update_profile(&self, profile: &String) {
+        self.current_profile.borrow_mut().clone_from(profile);
     }
 }
 #[cfg(test)]

@@ -1,10 +1,9 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::prelude as Ra;
 use std::{
-    fs::{self,remove_file, OpenOptions},
+    fs::{self, remove_file, OpenOptions},
     io::Write,
     path::Path,
-    rc::Rc,
 };
 
 use super::profile_input::ProfileInputPopup;
@@ -13,7 +12,7 @@ use crate::tui::{
     symbols::{PROFILE, TEMPALTE},
     utils::Keys,
     widgets::{ConfirmPopup, List, MsgPopup},
-    EventState, SharedTheme, Visibility,
+    EventState, Visibility,
 };
 use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
 
@@ -39,13 +38,9 @@ pub struct ProfileTab {
 }
 
 impl ProfileTab {
-    pub fn new(
-        clashtui_util: SharedClashTuiUtil,
-        clashtui_state: SharedClashTuiState,
-        theme: SharedTheme,
-    ) -> Self {
-        let profiles = List::new(PROFILE.to_string(), Rc::clone(&theme));
-        let templates = List::new(TEMPALTE.to_string(), Rc::clone(&theme));
+    pub fn new(clashtui_util: SharedClashTuiUtil, clashtui_state: SharedClashTuiState) -> Self {
+        let profiles = List::new(PROFILE.to_string());
+        let templates = List::new(TEMPALTE.to_string());
 
         let mut instance = Self {
             is_visible: true,

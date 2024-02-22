@@ -4,7 +4,7 @@ mod tabbar;
 pub mod tabs;
 pub mod utils;
 extern crate ui;
-pub use ui::utils::{tools, SharedTheme, Theme};
+pub use ui::utils::{tools, Theme};
 pub use ui::{widgets, EventState, Visibility};
 
 pub use statusbar::StatusBar;

@@ -1,7 +1,7 @@
+use core::cell::RefCell;
 use crossterm::event::{Event, KeyEventKind};
 use ratatui::prelude as Ra;
 use std::{collections::HashMap, path::PathBuf, rc::Rc};
-use core::cell::RefCell;
 
 use crate::msgpopup_methods;
 use crate::tui::{
@@ -81,25 +81,23 @@ impl App {
         let clashtui_util = Rc::new(util);
 
         let clashtui_state =
-            SharedClashTuiState::new(RefCell::new(State::new(clashtui_util.clone())));
-        let theme = Rc::new(Theme::default());
-        let help_popup = HelpPopUp::new("Help".to_string(), Rc::clone(&theme));
+            SharedClashTuiState::new(RefCell::new(State::new(Rc::clone(&clashtui_util))));
+        let _ = Theme::load(None).map_err(|e| log::error!("Loading Theme:{}", e));
+        let help_popup = HelpPopUp::new("Help".to_string());
         let tabbar = TabBar::new(
             "".to_string(),
             vec![
                 symbols::PROFILE.to_string(),
                 symbols::CLASHSRVCTL.to_string(),
             ],
-            Rc::clone(&theme),
         );
-        let statusbar = StatusBar::new(Rc::clone(&clashtui_state), Rc::clone(&theme));
+        let statusbar = StatusBar::new(Rc::clone(&clashtui_state));
         let tabs: HashMap<Tab, Tabs> = HashMap::from_iter([
             (
                 Tab::Profile,
                 Tabs::Profile(RefCell::new(ProfileTab::new(
                     clashtui_util.clone(),
                     clashtui_state.clone(),
-                    theme.clone(),
                 ))),
             ),
             (
@@ -107,7 +105,6 @@ impl App {
                 Tabs::ClashSrvCtl(RefCell::new(ClashSrvCtlTab::new(
                     clashtui_util.clone(),
                     clashtui_state.clone(),
-                    theme.clone(),
                 ))),
             ),
         ]); // Init the tabs

@@ -1,7 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use super::SharedTheme;
+use super::Theme;
 use crate::tui::EventState;
 
 pub struct TabBar {
@@ -9,19 +9,14 @@ pub struct TabBar {
     is_visible: bool,
     tab_titles: Vec<String>,
     index: usize,
-
-    theme: SharedTheme,
 }
-
 impl TabBar {
-    pub fn new(title: String, tab_titles: Vec<String>, theme: SharedTheme) -> Self {
+    pub fn new(title: String, tab_titles: Vec<String>) -> Self {
         Self {
             title,
             is_visible: true,
             tab_titles,
             index: 0,
-
-            theme,
         }
     }
 
@@ -65,7 +60,7 @@ impl TabBar {
             .map(|t| {
                 Ra::text::Line::from(Ra::Span::styled(
                     t,
-                    Ra::Style::default().fg(self.theme.tab_txt_fg),
+                    Ra::Style::default().fg(Theme::get().tab_txt_fg),
                 ))
             })
             .collect();
@@ -75,7 +70,7 @@ impl TabBar {
                     .borders(Raw::Borders::ALL)
                     .title(self.title.as_str()),
             )
-            .highlight_style(Ra::Style::default().fg(self.theme.tab_hl_fg))
+            .highlight_style(Ra::Style::default().fg(Theme::get().tab_hl_fg))
             .select(self.index);
         f.render_widget(tabs, area);
     }
