@@ -2,10 +2,8 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
-use crate::{Infailable, Theme};
+use crate::{utils::tools, EventState, Infailable, Theme};
 
-use super::utils::tools;
-use super::EventState;
 /// Pop a Message Window
 ///
 /// Using arrow keys or j\k\h\l(vim-like) to navigate.

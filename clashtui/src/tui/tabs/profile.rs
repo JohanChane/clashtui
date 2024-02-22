@@ -72,7 +72,12 @@ impl ProfileTab {
 
         let mut event_state = self.msgpopup.event(ev)?;
         if event_state.is_notconsumed() {
-            event_state = self.confirm_popup.event(ev)?;
+            event_state = match self.confirm_popup.event(ev)? {
+                EventState::Yes => EventState::ProfileDelete,
+                EventState::Cancel => EventState::WorkDone,
+                EventState::WorkDone => EventState::WorkDone,
+                _ => EventState::NotConsumed,
+            };
         }
         if event_state.is_notconsumed() {
             event_state = self.profile_input.event(ev)?;

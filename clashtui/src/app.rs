@@ -219,6 +219,7 @@ impl App {
     pub fn handle_last_ev(&mut self, last_ev: &EventState) -> EventState {
         let ev_state = match last_ev {
             EventState::NotConsumed | EventState::WorkDone => EventState::NotConsumed,
+            EventState::Yes | EventState::Cancel => unreachable!(),
             EventState::ProfileUpdate | EventState::ProfileUpdateAll => {
                 if let Tabs::Profile(profile_tab) = self.tabs.get(&Tab::Profile).unwrap() {
                     profile_tab.borrow_mut().hide_msgpopup();

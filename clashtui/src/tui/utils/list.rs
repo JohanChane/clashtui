@@ -48,8 +48,7 @@ impl HelpPopUp {
 
         Ok(EventState::WorkDone)
     }
-    #[allow(unused_variables)]
-    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
+    pub fn draw(&mut self, f: &mut Ra::Frame, _area: Ra::Rect) {
         use Ra::Style;
         if !self.is_visible {
             return;

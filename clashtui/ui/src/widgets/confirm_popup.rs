@@ -1,9 +1,9 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::prelude as Ra;
 
-use crate::Infailable;
+use crate::{EventState, Infailable};
 
-use super::{EventState, MsgPopup};
+use super::MsgPopup;
 /// Modified [MsgPopup]
 ///
 /// Add 'y', 'n'/Esc to close
@@ -27,9 +27,13 @@ impl ConfirmPopup {
                 return Ok(EventState::NotConsumed);
             }
             match key.code {
-                KeyCode::Char('y') | KeyCode::Char('n') | KeyCode::Esc => {
+                KeyCode::Char('y') => {
                     self.0.hide();
-                    return Ok(EventState::WorkDone);
+                    return Ok(EventState::Yes);
+                }
+                KeyCode::Char('n') | KeyCode::Esc => {
+                    self.0.hide();
+                    return Ok(EventState::Cancel);
                 }
                 _ => {
                     event_state = self.0.event(ev)?;

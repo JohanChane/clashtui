@@ -6,7 +6,7 @@ use crate::tui::{widgets::InputPopup, EventState, Visibility};
 #[derive(PartialEq)]
 enum Fouce {
     Name,
-    Url,
+    Uri,
 }
 
 pub struct ProfileInputPopup {
@@ -53,7 +53,7 @@ impl ProfileInputPopup {
                     }
                     _ => match self.fouce {
                         Fouce::Name => self.name_input.event(ev)?,
-                        Fouce::Url => self.uri_input.event(ev)?,
+                        Fouce::Uri => self.uri_input.event(ev)?,
                     },
                 };
             }
@@ -90,7 +90,7 @@ impl ProfileInputPopup {
 
     pub fn switch_fouce(&mut self) {
         if self.fouce == Fouce::Name {
-            self.fouce = Fouce::Url;
+            self.fouce = Fouce::Uri;
         } else {
             self.fouce = Fouce::Name;
         }

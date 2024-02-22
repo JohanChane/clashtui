@@ -22,7 +22,7 @@ pub enum Keys {
 }
 
 impl Keys {
-    pub fn bindto(self) -> KeyCode {
+    pub const fn bindto(self) -> KeyCode {
         match self {
             Keys::ProfileSwitch => KeyCode::Char('P'),
             Keys::ProfileUpdate => KeyCode::Char('u'),

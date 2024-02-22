@@ -6,6 +6,8 @@ pub use theme::Theme;
 
 #[derive(PartialEq, Eq)]
 pub enum EventState {
+    Yes,
+    Cancel,
     NotConsumed,
     WorkDone,
     ProfileUpdate,

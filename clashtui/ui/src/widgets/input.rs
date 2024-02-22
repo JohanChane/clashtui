@@ -1,8 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use super::EventState;
-use crate::{Infailable, Theme, Visibility};
+use crate::{EventState, Infailable, Theme, Visibility};
 /// Collect input and cache as [String]
 #[derive(Visibility)]
 pub struct InputPopup {
