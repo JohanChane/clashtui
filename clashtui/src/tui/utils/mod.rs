@@ -16,6 +16,7 @@ macro_rules! msgpopup_methods {
                 self.msgpopup.push_list_msg(msg);
                 self.msgpopup.show();
             }
+            #[allow(unused)]
             pub fn hide_msgpopup(&mut self) {
                 self.msgpopup.hide();
             }

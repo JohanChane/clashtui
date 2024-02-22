@@ -5,7 +5,7 @@ pub use error::Infailable;
 pub use theme::Theme;
 pub type SharedTheme = std::rc::Rc<Theme>;
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq)]
 pub enum EventState {
     NotConsumed,
     WorkDone,

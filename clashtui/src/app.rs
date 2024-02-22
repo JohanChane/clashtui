@@ -1,6 +1,7 @@
 use crossterm::event::{Event, KeyEventKind};
 use ratatui::prelude as Ra;
-use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
+use std::{collections::HashMap, path::PathBuf, rc::Rc};
+use core::cell::RefCell;
 
 use crate::msgpopup_methods;
 use crate::tui::{

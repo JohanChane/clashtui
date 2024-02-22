@@ -1,8 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::prelude as Ra;
 use std::{
-    fs,
-    fs::{remove_file, OpenOptions},
+    fs::{self,remove_file, OpenOptions},
     io::Write,
     path::Path,
     rc::Rc,

@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, fs::File};
+use std::fs::File;
+use core::cell::RefCell;
 #[derive(Debug, Default,Serialize,Deserialize)]
 pub struct ClashTuiConfig {
     pub clash_cfg_dir: String,
@@ -67,7 +68,7 @@ pub enum ErrKind {
     LoadClashConfig,
     CronUpdateProfile,
 }
-type Result<T> = std::result::Result<T, CfgError>;
+type Result<T> = core::result::Result<T, CfgError>;
 #[derive(Debug)]
 pub struct CfgError {
     _kind: ErrKind,
@@ -78,8 +79,8 @@ impl CfgError {
         Self { _kind, reason }
     }
 }
-impl std::fmt::Display for CfgError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::fmt::Display for CfgError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:#?}", self)
     }
 }

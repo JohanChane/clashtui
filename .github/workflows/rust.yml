@@ -76,7 +76,6 @@ jobs:
 
     - name: Pre Upload
       run: |
-        tree
         mkdir artifacts
         mv ./clashtui/target/release/clashtui.exe ./artifacts/clashtui_r.exe
         mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui_d.exe

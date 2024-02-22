@@ -1,5 +1,5 @@
-use std::cell::RefCell;
-use std::str::FromStr as _;
+use core::cell::RefCell;
+use core::str::FromStr as _;
 use std::{
     fs::File,
     io::{Error, Read},
