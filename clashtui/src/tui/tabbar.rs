@@ -73,7 +73,7 @@ impl TabBar {
             .block(
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
-                    .title(self.title.clone()),
+                    .title(self.title.as_str()),
             )
             .highlight_style(Ra::Style::default().fg(self.theme.tab_hl_fg))
             .select(self.index);
@@ -93,6 +93,6 @@ impl TabBar {
     }
 
     pub fn selected(&self) -> Option<&String> {
-        return self.tab_titles.get(self.index);
+        self.tab_titles.get(self.index)
     }
 }

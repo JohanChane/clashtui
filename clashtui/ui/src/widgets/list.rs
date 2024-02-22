@@ -77,18 +77,10 @@ impl List {
             return;
         }
 
-        let items: Vec<Raw::ListItem> = self
-            .items
-            .iter()
-            .map(|i| {
-                let lines = vec![Ra::Line::from(i.clone())];
-                Raw::ListItem::new(lines).style(Ra::Style::default())
-            })
-            .collect();
-
-        let item_len = items.len();
-
-        let list = Raw::List::new(items)
+        f.render_stateful_widget(
+            Raw::List::from_iter(self.items.iter().map(|i| {
+                Raw::ListItem::new(Ra::Line::from(i.as_str())).style(Ra::Style::default())
+            }))
             .block(
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
@@ -97,7 +89,7 @@ impl List {
                     } else {
                         self.theme.list_block_fg_unfouced
                     }))
-                    .title(self.title.clone()),
+                    .title(self.title.as_str()),
             )
             .highlight_style(
                 Ra::Style::default()
@@ -107,12 +99,12 @@ impl List {
                         Ra::Color::default()
                     })
                     .add_modifier(Ra::Modifier::BOLD),
-            );
+            ),
+            area,
+            &mut self.list_state,
+        );
 
-        f.render_stateful_widget(list, area, &mut self.list_state);
-
-        if item_len > area.height as usize {
-            self.scrollbar = self.scrollbar.content_length(item_len);
+        if self.items.len() + 2 > area.height as usize {
             f.render_stateful_widget(
                 Raw::Scrollbar::default()
                     .orientation(Raw::ScrollbarOrientation::VerticalRight)
@@ -143,12 +135,17 @@ impl List {
         let i = match self.list_state.selected() {
             Some(i) => {
                 if i >= self.items.len() - 1 {
+                    self.scrollbar.first();
                     0
                 } else {
+                    self.scrollbar.next();
                     i + 1
                 }
             }
-            None => 0,
+            None => {
+                self.scrollbar.first();
+                0
+            }
         };
         self.list_state.select(Some(i));
     }
@@ -161,12 +158,17 @@ impl List {
         let i = match self.list_state.selected() {
             Some(i) => {
                 if i == 0 {
+                    self.scrollbar.last();
                     self.items.len() - 1
                 } else {
+                    self.scrollbar.prev();
                     i - 1
                 }
             }
-            None => 0,
+            None => {
+                self.scrollbar.last();
+                0
+            }
         };
         self.list_state.select(Some(i));
     }
@@ -183,9 +185,11 @@ impl List {
             None => self.list_state.select(None),
         }
         self.items = items;
+        self.scrollbar = self.scrollbar.content_length(self.items.len());
 
         if self.list_state.selected().is_none() && !self.items.is_empty() {
             self.list_state.select(Some(0));
+            self.scrollbar.first();
         }
     }
 

@@ -70,7 +70,7 @@ impl InputPopup {
             .block(
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
-                    .title(self.title.clone()),
+                    .title(self.title.as_str()),
             );
         f.render_widget(input, area);
     }
@@ -84,7 +84,7 @@ impl InputPopup {
     }
 
     pub fn handle_enter_ev(&mut self) {
-        self.input_data = self.input.clone();
+        self.input_data.clone_from(&self.input);
         self.input.clear();
         self.reset_cursor();
     }
