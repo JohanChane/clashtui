@@ -52,7 +52,7 @@ For example: [ArchLinux](https://aur.archlinux.org/packages/mihomo).
 #### Set Up Trigger:
  > This will `setcap` for `mihomo` automatically every time you update via `pacman`
  - `vi /etc/pacman.d/hooks/mihomo.hook`
-```toml
+```systemd
 [Trigger]
 Operation = Install
 Operation = Upgrade
@@ -67,7 +67,7 @@ Exec = /usr/bin/setcap 'cap_net_admin,cap_net_bind_service=+ep' /usr/bin/mihomo
 #### Set Up Systemd User Service: 
  > For those want to use system-wide service, please follow [this](https://wiki.metacubex.one/startup/service/#systemd) 
  - Create service: `systemctl --user edit mihomo`
-```toml
+```systemd
 [Unit]
 Description=mihomo Daemon, Another Clash Kernel.
 After=network.target NetworkManager.service systemd-networkd.service iwd.service
