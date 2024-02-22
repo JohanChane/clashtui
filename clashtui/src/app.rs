@@ -297,8 +297,7 @@ impl App {
             .tabbar
             .selected()
             .expect("UB: selected tab out of bound");
-        let _ = self
-            .tabs
+        self.tabs
             .iter()
             .map(|(n, v)| (n == tabname, v))
             .for_each(|(b, v)| match v {

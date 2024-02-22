@@ -4,6 +4,7 @@ mod ipc;
 mod state;
 mod tui;
 mod tui_impl;
+#[allow(clippy::module_inception)]
 mod utils;
 
 pub type SharedClashTuiUtil = std::rc::Rc<tui::ClashTuiUtil>;
