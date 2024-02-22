@@ -3,18 +3,29 @@ use std::sync::OnceLock;
 
 static GLOBAL_THEME: OnceLock<Theme> = OnceLock::new();
 
+// Given that this is a single-theard app, sync do not seem to be important
+// But OnceCell impl !Sync, so this new type is needed
+// However, there seems to be not need to bypass this, so I should just keep it
+//
+// struct Bx(std::cell::OnceCell<Theme>);
+// unsafe impl Sync for Bx {}
+
 // #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Theme {
     pub popup_block_fg: Color,
+    pub popup_text_fg: Color,
 
-    pub list_block_fg_fouced: Color,
-    pub list_block_fg_unfouced: Color,
+    pub input_text_selected_fg: Color,
+    pub input_text_unselected_fg: Color,
+
+    pub list_block_fouced_fg: Color,
+    pub list_block_unfouced_fg: Color,
     pub list_hl_bg_fouced: Color,
 
-    pub tab_txt_fg: Color,
-    pub tab_hl_fg: Color,
+    pub tabbar_text_fg: Color,
+    pub tabbar_hl_fg: Color,
 
-    pub statusbar_txt_fg: Color,
+    pub statusbar_text_fg: Color,
 }
 
 impl Theme {
@@ -40,16 +51,20 @@ impl Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self {
-            popup_block_fg: Color::Rgb(0, 85, 119),
+            popup_block_fg: Color::Rgb(0, 102, 102),
+            popup_text_fg: Color::Rgb(46, 204, 113),
 
-            list_block_fg_fouced: Color::Rgb(0, 204, 153),
-            list_block_fg_unfouced: Color::Rgb(220, 220, 220),
+            input_text_selected_fg: Color::Yellow,
+            input_text_unselected_fg: Color::Reset,
+
+            list_block_fouced_fg: Color::Rgb(0, 204, 153),
+            list_block_unfouced_fg: Color::Rgb(220, 220, 220),
             list_hl_bg_fouced: Color::Rgb(64, 64, 64),
 
-            tab_txt_fg: Color::Rgb(0, 153, 153),
-            tab_hl_fg: Color::Rgb(46, 204, 113),
+            tabbar_text_fg: Color::Rgb(0, 153, 153),
+            tabbar_hl_fg: Color::Rgb(46, 204, 113),
 
-            statusbar_txt_fg: Color::Rgb(20, 122, 122),
+            statusbar_text_fg: Color::Rgb(20, 122, 122),
         }
     }
 }

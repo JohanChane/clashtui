@@ -58,9 +58,9 @@ impl List {
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
                     .border_style(Ra::Style::default().fg(if is_fouced {
-                        Theme::get().list_block_fg_fouced
+                        Theme::get().list_block_fouced_fg
                     } else {
-                        Theme::get().list_block_fg_unfouced
+                        Theme::get().list_block_unfouced_fg
                     }))
                     .title(self.title.as_str()),
             )

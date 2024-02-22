@@ -2,7 +2,6 @@ mod confirm_popup;
 mod input;
 mod list;
 mod msg;
-mod tmp;
 use super::utils;
 use super::EventState;
 

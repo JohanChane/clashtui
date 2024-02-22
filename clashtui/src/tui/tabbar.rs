@@ -60,7 +60,7 @@ impl TabBar {
             .map(|t| {
                 Ra::text::Line::from(Ra::Span::styled(
                     t,
-                    Ra::Style::default().fg(Theme::get().tab_txt_fg),
+                    Ra::Style::default().fg(Theme::get().tabbar_text_fg),
                 ))
             })
             .collect();
@@ -70,7 +70,7 @@ impl TabBar {
                     .borders(Raw::Borders::ALL)
                     .title(self.title.as_str()),
             )
-            .highlight_style(Ra::Style::default().fg(Theme::get().tab_hl_fg))
+            .highlight_style(Ra::Style::default().fg(Theme::get().tabbar_hl_fg))
             .select(self.index);
         f.render_widget(tabs, area);
     }

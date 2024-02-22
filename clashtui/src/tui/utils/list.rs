@@ -75,7 +75,7 @@ impl HelpPopUp {
             .block(
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
-                    .border_style(Style::default().fg(Theme::get().list_block_fg_fouced))
+                    .border_style(Style::default().fg(Theme::get().list_block_fouced_fg))
                     .title(self.title.clone()),
             )
             .highlight_style(

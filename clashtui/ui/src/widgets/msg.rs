@@ -2,10 +2,10 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
-use crate::Infailable;
+use crate::{Infailable, Theme};
 
 use super::utils::tools;
-use super::{tmp, EventState};
+use super::EventState;
 /// Pop a Message Window
 ///
 /// Using arrow keys or j\k\h\l(vim-like) to navigate.
@@ -63,7 +63,7 @@ impl MsgPopup {
             .map(|s| {
                 Ra::Line::from(Ra::Span::styled(
                     s,
-                    Ra::Style::default().fg(tmp::MSG_TEXT_FG),
+                    Ra::Style::default().fg(Theme::get().popup_text_fg),
                 ))
             })
             .collect();
@@ -84,7 +84,7 @@ impl MsgPopup {
 
         let block = Raw::Block::new()
             .borders(Raw::Borders::ALL)
-            .border_style(Ra::Style::default().fg(tmp::MSG_BLOCK_FG));
+            .border_style(Ra::Style::default().fg(Theme::get().popup_block_fg));
 
         f.render_widget(Raw::Clear, area);
         f.render_widget(paragraph.block(block), area);

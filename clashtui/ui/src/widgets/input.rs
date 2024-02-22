@@ -1,9 +1,8 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use super::tmp;
 use super::EventState;
-use crate::{Infailable, Visibility};
+use crate::{Infailable, Theme, Visibility};
 /// Collect input and cache as [String]
 #[derive(Visibility)]
 pub struct InputPopup {
@@ -63,9 +62,9 @@ impl InputPopup {
 
         let input = Raw::Paragraph::new(self.input.as_str())
             .style(Ra::Style::default().fg(if is_selected {
-                tmp::IPT_TEXT_SEL_FG
+                Theme::get().input_text_selected_fg
             } else {
-                tmp::IPT_TEXT_NOSEL_FG
+                Theme::get().input_text_unselected_fg
             }))
             .block(
                 Raw::Block::default()

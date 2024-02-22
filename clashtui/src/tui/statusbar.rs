@@ -26,7 +26,7 @@ impl StatusBar {
         let status_str = state.render();
         let paragraph = Raw::Paragraph::new(Ra::Span::styled(
             status_str,
-            Ra::Style::default().fg(Theme::get().statusbar_txt_fg),
+            Ra::Style::default().fg(Theme::get().statusbar_text_fg),
         ))
         //.alignment(ratatui::prelude::Alignment::Right)
         .wrap(Raw::Wrap { trim: true });
