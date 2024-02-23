@@ -18,28 +18,23 @@ struct CliEnv {
     /// time in ms between two ticks.
     #[argh(option, default = "250")]
     tick_rate: u64,
-    /// whether unicode symbols are used to improve the overall look of the app
-    /// **current, it does Not work
-    #[argh(switch)]
-    enhanced_graphics: bool,
-    /// only update all profiles
+    /// don't show UI but only update all profiles
     #[argh(switch, short = 'u')]
-    update: bool,
+    update_all_profiles: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli: CliEnv = argh::from_env();
     let mut flags = Flags::with_capacity(3);
-    if cli.update {
+    if cli.update_all_profiles {
         flags.insert(utils::Flag::UpdateOnly);
     };
     let tick_rate = Duration::from_millis(cli.tick_rate);
-    run(flags, tick_rate, cli.enhanced_graphics)?;
+    run(flags, tick_rate)?;
 
     Ok(())
 }
-#[allow(unused_variables)]
-pub fn run(mut flags: Flags, tick_rate: Duration, enhanced_graphics: bool) -> anyhow::Result<()> {
+pub fn run(mut flags: Flags, tick_rate: Duration) -> anyhow::Result<()> {
     let res;
     let config_dir = load_app_dir(&mut flags);
     log::debug!("Current flags: {:?}", flags);

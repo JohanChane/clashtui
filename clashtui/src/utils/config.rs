@@ -7,6 +7,7 @@ pub struct ClashTuiConfig {
     pub clash_core_path: String,
     pub clash_cfg_path: String,
     pub clash_srv_name: String,
+    pub is_user: bool,
 
     pub edit_cmd: String,
     pub open_dir_cmd: String,
@@ -36,10 +37,14 @@ impl ClashTuiConfig {
 }
 #[cfg(test)]
 #[test]
-#[ignore = "Not testable in Github Action, need to be fixed"]
 fn test_save_and_load() {
     let mut flag = true;
-    let path = "config.yaml";
+    let exe_dir = std::env::current_dir().unwrap();
+    println!("{exe_dir:?}");
+    let path_ = exe_dir.parent().unwrap().join("Example/config.yaml");
+    println!("{path_:?}");
+    assert!(path_.is_file());
+    let path = path_.as_path().to_str().unwrap();
     let conf = match ClashTuiConfig::from_file(path) {
         Ok(v) => v,
         Err(e) => {
@@ -48,12 +53,9 @@ fn test_save_and_load() {
             ClashTuiConfig::default()
         }
     };
-    assert!(flag);
-    flag = false;
     println!("{:?}", conf);
-    let e = conf.to_file(path);
-    match e {
-        Ok(_) => flag = true,
+    match conf.to_file(path) {
+        Ok(_) => flag &= true,
         Err(v) => println!("{}", v),
     };
     assert!(flag);

@@ -1,0 +1,8 @@
+clash_cfg_dir: ~/.local/proxy/mihomo
+clash_core_path: mihomo
+clash_cfg_path: ~/.local/proxy/mihomo/config.yaml
+clash_srv_name: mihomo
+is_user: true
+edit_cmd: alacritty -e nvim %s
+open_dir_cmd: alacritty -e ranger %s
+current_profile: ''

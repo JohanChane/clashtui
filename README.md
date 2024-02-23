@@ -43,6 +43,11 @@
 - Familiarity with clash configurations
 - Preference for TUI software
 
+## Features
+ - Cli mode support, use `clashtui --help` to get the usage
+ - Support both system and user mode service
+ - Generate profile with template
+
 ## Installing Mihomo Service (With Tun Mode Avaliable)
 
 ### Linux

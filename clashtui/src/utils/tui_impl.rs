@@ -416,14 +416,32 @@ impl ClashTuiUtil {
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
         match op {
-            ClashSrvOp::StartClashService => exec_ipc(
-                "systemctl",
-                vec!["restart", self.tui_cfg.clash_srv_name.as_str()],
-            ),
-            ClashSrvOp::StopClashService => exec_ipc(
-                "systemctl",
-                vec!["stop", self.tui_cfg.clash_srv_name.as_str()],
-            ),
+            ClashSrvOp::StartClashService => {
+                if self.tui_cfg.is_user {
+                    exec_ipc(
+                        "systemctl",
+                        vec!["restart", "--user", self.tui_cfg.clash_srv_name.as_str()],
+                    )
+                } else {
+                    exec_ipc(
+                        "systemctl",
+                        vec!["restart", self.tui_cfg.clash_srv_name.as_str()],
+                    )
+                }
+            }
+            ClashSrvOp::StopClashService => {
+                if self.tui_cfg.is_user {
+                    exec_ipc(
+                        "systemctl",
+                        vec!["stop", "--user", self.tui_cfg.clash_srv_name.as_str()],
+                    )
+                } else {
+                    exec_ipc(
+                        "systemctl",
+                        vec!["stop", self.tui_cfg.clash_srv_name.as_str()],
+                    )
+                }
+            }
             ClashSrvOp::TestClashConfig => {
                 self.test_profile_config(self.tui_cfg.clash_cfg_path.as_str(), false)
             }

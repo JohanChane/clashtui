@@ -1,7 +1,0 @@
-[default]
-clash_core_path = "mihomo"
-clash_cfg_dir = "/srv/mihomo"
-clash_cfg_path = "/srv/mihomo/config.yaml"
-clash_srv_name = "mihomo"
-#edit_cmd = "alacritty -e nvim %s"
-#opendir_cmd = "alacritty -e ranger %s"
