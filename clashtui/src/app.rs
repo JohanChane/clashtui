@@ -29,10 +29,10 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(flags: &Flags, clashtui_config_dir: PathBuf) -> (Option<Self>, Vec<CfgError>) {
+    pub fn new(flags: &Flags, clashtui_config_dir: &PathBuf) -> (Option<Self>, Vec<CfgError>) {
         #[cfg(debug_assertions)]
         let _ = std::fs::remove_file(clashtui_config_dir.join("clashtui.log")); // auto rm old log for debug
-        Self::setup_logging(clashtui_config_dir.join("clashtui.log").to_str().unwrap());
+        setup_logging(clashtui_config_dir.join("clashtui.log").to_str().unwrap());
 
         let (util, mut err_track) = ClashTuiUtil::new(
             &clashtui_config_dir,
@@ -306,28 +306,32 @@ impl App {
             });
     }
 
-    fn setup_logging(log_path: &str) {
-        use log4rs::append::file::FileAppender;
-        use log4rs::config::{Appender, Config, Root};
-        use log4rs::encode::pattern::PatternEncoder;
-        // No need to change. This is set to auto switch to Info level when build release
-        #[allow(unused_variables)]
-        let log_level = log::LevelFilter::Info;
-        #[cfg(debug_assertions)]
-        let log_level = log::LevelFilter::Debug;
-        let file_appender = FileAppender::builder()
-            .encoder(Box::new(PatternEncoder::new("[{l}] {t} - {m}{n}")))
-            .build(log_path)
-            .unwrap();
-
-        let config = Config::builder()
-            .appender(Appender::builder().build("file", Box::new(file_appender)))
-            .build(Root::builder().appender("file").build(log_level))
-            .unwrap();
-
-        log4rs::init_config(config).unwrap();
-        log::info!("Start Log, level: {}", log_level);
+    pub fn save(&self, config_path:&str) -> Result<(), CfgError> {
+        self.clashtui_util.tui_cfg.to_file(config_path)
     }
+}
+
+fn setup_logging(log_path: &str) {
+    use log4rs::append::file::FileAppender;
+    use log4rs::config::{Appender, Config, Root};
+    use log4rs::encode::pattern::PatternEncoder;
+    // No need to change. This is set to auto switch to Info level when build release
+    #[allow(unused_variables)]
+    let log_level = log::LevelFilter::Info;
+    #[cfg(debug_assertions)]
+    let log_level = log::LevelFilter::Debug;
+    let file_appender = FileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new("[{l}] {t} - {m}{n}")))
+        .build(log_path)
+        .unwrap();
+
+    let config = Config::builder()
+        .appender(Appender::builder().build("file", Box::new(file_appender)))
+        .build(Root::builder().appender("file").build(log_level))
+        .unwrap();
+
+    log4rs::init_config(config).unwrap();
+    log::info!("Start Log, level: {}", log_level);
 }
 
 msgpopup_methods!(App);

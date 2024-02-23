@@ -38,7 +38,7 @@ pub fn run(mut flags: Flags, tick_rate: Duration) -> anyhow::Result<()> {
     let res;
     let config_dir = load_app_dir(&mut flags);
     log::debug!("Current flags: {:?}", flags);
-    let (app, err_track) = App::new(&flags, config_dir);
+    let (app, err_track) = App::new(&flags, &config_dir);
     if let Some(mut app) = app {
         use crossterm::{
             event::{DisableMouseCapture, EnableMouseCapture},
@@ -65,6 +65,7 @@ pub fn run(mut flags: Flags, tick_rate: Duration) -> anyhow::Result<()> {
             DisableMouseCapture
         )?;
         terminal.show_cursor()?;
+        app.save(config_dir.join("config.yaml").to_str().unwrap())?;
     } else {
         if !err_track.is_empty() {
             err_track.into_iter().for_each(|v| println!("{v}"));

@@ -26,7 +26,6 @@
     * [Advanced Usage](#advanced-usage)
         * [Configuring Commands to Open Files and Directories](#configuring-commands-to-open-files-and-directories)
         * [Customizing Configuration Templates](#customizing-configuration-templates)
-* [Features to be added](#features-to-be-added)
 * [File Structure of clashtui](#file-structure-of-clashtui)
 * [Project Disclaimer](#project-disclaimer)
 
