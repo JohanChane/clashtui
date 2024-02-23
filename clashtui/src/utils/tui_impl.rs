@@ -364,11 +364,10 @@ impl ClashTuiUtil {
     }
     /// Judging by format
     fn is_yaml(path: &Path) -> bool {
-        if let Ok(f) = std::fs::File::open(path) {
-            serde_yaml::from_reader::<std::fs::File, serde_yaml::Value>(f).is_ok()
-        } else {
-            false
-        }
+        std::fs::File::open(path).is_ok_and(|f| {
+            serde_yaml::from_reader::<std::fs::File, serde_yaml::Value>(f)
+                .is_ok_and(|v| v.is_mapping())
+        })
     }
 }
 use super::ipc::exec_ipc;
