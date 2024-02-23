@@ -129,7 +129,13 @@ impl ClashTuiUtil {
             },
             Some,
         );
-        _State::new(pf, mode, tun, ver, sysp)
+        _State {
+            profile: pf,
+            mode,
+            tun,
+            ver,
+            sysproxy: sysp,
+        }
     }
 
     #[cfg(target_os = "linux")]
@@ -142,7 +148,12 @@ impl ClashTuiUtil {
             }
         }
         let (pf, mode, tun, ver) = self._update_state(new_pf, new_mode);
-        _State::new(pf, mode, tun, ver)
+        _State {
+            profile: pf,
+            mode,
+            tun,
+            ver,
+        }
     }
 
     pub fn fetch_recent_logs(&self, num_lines: usize) -> Vec<String> {

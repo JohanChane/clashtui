@@ -236,25 +236,15 @@ mod tests {
 
     #[test]
     fn test() {
-        let mut is = true;
+        let mut flag = true;
         let sym = ClashUtil::new(
             "http://127.0.0.1:9090".to_string(),
             "http://127.0.0.1:7890".to_string(),
         );
         match sym.version() {
             Ok(r) => println!("{:?}", r),
-            Err(_) => is = false,
+            Err(_) => flag = false,
         }
-        assert!(is)
-    }
-
-    #[test]
-    fn test_connection() {
-        let c = ClashUtil::new(
-            "http://127.0.0.1:9090".to_string(),
-            "http://127.0.0.1:7890".into(),
-        );
-        let res = c.get("", None);
-        println!("{:?}", res);
+        assert!(flag)
     }
 }

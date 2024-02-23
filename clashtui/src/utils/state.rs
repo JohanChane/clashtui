@@ -9,33 +9,6 @@ pub struct _State {
     pub sysproxy: Option<bool>,
     pub ver: String,
 }
-impl _State {
-    #[cfg(target_os = "linux")]
-    pub fn new(pf: String, mode: Option<Mode>, tun: Option<TunStack>, ver: String) -> Self {
-        Self {
-            tun,
-            mode,
-            profile: pf,
-            ver,
-        }
-    }
-    #[cfg(target_os = "windows")]
-    pub fn new(
-        profile: String,
-        mode: Option<Mode>,
-        tun: Option<TunStack>,
-        ver: String,
-        sysproxy: Option<bool>,
-    ) -> Self {
-        Self {
-            profile,
-            mode,
-            tun,
-            sysproxy,
-            ver,
-        }
-    }
-}
 pub struct State {
     st: _State,
     ct: SharedClashTuiUtil,
