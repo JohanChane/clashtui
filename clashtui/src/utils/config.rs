@@ -2,6 +2,7 @@ use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 #[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct ClashTuiConfig {
     pub clash_cfg_dir: String,
     pub clash_core_path: String,
@@ -114,9 +115,7 @@ pub fn init_config(
     ClashTuiConfig::default().to_file(clashtui_config_dir.join("config.yaml").to_str().unwrap())?;
 
     fs::create_dir(clashtui_config_dir.join("profiles"))?;
-    // Well, just keep them before I remove the template function or what
-    fs::create_dir_all(clashtui_config_dir.join("templates"))?;
-    fs::File::create(clashtui_config_dir.join("templates/template_proxy_providers"))?;
+    fs::create_dir(clashtui_config_dir.join("templates"))?;
 
     fs::write(
         clashtui_config_dir.join("basic_clash_config.yaml"),
