@@ -90,12 +90,12 @@ ExecReload=/bin/kill -HUP $MAINPID
 [Install]
 WantedBy=default.target
 ```
- - To enable at boot: `systemctl enable mihomo`
- - To start the service: `systemctl start mihomo`
+ - To enable at boot: `systemctl --user enable mihomo`
+ - To start the service: `systemctl --user start mihomo`
 
  > It's advised to test the mihomo service with a functional mihomo configuration to verify its success. 
  >
- > And check for any missing [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) files.
+ > Check for any missing [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) files.
 
 ### Windows
 
@@ -165,8 +165,7 @@ open_dir_cmd: ''
 current_profile: ''
 ```
 
-After editing, add `nssm` and `clashtui`(Optional) to PATH
-> For manually downloaded clashtui: Add `D:/PortableProgramFiles/clashtui` to PATH.
+ > After editing, add `nssm` and `clashtui`(Optional) to PATH
 
 Run clashtui. In `ClashSrvCtl`, select `InstallSrv`. The program will install the `mihomo` core service based on the configured settings. This service starts automatically at boot. After that, press `R` to start the core service without rebooting.
 
