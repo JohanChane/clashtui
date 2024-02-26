@@ -86,6 +86,11 @@ impl ClashTuiUtil {
                 "Unknown".to_string()
             }
         };
+        if let Err(e) = self.fetch_remote() {
+            if e.kind() != std::io::ErrorKind::ConnectionRefused {
+                log::warn!("{}", e);
+            }
+        }
         let (mode, tun) = match self.clash_remote_config.borrow().as_ref() {
             Some(v) => (
                 Some(v.mode),
@@ -107,13 +112,6 @@ impl ClashTuiUtil {
         new_mode: Option<String>,
         new_sysp: Option<bool>,
     ) -> _State {
-        if new_mode.is_none() && new_pf.is_none() && new_sysp.is_none() {
-            if let Err(e) = self.fetch_remote() {
-                if e.kind() != std::io::ErrorKind::ConnectionRefused {
-                    log::warn!("{}", e);
-                }
-            }
-        }
         if let Some(b) = new_sysp {
             let _ = if b {
                 super::ipc::enable_system_proxy(&self.clash_api.proxy_addr)
@@ -140,13 +138,6 @@ impl ClashTuiUtil {
 
     #[cfg(target_os = "linux")]
     pub fn update_state(&self, new_pf: Option<String>, new_mode: Option<String>) -> _State {
-        if new_mode.is_none() && new_pf.is_none() {
-            if let Err(e) = self.fetch_remote() {
-                if e.kind() != std::io::ErrorKind::ConnectionRefused {
-                    log::warn!("{}", e);
-                }
-            }
-        }
         let (pf, mode, tun, ver) = self._update_state(new_pf, new_mode);
         _State {
             profile: pf,
@@ -169,13 +160,12 @@ impl ClashTuiUtil {
 // Web
 impl ClashTuiUtil {
     fn fetch_remote(&self) -> Result<(), Error> {
-        let cur_remote = match self.clash_api.config_get() {
-            Ok(v) => v,
-            Err(e) => return Err(e),
-        };
+        let cur_remote = self.clash_api.config_get()?;
         let remote = ClashConfig::from_str(cur_remote.as_str())
             .map_err(|_| Error::new(std::io::ErrorKind::InvalidData, "Failed to prase str"))?;
+        log::debug!("{:#?}", remote);
         self.clash_remote_config.borrow_mut().replace(remote);
+        log::debug!("{:#?}", self.clash_remote_config.borrow());
         Ok(())
     }
 

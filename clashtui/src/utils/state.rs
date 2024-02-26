@@ -47,7 +47,7 @@ impl State {
         }
         #[cfg(target_os = "linux")]
         {
-            self.st = self.ct.update_state(Some(mode), None)
+            self.st = self.ct.update_state(None, Some(mode))
         }
     }
     pub fn render(&self) -> String {
