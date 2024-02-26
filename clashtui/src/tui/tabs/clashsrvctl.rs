@@ -10,8 +10,9 @@ use crate::{
         widgets::{List, MsgPopup},
         EventState, Visibility,
     },
-    utils::{ClashSrvOp, Mode, SharedClashTuiState, SharedClashTuiUtil},
+    utils::{ClashSrvOp, SharedClashTuiState, SharedClashTuiUtil},
 };
+use api::Mode;
 
 #[derive(Visibility)]
 pub struct ClashSrvCtlTab {

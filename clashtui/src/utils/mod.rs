@@ -10,7 +10,6 @@ mod utils;
 pub type SharedClashTuiUtil = std::rc::Rc<tui::ClashTuiUtil>;
 pub type SharedClashTuiState = std::rc::Rc<std::cell::RefCell<State>>;
 
-pub use api::Mode;
 pub use config::{init_config, CfgError, ErrKind};
 pub use flags::{Flag, Flags};
 pub use state::State;

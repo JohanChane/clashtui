@@ -4,6 +4,7 @@ use std::{
 };
 
 use reqwest::blocking::Client;
+type Result<T> = core::result::Result<T, std::io::Error>;
 
 const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
 
@@ -20,7 +21,7 @@ pub struct Resp {
     inner: reqwest::blocking::Response,
 }
 impl Resp {
-    pub fn copy_to<W: ?Sized>(self, w: &mut W) -> Result<u64, Error>
+    pub fn copy_to<W: ?Sized>(self, w: &mut W) -> Result<u64>
     where
         W: std::io::Write,
     {
@@ -44,7 +45,7 @@ impl ClashUtil {
             clash_client: OnceCell::new(),
         }
     }
-    fn get(&self, url: &str, payload: Option<String>) -> Result<String, reqwest::Error> {
+    fn get(&self, url: &str, payload: Option<String>) -> core::result::Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
             Some(kv) => self
@@ -59,7 +60,7 @@ impl ClashUtil {
             Err(e) => Err(e),
         }
     }
-    fn post(&self, url: &str, payload: Option<String>) -> Result<String, reqwest::Error> {
+    fn post(&self, url: &str, payload: Option<String>) -> core::result::Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
             Some(kv) => self.client.get_or_init(Client::new).post(api).body(kv),
@@ -72,7 +73,7 @@ impl ClashUtil {
         }
     }
 
-    fn put(&self, url: &str, payload: Option<String>) -> Result<String, reqwest::Error> {
+    fn put(&self, url: &str, payload: Option<String>) -> core::result::Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
             Some(kv) => self.client.get_or_init(Client::new).put(api).body(kv),
@@ -85,26 +86,26 @@ impl ClashUtil {
         }
     }
 
-    pub fn restart(&self, payload: Option<String>) -> Result<String, std::io::Error> {
+    pub fn restart(&self, payload: Option<String>) -> Result<String> {
         match payload {
             Some(load) => self.post("/restart", Some(load)),
             None => self.post("/restart", Some(DEFAULT_PAYLOAD.to_string())),
         }
         .map_err(process_err)
     }
-    pub fn version(&self) -> Result<String, std::io::Error> {
+    pub fn version(&self) -> Result<String> {
         self.get("/version", None).map_err(process_err)
     }
-    pub fn config_get(&self) -> Result<String, Error> {
+    pub fn config_get(&self) -> Result<String> {
         self.get("/configs", None).map_err(process_err)
     }
-    pub fn config_reload(&self, payload: String) -> Result<(), Error> {
+    pub fn config_reload(&self, payload: String) -> Result<()> {
         match self.put("/configs?force=true", Some(payload)) {
             Err(e) => Err(process_err(e)),
             _ => Ok(()),
         }
     }
-    pub fn mock_clash_core(&self, url: &str) -> Result<Resp, Error> {
+    pub fn mock_clash_core(&self, url: &str) -> Result<Resp> {
         self.clash_client
             .get_or_init(|| {
                 // [TODO] When get_or_try_init is stable...
@@ -123,7 +124,7 @@ impl ClashUtil {
             .map(|v| Resp { inner: v })
             .map_err(process_err)
     }
-    pub fn config_patch(&self, payload: String) -> Result<String, Error> {
+    pub fn config_patch(&self, payload: String) -> Result<String> {
         self.client
             .get_or_init(Client::new)
             .patch(self.api.clone() + "/configs")
