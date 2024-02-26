@@ -370,7 +370,7 @@ impl ClashTuiUtil {
         })
     }
 }
-use super::ipc::exec_ipc;
+use super::ipc::exec;
 // IPC Related
 impl ClashTuiUtil {
     /// Exec `cmd` for given `path`
@@ -407,9 +407,9 @@ impl ClashTuiUtil {
             path,
         );
         #[cfg(target_os = "windows")]
-        return exec_ipc("cmd", vec!["/C", cmd.as_str()]);
+        return exec("cmd", vec!["/C", cmd.as_str()]);
         #[cfg(target_os = "linux")]
-        exec_ipc("sh", vec!["-c", cmd.as_str()])
+        exec("sh", vec!["-c", cmd.as_str()])
     }
 
     #[cfg(target_os = "linux")]
@@ -417,12 +417,12 @@ impl ClashTuiUtil {
         match op {
             ClashSrvOp::StartClashService => {
                 if self.tui_cfg.is_user {
-                    exec_ipc(
+                    exec(
                         "systemctl",
                         vec!["restart", "--user", self.tui_cfg.clash_srv_name.as_str()],
                     )
                 } else {
-                    exec_ipc(
+                    exec(
                         "systemctl",
                         vec!["restart", self.tui_cfg.clash_srv_name.as_str()],
                     )
@@ -430,12 +430,12 @@ impl ClashTuiUtil {
             }
             ClashSrvOp::StopClashService => {
                 if self.tui_cfg.is_user {
-                    exec_ipc(
+                    exec(
                         "systemctl",
                         vec!["stop", "--user", self.tui_cfg.clash_srv_name.as_str()],
                     )
                 } else {
-                    exec_ipc(
+                    exec(
                         "systemctl",
                         vec!["stop", self.tui_cfg.clash_srv_name.as_str()],
                     )
@@ -444,7 +444,7 @@ impl ClashTuiUtil {
             ClashSrvOp::TestClashConfig => {
                 self.test_profile_config(self.tui_cfg.clash_cfg_path.as_str(), false)
             }
-            ClashSrvOp::SetPermission => exec_ipc(
+            ClashSrvOp::SetPermission => super::ipc::exec_with_sbin(
                 "setcap",
                 vec![
                     "'cap_net_admin,cap_net_bind_service=+ep'",
@@ -476,7 +476,7 @@ impl ClashTuiUtil {
                     format!("restart {}", self.tui_cfg.clash_srv_name).as_str(),
                     true,
                 )?;
-                exec_ipc(
+                exec(
                     nssm_pgm,
                     vec!["status", self.tui_cfg.clash_srv_name.as_str()],
                 )
@@ -488,7 +488,7 @@ impl ClashTuiUtil {
                     &format!("stop {}", self.tui_cfg.clash_srv_name),
                     true,
                 )?;
-                exec_ipc(
+                exec(
                     nssm_pgm,
                     vec!["status", self.tui_cfg.clash_srv_name.as_str()],
                 )
@@ -511,7 +511,7 @@ impl ClashTuiUtil {
                     true,
                 )?;
 
-                exec_ipc(
+                exec(
                     nssm_pgm,
                     vec!["status", self.tui_cfg.clash_srv_name.as_str()],
                 )

@@ -4,7 +4,7 @@ use std::process::{Command, Output};
 
 type Result<T> = core::result::Result<T, std::io::Error>;
 
-pub fn exec_ipc(pgm: &str, args: Vec<&str>) -> Result<String> {
+pub fn exec(pgm: &str, args: Vec<&str>) -> Result<String> {
     log::debug!("IPC: {} {:?}", pgm, args);
     let output = Command::new(pgm).args(args).output()?;
     string_process_output(output)
@@ -14,6 +14,14 @@ pub fn spawn(pgm: &str, args: Vec<&str>) -> Result<()> {
     log::debug!("SPW: {} {:?}", pgm, args);
     Command::new(pgm).args(args).spawn()?;
     Ok(())
+}
+#[cfg(target_os = "linux")]
+pub fn exec_with_sbin(pgm: &str, args: Vec<&str>) -> Result<String> {
+    log::debug!("IPC: {} {:?}", pgm, args);
+    let mut path = std::env::var("PATH").unwrap_or_default();
+    path.push_str(":/usr/sbin");
+    let output = Command::new(pgm).env("PATH", path).args(args).output()?;
+    string_process_output(output)
 }
 
 #[cfg(target_os = "windows")]
