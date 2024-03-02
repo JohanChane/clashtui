@@ -1,18 +1,11 @@
-pub fn concat_update_profile_result(
-    result: (Vec<(String, String)>, Vec<(String, String)>),
-) -> Vec<String> {
-    let (updated_res, not_updated_res) = result;
-    let mut concatenated_result = Vec::new();
-
-    for (url, path) in not_updated_res {
-        concatenated_result.push(format!("Not Updated: {} -> {}", url, path));
-    }
-
-    for (url, path) in updated_res {
-        concatenated_result.push(format!("Updated: {} -> {}", url, path));
-    }
-
-    concatenated_result
+pub fn concat_update_profile_result(result: (Vec<String>, Vec<String>)) -> Vec<String> {
+    let suc = result.0.iter().map(|v| format!("Updated: {v}"));
+    result
+        .1
+        .iter()
+        .map(|v| format!("Not Updated: {v}"))
+        .chain(suc)
+        .collect()
 }
 
 pub fn get_file_names(dir: &std::path::Path) -> Result<Vec<String>, std::io::Error> {

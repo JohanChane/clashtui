@@ -233,10 +233,8 @@ impl ClashTuiUtil {
         })
     }
     pub fn get_profile_yaml_path(&self, profile_name: &String) -> PathBuf {
-        let profile_path = self.profile_dir.join(profile_name);
-
         if self.is_profile_yaml(profile_name) {
-            profile_path
+            self.profile_dir.join(profile_name)
         } else {
             let profile_cache_dir = self.clashtui_dir.join("profile_cache");
             let profile_yaml_name = Path::new(profile_name).with_extension("yaml");
@@ -248,99 +246,76 @@ impl ClashTuiUtil {
         &self,
         profile_name: &String,
         does_update_all: bool,
-    ) -> anyhow::Result<(Vec<(String, String)>, Vec<(String, String)>)> {
-        use std::io::Read;
-        let net_res_keys = if !does_update_all {
-            vec!["proxy-providers"]
-        } else {
-            vec!["proxy-providers", "rule-providers"]
-        };
-
-        let profile_path = self.profile_dir.join(profile_name);
-        let mut profile_yaml_path = profile_path.clone();
-        let mut net_res: Vec<(String, String)> = Vec::new();
-        // ## 如果是订阅链接
+    ) -> Result<(Vec<String>, Vec<String>), Error> {
+        let mut profile_yaml_path = self.profile_dir.join(profile_name);
+        let mut net_res: Vec<(String, String, String)> = Vec::new();
+        // if it's just the link
         if !self.is_profile_yaml(profile_name) {
-            let mut file = File::open(profile_path)?;
-            let mut file_content = String::new();
-            file.read_to_string(&mut file_content)?;
-
+            let file_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
             let sub_url = file_content.trim();
-            let response = self.dl_remote_profile(sub_url)?;
 
             profile_yaml_path = self.get_profile_yaml_path(profile_name);
-            let directory = profile_yaml_path
-                .parent()
-                .ok_or_else(|| anyhow::anyhow!("Invalid file path"))?;
-            if !directory.exists() {
-                create_dir_all(directory)?;
-            }
-            let mut output_file = File::create(&profile_yaml_path)?;
-            response.copy_to(&mut output_file)?;
+            // Update the file to keep up-to-date
+            self.download_file(sub_url, &profile_yaml_path)?;
 
             net_res.push((
+                profile_name.clone(),
                 sub_url.to_string(),
                 profile_yaml_path.to_string_lossy().to_string(),
             ))
         }
 
-        // ## 更新 yaml 的网络资源
-        let mut file = File::open(profile_yaml_path)?;
-        let mut yaml_content = String::new();
-        file.read_to_string(&mut yaml_content)?;
-
-        if let Ok(parsed_yaml) = serde_yaml::from_str::<serde_yaml::Value>(yaml_content.as_str()) {
-            for key in &net_res_keys {
-                let providers =
-                    if let Some(serde_yaml::Value::Mapping(providers)) = parsed_yaml.get(key) {
-                        providers
-                    } else {
-                        continue;
-                    };
-
-                for (_, provider_value) in providers {
-                    let provider_content =
-                        if let serde_yaml::Value::Mapping(provider_content) = provider_value {
-                            provider_content
+        // Update the resouce in the file (if there is)
+        {
+            let yaml_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
+            let parsed_yaml = serde_yaml::Value::from(yaml_content.as_str());
+            drop(yaml_content);
+            if !does_update_all {
+                vec!["proxy-providers"]
+            } else {
+                vec!["proxy-providers", "rule-providers"]
+            }
+            .into_iter()
+            .filter_map(|key| parsed_yaml.get(key))
+            .filter_map(|val| val.as_mapping())
+            // flatten inner iter
+            .flat_map(|providers| {
+                providers
+                    .into_iter()
+                    .filter_map(|(_, provider_value)| provider_value.as_mapping())
+                    // pass only when type is http
+                    .filter(|&provider_content| {
+                        provider_content
+                            .get("type")
+                            .and_then(|v| v.as_str())
+                            .is_some_and(|t| t == "http")
+                    })
+                    .filter_map(|provider_content| {
+                        if let (
+                            Some(serde_yaml::Value::String(url)),
+                            Some(serde_yaml::Value::String(path)),
+                        ) = (provider_content.get("url"), provider_content.get("path"))
+                        {
+                            Some((profile_name.clone(), url.clone(), path.clone()))
                         } else {
-                            continue;
-                        };
-
-                    if let Some(serde_yaml::Value::String(t)) = provider_content.get("type") {
-                        if t != "http" {
-                            continue;
+                            None
                         }
-                    } else {
-                        continue;
-                    };
-
-                    if let (
-                        Some(serde_yaml::Value::String(url)),
-                        Some(serde_yaml::Value::String(path)),
-                    ) = (provider_content.get("url"), provider_content.get("path"))
-                    {
-                        net_res.push((url.clone(), path.clone()))
-                    }
-                }
-            }
-        } else {
-            return Err(anyhow::anyhow!("Not yaml?"));
+                    })
+            })
+            .for_each(|v| net_res.push(v));
         }
-        let mut updated_res = vec![];
-        let mut not_updated_res = vec![];
-        for (url, path) in &net_res {
-            match self.download_file(url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(path)) {
-                Ok(_) => {
-                    updated_res.push((url.clone(), path.clone()));
-                }
+
+        let mut temp = (vec![], vec![]);
+        net_res.into_iter().for_each(|(name, url, path)| {
+            match self.download_file(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(path)) {
+                Ok(_) => temp.0.push(name),
                 Err(err) => {
-                    not_updated_res.push((url.clone(), path.clone()));
-                    log::error!("Failed to Download file: {}", err);
+                    log::error!("Update profile:{err}");
+                    temp.1.push(name)
                 }
             }
-        }
-
-        Ok((updated_res, not_updated_res))
+        });
+        Ok(temp)
     }
 
     fn download_file(&self, url: &str, path: &PathBuf) -> Result<(), Error> {
@@ -416,30 +391,26 @@ impl ClashTuiUtil {
     pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
         match op {
             ClashSrvOp::StartClashService => {
+                let mut args = vec!["restart", self.tui_cfg.clash_srv_name.as_str()];
                 if self.tui_cfg.is_user {
-                    exec(
-                        "systemctl",
-                        vec!["restart", "--user", self.tui_cfg.clash_srv_name.as_str()],
-                    )
-                } else {
-                    exec(
-                        "systemctl",
-                        vec!["restart", self.tui_cfg.clash_srv_name.as_str()],
-                    )
+                    args.push("--user")
                 }
+                exec("systemctl", args)?;
+                exec(
+                    "systemctl",
+                    vec!["status", self.tui_cfg.clash_srv_name.as_str()],
+                )
             }
             ClashSrvOp::StopClashService => {
+                let mut args = vec!["stop", self.tui_cfg.clash_srv_name.as_str()];
                 if self.tui_cfg.is_user {
-                    exec(
-                        "systemctl",
-                        vec!["stop", "--user", self.tui_cfg.clash_srv_name.as_str()],
-                    )
-                } else {
-                    exec(
-                        "systemctl",
-                        vec!["stop", self.tui_cfg.clash_srv_name.as_str()],
-                    )
+                    args.push("--user")
                 }
+                exec("systemctl", args)?;
+                exec(
+                    "systemctl",
+                    vec!["status", self.tui_cfg.clash_srv_name.as_str()],
+                )
             }
             ClashSrvOp::TestClashConfig => {
                 self.test_profile_config(self.tui_cfg.clash_cfg_path.as_str(), false)
