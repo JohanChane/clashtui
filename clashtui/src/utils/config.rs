@@ -108,7 +108,6 @@ pub fn init_config(
     clashtui_config_dir: &std::path::PathBuf,
     default_basic_clash_cfg_content: &str,
 ) -> Result<()> {
-    // just assume it's working, handle bug when bug occurs
     use std::fs;
     fs::create_dir_all(clashtui_config_dir)?;
 

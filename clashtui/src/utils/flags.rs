@@ -6,22 +6,18 @@ pub enum Flag {
     PortableMode,
 }
 #[derive(Debug)]
-pub struct Flags {
-    inner: std::collections::HashSet<Flag>,
-}
+pub struct Flags(std::collections::HashSet<Flag>);
 impl Flags {
     pub fn with_capacity(capacity: usize) -> Self {
-        Self {
-            inner: std::collections::HashSet::with_capacity(capacity),
-        }
+        Self(std::collections::HashSet::with_capacity(capacity))
     }
     pub fn insert(&mut self, k: Flag) {
         // current, flag should not be add more than once
-        if !self.inner.insert(k) {
+        if !self.0.insert(k) {
             unreachable!()
         }
     }
     pub fn contains(&self, k: Flag) -> bool {
-        self.inner.contains(&k)
+        self.0.contains(&k)
     }
 }

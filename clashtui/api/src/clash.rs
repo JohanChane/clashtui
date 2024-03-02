@@ -45,7 +45,11 @@ impl ClashUtil {
             clash_client: OnceCell::new(),
         }
     }
-    fn get(&self, url: &str, payload: Option<String>) -> core::result::Result<String, reqwest::Error> {
+    fn get(
+        &self,
+        url: &str,
+        payload: Option<String>,
+    ) -> core::result::Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
             Some(kv) => self
@@ -60,7 +64,11 @@ impl ClashUtil {
             Err(e) => Err(e),
         }
     }
-    fn post(&self, url: &str, payload: Option<String>) -> core::result::Result<String, reqwest::Error> {
+    fn post(
+        &self,
+        url: &str,
+        payload: Option<String>,
+    ) -> core::result::Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
             Some(kv) => self.client.get_or_init(Client::new).post(api).body(kv),
@@ -73,7 +81,11 @@ impl ClashUtil {
         }
     }
 
-    fn put(&self, url: &str, payload: Option<String>) -> core::result::Result<String, reqwest::Error> {
+    fn put(
+        &self,
+        url: &str,
+        payload: Option<String>,
+    ) -> core::result::Result<String, reqwest::Error> {
         let api = format!("{}{}", self.api, url);
         let response = match payload {
             Some(kv) => self.client.get_or_init(Client::new).put(api).body(kv),

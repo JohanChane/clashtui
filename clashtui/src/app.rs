@@ -35,7 +35,7 @@ impl App {
         setup_logging(clashtui_config_dir.join("clashtui.log").to_str().unwrap());
 
         let (util, mut err_track) = ClashTuiUtil::new(
-            &clashtui_config_dir,
+            clashtui_config_dir,
             &clashtui_config_dir.join("profiles"),
             !flags.contains(Flag::FirstInit),
         );
@@ -201,7 +201,7 @@ impl App {
                     .map_err(|()| std::io::Error::new(std::io::ErrorKind::Other, "Undefined"))?;
                 let mut iter = self.tabs.values().map(|v| match v {
                     Tabs::Profile(v) => v.borrow_mut().event(ev),
-                    Tabs::ClashSrvCtl(v) => v.borrow_mut().event(ev).map_err(|e| e.into()),
+                    Tabs::ClashSrvCtl(v) => Ok(v.borrow_mut().event(ev)?),
                 });
                 while event_state.is_notconsumed() {
                     match iter.next() {
@@ -306,7 +306,7 @@ impl App {
             });
     }
 
-    pub fn save(&self, config_path:&str) -> Result<(), CfgError> {
+    pub fn save(&self, config_path: &str) -> Result<(), CfgError> {
         self.clashtui_util.tui_cfg.to_file(config_path)
     }
 }
