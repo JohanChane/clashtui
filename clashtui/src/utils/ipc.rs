@@ -1,6 +1,6 @@
 #[cfg(target_os = "windows")]
 use encoding::{all::GBK, DecoderTrap, Encoding};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 type Result<T> = core::result::Result<T, std::io::Error>;
 
@@ -12,12 +12,17 @@ pub fn exec(pgm: &str, args: Vec<&str>) -> Result<String> {
 
 pub fn spawn(pgm: &str, args: Vec<&str>) -> Result<()> {
     log::debug!("SPW: {} {:?}", pgm, args);
-    Command::new(pgm).args(args).spawn()?;
+    // Just ignore the output, otherwise the ui might be broken
+    Command::new(pgm)
+        .stderr(Stdio::null())
+        .stdout(Stdio::null())
+        .args(args)
+        .spawn()?;
     Ok(())
 }
 #[cfg(target_os = "linux")]
 pub fn exec_with_sbin(pgm: &str, args: Vec<&str>) -> Result<String> {
-    log::debug!("IPC: {} {:?}", pgm, args);
+    log::debug!("LIPC: {} {:?}", pgm, args);
     let mut path = std::env::var("PATH").unwrap_or_default();
     path.push_str(":/usr/sbin");
     let output = Command::new(pgm).env("PATH", path).args(args).output()?;
