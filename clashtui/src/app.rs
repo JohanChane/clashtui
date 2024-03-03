@@ -85,24 +85,19 @@ impl App {
         // May not often used, place in heap
         let help_popup = Box::new(HelpPopUp::new());
 
+        let tabs_ = [Tab::Profile, Tab::ClashSrvCtl];
+        let tabbar = TabBar::new(tabs_.iter().map(|v| v.to_string()).collect());
+        let tabs: HashMap<Tab, Tabs> = HashMap::from_iter(tabs_.into_iter().zip([
+            Tabs::Profile(RefCell::new(ProfileTab::new(
+                clashtui_util.clone(),
+                clashtui_state.clone(),
+            ))),
+            Tabs::ClashSrvCtl(RefCell::new(ClashSrvCtlTab::new(
+                clashtui_util.clone(),
+                clashtui_state.clone(),
+            ))),
+        ])); // Init the tabs
         let statusbar = StatusBar::new(Rc::clone(&clashtui_state));
-        let tabs: HashMap<Tab, Tabs> = HashMap::from_iter([
-            (
-                Tab::Profile,
-                Tabs::Profile(RefCell::new(ProfileTab::new(
-                    clashtui_util.clone(),
-                    clashtui_state.clone(),
-                ))),
-            ),
-            (
-                Tab::ClashSrvCtl,
-                Tabs::ClashSrvCtl(RefCell::new(ClashSrvCtlTab::new(
-                    clashtui_util.clone(),
-                    clashtui_state.clone(),
-                ))),
-            ),
-        ]); // Init the tabs
-        let tabbar = TabBar::new(tabs.keys().map(|v| v.to_string()).collect());
 
         let app = Self {
             tabbar,

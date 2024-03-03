@@ -4,7 +4,7 @@ use std::{
 };
 
 use reqwest::blocking::Client;
-type Result<T> = core::result::Result<T, std::io::Error>;
+use std::io::Result;
 
 const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
 

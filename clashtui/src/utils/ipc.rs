@@ -2,7 +2,7 @@
 use encoding::{all::GBK, DecoderTrap, Encoding};
 use std::process::{Command, Output, Stdio};
 
-type Result<T> = core::result::Result<T, std::io::Error>;
+use std::io::Result;
 
 pub fn exec(pgm: &str, args: Vec<&str>) -> Result<String> {
     log::debug!("IPC: {} {:?}", pgm, args);

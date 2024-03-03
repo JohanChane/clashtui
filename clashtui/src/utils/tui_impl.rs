@@ -279,7 +279,7 @@ impl ClashTuiUtil {
         does_update_all: bool,
     ) -> Result<(Vec<String>, Vec<String>), Error> {
         let mut profile_yaml_path = self.profile_dir.join(profile_name);
-        let mut net_res: Vec<(String, String, String)> = Vec::new();
+        let mut net_res: Vec<(String, String)> = Vec::new();
         // if it's just the link
         if !self.is_profile_yaml(profile_name) {
             let file_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
@@ -290,7 +290,6 @@ impl ClashTuiUtil {
             self.download_file(sub_url, &profile_yaml_path)?;
 
             net_res.push((
-                profile_name.clone(),
                 sub_url.to_string(),
                 profile_yaml_path.to_string_lossy().to_string(),
             ))
@@ -328,7 +327,7 @@ impl ClashTuiUtil {
                                 Some(serde_yaml::Value::String(path)),
                             ) = (provider_content.get("url"), provider_content.get("path"))
                             {
-                                Some((profile_name.clone(), url.clone(), path.clone()))
+                                Some((url.clone(), path.clone()))
                             } else {
                                 None
                             }
@@ -338,12 +337,12 @@ impl ClashTuiUtil {
         }
 
         let mut temp = (vec![], vec![]);
-        net_res.into_iter().for_each(|(name, url, path)| {
+        net_res.into_iter().for_each(|(url, path)| {
             match self.download_file(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(path)) {
-                Ok(_) => temp.0.push(name),
+                Ok(_) => temp.0.push(url),
                 Err(err) => {
                     log::error!("Update profile:{err}");
-                    temp.1.push(name)
+                    temp.1.push(url)
                 }
             }
         });
