@@ -12,9 +12,9 @@ pub struct HelpPopUp {
 }
 
 impl HelpPopUp {
-    pub fn new(title: String) -> Self {
+    pub fn new() -> Self {
         Self {
-            title,
+            title: "Help".to_string(),
             is_visible: false,
             items: HELP.lines().map(|line| line.trim().to_string()).collect(),
             list_state: Raw::ListState::default().with_selected(Some(0)),

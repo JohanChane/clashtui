@@ -5,15 +5,13 @@ use super::Theme;
 use crate::tui::EventState;
 
 pub struct TabBar {
-    title: String,
     is_visible: bool,
     tab_titles: Vec<String>,
     index: usize,
 }
 impl TabBar {
-    pub fn new(title: String, tab_titles: Vec<String>) -> Self {
+    pub fn new(tab_titles: Vec<String>) -> Self {
         Self {
-            title,
             is_visible: true,
             tab_titles,
             index: 0,
@@ -65,11 +63,7 @@ impl TabBar {
             })
             .collect();
         let tabs = Raw::Tabs::new(items)
-            .block(
-                Raw::Block::default()
-                    .borders(Raw::Borders::ALL)
-                    .title(self.title.as_str()),
-            )
+            .block(Raw::Block::default().borders(Raw::Borders::ALL))
             .highlight_style(Ra::Style::default().fg(Theme::get().tabbar_hl_fg))
             .select(self.index);
         f.render_widget(tabs, area);

@@ -63,7 +63,6 @@ impl ProfileInputPopup {
     }
 
     pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
-        //! will clear the area
         if !self.is_visible() {
             return;
         }

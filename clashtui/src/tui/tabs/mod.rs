@@ -14,13 +14,18 @@ pub enum Tab {
     Profile,
     ClashSrvCtl,
 }
-impl std::cmp::PartialEq<std::string::String> for Tab {
-    fn eq(&self, other: &std::string::String) -> bool {
+impl ToString for Tab {
+    fn to_string(&self) -> String {
         use super::symbols;
-        let fmtd = match self {
+        match self {
             Tab::Profile => symbols::PROFILE.to_string(),
             Tab::ClashSrvCtl => symbols::CLASHSRVCTL.to_string(),
-        };
+        }
+    }
+}
+impl std::cmp::PartialEq<std::string::String> for Tab {
+    fn eq(&self, other: &std::string::String) -> bool {
+        let fmtd = self.to_string();
         &fmtd == other
     }
 }

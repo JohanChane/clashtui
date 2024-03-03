@@ -5,7 +5,6 @@ use std::{collections::HashMap, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
 use crate::tui::{
-    symbols,
     tabs::{ClashSrvCtlTab, ProfileTab, Tab, Tabs},
     tools,
     utils::{HelpPopUp, Keys},
@@ -20,7 +19,7 @@ pub struct App {
     tabbar: TabBar,
     tabs: HashMap<Tab, Tabs>,
     pub should_quit: bool,
-    help_popup: HelpPopUp,
+    help_popup: Box<HelpPopUp>,
     msgpopup: MsgPopup,
 
     clashtui_util: SharedClashTuiUtil,
@@ -78,19 +77,14 @@ impl App {
             .map_err(|e| log::error!("Err while CronUpdate: {}", e));
             return (None, err_track);
         } // Finish cron
-        let clashtui_util = Rc::new(util);
+        let clashtui_util = SharedClashTuiUtil::new(util);
 
         let clashtui_state =
             SharedClashTuiState::new(RefCell::new(State::new(Rc::clone(&clashtui_util))));
         let _ = Theme::load(None).map_err(|e| log::error!("Loading Theme:{}", e));
-        let help_popup = HelpPopUp::new("Help".to_string());
-        let tabbar = TabBar::new(
-            "".to_string(),
-            vec![
-                symbols::PROFILE.to_string(),
-                symbols::CLASHSRVCTL.to_string(),
-            ],
-        );
+        // May not often used, place in heap
+        let help_popup = Box::new(HelpPopUp::new());
+
         let statusbar = StatusBar::new(Rc::clone(&clashtui_state));
         let tabs: HashMap<Tab, Tabs> = HashMap::from_iter([
             (
@@ -108,6 +102,7 @@ impl App {
                 ))),
             ),
         ]); // Init the tabs
+        let tabbar = TabBar::new(tabs.keys().map(|v| v.to_string()).collect());
 
         let app = Self {
             tabbar,

@@ -270,6 +270,7 @@ impl ClashTuiUtil {
             let yaml_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
             let parsed_yaml = serde_yaml::Value::from(yaml_content.as_str());
             drop(yaml_content);
+            net_res.extend(
             if !does_update_all {
                 vec!["proxy-providers"]
             } else {
@@ -301,8 +302,8 @@ impl ClashTuiUtil {
                             None
                         }
                     })
-            })
-            .for_each(|v| net_res.push(v));
+                }),
+            );
         }
 
         let mut temp = (vec![], vec![]);
@@ -424,7 +425,7 @@ impl ClashTuiUtil {
             ),
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
-                "No Support Adction",
+                "No Support Action",
             )),
         }
     }
@@ -505,7 +506,7 @@ impl ClashTuiUtil {
             }
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
-                "No Support Adction",
+                "No Support Action",
             )),
         }
     }

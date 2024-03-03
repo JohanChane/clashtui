@@ -127,7 +127,7 @@ impl MsgPopup {
     pub fn push_txt_msg(&mut self, msg: String) {
         self.msg.push(msg);
     }
-    pub fn push_list_msg(&mut self, msg: Vec<String>) {
+    pub fn push_list_msg(&mut self, msg: impl IntoIterator<Item = String>) {
         self.msg.extend(msg);
     }
 }

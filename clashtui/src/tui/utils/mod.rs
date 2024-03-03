@@ -12,7 +12,7 @@ macro_rules! msgpopup_methods {
                 self.msgpopup.push_txt_msg(msg);
                 self.msgpopup.show();
             }
-            pub fn popup_list_msg(&mut self, msg: Vec<String>) {
+            pub fn popup_list_msg(&mut self, msg: impl IntoIterator<Item = String>) {
                 self.msgpopup.push_list_msg(msg);
                 self.msgpopup.show();
             }

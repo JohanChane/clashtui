@@ -125,7 +125,10 @@ fn run_app<B: Backend>(
             .checked_sub(last_tick.elapsed())
             .unwrap_or_else(|| Duration::from_secs(0));
         if crossterm::event::poll(timeout)? {
-            last_ev = app.event(&event::read()?)?;
+            last_ev = app
+                .event(&event::read()?)
+                .map_err(|e| app.popup_txt_msg(e.to_string()))
+                .unwrap_or(EventState::NotConsumed);
         }
 
         if last_tick.elapsed() >= tick_rate {
