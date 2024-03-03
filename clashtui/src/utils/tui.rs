@@ -14,7 +14,7 @@ use api::{ClashConfig, ClashUtil, Resp};
 
 pub struct ClashTuiUtil {
     pub clashtui_dir: PathBuf,
-    pub profile_dir: PathBuf,
+    pub(super) profile_dir: PathBuf,
 
     clash_api: ClashUtil,
     pub tui_cfg: ClashTuiConfig,
@@ -201,7 +201,7 @@ impl ClashTuiUtil {
     fn merge_profile(&self, profile_name: &String) -> anyhow::Result<()> {
         let basic_clash_cfg_path = self.clashtui_dir.join("basic_clash_config.yaml");
         let mut dst_parsed_yaml = parse_yaml(&basic_clash_cfg_path)?;
-        let profile_yaml_path = self.get_profile_yaml_path(profile_name);
+        let profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
         let profile_parsed_yaml = parse_yaml(&profile_yaml_path).or_else(|e| {
             anyhow::bail!(
                 "Maybe need to update first. Failed to parse {}: {}",

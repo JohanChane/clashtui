@@ -59,7 +59,10 @@ impl ProfileTab {
         instance
             .profile_list
             .select(instance.clashtui_state.borrow().get_profile());
-        let template_names: Vec<String> = instance.clashtui_util.get_template_names().unwrap();
+        let template_names: Vec<String> = instance
+            .clashtui_util
+            .get_template_names()
+            .expect("Unable to init ProfileTab");
         instance.template_list.set_items(template_names);
 
         instance
@@ -143,7 +146,7 @@ impl ProfileTab {
     }
     pub fn handle_delete_profile_ev(&mut self) {
         if let Some(profile_name) = self.profile_list.selected() {
-            match remove_file(self.clashtui_util.profile_dir.join(profile_name)) {
+            match remove_file(self.clashtui_util.get_profile_path_unchecked(profile_name)) {
                 Ok(()) => {
                     self.update_profile_list();
                 }
@@ -169,7 +172,7 @@ impl ProfileTab {
             match OpenOptions::new()
                 .create_new(true)
                 .write(true)
-                .open(self.clashtui_util.profile_dir.join(profile_name))
+                .open(self.clashtui_util.get_profile_path_unchecked(profile_name))
             {
                 Ok(mut file) => {
                     if let Err(err) = write!(file, "{}", uri) {
@@ -186,16 +189,13 @@ impl ProfileTab {
                 self.popup_txt_msg("Failed to import: file exists".to_string());
                 return;
             }
+            self.clashtui_util
+                .get_profile_yaml_path(profile_name)
+                .map_err(|e| self.popup_txt_msg(e.to_string()))
+                .into_iter()
+                .map_while(|path| fs::copy(Path::new(uri), path).err())
+                .for_each(|e| self.popup_txt_msg(e.to_string()));
 
-            let _ = fs::copy(
-                Path::new(uri),
-                Path::new(
-                    &self
-                        .clashtui_util
-                        .profile_dir
-                        .join(Path::new(profile_name).with_extension("yaml")),
-                ),
-            );
             self.update_profile_list();
         } else {
             self.popup_txt_msg("Uri is invalid.".to_string());
@@ -231,118 +231,144 @@ impl ProfileTab {
 
             match self.fouce {
                 Fouce::Profile => {
-                    event_state = if Keys::TemplateSwitch.is(key) {
-                        self.switch_fouce(Fouce::Template);
-                        EventState::WorkDone
-                    } else if Keys::Select.is(key) {
-                        self.popup_txt_msg("Selecting...".to_string());
-                        EventState::ProfileSelect
-                    } else if Keys::ProfileUpdate.is(key) {
-                        self.popup_txt_msg("Updating...".to_string());
-                        EventState::ProfileUpdate
-                    } else if Keys::ProfileUpdateAll.is(key) {
-                        self.popup_txt_msg("Updating...".to_string());
-                        EventState::ProfileUpdateAll
-                    } else if Keys::ProfileImport.is(key) {
-                        self.profile_input.show();
-                        EventState::WorkDone
-                    } else if Keys::ProfileDelete.is(key) {
-                        self.confirm_popup
-                            .popup_msg("`y` to Delete, `Esc` to cancel".to_string());
-                        EventState::WorkDone
-                    } else if Keys::Edit.is(key) {
-                        if let Some(profile_name) = self.profile_list.selected() {
-                            if let Err(err) = self
-                                .clashtui_util
-                                .edit_file(&self.clashtui_util.profile_dir.join(profile_name))
-                            {
-                                log::error!("{}", err);
-                                self.popup_txt_msg(err.to_string());
-                            }
+                    event_state = match key.code.into() {
+                        Keys::TemplateSwitch => {
+                            self.switch_fouce(Fouce::Template);
+                            EventState::WorkDone
                         }
-                        EventState::WorkDone
-                    } else if Keys::Preview.is(key) {
-                        if let Some(profile_name) = self.profile_list.selected() {
-                            let profile_path = self.clashtui_util.profile_dir.join(profile_name);
-                            let file_content = std::fs::read_to_string(profile_path)?;
-                            let mut lines: Vec<String> =
-                                file_content.lines().map(|s| s.to_string()).collect();
-
-                            if !self.clashtui_util.is_profile_yaml(profile_name) {
-                                let yaml_path =
-                                    self.clashtui_util.get_profile_yaml_path(profile_name);
-                                if yaml_path.is_file() {
-                                    let yaml_content = std::fs::read_to_string(&yaml_path)?;
-                                    let yaml_lines: Vec<String> =
-                                        yaml_content.lines().map(|s| s.to_string()).collect();
-                                    lines.push(String::new());
-                                    lines.extend(yaml_lines);
-                                } else {
-                                    lines.push(String::new());
-                                    lines.push(
-                                        "yaml file isn't exists. Please update it.".to_string(),
-                                    );
-                                }
-                            }
-
-                            self.popup_list_msg(lines);
+                        Keys::Select => {
+                            self.popup_txt_msg("Selecting...".to_string());
+                            EventState::ProfileSelect
                         }
-                        EventState::WorkDone
-                    } else if Keys::ProfileTestConfig.is(key) {
-                        if let Some(profile_name) = self.profile_list.selected() {
-                            let path = self.clashtui_util.get_profile_yaml_path(profile_name);
-                            match self
-                                .clashtui_util
-                                .test_profile_config(path.to_str().unwrap(), false)
-                            {
-                                Ok(output) => {
-                                    let list_msg: Vec<String> = output
+                        Keys::ProfileUpdate => {
+                            self.popup_txt_msg("Updating...".to_string());
+                            EventState::ProfileUpdate
+                        }
+                        Keys::ProfileUpdateAll => {
+                            self.popup_txt_msg("Updating...".to_string());
+                            EventState::ProfileUpdateAll
+                        }
+                        Keys::ProfileImport => {
+                            self.profile_input.show();
+                            EventState::WorkDone
+                        }
+                        Keys::ProfileDelete => {
+                            self.confirm_popup
+                                .popup_msg("`y` to Delete, `Esc` to cancel".to_string());
+                            EventState::WorkDone
+                        }
+                        Keys::Edit => {
+                            // Hmm, now every time I call edit, an window will pop up
+                            // even if there is no error. But I think it's fine, maybe
+                            // I'll solve it one day
+                            self.popup_txt_msg(
+                                self.profile_list
+                                    .selected()
+                                    .into_iter()
+                                    .map(|profile_name| {
+                                        self.clashtui_util.edit_file(
+                                            &self
+                                                .clashtui_util
+                                                .get_profile_path_unchecked(profile_name),
+                                        )
+                                    })
+                                    .map_while(|r| r.err())
+                                    .map(|err| {
+                                        log::error!("{}", err);
+                                        err.to_string()
+                                    })
+                                    .collect(),
+                            );
+                            EventState::WorkDone
+                        }
+                        Keys::Preview => {
+                            if let Some(profile_name) = self.profile_list.selected() {
+                                let mut profile_path = Some(
+                                    self.clashtui_util.get_profile_path_unchecked(profile_name),
+                                );
+                                let mut lines: Vec<String> =
+                                    std::fs::read_to_string(profile_path.as_ref().unwrap())?
                                         .lines()
-                                        .map(|line| line.trim().to_string())
+                                        .map(|s| s.to_string())
                                         .collect();
-                                    self.popup_list_msg(list_msg);
+
+                                if !self.clashtui_util.is_profile_yaml(profile_name) {
+                                    lines.push(String::new());
+                                    profile_path =
+                                        self.clashtui_util.get_profile_yaml_path(profile_name).ok();
+                                    if let Some(profile_path) = profile_path {
+                                        lines.extend(
+                                            std::fs::read_to_string(profile_path)?
+                                                .lines()
+                                                .map(|s| s.to_string()),
+                                        );
+                                    } else {
+                                        lines.push(
+                                            "yaml file isn't exists. Please update it.".to_string(),
+                                        );
+                                    }
                                 }
-                                Err(err) => self.popup_txt_msg(err.to_string()),
+                                self.popup_list_msg(lines);
                             }
+                            EventState::WorkDone
                         }
-                        EventState::WorkDone
-                    } else {
-                        EventState::NotConsumed
+                        Keys::ProfileTestConfig => {
+                            if let Some(profile_name) = self.profile_list.selected() {
+                                let path =
+                                    self.clashtui_util.get_profile_yaml_path(profile_name)?;
+                                match self
+                                    .clashtui_util
+                                    .test_profile_config(path.to_str().unwrap(), false)
+                                {
+                                    Ok(output) => self.popup_list_msg(
+                                        output.lines().map(|line| line.trim().to_string()),
+                                    ),
+                                    Err(err) => self.popup_txt_msg(err.to_string()),
+                                }
+                            }
+                            EventState::WorkDone
+                        }
+                        _ => EventState::NotConsumed,
                     };
                 }
                 Fouce::Template => {
-                    event_state = if Keys::ProfileSwitch.is(key) {
-                        self.switch_fouce(Fouce::Profile);
-                        EventState::WorkDone
-                    } else if Keys::Select.is(key) {
-                        self.handle_create_template_ev();
-                        EventState::WorkDone
-                    } else if Keys::Preview.is(key) {
-                        if let Some(name) = self.template_list.selected() {
-                            let path = self
-                                .clashtui_util
-                                .clashtui_dir
-                                .join(format!("templates/{}", name));
-                            let content = std::fs::read_to_string(path)?;
-                            let lines: Vec<String> =
-                                content.lines().map(|s| s.to_string()).collect();
-
-                            self.popup_list_msg(lines);
+                    event_state = match key.code.into() {
+                        Keys::ProfileSwitch => {
+                            self.switch_fouce(Fouce::Profile);
+                            EventState::WorkDone
                         }
-                        EventState::WorkDone
-                    } else if Keys::Edit.is(key) {
-                        if let Some(name) = self.template_list.selected() {
-                            let tpl_file_path = self
-                                .clashtui_util
-                                .clashtui_dir
-                                .join(format!("templates/{}", name));
-                            if let Err(err) = self.clashtui_util.edit_file(&tpl_file_path) {
-                                self.popup_txt_msg(err.to_string());
+                        Keys::Select => {
+                            self.handle_create_template_ev();
+                            EventState::WorkDone
+                        }
+                        Keys::Preview => {
+                            if let Some(name) = self.template_list.selected() {
+                                let path = self.clashtui_util.get_template_path_unchecked(name);
+                                self.popup_list_msg(
+                                    std::fs::read_to_string(path)?
+                                        .lines()
+                                        .map(|s| s.to_string()),
+                                );
                             }
+                            EventState::WorkDone
                         }
-                        EventState::WorkDone
-                    } else {
-                        EventState::NotConsumed
+                        Keys::Edit => {
+                            self.popup_txt_msg(
+                                self.template_list
+                                    .selected()
+                                    .into_iter()
+                                    .map(|name| {
+                                        self.clashtui_util.get_template_path_unchecked(name)
+                                    })
+                                    .map_while(|tpl_file_path| {
+                                        self.clashtui_util.edit_file(&tpl_file_path).err()
+                                    })
+                                    .map(|err| err.to_string())
+                                    .collect(),
+                            );
+                            EventState::WorkDone
+                        }
+                        _ => EventState::NotConsumed,
                     };
                 }
             }

@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::{tui::parse_yaml, utils as Utils, ClashSrvOp, ClashTuiUtil};
+use super::{is_yaml, tui::parse_yaml, utils as Utils, ClashSrvOp, ClashTuiUtil};
 
 impl ClashTuiUtil {
     pub fn create_yaml_with_template(&self, template_name: &String) -> anyhow::Result<()> {
@@ -232,14 +232,45 @@ impl ClashTuiUtil {
             v
         })
     }
-    pub fn get_profile_yaml_path(&self, profile_name: &String) -> PathBuf {
-        if self.is_profile_yaml(profile_name) {
-            self.profile_dir.join(profile_name)
+    /// Wrapped `self.profile_dir.join(profile_name)`
+    pub fn get_profile_path_unchecked<P>(&self, profile_name: P) -> PathBuf
+    where
+        P: AsRef<Path>,
+    {
+        self.profile_dir.join(profile_name)
+    }
+    /// Wrapped `self.profile_dir.join(profile_name)`
+    pub fn get_template_path_unchecked<P>(&self, name: P) -> PathBuf
+    where
+        P: AsRef<Path>,
+    {
+        self.clashtui_dir.join("templates").join(name)
+    }
+    /// Check the `profiles` and `profile_cache` path
+    pub fn get_profile_yaml_path<P>(&self, profile_name: P) -> Result<PathBuf, Error>
+    where
+        P: AsRef<Path> + AsRef<std::ffi::OsStr>,
+    {
+        let mut path = self.get_profile_path_unchecked(&profile_name);
+        if is_yaml(&path) {
+            Some(path)
         } else {
-            let profile_cache_dir = self.clashtui_dir.join("profile_cache");
-            let profile_yaml_name = Path::new(profile_name).with_extension("yaml");
-            profile_cache_dir.join(profile_yaml_name)
+            path = self.get_profile_cache_unchecked(profile_name);
+            is_yaml(&path).then_some(path)
         }
+        .ok_or(Error::new(
+            std::io::ErrorKind::NotFound,
+            "No valid yaml file",
+        ))
+    }
+    fn get_profile_cache_unchecked<P>(&self, profile_name: P) -> PathBuf
+    where
+        P: AsRef<Path> + AsRef<std::ffi::OsStr>,
+    {
+        self.clashtui_dir
+            .join("profile_cache")
+            .join(profile_name)
+            .with_extension("yaml")
     }
 
     pub fn update_local_profile(
@@ -254,7 +285,7 @@ impl ClashTuiUtil {
             let file_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
             let sub_url = file_content.trim();
 
-            profile_yaml_path = self.get_profile_yaml_path(profile_name);
+            profile_yaml_path = self.get_profile_cache_unchecked(profile_name);
             // Update the file to keep up-to-date
             self.download_file(sub_url, &profile_yaml_path)?;
 
@@ -271,37 +302,37 @@ impl ClashTuiUtil {
             let parsed_yaml = serde_yaml::Value::from(yaml_content.as_str());
             drop(yaml_content);
             net_res.extend(
-            if !does_update_all {
-                vec!["proxy-providers"]
-            } else {
-                vec!["proxy-providers", "rule-providers"]
-            }
-            .into_iter()
-            .filter_map(|key| parsed_yaml.get(key))
-            .filter_map(|val| val.as_mapping())
-            // flatten inner iter
-            .flat_map(|providers| {
-                providers
-                    .into_iter()
-                    .filter_map(|(_, provider_value)| provider_value.as_mapping())
-                    // pass only when type is http
-                    .filter(|&provider_content| {
-                        provider_content
-                            .get("type")
-                            .and_then(|v| v.as_str())
-                            .is_some_and(|t| t == "http")
-                    })
-                    .filter_map(|provider_content| {
-                        if let (
-                            Some(serde_yaml::Value::String(url)),
-                            Some(serde_yaml::Value::String(path)),
-                        ) = (provider_content.get("url"), provider_content.get("path"))
-                        {
-                            Some((profile_name.clone(), url.clone(), path.clone()))
-                        } else {
-                            None
-                        }
-                    })
+                if !does_update_all {
+                    vec!["proxy-providers"]
+                } else {
+                    vec!["proxy-providers", "rule-providers"]
+                }
+                .into_iter()
+                .filter_map(|key| parsed_yaml.get(key))
+                .filter_map(|val| val.as_mapping())
+                // flatten inner iter
+                .flat_map(|providers| {
+                    providers
+                        .into_iter()
+                        .filter_map(|(_, provider_value)| provider_value.as_mapping())
+                        // pass only when type is http
+                        .filter(|&provider_content| {
+                            provider_content
+                                .get("type")
+                                .and_then(|v| v.as_str())
+                                .is_some_and(|t| t == "http")
+                        })
+                        .filter_map(|provider_content| {
+                            if let (
+                                Some(serde_yaml::Value::String(url)),
+                                Some(serde_yaml::Value::String(path)),
+                            ) = (provider_content.get("url"), provider_content.get("path"))
+                            {
+                                Some((profile_name.clone(), url.clone(), path.clone()))
+                            } else {
+                                None
+                            }
+                        })
                 }),
             );
         }
@@ -333,17 +364,15 @@ impl ClashTuiUtil {
         response.copy_to(&mut output_file)?;
         Ok(())
     }
+    /// Check file only in `profiles`
+    ///
     /// Judging by format
-    pub fn is_profile_yaml(&self, profile_name: &String) -> bool {
-        let profile_path = self.profile_dir.join(profile_name);
-        Self::is_yaml(&profile_path)
-    }
-    /// Judging by format
-    fn is_yaml(path: &Path) -> bool {
-        std::fs::File::open(path).is_ok_and(|f| {
-            serde_yaml::from_reader::<std::fs::File, serde_yaml::Value>(f)
-                .is_ok_and(|v| v.is_mapping())
-        })
+    pub fn is_profile_yaml<P>(&self, profile_name: P) -> bool
+    where
+        P: AsRef<Path>,
+    {
+        let profile_path = self.get_profile_path_unchecked(profile_name);
+        is_yaml(&profile_path)
     }
 }
 use super::ipc::exec;

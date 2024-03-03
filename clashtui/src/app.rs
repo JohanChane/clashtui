@@ -150,43 +150,48 @@ impl App {
             if key.kind != KeyEventKind::Press {
                 return Ok(EventState::NotConsumed);
             }
-
-            event_state = if Keys::AppQuit.is(key) {
-                self.should_quit = true;
-                EventState::WorkDone
-            } else if Keys::AppHelp.is(key) {
-                self.help_popup.show();
-                EventState::WorkDone
-            } else if Keys::ClashConfig.is(key) {
-                let _ = self
-                    .clashtui_util
-                    .open_dir(self.clashtui_util.clashtui_dir.as_path())
-                    .map_err(|e| log::error!("ODIR: {}", e));
-                EventState::WorkDone
-            } else if Keys::AppConfig.is(key) {
-                let _ = self
-                    .clashtui_util
-                    .open_dir(&PathBuf::from(&self.clashtui_util.tui_cfg.clash_cfg_dir))
-                    .map_err(|e| log::error!("ODIR: {}", e));
-                EventState::WorkDone
-            } else if Keys::LogCat.is(key) {
-                let log = self.clashtui_util.fetch_recent_logs(20);
-                self.popup_list_msg(log);
-                EventState::WorkDone
-            } else if Keys::ClashsrvctlRestart.is(key) {
-                match self.clashtui_util.restart_clash() {
-                    Ok(output) => {
-                        let list_msg: Vec<String> =
-                            output.lines().map(|line| line.trim().to_string()).collect();
-                        self.popup_list_msg(list_msg);
-                    }
-                    Err(err) => {
-                        self.popup_txt_msg(err.to_string());
-                    }
+            event_state = match key.code.into() {
+                Keys::AppQuit => {
+                    self.should_quit = true;
+                    EventState::WorkDone
                 }
-                EventState::WorkDone
-            } else {
-                EventState::NotConsumed
+                Keys::AppHelp => {
+                    self.help_popup.show();
+                    EventState::WorkDone
+                }
+                Keys::ClashConfig => {
+                    let _ = self
+                        .clashtui_util
+                        .open_dir(self.clashtui_util.clashtui_dir.as_path())
+                        .map_err(|e| log::error!("ODIR: {}", e));
+                    EventState::WorkDone
+                }
+                Keys::AppConfig => {
+                    let _ = self
+                        .clashtui_util
+                        .open_dir(&PathBuf::from(&self.clashtui_util.tui_cfg.clash_cfg_dir))
+                        .map_err(|e| log::error!("ODIR: {}", e));
+                    EventState::WorkDone
+                }
+                Keys::LogCat => {
+                    let log = self.clashtui_util.fetch_recent_logs(20);
+                    self.popup_list_msg(log);
+                    EventState::WorkDone
+                }
+                Keys::ClashsrvctlRestart => {
+                    match self.clashtui_util.restart_clash() {
+                        Ok(output) => {
+                            let list_msg: Vec<String> =
+                                output.lines().map(|line| line.trim().to_string()).collect();
+                            self.popup_list_msg(list_msg);
+                        }
+                        Err(err) => {
+                            self.popup_txt_msg(err.to_string());
+                        }
+                    }
+                    EventState::WorkDone
+                }
+                _ => EventState::NotConsumed,
             };
 
             if event_state == EventState::NotConsumed {

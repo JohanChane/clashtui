@@ -76,13 +76,13 @@ impl ClashSrvCtlTab {
                 return Ok(event_state);
             }
             if let Event::Key(key) = ev {
-                if Keys::Select.is(key) {
+                if &Keys::Select == key {
                     if let Some(new) = self.mode_selector.selected() {
                         self.clashtui_state.borrow_mut().set_mode(new.clone());
                     }
                     self.mode_selector.hide();
                 }
-                if Keys::Esc.is(key) {
+                if &Keys::Esc == key {
                     self.mode_selector.hide();
                 }
             }
@@ -104,7 +104,7 @@ impl ClashSrvCtlTab {
                 return Ok(EventState::NotConsumed);
             }
 
-            event_state = if Keys::Select.is(key) {
+            event_state = if &Keys::Select == key {
                 let op_str = self.main_list.selected().unwrap();
                 let op = ClashSrvOp::from(op_str.as_str());
                 match op {

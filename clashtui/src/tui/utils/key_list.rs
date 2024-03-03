@@ -1,5 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent};
-
+#[derive(PartialEq)]
 pub enum Keys {
     ProfileSwitch,
     ProfileUpdate,
@@ -19,34 +19,47 @@ pub enum Keys {
     AppConfig,
     ClashConfig,
     AppHelp,
+
+    Reserved,
 }
 
-impl Keys {
-    pub const fn bindto(self) -> KeyCode {
-        match self {
-            Keys::ProfileSwitch => KeyCode::Char('P'),
-            Keys::ProfileUpdate => KeyCode::Char('u'),
-            Keys::ProfileUpdateAll => KeyCode::Char('U'),
-            Keys::ProfileImport => KeyCode::Char('i'),
-            Keys::ProfileDelete => KeyCode::Char('d'),
-            Keys::ProfileTestConfig => KeyCode::Char('t'),
+impl From<KeyCode> for Keys {
+    fn from(value: KeyCode) -> Self {
+        match value {
+            KeyCode::Char('P') => Keys::ProfileSwitch,
+            KeyCode::Char('u') => Keys::ProfileUpdate,
+            KeyCode::Char('U') => Keys::ProfileUpdateAll,
+            KeyCode::Char('i') => Keys::ProfileImport,
+            KeyCode::Char('d') => Keys::ProfileDelete,
+            KeyCode::Char('t') => Keys::ProfileTestConfig,
 
-            Keys::TemplateSwitch => KeyCode::Char('T'),
+            KeyCode::Char('T') => Keys::TemplateSwitch,
 
-            Keys::ClashsrvctlRestart => KeyCode::Char('R'),
+            KeyCode::Char('R') => Keys::ClashsrvctlRestart,
 
-            Keys::Select => KeyCode::Enter,
-            Keys::Esc => KeyCode::Esc,
-            Keys::Edit => KeyCode::Char('e'),
-            Keys::Preview => KeyCode::Char('p'),
-            Keys::LogCat => KeyCode::Char('L'),
-            Keys::AppQuit => KeyCode::Char('Q'),
-            Keys::AppHelp => KeyCode::Char('?'),
-            Keys::AppConfig => KeyCode::Char('H'),
-            Keys::ClashConfig => KeyCode::Char('G'),
+            KeyCode::Enter => Keys::Select,
+            KeyCode::Esc => Keys::Esc,
+            KeyCode::Char('e') => Keys::Edit,
+            KeyCode::Char('p') => Keys::Preview,
+            KeyCode::Char('L') => Keys::LogCat,
+            KeyCode::Char('Q') => Keys::AppQuit,
+            KeyCode::Char('?') => Keys::AppHelp,
+            KeyCode::Char('H') => Keys::AppConfig,
+            KeyCode::Char('G') => Keys::ClashConfig,
+
+            _ => Keys::Reserved,
         }
     }
-    pub fn is(self, code: &KeyEvent) -> bool {
-        self.bindto() == code.code
+}
+
+// impl core::cmp::PartialEq<KeyCode> for Keys {
+//     fn eq(&self, other: &KeyCode) -> bool {
+//         <KeyCode as Into<Keys>>::into(*other) == *self
+//     }
+// }
+
+impl core::cmp::PartialEq<KeyEvent> for Keys {
+    fn eq(&self, other: &KeyEvent) -> bool {
+        <KeyCode as Into<Keys>>::into(other.code) == *self
     }
 }
