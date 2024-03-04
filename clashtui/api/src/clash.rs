@@ -148,6 +148,7 @@ impl ClashUtil {
             .text()
             .map_err(process_err)
     }
+    #[deprecated]
     pub fn check_geo_update(
         &self,
         old_id: Option<&String>,
@@ -316,6 +317,7 @@ mod tests {
         assert!(flag)
     }
     #[test]
+    #[allow(deprecated)]
     fn test_geo_update() {
         let mut flag = true;
         let sym = ClashUtil::new(

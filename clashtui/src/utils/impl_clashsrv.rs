@@ -4,20 +4,6 @@ use crate::tui::tabs::ClashSrvOp;
 use std::io::Error;
 
 impl ClashTuiUtil {
-    pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> Result<String, Error> {
-        let cmd = format!(
-            "{} {} -d {} -f {} -t",
-            self.tui_cfg.clash_core_path,
-            if geodata_mode { "-m" } else { "" },
-            self.tui_cfg.clash_cfg_dir,
-            path,
-        );
-        #[cfg(target_os = "windows")]
-        return exec("cmd", vec!["/C", cmd.as_str()]);
-        #[cfg(target_os = "linux")]
-        exec("sh", vec!["-c", cmd.as_str()])
-    }
-
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
         match op {

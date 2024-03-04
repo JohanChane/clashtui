@@ -1,4 +1,4 @@
-use super::{is_yaml, tui::parse_yaml, utils as Utils, ClashTuiUtil};
+use super::{is_yaml, parse_yaml, utils as Utils, ClashTuiUtil};
 use std::{
     fs::{create_dir_all, File},
     io::Error,
@@ -219,57 +219,81 @@ impl ClashTuiUtil {
         Ok(())
     }
 
-    pub fn get_profile_names(&self) -> Result<Vec<String>, Error> {
-        Utils::get_file_names(self.profile_dir.as_path()).map(|mut v| {
-            v.sort();
-            v
+    pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> Result<String, Error> {
+        use super::ipc::exec;
+        let cmd = format!(
+            "{} {} -d {} -f {} -t",
+            self.tui_cfg.clash_core_path,
+            if geodata_mode { "-m" } else { "" },
+            self.tui_cfg.clash_cfg_dir,
+            path,
+        );
+        #[cfg(target_os = "windows")]
+        return exec("cmd", vec!["/C", cmd.as_str()]);
+        #[cfg(target_os = "linux")]
+        exec("sh", vec!["-c", cmd.as_str()])
+    }
+
+    pub fn select_profile(&self, profile_name: &String) -> Result<(), Error> {
+        if let Err(err) = self.merge_profile(profile_name) {
+            log::error!(
+                "Failed to Merge Profile `{}`: {}",
+                profile_name,
+                err.to_string()
+            );
+            return Err(Error::new(std::io::ErrorKind::Other, err));
+        };
+        let body = serde_json::json!({
+            "path": self.tui_cfg.clash_cfg_path.as_str(),
+            "payload": ""
         })
+        .to_string();
+        if let Err(err) = self.config_reload(body) {
+            log::error!(
+                "Failed to Patch Profile `{}`: {}",
+                profile_name,
+                err.to_string()
+            );
+            return Err(Error::new(std::io::ErrorKind::Other, err));
+        };
+        Ok(())
     }
-    pub fn get_template_names(&self) -> Result<Vec<String>, Error> {
-        Utils::get_file_names(self.clashtui_dir.join("templates").as_path()).map(|mut v| {
-            v.sort();
-            v
-        })
-    }
-    /// Wrapped `self.profile_dir.join(profile_name)`
-    pub fn get_profile_path_unchecked<P>(&self, profile_name: P) -> PathBuf
-    where
-        P: AsRef<Path>,
-    {
-        self.profile_dir.join(profile_name)
-    }
-    /// Wrapped `self.profile_dir.join(profile_name)`
-    pub fn get_template_path_unchecked<P>(&self, name: P) -> PathBuf
-    where
-        P: AsRef<Path>,
-    {
-        self.clashtui_dir.join("templates").join(name)
-    }
-    /// Check the `profiles` and `profile_cache` path
-    pub fn get_profile_yaml_path<P>(&self, profile_name: P) -> Result<PathBuf, Error>
-    where
-        P: AsRef<Path> + AsRef<std::ffi::OsStr>,
-    {
-        let mut path = self.get_profile_path_unchecked(&profile_name);
-        if is_yaml(&path) {
-            Some(path)
-        } else {
-            path = self.get_profile_cache_unchecked(profile_name);
-            is_yaml(&path).then_some(path)
+
+    fn merge_profile(&self, profile_name: &String) -> std::io::Result<()> {
+        let basic_clash_cfg_path = self.clashtui_dir.join(super::tui::BASIC_FILE);
+        let mut dst_parsed_yaml = parse_yaml(&basic_clash_cfg_path)?;
+        let profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
+        let profile_parsed_yaml = parse_yaml(&profile_yaml_path).map_err(|e| {
+            Error::new(
+                e.kind(),
+                format!(
+                    "Maybe need to update first. Failed to parse {}: {e}",
+                    profile_yaml_path.to_str().unwrap()
+                ),
+            )
+        })?;
+
+        if let serde_yaml::Value::Mapping(dst_mapping) = &mut dst_parsed_yaml {
+            if let serde_yaml::Value::Mapping(mapping) = &profile_parsed_yaml {
+                for (key, value) in mapping.iter() {
+                    if let serde_yaml::Value::String(k) = key {
+                        match k.as_str() {
+                            "proxy-groups" | "proxy-providers" | "proxies" | "sub-rules"
+                            | "rules" | "rule-providers" => {
+                                dst_mapping.insert(key.clone(), value.clone());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
         }
-        .ok_or(Error::new(
-            std::io::ErrorKind::NotFound,
-            "No valid yaml file",
-        ))
-    }
-    fn get_profile_cache_unchecked<P>(&self, profile_name: P) -> PathBuf
-    where
-        P: AsRef<Path> + AsRef<std::ffi::OsStr>,
-    {
-        self.clashtui_dir
-            .join("profile_cache")
-            .join(profile_name)
-            .with_extension("yaml")
+
+        let final_clash_cfg_file = File::create(&self.tui_cfg.clash_cfg_path)?;
+        serde_yaml::to_writer(final_clash_cfg_file, &dst_parsed_yaml)
+            .map_err(|e| Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+
+        Ok(())
     }
 
     pub fn update_local_profile(
@@ -361,6 +385,61 @@ impl ClashTuiUtil {
         let mut output_file = File::create(path)?;
         response.copy_to(&mut output_file)?;
         Ok(())
+    }
+}
+
+impl ClashTuiUtil {
+    pub fn get_profile_names(&self) -> Result<Vec<String>, Error> {
+        Utils::get_file_names(self.profile_dir.as_path()).map(|mut v| {
+            v.sort();
+            v
+        })
+    }
+    pub fn get_template_names(&self) -> Result<Vec<String>, Error> {
+        Utils::get_file_names(self.clashtui_dir.join("templates").as_path()).map(|mut v| {
+            v.sort();
+            v
+        })
+    }
+    /// Wrapped `self.profile_dir.join(profile_name)`
+    pub fn get_profile_path_unchecked<P>(&self, profile_name: P) -> PathBuf
+    where
+        P: AsRef<Path>,
+    {
+        self.profile_dir.join(profile_name)
+    }
+    /// Wrapped `self.profile_dir.join(profile_name)`
+    pub fn get_template_path_unchecked<P>(&self, name: P) -> PathBuf
+    where
+        P: AsRef<Path>,
+    {
+        self.clashtui_dir.join("templates").join(name)
+    }
+    /// Check the `profiles` and `profile_cache` path
+    pub fn get_profile_yaml_path<P>(&self, profile_name: P) -> Result<PathBuf, Error>
+    where
+        P: AsRef<Path> + AsRef<std::ffi::OsStr>,
+    {
+        let mut path = self.get_profile_path_unchecked(&profile_name);
+        if is_yaml(&path) {
+            Some(path)
+        } else {
+            path = self.get_profile_cache_unchecked(profile_name);
+            is_yaml(&path).then_some(path)
+        }
+        .ok_or(Error::new(
+            std::io::ErrorKind::NotFound,
+            "No valid yaml file",
+        ))
+    }
+    fn get_profile_cache_unchecked<P>(&self, profile_name: P) -> PathBuf
+    where
+        P: AsRef<Path> + AsRef<std::ffi::OsStr>,
+    {
+        self.clashtui_dir
+            .join("profile_cache")
+            .join(profile_name)
+            .with_extension("yaml")
     }
     /// Check file only in `profiles`
     ///

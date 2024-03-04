@@ -74,9 +74,6 @@ impl App {
                 .as_bytes(),
             )
             .map_err(|e| log::error!("Update Profiles: {e}"));
-            if let Err(e) = util.update_geo() {
-                log::error!("Update Geo: {e}")
-            };
             return (None, err_track);
         } // Finish cron
         let clashtui_util = SharedClashTuiUtil::new(util);

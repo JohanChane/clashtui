@@ -27,3 +27,12 @@ pub fn is_yaml(path: &std::path::Path) -> bool {
         serde_yaml::from_reader::<std::fs::File, serde_yaml::Value>(f).is_ok_and(|v| v.is_mapping())
     })
 }
+
+pub(super) fn parse_yaml(yaml_path: &std::path::Path) -> std::io::Result<serde_yaml::Value> {
+    let mut file = std::fs::File::open(yaml_path)?;
+    let mut yaml_content = String::new();
+    std::io::Read::read_to_string(&mut file, &mut yaml_content)?;
+    let parsed_yaml_content: serde_yaml::Value =
+        serde_yaml::from_str(yaml_content.as_str()).unwrap();
+    Ok(parsed_yaml_content)
+}
