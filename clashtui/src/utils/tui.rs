@@ -235,6 +235,11 @@ impl ClashTuiUtil {
     pub fn dl_remote_profile(&self, url: &str) -> Result<Resp, Error> {
         self.clash_api.mock_clash_core(url)
     }
+
+    pub fn update_geo(&self) -> Result<String, Error> {
+        self.clash_api
+            .check_geo_update(None, Path::new(&self.tui_cfg.clash_cfg_dir))
+    }
 }
 
 pub(super) fn parse_yaml(yaml_path: &Path) -> anyhow::Result<serde_yaml::Value> {

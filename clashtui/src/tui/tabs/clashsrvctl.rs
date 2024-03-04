@@ -32,11 +32,12 @@ impl ClashSrvCtlTab {
         let title = CLASHSRVCTL.to_string();
         let mut operations = List::new(title);
         operations.set_items(vec![
-            ClashSrvOp::TestClashConfig.into(),
             #[cfg(target_os = "linux")]
             ClashSrvOp::SetPermission.into(),
             ClashSrvOp::StartClashService.into(),
             ClashSrvOp::StopClashService.into(),
+            ClashSrvOp::TestClashConfig.into(),
+            ClashSrvOp::UpdateGeoData.into(),
             ClashSrvOp::SwitchMode.into(),
             #[cfg(target_os = "windows")]
             ClashSrvOp::SwitchSysProxy.into(),

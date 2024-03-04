@@ -444,6 +444,7 @@ impl ClashTuiUtil {
             ClashSrvOp::TestClashConfig => {
                 self.test_profile_config(self.tui_cfg.clash_cfg_path.as_str(), false)
             }
+            ClashSrvOp::UpdateGeoData => todo!(),
             ClashSrvOp::SetPermission => super::ipc::exec_with_sbin(
                 "setcap",
                 vec![
@@ -497,6 +498,8 @@ impl ClashTuiUtil {
             ClashSrvOp::TestClashConfig => {
                 return self.test_profile_config(self.tui_cfg.clash_cfg_path.as_str(), false);
             }
+
+            ClashSrvOp::UpdateGeoData => todo!(),
 
             ClashSrvOp::InstallSrv => {
                 start_process_as_admin(

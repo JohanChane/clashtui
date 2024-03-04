@@ -42,7 +42,7 @@ impl App {
             let log_path = &clashtui_config_dir.join("CronUpdate.log");
             let _ = std::fs::remove_file(log_path); // clear old logs
             log::info!("Cron Mode!");
-            println!("Log saved to CronUpdate.log");
+            println!("Log will be saved to CronUpdate.log");
             let profile_list: Vec<_> = util
                 .get_profile_names()
                 .unwrap()
@@ -74,7 +74,10 @@ impl App {
                 )
                 .as_bytes(),
             )
-            .map_err(|e| log::error!("Err while CronUpdate: {}", e));
+            .map_err(|e| log::error!("Update Profiles: {e}"));
+            if let Err(e) = util.update_geo() {
+                log::error!("Update Geo: {e}")
+            };
             return (None, err_track);
         } // Finish cron
         let clashtui_util = SharedClashTuiUtil::new(util);

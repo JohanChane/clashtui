@@ -1,12 +1,14 @@
 use std::{
     cell::OnceCell,
-    io::{Error, ErrorKind},
+    io::{Error, ErrorKind, Write},
 };
 
 use reqwest::blocking::Client;
 use std::io::Result;
 
 const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
+const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
+const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 fn process_err(e: reqwest::Error) -> Error {
     if e.is_connect() {
@@ -32,7 +34,7 @@ impl Resp {
 pub struct ClashUtil {
     client: OnceCell<Client>,
     api: String,
-    pub proxy_addr: String,
+    proxy_addr: String,
     clash_client: OnceCell<Client>,
 }
 
@@ -146,6 +148,59 @@ impl ClashUtil {
             .text()
             .map_err(process_err)
     }
+    pub fn check_geo_update(
+        &self,
+        old_id: Option<&String>,
+        path: &std::path::Path,
+    ) -> Result<String> {
+        let info = self
+            .client
+            .get_or_init(Client::new)
+            .get(GEO_URI)
+            .header(reqwest::header::USER_AGENT, USER_AGENT)
+            .send()
+            .map_err(process_err)?
+            .text()
+            .map_err(process_err)?;
+        let info: crate::geo::GithubApi =
+            serde_json::from_str(info.as_str()).map_err(Error::from)?;
+        if info.check(old_id) {
+            let (assets, publist_at) = info.into();
+            let result: Vec<Error> = assets
+                .into_iter()
+                // .inspect(|e| println!("{e:?}"))
+                .map(|info| info.into())
+                // ignore sha check for now, though no future plan to add
+                .filter(|(name, _)| !name.ends_with("sha256sum"))
+                .filter_map(|(name, url)| {
+                    let path = path.join(name);
+                    self.client
+                        .get_or_init(Client::new)
+                        .get(url)
+                        .send()
+                        .map_err(process_err)
+                        .and_then(|dow| {
+                            std::fs::File::options()
+                                .create(true)
+                                .write(true)
+                                .open(path)
+                                .and_then(|mut file| {
+                                    file.write_all(dow.text().map_err(process_err)?.as_bytes())
+                                })
+                        })
+                        .err()
+                })
+                // .inspect(|e| println!("{e:?}"))
+                .collect();
+            if result.is_empty() {
+                Ok(publist_at)
+            } else {
+                Err(Error::new(ErrorKind::Other, format!("{result:?}")))
+            }
+        } else {
+            Ok("Already Up to dated".to_string())
+        }
+    }
     /*
     pub fn flush_fakeip(&self) -> Result<String, reqwest::Error> {
         self.post("/cache/fakeip/flush", None)
@@ -258,6 +313,31 @@ mod tests {
             Ok(r) => println!("{:?}", r),
             Err(_) => flag = false,
         }
+        assert!(flag)
+    }
+    #[test]
+    fn test_geo_update() {
+        let mut flag = true;
+        let sym = ClashUtil::new(
+            "http://127.0.0.1:9090".to_string(),
+            "http://127.0.0.1:7890".to_string(),
+        );
+        let exe_dir = std::env::current_dir().unwrap();
+        println!("{exe_dir:?}");
+        let path = exe_dir.join("tmp");
+        if !path.is_dir() {
+            std::fs::create_dir_all(&path).unwrap()
+        }
+        println!(
+            "result:{}",
+            match sym.check_geo_update(None, &path) {
+                Ok(r) => r,
+                Err(e) => {
+                    flag = false;
+                    format!("{e:?}")
+                }
+            }
+        );
         assert!(flag)
     }
 }
