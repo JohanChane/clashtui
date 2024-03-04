@@ -62,8 +62,6 @@ define_enum!(
     [
         StartClashService,
         StopClashService,
-        TestClashConfig,
-        UpdateGeoData,
         SetPermission,
         SwitchMode
     ]
@@ -83,8 +81,6 @@ define_enum!(
     [
         StartClashService,
         StopClashService,
-        TestClashConfig,
-        UpdateGeoData,
         SwitchSysProxy,
         EnableLoopback,
         InstallSrv,

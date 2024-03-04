@@ -39,8 +39,6 @@ impl ClashSrvCtlTab {
             ClashSrvOp::SetPermission.into(),
             ClashSrvOp::StartClashService.into(),
             ClashSrvOp::StopClashService.into(),
-            ClashSrvOp::TestClashConfig.into(),
-            ClashSrvOp::UpdateGeoData.into(),
             ClashSrvOp::SwitchMode.into(),
             #[cfg(target_os = "windows")]
             ClashSrvOp::SwitchSysProxy.into(),
