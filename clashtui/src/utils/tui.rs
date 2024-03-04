@@ -12,6 +12,8 @@ use super::{
 };
 use api::{ClashConfig, ClashUtil, Resp};
 
+const BASIC_FILE: &str = "basic_clash_config.yaml";
+
 pub struct ClashTuiUtil {
     pub clashtui_dir: PathBuf,
     pub(super) profile_dir: PathBuf,
@@ -198,16 +200,18 @@ impl ClashTuiUtil {
         Ok(())
     }
 
-    fn merge_profile(&self, profile_name: &String) -> anyhow::Result<()> {
-        let basic_clash_cfg_path = self.clashtui_dir.join("basic_clash_config.yaml");
+    fn merge_profile(&self, profile_name: &String) -> std::io::Result<()> {
+        let basic_clash_cfg_path = self.clashtui_dir.join(BASIC_FILE);
         let mut dst_parsed_yaml = parse_yaml(&basic_clash_cfg_path)?;
         let profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
-        let profile_parsed_yaml = parse_yaml(&profile_yaml_path).or_else(|e| {
-            anyhow::bail!(
-                "Maybe need to update first. Failed to parse {}: {}",
-                profile_yaml_path.to_str().unwrap(),
-                e.to_string()
-            );
+        let profile_parsed_yaml = parse_yaml(&profile_yaml_path).map_err(|e| {
+            Error::new(
+                e.kind(),
+                format!(
+                    "Maybe need to update first. Failed to parse {}: {e}",
+                    profile_yaml_path.to_str().unwrap()
+                ),
+            )
         })?;
 
         if let serde_yaml::Value::Mapping(dst_mapping) = &mut dst_parsed_yaml {
@@ -227,7 +231,8 @@ impl ClashTuiUtil {
         }
 
         let final_clash_cfg_file = File::create(&self.tui_cfg.clash_cfg_path)?;
-        serde_yaml::to_writer(final_clash_cfg_file, &dst_parsed_yaml)?;
+        serde_yaml::to_writer(final_clash_cfg_file, &dst_parsed_yaml)
+            .map_err(|e| Error::new(std::io::ErrorKind::Other, e.to_string()))?;
 
         Ok(())
     }
@@ -242,7 +247,7 @@ impl ClashTuiUtil {
     }
 }
 
-pub(super) fn parse_yaml(yaml_path: &Path) -> anyhow::Result<serde_yaml::Value> {
+pub(super) fn parse_yaml(yaml_path: &Path) -> std::io::Result<serde_yaml::Value> {
     let mut file = File::open(yaml_path)?;
     let mut yaml_content = String::new();
     file.read_to_string(&mut yaml_content)?;
@@ -256,7 +261,7 @@ fn load_app_config(
     skip_init_conf: bool,
 ) -> (ClashTuiConfig, String, String, Vec<CfgError>) {
     let mut err_collect = Vec::new();
-    let basic_clash_config_path = Path::new(clashtui_dir).join("basic_clash_config.yaml");
+    let basic_clash_config_path = Path::new(clashtui_dir).join(BASIC_FILE);
     let basic_clash_config_value: serde_yaml::Value =
         match parse_yaml(basic_clash_config_path.as_path()) {
             Ok(r) => r,
@@ -265,17 +270,19 @@ fn load_app_config(
                     ErrKind::LoadProfileConfig,
                     "Fail to load User Defined Config".to_string(),
                 ));
-                serde_yaml::Value::from("")
+                serde_yaml::Value::Null
             }
         };
-    let controller_api = if let Some(controller_api) = basic_clash_config_value
+    let controller_api = basic_clash_config_value
         .get("external-controller")
-        .and_then(|v| v.as_str())
-    {
-        format!("http://{}", controller_api)
-    } else {
-        "http://127.0.0.1:9090".to_string()
-    };
+        .and_then(|v| {
+            format!(
+                "http://{}",
+                v.as_str().expect("external-controller not str?")
+            )
+            .into()
+        })
+        .unwrap_or_else(|| panic!("No external-controller in {BASIC_FILE}"));
     log::debug!("controller_api: {}", controller_api);
 
     let proxy_addr = get_proxy_addr(&basic_clash_config_value);
@@ -322,6 +329,5 @@ fn get_proxy_addr(yaml_data: &serde_yaml::Value) -> String {
     if let Some(port) = yaml_data.get("socks-port").and_then(|v| v.as_u64()) {
         return format!("socks5://{}:{}", host, port);
     }
-
-    format!("http://{}:7890", host)
+    panic!("No prots in {BASIC_FILE}")
 }
