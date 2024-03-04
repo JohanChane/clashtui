@@ -210,8 +210,8 @@ impl App {
 
         Ok(event_state)
     }
-    fn last_event(&mut self){
-        self.tabs.values().for_each(|v|match v {
+    fn last_event(&mut self) {
+        self.tabs.values().for_each(|v| match v {
             Tabs::Profile(tab) => tab.borrow_mut().late_event(),
             Tabs::ClashSrvCtl(tab) => tab.borrow_mut().late_event(),
         })
@@ -219,12 +219,10 @@ impl App {
     // For refreshing the interface before performing lengthy operation.
     pub fn handle_last_ev(&mut self, last_ev: &EventState) -> EventState {
         self.last_event();
-        let ev_state = match last_ev {
+        match last_ev {
             EventState::NotConsumed | EventState::WorkDone => EventState::NotConsumed,
             EventState::Yes | EventState::Cancel => unreachable!(),
-        };
-
-        ev_state
+        }
     }
 
     pub fn draw(&mut self, f: &mut Ra::Frame) {

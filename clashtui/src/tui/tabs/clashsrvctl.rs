@@ -1,6 +1,7 @@
 use crossterm::event::{Event, KeyEventKind};
 use ratatui::prelude as Ra;
 
+use super::ClashSrvOp;
 use crate::msgpopup_methods;
 use crate::{
     tui::{
@@ -12,7 +13,6 @@ use crate::{
     },
     utils::{SharedClashTuiState, SharedClashTuiUtil},
 };
-use super::ClashSrvOp;
 use api::Mode;
 
 #[derive(Visibility)]
