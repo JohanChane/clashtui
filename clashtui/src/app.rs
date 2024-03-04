@@ -23,7 +23,6 @@ pub struct App {
     msgpopup: MsgPopup,
 
     clashtui_util: SharedClashTuiUtil,
-    clashtui_state: SharedClashTuiState,
     statusbar: StatusBar,
 }
 
@@ -109,7 +108,6 @@ impl App {
             msgpopup: MsgPopup::new(),
             statusbar,
             clashtui_util,
-            clashtui_state,
             tabs,
         };
 
@@ -212,49 +210,18 @@ impl App {
 
         Ok(event_state)
     }
-
+    fn last_event(&mut self){
+        self.tabs.values().for_each(|v|match v {
+            Tabs::Profile(tab) => tab.borrow_mut().late_event(),
+            Tabs::ClashSrvCtl(tab) => tab.borrow_mut().late_event(),
+        })
+    }
     // For refreshing the interface before performing lengthy operation.
     pub fn handle_last_ev(&mut self, last_ev: &EventState) -> EventState {
+        self.last_event();
         let ev_state = match last_ev {
             EventState::NotConsumed | EventState::WorkDone => EventState::NotConsumed,
             EventState::Yes | EventState::Cancel => unreachable!(),
-            EventState::ProfileUpdate | EventState::ProfileUpdateAll => {
-                if let Tabs::Profile(profile_tab) = self.tabs.get(&Tab::Profile).unwrap() {
-                    profile_tab.borrow_mut().hide_msgpopup();
-                    if last_ev == &EventState::ProfileUpdate {
-                        profile_tab.borrow_mut().handle_update_profile_ev(false);
-                    } else if last_ev == &EventState::ProfileUpdateAll {
-                        profile_tab.borrow_mut().handle_update_profile_ev(true);
-                    }
-                };
-                EventState::WorkDone
-            }
-            EventState::ProfileSelect => {
-                if let Tabs::Profile(profile_tab) = self.tabs.get(&Tab::Profile).unwrap() {
-                    profile_tab.borrow_mut().hide_msgpopup();
-                    if let Some(v) = profile_tab.borrow_mut().handle_select_profile_ev() {
-                        self.clashtui_state.borrow_mut().set_profile(v)
-                    }
-                };
-                EventState::WorkDone
-            }
-            EventState::ProfileDelete => {
-                if let Tabs::Profile(profile_tab) = self.tabs.get(&Tab::Profile).unwrap() {
-                    profile_tab.borrow_mut().hide_msgpopup();
-                    profile_tab.borrow_mut().handle_delete_profile_ev();
-                };
-                EventState::WorkDone
-            }
-            #[cfg(target_os = "windows")]
-            EventState::SwitchSysProxy => {
-                let cur = self
-                    .clashtui_state
-                    .borrow()
-                    .get_sysproxy()
-                    .map_or(true, |b| !b);
-                self.clashtui_state.borrow_mut().set_sysproxy(cur);
-                EventState::WorkDone
-            }
         };
 
         ev_state

@@ -125,9 +125,11 @@ impl MsgPopup {
         self.msg.clear();
     }
     pub fn push_txt_msg(&mut self, msg: String) {
+        self.msg.clear();
         self.msg.push(msg);
     }
     pub fn push_list_msg(&mut self, msg: impl IntoIterator<Item = String>) {
+        self.msg.clear();
         self.msg.extend(msg);
     }
 }

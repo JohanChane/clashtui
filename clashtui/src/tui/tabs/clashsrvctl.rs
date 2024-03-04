@@ -10,8 +10,9 @@ use crate::{
         widgets::{List, MsgPopup},
         EventState, Visibility,
     },
-    utils::{ClashSrvOp, SharedClashTuiState, SharedClashTuiUtil},
+    utils::{SharedClashTuiState, SharedClashTuiUtil},
 };
+use super::ClashSrvOp;
 use api::Mode;
 
 #[derive(Visibility)]
@@ -25,6 +26,8 @@ pub struct ClashSrvCtlTab {
 
     clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
+
+    op: Option<ClashSrvOp>,
 }
 
 impl ClashSrvCtlTab {
@@ -63,6 +66,7 @@ impl ClashSrvCtlTab {
             clashtui_util,
             clashtui_state,
             msgpopup: MsgPopup::new(),
+            op: None,
         }
     }
 
@@ -99,53 +103,57 @@ impl ClashSrvCtlTab {
             return Ok(EventState::NotConsumed);
         }
 
-        let mut event_state;
+        let event_state;
         if let Event::Key(key) = ev {
             if key.kind != KeyEventKind::Press {
                 return Ok(EventState::NotConsumed);
             }
-
+            // override `Enter`
             event_state = if &Keys::Select == key {
-                let op_str = self.main_list.selected().unwrap();
-                let op = ClashSrvOp::from(op_str.as_str());
-                match op {
-                    #[cfg(target_os = "windows")]
-                    ClashSrvOp::SwitchSysProxy => {
-                        self.popup_txt_msg("SwitchSysProxy...".to_string());
-                        EventState::SwitchSysProxy
-                    }
-                    ClashSrvOp::SwitchMode => {
-                        self.mode_selector.show();
-                        EventState::WorkDone
-                    }
-                    _ => {
-                        match self.clashtui_util.clash_srv_ctl(op) {
-                            Ok(output) => {
-                                let list_msg: Vec<String> =
-                                    output.lines().map(|line| line.trim().to_string()).collect();
-                                self.popup_list_msg(list_msg);
-                            }
-                            Err(err) => {
-                                self.popup_txt_msg(err.to_string());
-                            }
-                        }
-                        EventState::WorkDone
-                    }
+                let op = ClashSrvOp::from(self.main_list.selected().unwrap().as_str());
+                if let ClashSrvOp::SwitchMode = op {
+                    self.mode_selector.show();
+                } else {
+                    self.op.replace(op);
+                    self.popup_txt_msg("Working...".to_string());
                 }
+                EventState::WorkDone
             } else {
-                EventState::NotConsumed
+                self.main_list.event(ev)?
             };
-
-            if event_state == EventState::NotConsumed {
-                event_state = self.main_list.event(ev)?;
-            }
         } else {
             event_state = EventState::NotConsumed
         }
 
         Ok(event_state)
     }
-
+    pub fn late_event(&mut self) {
+        if let Some(op) = self.op.take() {
+            match op {
+                ClashSrvOp::SwitchMode => unreachable!(),
+                #[cfg(target_os = "windows")]
+                ClashSrvOp::SwitchSysProxy => {
+                    let cur = self
+                        .clashtui_state
+                        .borrow()
+                        .get_sysproxy()
+                        .map_or(true, |b| !b);
+                    self.clashtui_state.borrow_mut().set_sysproxy(cur);
+                    self.hide_msgpopup();
+                }
+                _ => match self.clashtui_util.clash_srv_ctl(op) {
+                    Ok(output) => {
+                        let list_msg: Vec<String> =
+                            output.lines().map(|line| line.trim().to_string()).collect();
+                        self.popup_list_msg(list_msg);
+                    }
+                    Err(err) => {
+                        self.popup_txt_msg(err.to_string());
+                    }
+                },
+            }
+        }
+    }
     pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
         if !self.is_visible() {
             return;

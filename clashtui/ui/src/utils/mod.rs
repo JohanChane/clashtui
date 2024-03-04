@@ -10,12 +10,6 @@ pub enum EventState {
     Cancel,
     NotConsumed,
     WorkDone,
-    ProfileUpdate,
-    ProfileUpdateAll,
-    ProfileSelect,
-    ProfileDelete,
-    #[cfg(target_os = "windows")]
-    SwitchSysProxy,
 }
 
 impl EventState {

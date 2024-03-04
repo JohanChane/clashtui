@@ -6,7 +6,7 @@ use std::{
     path::Path,
 };
 
-use super::profile_input::ProfileInputPopup;
+use super::{profile_input::ProfileInputPopup, PTOp};
 use crate::msgpopup_methods;
 use crate::tui::{
     symbols::{PROFILE, TEMPALTE},
@@ -35,6 +35,7 @@ pub struct ProfileTab {
 
     clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
+    op: Option<PTOp>,
 }
 
 impl ProfileTab {
@@ -53,6 +54,7 @@ impl ProfileTab {
 
             clashtui_util,
             clashtui_state,
+            op: None,
         };
 
         instance.update_profile_list();
@@ -76,9 +78,11 @@ impl ProfileTab {
         let mut event_state = self.msgpopup.event(ev)?;
         if event_state.is_notconsumed() {
             event_state = match self.confirm_popup.event(ev)? {
-                EventState::Yes => EventState::ProfileDelete,
-                EventState::Cancel => EventState::WorkDone,
-                EventState::WorkDone => EventState::WorkDone,
+                EventState::Yes => {
+                    self.op.replace(PTOp::ProfileDelete);
+                    EventState::WorkDone
+                }
+                EventState::Cancel | EventState::WorkDone => EventState::WorkDone,
                 _ => EventState::NotConsumed,
             };
         }
@@ -164,7 +168,7 @@ impl ProfileTab {
         let uri = uri.trim();
 
         if uri.is_empty() || profile_name.is_empty() {
-            self.popup_txt_msg("Uri or Name is empty!".to_string());
+            self.popup_txt_msg("Url or Name is empty!".to_string());
             return;
         }
 
@@ -198,7 +202,7 @@ impl ProfileTab {
 
             self.update_profile_list();
         } else {
-            self.popup_txt_msg("Uri is invalid.".to_string());
+            self.popup_txt_msg("Url is invalid.".to_string());
         }
     }
 
@@ -238,15 +242,18 @@ impl ProfileTab {
                         }
                         Keys::Select => {
                             self.popup_txt_msg("Selecting...".to_string());
-                            EventState::ProfileSelect
+                            self.op.replace(PTOp::ProfileSelect);
+                            EventState::WorkDone
                         }
                         Keys::ProfileUpdate => {
                             self.popup_txt_msg("Updating...".to_string());
-                            EventState::ProfileUpdate
+                            self.op.replace(PTOp::ProfileUpdate);
+                            EventState::WorkDone
                         }
                         Keys::ProfileUpdateAll => {
                             self.popup_txt_msg("Updating...".to_string());
-                            EventState::ProfileUpdateAll
+                            self.op.replace(PTOp::ProfileUpdateAll);
+                            EventState::WorkDone
                         }
                         Keys::ProfileImport => {
                             self.profile_input.show();
@@ -383,7 +390,28 @@ impl ProfileTab {
 
         Ok(event_state)
     }
-
+    pub fn late_event(&mut self) {
+        if let Some(op) = self.op.take() {
+            self.hide_msgpopup();
+            match op {
+                PTOp::ProfileUpdate | PTOp::ProfileUpdateAll => {
+                    if op == PTOp::ProfileUpdate {
+                        self.handle_update_profile_ev(false);
+                    } else {
+                        self.handle_update_profile_ev(true);
+                    }
+                }
+                PTOp::ProfileSelect => {
+                    if let Some(v) = self.handle_select_profile_ev() {
+                        self.clashtui_state.borrow_mut().set_profile(v)
+                    }
+                }
+                PTOp::ProfileDelete => {
+                    self.handle_delete_profile_ev();
+                }
+            }
+        }
+    }
     pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
         if !self.is_visible() {
             return;
