@@ -23,10 +23,17 @@ struct CliEnv {
     /// don't show UI but only update all profiles
     #[argh(switch, short = 'u')]
     update_all_profiles: bool,
+    /// print version information and exit
+    #[argh(switch, short = 'v')]
+    version: bool,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli: CliEnv = argh::from_env();
+    if cli.version {
+        println!("{VERSION}");
+        std::process::exit(0);
+    }
     let mut flags = Flags::with_capacity(3);
     if cli.update_all_profiles {
         flags.insert(utils::Flag::UpdateOnly);
