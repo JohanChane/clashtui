@@ -5,7 +5,7 @@ use crate::msgpopup_methods;
 use crate::tui::{
     tabs::{ClashSrvCtlTab, ProfileTab, Tab, TabEvent, Tabs},
     tools,
-    utils::{HelpPopUp, Keys},
+    utils::{HelpPopUp, InfoPopUp, Keys},
     widgets::MsgPopup,
     EventState, StatusBar, TabBar, Theme, Visibility,
 };
@@ -17,7 +17,8 @@ pub struct App {
     tabbar: TabBar,
     tabs: HashMap<Tab, Tabs>,
     pub should_quit: bool,
-    help_popup: Box<HelpPopUp>,
+    help_popup: HelpPopUp,
+    info_popup: InfoPopUp,
     msgpopup: MsgPopup,
 
     clashtui_util: SharedClashTuiUtil,
@@ -79,8 +80,6 @@ impl App {
         let clashtui_state =
             SharedClashTuiState::new(RefCell::new(State::new(Rc::clone(&clashtui_util))));
         let _ = Theme::load(None).map_err(|e| log::error!("Loading Theme:{}", e));
-        // May not often used, place in heap
-        let help_popup = Box::new(HelpPopUp::new());
 
         let tabs_ = [Tab::Profile, Tab::ClashSrvCtl];
         let tabbar = TabBar::new(tabs_.iter().map(|v| v.to_string()).collect());
@@ -95,11 +94,13 @@ impl App {
             ))),
         ])); // Init the tabs
         let statusbar = StatusBar::new(Rc::clone(&clashtui_state));
+        let info_popup =InfoPopUp::with_items(&clashtui_util.clash_version());
 
         let app = Self {
             tabbar,
             should_quit: false,
-            help_popup,
+            help_popup: HelpPopUp::new(),
+            info_popup,
             msgpopup: Default::default(),
             statusbar,
             clashtui_util,
@@ -112,7 +113,9 @@ impl App {
     fn popup_event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ui::Infailable> {
         // ## Self Popups
         let mut event_state = self.help_popup.event(ev)?;
-
+        if event_state.is_notconsumed() {
+            event_state = self.info_popup.event(ev)?;
+        }
         // ## Tab Popups
         let mut iter = self.tabs.values().map(|v| match v {
             Tabs::Profile(v) => v.borrow_mut().popup_event(ev),
@@ -148,6 +151,10 @@ impl App {
                 }
                 Keys::AppHelp => {
                     self.help_popup.show();
+                    EventState::WorkDone
+                }
+                Keys::AppInfo => {
+                    self.info_popup.show();
                     EventState::WorkDone
                 }
                 Keys::ClashConfig => {
@@ -206,6 +213,7 @@ impl App {
         Ok(event_state)
     }
     fn late_event(&mut self) {
+        self.hide_msgpopup();
         self.tabs.values().for_each(|v| match v {
             Tabs::Profile(tab) => tab.borrow_mut().late_event(),
             Tabs::ClashSrvCtl(tab) => tab.borrow_mut().late_event(),
@@ -246,6 +254,7 @@ impl App {
 
         let help_area = tools::centered_percent_rect(60, 60, f.size());
         self.help_popup.draw(f, help_area);
+        self.info_popup.draw(f, help_area);
         self.msgpopup.draw(f, help_area);
     }
 

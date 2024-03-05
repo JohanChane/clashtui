@@ -7,7 +7,6 @@ pub struct _State {
     pub tun: Option<TunStack>,
     #[cfg(target_os = "windows")]
     pub sysproxy: Option<bool>,
-    pub ver: String,
 }
 pub struct State {
     st: _State,
@@ -53,7 +52,7 @@ impl State {
     pub fn render(&self) -> String {
         #[cfg(target_os = "windows")]
         let status_str = format!(
-            "Profile: {}    Mode: {}    SysProxy: {}    Tun: {}    ClashVer: {}    Help: ?",
+            "Profile: {}    Mode: {}    SysProxy: {}    Tun: {}    Help: ?",
             self.st.profile,
             self.st
                 .mode
@@ -66,11 +65,10 @@ impl State {
                 .tun
                 .as_ref()
                 .map_or("Unknown".to_string(), |v| format!("{}", v)),
-            self.st.ver
         );
         #[cfg(target_os = "linux")]
         let status_str = format!(
-            "Profile: {}    Mode: {}    Tun: {}    ClashVer: {}    Help: ?",
+            "Profile: {}    Mode: {}    Tun: {}    Help: ?",
             self.st.profile,
             self.st
                 .mode
@@ -80,7 +78,6 @@ impl State {
                 .tun
                 .as_ref()
                 .map_or("Unknown".to_string(), |v| format!("{}", v)),
-            self.st.ver
         );
         status_str
     }

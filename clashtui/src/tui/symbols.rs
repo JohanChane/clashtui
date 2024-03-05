@@ -22,6 +22,7 @@ enter: Action
 j/k/h/l OR Up/Down/Left/Right: Scroll
 
 ## Global
+I: Show informations
 R: Restart clash core
 H: Locate app home path
 G: Locate clash config dir

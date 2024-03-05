@@ -74,7 +74,7 @@ impl ClashTuiUtil {
                 super::ipc::disable_system_proxy()
             };
         }
-        let (pf, mode, tun, ver) = self._update_state(new_pf, new_mode);
+        let (pf, mode, tun) = self._update_state(new_pf, new_mode);
         let sysp = super::ipc::is_system_proxy_enabled().map_or_else(
             |v| {
                 log::error!("{}", v);
@@ -86,19 +86,17 @@ impl ClashTuiUtil {
             profile: pf,
             mode,
             tun,
-            ver,
             sysproxy: sysp,
         }
     }
 
     #[cfg(target_os = "linux")]
     pub fn update_state(&self, new_pf: Option<String>, new_mode: Option<String>) -> _State {
-        let (pf, mode, tun, ver) = self._update_state(new_pf, new_mode);
+        let (pf, mode, tun) = self._update_state(new_pf, new_mode);
         _State {
             profile: pf,
             mode,
             tun,
-            ver,
         }
     }
 
@@ -114,6 +112,15 @@ impl ClashTuiUtil {
 }
 // Web
 impl ClashTuiUtil {
+    pub fn clash_version(&self) -> String {
+        match self.clash_api.version() {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("{}", e);
+                "Unknown".to_string()
+            }
+        }
+    }
     fn fetch_remote(&self) -> Result<(), Error> {
         let cur_remote = self.clash_api.config_get()?;
         let remote = ClashConfig::from_str(cur_remote.as_str())
@@ -137,7 +144,7 @@ impl ClashTuiUtil {
         &self,
         new_pf: Option<String>,
         new_mode: Option<String>,
-    ) -> (String, Option<api::Mode>, Option<api::TunStack>, String) {
+    ) -> (String, Option<api::Mode>, Option<api::TunStack>) {
         if let Some(v) = new_mode {
             let load = format!(r#"{{"mode": "{}"}}"#, v);
             let _ = self
@@ -154,13 +161,6 @@ impl ClashTuiUtil {
             None => self.tui_cfg.current_profile.borrow().clone(),
         };
 
-        let ver = match self.clash_api.version() {
-            Ok(v) => v,
-            Err(e) => {
-                log::warn!("{}", e);
-                "Unknown".to_string()
-            }
-        };
         if let Err(e) = self.fetch_remote() {
             if e.kind() != std::io::ErrorKind::ConnectionRefused {
                 log::warn!("{}", e);
@@ -177,7 +177,7 @@ impl ClashTuiUtil {
             ),
             None => (None, None),
         };
-        (pf, mode, tun, ver)
+        (pf, mode, tun)
     }
 }
 

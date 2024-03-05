@@ -19,6 +19,7 @@ pub enum Keys {
     AppConfig,
     ClashConfig,
     AppHelp,
+    AppInfo,
 
     Reserved,
 }
@@ -44,6 +45,7 @@ impl From<KeyCode> for Keys {
             KeyCode::Char('L') => Keys::LogCat,
             KeyCode::Char('Q') => Keys::AppQuit,
             KeyCode::Char('?') => Keys::AppHelp,
+            KeyCode::Char('I') => Keys::AppInfo,
             KeyCode::Char('H') => Keys::AppConfig,
             KeyCode::Char('G') => Keys::ClashConfig,
 
