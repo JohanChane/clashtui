@@ -4,7 +4,7 @@ use std::{
     path::Path,
 };
 
-use super::{profile_input::ProfileInputPopup, PTOp};
+use super::profile_input::ProfileInputPopup;
 use crate::tui::{
     symbols::{PROFILE, TEMPALTE},
     utils::Keys,
@@ -13,6 +13,15 @@ use crate::tui::{
 };
 use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
 use crate::{msgpopup_methods, utils::get_modify_time};
+crate::define_enum!(
+    PTOp,
+    [
+        ProfileUpdate,
+        ProfileUpdateAll,
+        ProfileSelect,
+        ProfileDelete
+    ]
+);
 
 #[derive(PartialEq)]
 enum Fouce {

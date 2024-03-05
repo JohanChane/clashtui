@@ -37,7 +37,7 @@ jobs:
     - name: Run tests
       run: cd clashtui && cargo test --verbose
     - name: Build
-      run: cd clashtui && cargo build --verbose && cargo build --release
+      run: cd clashtui && cargo build --verbose --locked && cargo build --release --locked
 
     - name: Pre Upload
       run: |

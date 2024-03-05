@@ -61,7 +61,7 @@ macro_rules! msgpopup_methods {
         }
     };
 }
-
+#[macro_export]
 macro_rules! define_enum {
     ($name: ident, [$($variant:ident),*]) => {
         #[derive(Debug, PartialEq)]
@@ -98,16 +98,6 @@ define_enum!(
         SwitchMode
     ]
 );
-define_enum!(
-    PTOp,
-    [
-        ProfileUpdate,
-        ProfileUpdateAll,
-        ProfileSelect,
-        ProfileDelete
-    ]
-);
-
 #[cfg(target_os = "windows")]
 define_enum!(
     ClashSrvOp,
