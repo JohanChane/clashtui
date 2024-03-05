@@ -10,21 +10,12 @@ use crate::{utils::tools, EventState, Infailable, Theme};
 /// Press Esc to close, do nothing for others
 ///
 /// Not impl [Visibility][crate::Visibility] but impl the functions
+#[derive(Default)]
 pub struct MsgPopup {
     is_visible: bool,
     msg: Vec<String>,
     scroll_v: u16,
     scroll_h: u16,
-}
-impl Default for MsgPopup {
-    fn default() -> Self {
-        Self {
-            is_visible: false,
-            msg: vec![],
-            scroll_v: 0,
-            scroll_h: 0,
-        }
-    }
 }
 impl MsgPopup {
     pub fn event(&mut self, ev: &Event) -> Result<EventState, Infailable> {

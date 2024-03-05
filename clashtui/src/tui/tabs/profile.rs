@@ -5,7 +5,6 @@ use std::{
 };
 
 use super::{profile_input::ProfileInputPopup, PTOp};
-use crate::msgpopup_methods;
 use crate::tui::{
     symbols::{PROFILE, TEMPALTE},
     utils::Keys,
@@ -13,6 +12,7 @@ use crate::tui::{
     EventState, Visibility,
 };
 use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
+use crate::{msgpopup_methods, utils::get_modify_time};
 
 #[derive(PartialEq)]
 enum Fouce {
@@ -182,6 +182,18 @@ impl ProfileTab {
 
     pub fn update_profile_list(&mut self) {
         let profile_names: Vec<String> = self.clashtui_util.get_profile_names().unwrap();
+        if !profile_names
+            .iter()
+            .filter_map(|v| get_modify_time(v).ok())
+            .all(|t| {
+                // Within one day
+                t > std::time::SystemTime::now() - std::time::Duration::from_secs(24 * 60 * 60)
+            })
+        {
+            self.popup_txt_msg(
+                "Some profile might haven't updated for more than one day".to_string(),
+            )
+        };
         self.profile_list.set_items(profile_names);
     }
 }

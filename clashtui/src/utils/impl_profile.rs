@@ -390,13 +390,13 @@ impl ClashTuiUtil {
 
 impl ClashTuiUtil {
     pub fn get_profile_names(&self) -> Result<Vec<String>, Error> {
-        Utils::get_file_names(self.profile_dir.as_path()).map(|mut v| {
+        Utils::get_file_names(&self.profile_dir).map(|mut v| {
             v.sort();
             v
         })
     }
     pub fn get_template_names(&self) -> Result<Vec<String>, Error> {
-        Utils::get_file_names(self.clashtui_dir.join("templates").as_path()).map(|mut v| {
+        Utils::get_file_names(self.clashtui_dir.join("templates")).map(|mut v| {
             v.sort();
             v
         })

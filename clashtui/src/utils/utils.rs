@@ -8,7 +8,10 @@ pub fn concat_update_profile_result(result: (Vec<String>, Vec<String>)) -> Vec<S
         .collect()
 }
 
-pub fn get_file_names(dir: &std::path::Path) -> Result<Vec<String>, std::io::Error> {
+pub fn get_file_names<P>(dir: P) -> std::io::Result<Vec<String>>
+where
+    P: AsRef<std::path::Path>,
+{
     let mut file_names: Vec<String> = Vec::new();
 
     for entry in std::fs::read_dir(dir)? {
@@ -35,4 +38,19 @@ pub(super) fn parse_yaml(yaml_path: &std::path::Path) -> std::io::Result<serde_y
     let parsed_yaml_content: serde_yaml::Value =
         serde_yaml::from_str(yaml_content.as_str()).unwrap();
     Ok(parsed_yaml_content)
+}
+
+pub fn get_modify_time<P>(file_path: P) -> std::io::Result<std::time::SystemTime>
+where
+    P: AsRef<std::path::Path>,
+{
+    let file = std::fs::metadata(file_path)?;
+    if file.is_file() {
+        file.modified()
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Not a file?",
+        ))
+    }
 }
