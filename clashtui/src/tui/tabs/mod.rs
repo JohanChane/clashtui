@@ -29,6 +29,18 @@ impl std::cmp::PartialEq<std::string::String> for Tab {
         &fmtd == other
     }
 }
+pub trait TabEvent {
+    fn draw(&mut self, f: &mut ratatui::prelude::Frame, area: ratatui::prelude::Rect);
+    fn popup_event(
+        &mut self,
+        ev: &crossterm::event::Event,
+    ) -> Result<ui::EventState, impl std::error::Error>;
+    fn event(
+        &mut self,
+        ev: &crossterm::event::Event,
+    ) -> Result<ui::EventState, impl std::error::Error>;
+    fn late_event(&mut self);
+}
 
 #[macro_export]
 macro_rules! msgpopup_methods {
@@ -52,7 +64,7 @@ macro_rules! msgpopup_methods {
 
 macro_rules! define_enum {
     ($name: ident, [$($variant:ident),*]) => {
-        #[derive(Debug, PartialEq, Eq, Clone)]
+        #[derive(Debug, PartialEq)]
         pub enum $name {
             $($variant),*
         }

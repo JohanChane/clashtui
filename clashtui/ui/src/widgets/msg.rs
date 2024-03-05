@@ -16,17 +16,17 @@ pub struct MsgPopup {
     scroll_v: u16,
     scroll_h: u16,
 }
-
-impl MsgPopup {
-    pub fn new() -> Self {
+impl Default for MsgPopup {
+    fn default() -> Self {
         Self {
             is_visible: false,
-            msg: Vec::new(),
+            msg: vec![],
             scroll_v: 0,
             scroll_h: 0,
         }
     }
-
+}
+impl MsgPopup {
     pub fn event(&mut self, ev: &Event) -> Result<EventState, Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);

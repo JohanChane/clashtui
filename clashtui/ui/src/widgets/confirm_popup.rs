@@ -13,7 +13,7 @@ pub struct ConfirmPopup(MsgPopup);
 
 impl ConfirmPopup {
     pub fn new() -> Self {
-        Self(MsgPopup::new())
+        Self(MsgPopup::default())
     }
 
     pub fn event(&mut self, ev: &Event) -> Result<EventState, Infailable> {

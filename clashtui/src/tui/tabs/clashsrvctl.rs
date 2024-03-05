@@ -1,6 +1,3 @@
-use crossterm::event::{Event, KeyEventKind};
-use ratatui::prelude as Ra;
-
 use super::ClashSrvOp;
 use crate::msgpopup_methods;
 use crate::{
@@ -63,12 +60,13 @@ impl ClashSrvCtlTab {
             mode_selector: modes,
             clashtui_util,
             clashtui_state,
-            msgpopup: MsgPopup::new(),
+            msgpopup: Default::default(),
             op: None,
         }
     }
-
-    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
+}
+impl super::TabEvent for ClashSrvCtlTab {
+    fn popup_event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -78,7 +76,7 @@ impl ClashSrvCtlTab {
             if event_state == EventState::WorkDone {
                 return Ok(event_state);
             }
-            if let Event::Key(key) = ev {
+            if let crossterm::event::Event::Key(key) = ev {
                 if &Keys::Select == key {
                     if let Some(new) = self.mode_selector.selected() {
                         self.clashtui_state.borrow_mut().set_mode(new.clone());
@@ -96,14 +94,14 @@ impl ClashSrvCtlTab {
 
         Ok(event_state)
     }
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
+    fn event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
 
         let event_state;
-        if let Event::Key(key) = ev {
-            if key.kind != KeyEventKind::Press {
+        if let crossterm::event::Event::Key(key) = ev {
+            if key.kind != crossterm::event::KeyEventKind::Press {
                 return Ok(EventState::NotConsumed);
             }
             // override `Enter`
@@ -125,7 +123,7 @@ impl ClashSrvCtlTab {
 
         Ok(event_state)
     }
-    pub fn late_event(&mut self) {
+    fn late_event(&mut self) {
         if let Some(op) = self.op.take() {
             match op {
                 ClashSrvOp::SwitchMode => unreachable!(),
@@ -152,7 +150,7 @@ impl ClashSrvCtlTab {
             }
         }
     }
-    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
+    fn draw(&mut self, f: &mut ratatui::prelude::Frame, area: ratatui::prelude::Rect) {
         if !self.is_visible() {
             return;
         }

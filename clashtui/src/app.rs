@@ -1,11 +1,9 @@
 use core::cell::RefCell;
-use crossterm::event::{Event, KeyEventKind};
-use ratatui::prelude as Ra;
 use std::{collections::HashMap, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
 use crate::tui::{
-    tabs::{ClashSrvCtlTab, ProfileTab, Tab, Tabs},
+    tabs::{ClashSrvCtlTab, ProfileTab, Tab, TabEvent, Tabs},
     tools,
     utils::{HelpPopUp, Keys},
     widgets::MsgPopup,
@@ -102,7 +100,7 @@ impl App {
             tabbar,
             should_quit: false,
             help_popup,
-            msgpopup: MsgPopup::new(),
+            msgpopup: Default::default(),
             statusbar,
             clashtui_util,
             tabs,
@@ -111,7 +109,7 @@ impl App {
         (Some(app), err_track)
     }
 
-    fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
+    fn popup_event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ui::Infailable> {
         // ## Self Popups
         let mut event_state = self.help_popup.event(ev)?;
 
@@ -130,7 +128,7 @@ impl App {
         Ok(event_state)
     }
 
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, std::io::Error> {
+    pub fn event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, std::io::Error> {
         let mut event_state = self.msgpopup.event(ev)?;
         if event_state.is_notconsumed() {
             event_state = self.popup_event(ev)?;
@@ -139,8 +137,8 @@ impl App {
             return Ok(event_state);
         }
 
-        if let Event::Key(key) = ev {
-            if key.kind != KeyEventKind::Press {
+        if let crossterm::event::Event::Key(key) = ev {
+            if key.kind != crossterm::event::KeyEventKind::Press {
                 return Ok(EventState::NotConsumed);
             }
             event_state = match key.code.into() {
@@ -207,7 +205,7 @@ impl App {
 
         Ok(event_state)
     }
-    fn last_event(&mut self) {
+    fn late_event(&mut self) {
         self.tabs.values().for_each(|v| match v {
             Tabs::Profile(tab) => tab.borrow_mut().late_event(),
             Tabs::ClashSrvCtl(tab) => tab.borrow_mut().late_event(),
@@ -215,14 +213,15 @@ impl App {
     }
     // For refreshing the interface before performing lengthy operation.
     pub fn handle_last_ev(&mut self, last_ev: &EventState) -> EventState {
-        self.last_event();
+        self.late_event();
         match last_ev {
             EventState::NotConsumed | EventState::WorkDone => EventState::NotConsumed,
             EventState::Yes | EventState::Cancel => unreachable!(),
         }
     }
 
-    pub fn draw(&mut self, f: &mut Ra::Frame) {
+    pub fn draw(&mut self, f: &mut ratatui::prelude::Frame) {
+        use ratatui::prelude as Ra;
         let chunks = Ra::Layout::default()
             .constraints(
                 [

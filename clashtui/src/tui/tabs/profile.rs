@@ -1,5 +1,3 @@
-use crossterm::event::{Event, KeyCode, KeyEventKind};
-use ratatui::prelude as Ra;
 use std::{
     fs::{self, remove_file, OpenOptions},
     io::Write,
@@ -47,7 +45,7 @@ impl ProfileTab {
             is_visible: true,
             profile_list: profiles,
             template_list: templates,
-            msgpopup: MsgPopup::new(),
+            msgpopup: Default::default(),
             confirm_popup: ConfirmPopup::new(),
             fouce: Fouce::Profile,
             profile_input: ProfileInputPopup::new(),
@@ -69,41 +67,6 @@ impl ProfileTab {
 
         instance
     }
-
-    pub fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
-        if !self.is_visible {
-            return Ok(EventState::NotConsumed);
-        }
-
-        let mut event_state = self.msgpopup.event(ev)?;
-        if event_state.is_notconsumed() {
-            event_state = match self.confirm_popup.event(ev)? {
-                EventState::Yes => {
-                    self.op.replace(PTOp::ProfileDelete);
-                    EventState::WorkDone
-                }
-                EventState::Cancel | EventState::WorkDone => EventState::WorkDone,
-                _ => EventState::NotConsumed,
-            };
-        }
-        if event_state.is_notconsumed() {
-            event_state = self.profile_input.event(ev)?;
-
-            if event_state == EventState::WorkDone {
-                if let Event::Key(key) = ev {
-                    if key.kind != KeyEventKind::Press {
-                        return Ok(EventState::NotConsumed);
-                    }
-                    if key.code == KeyCode::Enter {
-                        self.handle_import_profile_ev();
-                    }
-                }
-            }
-        }
-
-        Ok(event_state)
-    }
-
     fn switch_fouce(&mut self, fouce: Fouce) {
         self.fouce = fouce;
     }
@@ -221,7 +184,44 @@ impl ProfileTab {
         let profile_names: Vec<String> = self.clashtui_util.get_profile_names().unwrap();
         self.profile_list.set_items(profile_names);
     }
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, std::io::Error> {
+}
+use crossterm::event::{Event, KeyCode, KeyEventKind};
+impl super::TabEvent for ProfileTab {
+    fn popup_event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ui::Infailable> {
+        if !self.is_visible {
+            return Ok(EventState::NotConsumed);
+        }
+
+        let mut event_state = self.msgpopup.event(ev)?;
+        if event_state.is_notconsumed() {
+            event_state = match self.confirm_popup.event(ev)? {
+                EventState::Yes => {
+                    self.op.replace(PTOp::ProfileDelete);
+                    EventState::WorkDone
+                }
+                EventState::Cancel | EventState::WorkDone => EventState::WorkDone,
+                _ => EventState::NotConsumed,
+            };
+        }
+        if event_state.is_notconsumed() {
+            event_state = self.profile_input.event(ev)?;
+
+            if event_state == EventState::WorkDone {
+                if let Event::Key(key) = ev {
+                    if key.kind != KeyEventKind::Press {
+                        return Ok(EventState::NotConsumed);
+                    }
+                    if key.code == KeyCode::Enter {
+                        self.handle_import_profile_ev();
+                    }
+                }
+            }
+        }
+
+        Ok(event_state)
+    }
+
+    fn event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, std::io::Error> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -390,7 +390,7 @@ impl ProfileTab {
 
         Ok(event_state)
     }
-    pub fn late_event(&mut self) {
+    fn late_event(&mut self) {
         if let Some(op) = self.op.take() {
             self.hide_msgpopup();
             match op {
@@ -412,11 +412,11 @@ impl ProfileTab {
             }
         }
     }
-    pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
+    fn draw(&mut self, f: &mut ratatui::prelude::Frame, area: ratatui::prelude::Rect) {
         if !self.is_visible() {
             return;
         }
-        use Ra::{Constraint, Layout};
+        use ratatui::prelude::{Constraint, Layout};
 
         let chunks = Layout::default()
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
