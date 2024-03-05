@@ -6,7 +6,7 @@ use crate::{utils::tools, EventState, Infailable, Theme};
 
 /// Pop a Message Window
 ///
-/// Using arrow keys or j\k\h\l(vim-like) to navigate.
+/// Using arrow keys or `j\k\h\l`(vim-like) to navigate.
 /// Press Esc to close, do nothing for others
 ///
 /// Not impl [Visibility][crate::Visibility] but impl the functions

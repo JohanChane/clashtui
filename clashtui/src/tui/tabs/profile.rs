@@ -80,19 +80,18 @@ impl ProfileTab {
         self.fouce = fouce;
     }
 
-    pub fn handle_select_profile_ev(&mut self) -> Option<String> {
+    fn handle_select_profile_ev(&mut self) {
         if let Some(profile_name) = self.profile_list.selected() {
             if let Err(err) = self.clashtui_util.select_profile(profile_name) {
-                self.popup_txt_msg(err.to_string());
-                None
+                self.popup_txt_msg(err.to_string())
             } else {
-                Some(profile_name.to_string())
+                self.clashtui_state
+                    .borrow_mut()
+                    .set_profile(profile_name.clone())
             }
-        } else {
-            None
-        }
+        };
     }
-    pub fn handle_update_profile_ev(&mut self, does_update_all: bool) {
+    fn handle_update_profile_ev(&mut self, does_update_all: bool) {
         if let Some(profile_name) = self.profile_list.selected() {
             match self
                 .clashtui_util
@@ -120,10 +119,10 @@ impl ProfileTab {
             }
         }
     }
-    pub fn handle_delete_profile_ev(&mut self) {
+    fn handle_delete_profile_ev(&mut self) {
         if let Some(profile_name) = self.profile_list.selected() {
             match remove_file(self.clashtui_util.get_profile_path_unchecked(profile_name)) {
-                Ok(()) => {
+                Ok(_) => {
                     self.update_profile_list();
                 }
                 Err(err) => {
@@ -133,7 +132,7 @@ impl ProfileTab {
         }
     }
 
-    pub fn handle_import_profile_ev(&mut self) {
+    fn handle_import_profile_ev(&mut self) {
         let profile_name = self.profile_input.name_input.get_input_data();
         let uri = self.profile_input.uri_input.get_input_data();
         let profile_name = profile_name.trim();
@@ -178,7 +177,7 @@ impl ProfileTab {
         }
     }
 
-    pub fn handle_create_template_ev(&mut self) {
+    fn handle_create_template_ev(&mut self) {
         if let Some(template_name) = self.template_list.selected() {
             if let Err(err) = self.clashtui_util.create_yaml_with_template(template_name) {
                 self.popup_txt_msg(err.to_string());
@@ -189,7 +188,7 @@ impl ProfileTab {
         }
     }
 
-    pub fn update_profile_list(&mut self) {
+    fn update_profile_list(&mut self) {
         let profile_names: Vec<String> = self.clashtui_util.get_profile_names().unwrap();
         if !profile_names
             .iter()
@@ -415,21 +414,10 @@ impl super::TabEvent for ProfileTab {
         if let Some(op) = self.op.take() {
             self.hide_msgpopup();
             match op {
-                PTOp::ProfileUpdate | PTOp::ProfileUpdateAll => {
-                    if op == PTOp::ProfileUpdate {
-                        self.handle_update_profile_ev(false);
-                    } else {
-                        self.handle_update_profile_ev(true);
-                    }
-                }
-                PTOp::ProfileSelect => {
-                    if let Some(v) = self.handle_select_profile_ev() {
-                        self.clashtui_state.borrow_mut().set_profile(v)
-                    }
-                }
-                PTOp::ProfileDelete => {
-                    self.handle_delete_profile_ev();
-                }
+                PTOp::ProfileUpdate => self.handle_update_profile_ev(false),
+                PTOp::ProfileUpdateAll => self.handle_update_profile_ev(true),
+                PTOp::ProfileSelect => self.handle_select_profile_ev(),
+                PTOp::ProfileDelete => self.handle_delete_profile_ev(),
             }
         }
     }

@@ -54,7 +54,6 @@ macro_rules! msgpopup_methods {
                 self.msgpopup.push_list_msg(msg);
                 self.msgpopup.show();
             }
-            #[allow(unused)]
             pub fn hide_msgpopup(&mut self) {
                 self.msgpopup.hide();
             }
@@ -63,9 +62,11 @@ macro_rules! msgpopup_methods {
 }
 #[macro_export]
 macro_rules! define_enum {
-    ($name: ident, [$($variant:ident),*]) => {
-        #[derive(Debug, PartialEq)]
-        pub enum $name {
+    ($(#[$attr:meta])*
+    $vis:vis $name: ident,
+    [$($variant:ident),*]) => {
+        $(#[$attr])*
+        $vis enum $name {
             $($variant),*
         }
 
@@ -90,7 +91,7 @@ macro_rules! define_enum {
 
 #[cfg(target_os = "linux")]
 define_enum!(
-    ClashSrvOp,
+    pub ClashSrvOp,
     [
         StartClashService,
         StopClashService,

@@ -9,6 +9,7 @@ pub struct HelpPopUp {
     is_visible: bool,
     items: Vec<String>,
     list_state: Raw::ListState,
+    scrollbar: Raw::ScrollbarState,
 }
 
 impl HelpPopUp {
@@ -18,9 +19,9 @@ impl HelpPopUp {
             is_visible: false,
             items: HELP.lines().map(|line| line.trim().to_string()).collect(),
             list_state: Raw::ListState::default().with_selected(Some(0)),
+            scrollbar: Raw::ScrollbarState::default().content_length(HELP.lines().count()),
         }
     }
-
     pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
@@ -57,10 +58,7 @@ impl HelpPopUp {
         let items: Vec<Raw::ListItem> = self
             .items
             .iter()
-            .map(|i| {
-                let lines = vec![Ra::Line::from(i.clone())];
-                Raw::ListItem::new(lines).style(Style::default())
-            })
+            .map(|i| Raw::ListItem::new(i.as_str()).style(Style::default()))
             .collect();
 
         // 自适应
@@ -85,19 +83,17 @@ impl HelpPopUp {
 
         f.render_widget(Raw::Clear, area);
         f.render_stateful_widget(list, area, &mut self.list_state);
+        if self.items.len() + 2 > area.height as usize {
+            f.render_stateful_widget(
+                Raw::Scrollbar::default()
+                    .orientation(Raw::ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(Some("↑"))
+                    .end_symbol(Some("↓")),
+                area,
+                &mut self.scrollbar,
+            );
+        }
     }
-
-    // pub fn selected(&self) -> Option<&String> {
-    //     if self.items.is_empty() {
-    //         return None;
-    //     }
-    //
-    //     match self.list_state.selected() {
-    //         Some(i) => Some(&self.items[i]),
-    //         None => None,
-    //     }
-    // }
-
     fn next(&mut self) {
         if self.items.is_empty() {
             return;
@@ -106,16 +102,20 @@ impl HelpPopUp {
         let i = match self.list_state.selected() {
             Some(i) => {
                 if i >= self.items.len() - 1 {
+                    self.scrollbar.first();
                     0
                 } else {
+                    self.scrollbar.next();
                     i + 1
                 }
             }
-            None => 0,
+            None => {
+                self.scrollbar.first();
+                0
+            }
         };
         self.list_state.select(Some(i));
     }
-
     fn previous(&mut self) {
         if self.items.is_empty() {
             return;
@@ -124,35 +124,18 @@ impl HelpPopUp {
         let i = match self.list_state.selected() {
             Some(i) => {
                 if i == 0 {
+                    self.scrollbar.last();
                     self.items.len() - 1
                 } else {
+                    self.scrollbar.prev();
                     i - 1
                 }
             }
-            None => 0,
+            None => {
+                self.scrollbar.last();
+                0
+            }
         };
         self.list_state.select(Some(i));
     }
-
-    // pub fn set_items(&mut self, items: Vec<String>) {
-    //     match self.list_state.selected() {
-    //         Some(i) => {
-    //             if i == 0 {
-    //                 self.list_state.select(None);
-    //             } else if i >= items.len() {
-    //                 self.list_state.select(Some(items.len() - 1));
-    //             }
-    //         }
-    //         None => self.list_state.select(None),
-    //     }
-    //     self.items = items;
-    //
-    //     if self.list_state.selected().is_none() && !self.items.is_empty() {
-    //         self.list_state.select(Some(0));
-    //     }
-    // }
-
-    // pub fn get_items(&self) -> &Vec<String> {
-    //     &self.items
-    // }
 }
