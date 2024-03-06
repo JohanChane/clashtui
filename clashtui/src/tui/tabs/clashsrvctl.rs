@@ -124,8 +124,8 @@ impl super::TabEvent for ClashSrvCtlTab {
         Ok(event_state)
     }
     fn late_event(&mut self) {
-        self.hide_msgpopup();
         if let Some(op) = self.op.take() {
+            self.hide_msgpopup();
             match op {
                 ClashSrvOp::SwitchMode => unreachable!(),
                 #[cfg(target_os = "windows")]

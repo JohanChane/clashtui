@@ -32,6 +32,7 @@ impl core::fmt::Display for Infos {
     }
 }
 impl InfoPopUp {
+    #[allow(unused)]
     pub fn set_items(&mut self, mihomover: Option<&String>) {
         if let Some(v) = mihomover {
             self.items.insert(Infos::MihomoVer, v.clone());

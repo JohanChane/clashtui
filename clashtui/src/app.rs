@@ -1,4 +1,4 @@
-use core::cell::RefCell;
+use core::cell::{OnceCell, RefCell};
 use std::{collections::HashMap, path::PathBuf, rc::Rc};
 
 use crate::msgpopup_methods;
@@ -17,7 +17,7 @@ pub struct App {
     tabbar: TabBar,
     tabs: HashMap<Tab, Tabs>,
     pub should_quit: bool,
-    help_popup: HelpPopUp,
+    help_popup: OnceCell<Box<HelpPopUp>>,
     info_popup: InfoPopUp,
     msgpopup: MsgPopup,
 
@@ -94,12 +94,12 @@ impl App {
             ))),
         ])); // Init the tabs
         let statusbar = StatusBar::new(Rc::clone(&clashtui_state));
-        let info_popup =InfoPopUp::with_items(&clashtui_util.clash_version());
+        let info_popup = InfoPopUp::with_items(&clashtui_util.clash_version());
 
         let app = Self {
             tabbar,
             should_quit: false,
-            help_popup: HelpPopUp::new(),
+            help_popup: Default::default(),
             info_popup,
             msgpopup: Default::default(),
             statusbar,
@@ -112,7 +112,11 @@ impl App {
 
     fn popup_event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ui::Infailable> {
         // ## Self Popups
-        let mut event_state = self.help_popup.event(ev)?;
+        let mut event_state = self
+            .help_popup
+            .get_mut()
+            .and_then(|v| v.event(ev).ok())
+            .unwrap_or(EventState::NotConsumed);
         if event_state.is_notconsumed() {
             event_state = self.info_popup.event(ev)?;
         }
@@ -150,7 +154,8 @@ impl App {
                     EventState::WorkDone
                 }
                 Keys::AppHelp => {
-                    self.help_popup.show();
+                    self.help_popup.get_or_init(|| Box::new(HelpPopUp::new()));
+                    self.help_popup.get_mut().unwrap().show();
                     EventState::WorkDone
                 }
                 Keys::AppInfo => {
@@ -213,7 +218,6 @@ impl App {
         Ok(event_state)
     }
     fn late_event(&mut self) {
-        self.hide_msgpopup();
         self.tabs.values().for_each(|v| match v {
             Tabs::Profile(tab) => tab.borrow_mut().late_event(),
             Tabs::ClashSrvCtl(tab) => tab.borrow_mut().late_event(),
@@ -253,7 +257,9 @@ impl App {
         self.statusbar.draw(f, chunks[2]);
 
         let help_area = tools::centered_percent_rect(60, 60, f.size());
-        self.help_popup.draw(f, help_area);
+        self.help_popup
+            .get_mut()
+            .and_then(|v| Some(v.draw(f, help_area)));
         self.info_popup.draw(f, help_area);
         self.msgpopup.draw(f, help_area);
     }

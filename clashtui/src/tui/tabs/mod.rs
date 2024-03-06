@@ -54,6 +54,7 @@ macro_rules! msgpopup_methods {
                 self.msgpopup.push_list_msg(msg);
                 self.msgpopup.show();
             }
+            #[allow(unused)]
             pub fn hide_msgpopup(&mut self) {
                 self.msgpopup.hide();
             }
@@ -101,7 +102,7 @@ define_enum!(
 );
 #[cfg(target_os = "windows")]
 define_enum!(
-    ClashSrvOp,
+    pub ClashSrvOp,
     [
         StartClashService,
         StopClashService,
