@@ -113,7 +113,7 @@ impl InfoPopUp {
 
         f.render_widget(Raw::Clear, area);
         f.render_stateful_widget(list, area, &mut self.list_state);
-        if self.items.len() + 2 > area.height as usize {
+        if item_len + 2 > area.height as usize {
             f.render_stateful_widget(
                 Raw::Scrollbar::default()
                     .orientation(Raw::ScrollbarOrientation::VerticalRight)

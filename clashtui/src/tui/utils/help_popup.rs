@@ -1,9 +1,7 @@
+use super::Keys;
 use crate::tui::{symbols::HELP, tools, EventState, Theme, Visibility};
 use crossterm::event::{Event, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
-use std::cmp::{max, min};
-
-use super::Keys;
 
 #[derive(Visibility)]
 pub struct HelpPopUp {
@@ -48,6 +46,7 @@ impl HelpPopUp {
         Ok(EventState::WorkDone)
     }
     pub fn draw(&mut self, f: &mut Ra::Frame, _area: Ra::Rect) {
+        use std::cmp::{max, min};
         use Ra::Style;
         if !self.is_visible {
             return;
@@ -81,7 +80,7 @@ impl HelpPopUp {
 
         f.render_widget(Raw::Clear, area);
         f.render_stateful_widget(list, area, &mut self.list_state);
-        if self.items.len() + 2 > area.height as usize {
+        if item_len + 2 > area.height as usize {
             f.render_stateful_widget(
                 Raw::Scrollbar::default()
                     .orientation(Raw::ScrollbarOrientation::VerticalRight)
