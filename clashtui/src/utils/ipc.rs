@@ -76,7 +76,7 @@ pub fn execute_powershell_script_as_admin(cmd: &str, does_wait: bool) -> Result<
     string_process_output(output)
 }
 #[cfg(target_os = "windows")]
-pub fn enable_system_proxy(proxy_addr: &String) -> Result<String> {
+pub fn enable_system_proxy(proxy_addr: &str) -> Result<String> {
     let enable_script = format!(
         r#"
         $proxyAddress = "{}"

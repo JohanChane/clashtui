@@ -8,12 +8,18 @@ pub enum Keys {
     ProfileDelete,
     ProfileTestConfig,
     TemplateSwitch,
-    ClashsrvctlRestart,
-
-    Select,
-    Esc,
     Edit,
     Preview,
+    ClashsrvctlRestart,
+
+    Down,
+    Up,
+    // Left,
+    // Right,
+    Select,
+    Esc,
+    Tab,
+
     LogCat,
     AppQuit,
     AppConfig,
@@ -33,15 +39,18 @@ impl From<KeyCode> for Keys {
             KeyCode::Char('i') => Keys::ProfileImport,
             KeyCode::Char('d') => Keys::ProfileDelete,
             KeyCode::Char('t') => Keys::ProfileTestConfig,
-
             KeyCode::Char('T') => Keys::TemplateSwitch,
+            KeyCode::Char('e') => Keys::Edit,
+            KeyCode::Char('p') => Keys::Preview,
 
             KeyCode::Char('R') => Keys::ClashsrvctlRestart,
 
+            KeyCode::Down | KeyCode::Char('j') => Keys::Down,
+            KeyCode::Up | KeyCode::Char('k') => Keys::Up,
             KeyCode::Enter => Keys::Select,
             KeyCode::Esc => Keys::Esc,
-            KeyCode::Char('e') => Keys::Edit,
-            KeyCode::Char('p') => Keys::Preview,
+            KeyCode::Tab => Keys::Tab,
+
             KeyCode::Char('L') => Keys::LogCat,
             KeyCode::Char('Q') => Keys::AppQuit,
             KeyCode::Char('?') => Keys::AppHelp,

@@ -1,7 +1,9 @@
 use crate::tui::{symbols::HELP, tools, EventState, Theme, Visibility};
-use crossterm::event::{Event, KeyCode, KeyEventKind};
+use crossterm::event::{Event, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
+
+use super::Keys;
 
 #[derive(Visibility)]
 pub struct HelpPopUp {
@@ -29,20 +31,16 @@ impl HelpPopUp {
 
         if let Event::Key(key) = ev {
             if key.kind == KeyEventKind::Press {
-                match key.code {
-                    KeyCode::Down | KeyCode::Char('j') => {
-                        self.next();
-                    }
-                    KeyCode::Up | KeyCode::Char('k') => {
-                        self.previous();
-                    }
-                    KeyCode::Esc => {
-                        self.hide();
-                    }
-                    KeyCode::Enter => {
-                        self.hide();
-                    }
-                    _ => {}
+                match key.code.into() {
+                    Keys::Down => self.next(),
+
+                    Keys::Up => self.previous(),
+
+                    Keys::Esc => self.hide(),
+
+                    Keys::Select => self.hide(),
+
+                    _ => (),
                 };
             }
         }

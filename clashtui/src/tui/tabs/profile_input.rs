@@ -1,7 +1,7 @@
-use crossterm::event::{Event, KeyCode, KeyEventKind};
+use crossterm::event::{Event, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::tui::{widgets::InputPopup, EventState, Visibility};
+use crate::tui::{utils::Keys, widgets::InputPopup, EventState, Visibility};
 
 #[derive(PartialEq)]
 enum Fouce {
@@ -32,19 +32,19 @@ impl ProfileInputPopup {
         let mut event_state = EventState::NotConsumed;
         if let Event::Key(key) = ev {
             if key.kind == KeyEventKind::Press {
-                event_state = match key.code {
-                    KeyCode::Tab => {
+                event_state = match key.code.into() {
+                    Keys::Tab => {
                         self.switch_fouce();
                         EventState::WorkDone
                     }
-                    KeyCode::Enter => {
+                    Keys::Select => {
                         self.name_input.handle_enter_ev();
                         self.uri_input.handle_enter_ev();
                         self.hide();
 
                         EventState::WorkDone
                     }
-                    KeyCode::Esc => {
+                    Keys::Esc => {
                         self.name_input.handle_esc_ev();
                         self.uri_input.handle_esc_ev();
                         self.hide();

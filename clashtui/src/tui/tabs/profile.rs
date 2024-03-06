@@ -205,7 +205,7 @@ impl ProfileTab {
         self.profile_list.set_items(profile_names);
     }
 }
-use crossterm::event::{Event, KeyCode, KeyEventKind};
+use crossterm::event::{Event, KeyEventKind};
 impl super::TabEvent for ProfileTab {
     fn popup_event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
@@ -231,7 +231,7 @@ impl super::TabEvent for ProfileTab {
                     if key.kind != KeyEventKind::Press {
                         return Ok(EventState::NotConsumed);
                     }
-                    if key.code == KeyCode::Enter {
+                    if &Keys::Select == key {
                         self.handle_import_profile_ev();
                     }
                 }
