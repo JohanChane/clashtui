@@ -200,7 +200,6 @@ dependencies = [
 name = "clashtui"
 version = "0.2.3"
 dependencies = [
- "anyhow",
  "api",
  "argh",
  "crossterm",

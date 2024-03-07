@@ -29,7 +29,6 @@ serde = "*"
 argh = "0.1"
 serde_yaml = "0.9"
 serde_json = "*"
-anyhow = "1.0"
 log = "0.4"
 log4rs = "1.3"
 

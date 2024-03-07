@@ -6,17 +6,18 @@ use std::{
 };
 
 impl ClashTuiUtil {
-    pub fn create_yaml_with_template(&self, template_name: &String) -> anyhow::Result<()> {
+    pub fn create_yaml_with_template(&self, template_name: &String) -> Result<(), String> {
         use std::borrow::Cow;
         use std::collections::HashMap;
         use std::io::{BufRead, BufReader};
         let template_dir = self.clashtui_dir.join("templates");
         let template_path = template_dir.join(template_name);
-        let tpl_parsed_yaml = parse_yaml(&template_path)?;
+        let tpl_parsed_yaml = parse_yaml(&template_path).map_err(|e| e.to_string())?;
         let mut out_parsed_yaml = Cow::Borrowed(&tpl_parsed_yaml);
 
         let proxy_url_file =
-            File::open(self.clashtui_dir.join("templates/template_proxy_providers"))?;
+            File::open(self.clashtui_dir.join("templates/template_proxy_providers"))
+                .map_err(|e| e.to_string())?;
         let mut proxy_urls = Vec::new();
         BufReader::new(proxy_url_file)
             .lines()
@@ -36,7 +37,7 @@ impl ClashTuiUtil {
         {
             pp_mapping
         } else {
-            anyhow::bail!("Failed to parse `proxy-providers`");
+            return Err(String::from("Failed to parse `proxy-providers`"));
         };
 
         for (pp_key, pp_value) in pp_mapping {
@@ -48,7 +49,7 @@ impl ClashTuiUtil {
             let pp = if let serde_yaml::Value::Mapping(pp) = pp_value {
                 pp
             } else {
-                anyhow::bail!("Failed to parse `proxy-providers` value");
+                return Err(String::from("Failed to parse `proxy-providers` value"));
             };
 
             let mut new_pp = pp.clone();
@@ -88,7 +89,7 @@ impl ClashTuiUtil {
         {
             pg_value
         } else {
-            anyhow::bail!("Failed to parse `proxy-groups`.");
+            return Err(String::from("Failed to parse `proxy-groups`."));
         };
 
         for the_pg_value in pg_value {
@@ -100,7 +101,7 @@ impl ClashTuiUtil {
             let the_pg = if let serde_yaml::Value::Mapping(the_pg) = the_pg_value {
                 the_pg
             } else {
-                anyhow::bail!("Failed to parse `proxy-groups` value");
+                return Err(String::from("Failed to parse `proxy-groups` value"));
             };
 
             let mut new_pg = the_pg.clone();
@@ -111,14 +112,14 @@ impl ClashTuiUtil {
             {
                 provider_keys
             } else {
-                anyhow::bail!("Failed to parse `providers` in `tpl_param`");
+                return Err(String::from("Failed to parse `providers` in `tpl_param`"));
             };
 
             for the_provider_key in provider_keys {
                 let the_pk_str = if let serde_yaml::Value::String(the_pk_str) = the_provider_key {
                     the_pk_str
                 } else {
-                    anyhow::bail!("Failed to parse string in `providers`");
+                    return Err(String::from("Failed to parse string in `providers`"));
                 };
 
                 let names = if let Some(names) = pp_names.get(the_pk_str) {
@@ -132,7 +133,7 @@ impl ClashTuiUtil {
                 {
                     the_pg_name
                 } else {
-                    anyhow::bail!("Failed to parse `name` in `proxy-groups`")
+                    return Err(String::from("Failed to parse `name` in `proxy-groups`"));
                 };
 
                 for n in names {
@@ -166,7 +167,7 @@ impl ClashTuiUtil {
         {
             pg_sequence
         } else {
-            anyhow::bail!("Failed to parse `proxy-groups`");
+            return Err(String::from("Failed to parse `proxy-groups`"));
         };
 
         for the_pg_seq in pg_sequence {
@@ -213,8 +214,8 @@ impl ClashTuiUtil {
 
         log::error!("testssdfs");
         let out_yaml_path = self.profile_dir.join(template_name);
-        let out_yaml_file = File::create(out_yaml_path)?;
-        serde_yaml::to_writer(out_yaml_file, &out_parsed_yaml)?;
+        let out_yaml_file = File::create(out_yaml_path).map_err(|e| e.to_string())?;
+        serde_yaml::to_writer(out_yaml_file, &out_parsed_yaml).map_err(|e| e.to_string())?;
 
         Ok(())
     }
