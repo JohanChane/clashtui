@@ -12,7 +12,7 @@ use crate::app::App;
 use crate::tui::EventState;
 use crate::utils::{Flag, Flags};
 
-pub const VERSION: &str = include_str!(concat!(env!("OUT_DIR"), "/VERSION"));
+pub const VERSION: &str = concat!(env!("VERGEN_GIT_DESCRIBE"));
 
 /// Mihomo (Clash.Meta) TUI Client
 #[derive(Debug, argh::FromArgs)]
