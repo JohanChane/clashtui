@@ -69,7 +69,6 @@ pub enum ErrKind {
     LoadAppConfig,
     LoadProfileConfig,
     LoadClashConfig,
-    CronUpdateProfile,
 }
 type Result<T> = core::result::Result<T, CfgError>;
 #[derive(Debug)]

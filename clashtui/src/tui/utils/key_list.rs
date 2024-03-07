@@ -10,7 +10,6 @@ pub enum Keys {
     TemplateSwitch,
     Edit,
     Preview,
-    ClashsrvctlRestart,
 
     Down,
     Up,
@@ -20,6 +19,7 @@ pub enum Keys {
     Esc,
     Tab,
 
+    ClashsrvctlRestart,
     LogCat,
     AppQuit,
     AppConfig,

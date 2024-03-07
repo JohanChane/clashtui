@@ -97,9 +97,7 @@ impl ProfileTab {
                 .clashtui_util
                 .update_local_profile(profile_name, does_update_all)
             {
-                Ok(res) => {
-                    let mut msg = crate::utils::concat_update_profile_result(res);
-
+                Ok(mut msg) => {
                     if profile_name == self.clashtui_state.borrow().get_profile() {
                         if let Err(err) = self.clashtui_util.select_profile(profile_name) {
                             log::error!("{:?}", err);
@@ -108,7 +106,7 @@ impl ProfileTab {
                             msg.push("Update and selected".to_string());
                         }
                     } else {
-                        msg.push("Updated".to_string());
+                        msg.push("Update sucess".to_string());
                     }
 
                     self.popup_list_msg(msg);

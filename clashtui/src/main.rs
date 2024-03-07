@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-pub fn run(mut flags: Flags, tick_rate: Duration) -> anyhow::Result<()> {
+pub fn run(mut flags: Flags, tick_rate: Duration) -> std::io::Result<()> {
     let res;
     let config_dir = load_app_dir(&mut flags);
     log::debug!("Current flags: {:?}", flags);
@@ -77,7 +77,7 @@ pub fn run(mut flags: Flags, tick_rate: Duration) -> anyhow::Result<()> {
         app.save(config_dir.join("config.yaml").to_str().unwrap())?;
     } else {
         if !err_track.is_empty() {
-            err_track.into_iter().for_each(|v| println!("{v}"));
+            err_track.into_iter().for_each(|v| eprintln!("{v}"));
         }
         res = Ok(());
     }
@@ -96,7 +96,7 @@ fn run_app<B: Backend>(
     tick_rate: Duration,
     mut err_track: Vec<CfgError>,
     flags: Flags,
-) -> anyhow::Result<()> {
+) -> std::io::Result<()> {
     {
         if flags.contains(utils::Flag::FirstInit) {
             app.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());

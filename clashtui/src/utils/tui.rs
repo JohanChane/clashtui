@@ -25,11 +25,7 @@ pub struct ClashTuiUtil {
 
 // Misc
 impl ClashTuiUtil {
-    pub fn new(
-        clashtui_dir: &PathBuf,
-        profile_dir: &Path,
-        is_inited: bool,
-    ) -> (Self, Vec<CfgError>) {
+    pub fn new(clashtui_dir: &PathBuf, is_inited: bool) -> (Self, Vec<CfgError>) {
         let ret = load_app_config(clashtui_dir, is_inited);
         let mut err_track = ret.3;
         let clash_api = ClashUtil::new(ret.1, ret.2);
@@ -51,7 +47,7 @@ impl ClashTuiUtil {
         (
             Self {
                 clashtui_dir: clashtui_dir.clone(),
-                profile_dir: profile_dir.to_path_buf(),
+                profile_dir: clashtui_dir.join("profiles").to_path_buf(),
                 clash_api,
                 tui_cfg: ret.0,
                 clash_remote_config: RefCell::new(remote),

@@ -300,7 +300,7 @@ impl ClashTuiUtil {
         &self,
         profile_name: &String,
         does_update_all: bool,
-    ) -> Result<(Vec<String>, Vec<String>), Error> {
+    ) -> Result<Vec<String>, Error> {
         let mut profile_yaml_path = self.profile_dir.join(profile_name);
         let mut net_res: Vec<(String, String)> = Vec::new();
         // if it's just the link
@@ -359,17 +359,18 @@ impl ClashTuiUtil {
             );
         }
 
-        let mut temp = (vec![], vec![]);
-        net_res.into_iter().for_each(|(url, path)| {
-            match self.download_file(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(path)) {
-                Ok(_) => temp.0.push(url),
-                Err(err) => {
-                    log::error!("Update profile:{err}");
-                    temp.1.push(url)
+        Ok(net_res
+            .into_iter()
+            .map(|(url, path)| {
+                match self.download_file(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(path)) {
+                    Ok(_) => format!("Updated: {url}"),
+                    Err(err) => {
+                        log::error!("Update profile:{err}");
+                        format!("Not Updated: {url}")
+                    }
                 }
-            }
-        });
-        Ok(temp)
+            })
+            .collect::<Vec<String>>())
     }
 
     fn download_file(&self, url: &str, path: &PathBuf) -> Result<(), Error> {

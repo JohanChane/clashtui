@@ -1,13 +1,3 @@
-pub fn concat_update_profile_result(result: (Vec<String>, Vec<String>)) -> Vec<String> {
-    let suc = result.0.iter().map(|v| format!("Updated: {v}"));
-    result
-        .1
-        .iter()
-        .map(|v| format!("Not Updated: {v}"))
-        .chain(suc)
-        .collect()
-}
-
 pub fn get_file_names<P>(dir: P) -> std::io::Result<Vec<String>>
 where
     P: AsRef<std::path::Path>,
