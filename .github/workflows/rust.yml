@@ -39,11 +39,14 @@ jobs:
     - name: Build
       run: cd clashtui && cargo build --verbose --locked && cargo build --release --locked
 
+    - name: Build Version
+      run: cd clashtui && cargo r -- -v
+
     - name: Pre Upload
       run: |
         mkdir artifacts
-        mv ./clashtui/target/release/clashtui ./artifacts/clashtui_r
-        mv ./clashtui/target/debug/clashtui ./artifacts/clashtui_d
+        mv ./clashtui/target/release/clashtui ./artifacts/clashtui.release
+        mv ./clashtui/target/debug/clashtui ./artifacts/clashtui.debug
 
     - name: upload artifacts
       uses: actions/upload-artifact@v4
@@ -74,11 +77,14 @@ jobs:
     - name: Build
       run: cd clashtui && cargo build --verbose && cargo build --release
 
+    - name: Build Version
+      run: cd clashtui && cargo r -- -v
+
     - name: Pre Upload
       run: |
         mkdir artifacts
-        mv ./clashtui/target/release/clashtui.exe ./artifacts/clashtui_r.exe
-        mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui_d.exe
+        mv ./clashtui/target/release/clashtui.exe ./artifacts/clashtui.release.exe
+        mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui.debug.exe
 
     - name: upload artifacts
       uses: actions/upload-artifact@v4
