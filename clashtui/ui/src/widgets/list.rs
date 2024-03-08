@@ -11,6 +11,7 @@ pub struct List {
     title: String,
     is_visible: bool,
     items: Vec<String>,
+    extra: Option<Vec<String>>,
     list_state: Raw::ListState,
     scrollbar: Raw::ScrollbarState,
 }
@@ -21,6 +22,7 @@ impl List {
             title,
             is_visible: true,
             items: vec![],
+            extra: None,
             list_state: Raw::ListState::default(),
             scrollbar: Raw::ScrollbarState::default(),
         }
@@ -51,9 +53,16 @@ impl List {
         }
 
         f.render_stateful_widget(
-            Raw::List::from_iter(self.items.iter().map(|i| {
-                Raw::ListItem::new(Ra::Line::from(i.as_str())).style(Ra::Style::default())
-            }))
+            if let Some(vc) = self.extra.as_ref() {
+                Raw::List::from_iter(self.items.iter().zip(vc.iter()).map(|(v, e)| {
+                    Raw::ListItem::new(Ra::Line::from(v.to_owned() + "(" + e + ")"))
+                        .style(Ra::Style::default())
+                }))
+            } else {
+                Raw::List::from_iter(self.items.iter().map(|i| {
+                    Raw::ListItem::new(Ra::Line::from(i.as_str())).style(Ra::Style::default())
+                }))
+            }
             .block(
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
@@ -164,6 +173,14 @@ impl List {
             self.list_state.select(Some(0));
             self.scrollbar.first();
         }
+    }
+
+    pub fn set_extras<I>(&mut self, extra: I)
+    where
+        I: Iterator<Item = String> + ExactSizeIterator,
+    {
+        assert_eq!(self.items.len(), extra.len());
+        self.extra.replace(Vec::from_iter(extra));
     }
 
     pub fn get_items(&self) -> &Vec<String> {

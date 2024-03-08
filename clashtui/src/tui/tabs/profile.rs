@@ -100,7 +100,7 @@ impl ProfileTab {
                 Ok(mut msg) => {
                     if profile_name == self.clashtui_state.borrow().get_profile() {
                         if let Err(err) = self.clashtui_util.select_profile(profile_name) {
-                            log::error!("{:?}", err);
+                            log::error!("{profile_name} => {err}");
                             msg.push(err.to_string());
                         } else {
                             msg.push("Update and selected".to_string());
@@ -112,9 +112,11 @@ impl ProfileTab {
                     self.popup_list_msg(msg);
                 }
                 Err(err) => {
-                    self.popup_txt_msg(format!("Failed to Update: {}", err));
+                    log::error!("{profile_name} => {err}");
+                    self.popup_txt_msg(format!("Failed to Update: {err}"));
                 }
-            }
+            };
+            self.update_profile_list();
         }
     }
     fn handle_delete_profile_ev(&mut self) {
@@ -187,20 +189,36 @@ impl ProfileTab {
     }
 
     fn update_profile_list(&mut self) {
-        let profile_names: Vec<String> = self.clashtui_util.get_profile_names().unwrap();
-        if !profile_names
+        let profile_names = self.clashtui_util.get_profile_names().unwrap();
+        let profile_times: Vec<Option<std::time::SystemTime>> = profile_names
             .iter()
-            .filter_map(|v| get_modify_time(v).ok())
-            .all(|t| {
-                // Within one day
-                t > std::time::SystemTime::now() - std::time::Duration::from_secs(24 * 60 * 60)
+            .map(|v| {
+                self.clashtui_util
+                    .get_profile_yaml_path(v)
+                    .and_then(get_modify_time)
             })
-        {
+            .map(|p| p.map_err(|e| log::error!("{e}")).ok())
+            .collect();
+        let now = std::time::SystemTime::now();
+        if !profile_times.iter().filter_map(|t| t.as_ref()).any(|t| {
+            // Within one day
+            *t > now - std::time::Duration::from_secs(24 * 60 * 60)
+        }) {
             self.popup_txt_msg(
                 "Some profile might haven't updated for more than one day".to_string(),
             )
         };
         self.profile_list.set_items(profile_names);
+        self.profile_list
+            .set_extras(profile_times.into_iter().map(|t| {
+                t.map(|t| {
+                    display_duration(
+                        now.duration_since(t)
+                            .expect("Clock may have gone backwards"),
+                    )
+                })
+                .unwrap_or("Never/Error".to_string())
+            }))
     }
 }
 use crossterm::event::{Event, KeyEventKind};
@@ -447,5 +465,19 @@ impl super::TabEvent for ProfileTab {
         self.confirm_popup.draw(f, area);
     }
 }
-
+fn display_duration(t: std::time::Duration) -> String {
+    use std::time::Duration;
+    if t.is_zero() {
+        "Just Now".to_string()
+    } else if t < Duration::from_secs(60 * 59) {
+        let min = t.as_secs() / 60;
+        format!("In {} mins", min + 1)
+    } else if t < Duration::from_secs(3600 * 24) {
+        let hou = t.as_secs() / 3600;
+        format!("In {hou} hours")
+    } else {
+        let day = t.as_secs() / (3600 * 24);
+        format!("In about {day} days")
+    }
+}
 msgpopup_methods!(ProfileTab);
