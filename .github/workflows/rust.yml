@@ -9,88 +9,92 @@ env:
 
 jobs:
   build-linux:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Mihomo
-      run: |
-        wget --output-document mihomo.gz https://github.com/MetaCubeX/mihomo/releases/download/v1.18.0/mihomo-linux-amd64-v1.18.0.gz
-        gunzip mihomo.gz
-        chmod +x mihomo
-        nohup ./mihomo -d Example -f Example/basic_clash_config.yaml &
-      
-    - name: Cache Target
-      uses: actions/cache@v4
-      with:
-        path: |
-          ./clashtui/target
-          ~/.cargo            
-        key: debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-${{ hashFiles('./clashtui/rust-toolchain.toml') }}
-        restore-keys: |
-          debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-
-          debug-${{ runner.os }}-   
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Download Dependencies
-      run: cd clashtui && cargo fetch
-    - name: Run tests
-      run: cd clashtui && cargo test --verbose
-    - name: Build
-      run: cd clashtui && cargo build --verbose --locked && cargo build --release --locked
+      - name: Set up Mihomo
+        run: |
+          wget --output-document mihomo.gz https://github.com/MetaCubeX/mihomo/releases/download/v1.18.0/mihomo-linux-amd64-v1.18.0.gz
+          gunzip mihomo.gz
+          chmod +x mihomo
+          nohup ./mihomo -d Example -f Example/basic_clash_config.yaml &
 
-    - name: Build Version
-      run: cd clashtui && cargo r -- -v
+      - name: Cache Target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./clashtui/target
+            ~/.cargo
+          key: debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-${{ hashFiles('./clashtui/rust-toolchain.toml') }}
+          restore-keys: |
+            debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-
+            debug-${{ runner.os }}-
 
-    - name: Pre Upload
-      run: |
-        mkdir artifacts
-        mv ./clashtui/target/release/clashtui ./artifacts/clashtui.release
-        mv ./clashtui/target/debug/clashtui ./artifacts/clashtui.debug
+      - name: Download Dependencies
+        run: cd clashtui && cargo fetch
+      - name: Run tests
+        run: cd clashtui && cargo test --verbose
+      - name: Build
+        run: cd clashtui && cargo build --verbose --locked && cargo build --release --locked
 
-    - name: upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: Linux_Build
-        path: artifacts
+      - name: Build Version
+        run: cd clashtui && cargo r -- -v
+
+      - name: Pre Upload
+        run: |
+          mkdir artifacts
+          mv ./clashtui/target/release/clashtui ./artifacts/clashtui.release
+          mv ./clashtui/target/debug/clashtui ./artifacts/clashtui.debug
+
+      - name: upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux_Build
+          path: artifacts
 
   build-windows:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Cache Target
-      uses: actions/cache@v4
-      with:
-        path: |
-          ./clashtui/target
-          ~/.cargo            
-        key: debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-${{ hashFiles('./clashtui/rust-toolchain.toml') }}
-        restore-keys: |
-          debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-
-          debug-${{ runner.os }}-   
+      - name: Cache Target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./clashtui/target
+            ~/.cargo
+          key: debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-${{ hashFiles('./clashtui/rust-toolchain.toml') }}
+          restore-keys: |
+            debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-
+            debug-${{ runner.os }}-
 
-    - name: Download Dependencies
-      run: cd clashtui && cargo fetch
-    # - name: Run tests
-    #   run: cd clashtui && cargo test --verbose
-    - name: Build
-      run: cd clashtui && cargo build --verbose && cargo build --release
+      - name: Download Dependencies
+        run: cd clashtui && cargo fetch
+      # - name: Run tests
+      #   run: cd clashtui && cargo test --verbose
+      - name: Build
+        run: cd clashtui && cargo build --verbose && cargo build --release
 
-    - name: Build Version
-      run: cd clashtui && cargo r -- -v
+      - name: Build Version
+        run: cd clashtui && cargo r -- -v
 
-    - name: Pre Upload
-      run: |
-        mkdir artifacts
-        mv ./clashtui/target/release/clashtui.exe ./artifacts/clashtui.release.exe
-        mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui.debug.exe
+      - name: Pre Upload
+        run: |
+          mkdir artifacts
+          mv ./clashtui/target/release/clashtui.exe ./artifacts/clashtui.release.exe
+          mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui.debug.exe
 
-    - name: upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: Windows_Build
-        path: artifacts
+      - name: upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows_Build
+          path: artifacts
 
   release:
     runs-on: ubuntu-latest
@@ -105,11 +109,9 @@ jobs:
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4
-        with: 
-          merge-multiple:
-            true
-          path:
-            ./artifacts
+        with:
+          merge-multiple: true
+          path: ./artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
