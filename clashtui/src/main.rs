@@ -83,7 +83,7 @@ pub fn run(mut flags: Flags, tick_rate: Duration) -> std::io::Result<()> {
     }
 
     if let Err(err) = res {
-        println!("{err:?}");
+        eprintln!("{err:?}");
     }
 
     Ok(())

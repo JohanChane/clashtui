@@ -56,14 +56,14 @@ impl App {
         let _ = Theme::load(None).map_err(|e| log::error!("Loading Theme:{}", e));
 
         let tabs: Vec<Tabs> = vec![
-            Tabs::Profile(RefCell::new(ProfileTab::new(
+            Tabs::Profile(ProfileTab::new(
                 clashtui_util.clone(),
                 clashtui_state.clone(),
-            ))),
-            Tabs::ClashSrvCtl(RefCell::new(ClashSrvCtlTab::new(
+            )),
+            Tabs::ClashSrvCtl(ClashSrvCtlTab::new(
                 clashtui_util.clone(),
                 clashtui_state.clone(),
-            ))),
+            )),
         ]; // Init the tabs
         let tabbar = TabBar::new(tabs.iter().map(|v| v.to_string()).collect());
         let statusbar = StatusBar::new(Rc::clone(&clashtui_state));
@@ -94,9 +94,9 @@ impl App {
             event_state = self.info_popup.event(ev)?;
         }
         // ## Tab Popups
-        let mut iter = self.tabs.iter().map(|v| match v {
-            Tabs::Profile(v) => v.borrow_mut().popup_event(ev),
-            Tabs::ClashSrvCtl(v) => v.borrow_mut().popup_event(ev),
+        let mut iter = self.tabs.iter_mut().map(|v| match v {
+            Tabs::Profile(tab) => tab.popup_event(ev),
+            Tabs::ClashSrvCtl(tab) => tab.popup_event(ev),
         });
         while event_state.is_notconsumed() {
             match iter.next() {
@@ -175,9 +175,9 @@ impl App {
                     .tabbar
                     .event(ev)
                     .map_err(|()| std::io::Error::new(std::io::ErrorKind::Other, "Undefined"))?;
-                let mut iter = self.tabs.iter().map(|v| match v {
-                    Tabs::Profile(v) => v.borrow_mut().event(ev),
-                    Tabs::ClashSrvCtl(v) => Ok(v.borrow_mut().event(ev)?),
+                let mut iter = self.tabs.iter_mut().map(|v| match v {
+                    Tabs::Profile(tab) => tab.event(ev),
+                    Tabs::ClashSrvCtl(tab) => Ok(tab.event(ev)?),
                 });
                 while event_state.is_notconsumed() {
                     match iter.next() {
@@ -191,9 +191,9 @@ impl App {
         Ok(event_state)
     }
     fn late_event(&mut self) {
-        self.tabs.iter().for_each(|v| match v {
-            Tabs::Profile(tab) => tab.borrow_mut().late_event(),
-            Tabs::ClashSrvCtl(tab) => tab.borrow_mut().late_event(),
+        self.tabs.iter_mut().for_each(|v| match v {
+            Tabs::Profile(tab) => tab.late_event(),
+            Tabs::ClashSrvCtl(tab) => tab.late_event(),
         })
     }
     // For refreshing the interface before performing lengthy operation.
@@ -222,9 +222,9 @@ impl App {
         self.tabbar.draw(f, chunks[0]);
 
         let tab_chunk = chunks[1];
-        self.tabs.iter().for_each(|v| match v {
-            Tabs::Profile(v) => v.borrow_mut().draw(f, tab_chunk),
-            Tabs::ClashSrvCtl(v) => v.borrow_mut().draw(f, tab_chunk),
+        self.tabs.iter_mut().for_each(|v| match v {
+            Tabs::Profile(tab) => tab.draw(f, tab_chunk),
+            Tabs::ClashSrvCtl(tab) => tab.draw(f, tab_chunk),
         });
 
         self.statusbar.draw(f, chunks[2]);
@@ -239,17 +239,17 @@ impl App {
 
     pub fn on_tick(&mut self) {}
 
-    fn update_tabbar(&self) {
+    fn update_tabbar(&mut self) {
         let tabname = self
             .tabbar
             .selected()
             .expect("UB: selected tab out of bound");
         self.tabs
-            .iter()
+            .iter_mut()
             .map(|v| (v == tabname, v))
             .for_each(|(b, v)| match v {
-                Tabs::Profile(k) => k.borrow_mut().set_visible(b),
-                Tabs::ClashSrvCtl(k) => k.borrow_mut().set_visible(b),
+                Tabs::Profile(tab) => tab.set_visible(b),
+                Tabs::ClashSrvCtl(tab) => tab.set_visible(b),
             });
     }
 

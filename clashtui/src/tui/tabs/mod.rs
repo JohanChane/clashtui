@@ -6,8 +6,8 @@ pub use clashsrvctl::ClashSrvCtlTab;
 pub use profile::ProfileTab;
 
 pub enum Tabs {
-    Profile(std::cell::RefCell<ProfileTab>),
-    ClashSrvCtl(std::cell::RefCell<ClashSrvCtlTab>),
+    Profile(ProfileTab),
+    ClashSrvCtl(ClashSrvCtlTab),
 }
 impl ToString for Tabs {
     fn to_string(&self) -> String {
