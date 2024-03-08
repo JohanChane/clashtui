@@ -157,9 +157,7 @@ impl App {
                 Keys::ClashsrvctlRestart => {
                     match self.clashtui_util.restart_clash() {
                         Ok(output) => {
-                            let list_msg: Vec<String> =
-                                output.lines().map(|line| line.trim().to_string()).collect();
-                            self.popup_list_msg(list_msg);
+                            self.popup_list_msg(output.lines().map(|line| line.trim().to_string()));
                         }
                         Err(err) => {
                             self.popup_txt_msg(err.to_string());

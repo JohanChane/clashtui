@@ -66,14 +66,15 @@ impl MsgPopup {
         let paragraph = if text.len() == 1 && max_item_width < area.width as usize {
             Raw::Paragraph::new(text)
                 .wrap(Raw::Wrap { trim: true })
-                .alignment(Ra::Alignment::Center) // Will cause inability to scroll horizontally.
+                .alignment(Ra::Alignment::Center)
         } else {
             Raw::Paragraph::new(text).scroll((self.scroll_v, self.scroll_h))
         };
 
         let block = Raw::Block::new()
             .borders(Raw::Borders::ALL)
-            .border_style(Ra::Style::default().fg(Theme::get().popup_block_fg));
+            .border_style(Ra::Style::default().fg(Theme::get().popup_block_fg))
+            .title("Msg");
 
         f.render_widget(Raw::Clear, area);
         f.render_widget(paragraph.block(block), area);
