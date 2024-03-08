@@ -29,10 +29,10 @@ jobs:
           path: |
             ./clashtui/target
             ~/.cargo
-          key: debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-${{ hashFiles('./clashtui/rust-toolchain.toml') }}
+          key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
           restore-keys: |
-            debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-
-            debug-${{ runner.os }}-
+            ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
+            ci-${{ runner.os }}-
 
       - name: Download Dependencies
         run: cd clashtui && cargo fetch
@@ -55,6 +55,7 @@ jobs:
         with:
           name: Linux_Build
           path: artifacts
+          retention-days: 5
 
   build-windows:
     runs-on: windows-latest
@@ -69,10 +70,10 @@ jobs:
           path: |
             ./clashtui/target
             ~/.cargo
-          key: debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-${{ hashFiles('./clashtui/rust-toolchain.toml') }}
+          key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
           restore-keys: |
-            debug-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}-
-            debug-${{ runner.os }}-
+            ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
+            ci-${{ runner.os }}-
 
       - name: Download Dependencies
         run: cd clashtui && cargo fetch
@@ -95,6 +96,7 @@ jobs:
         with:
           name: Windows_Build
           path: artifacts
+          retention-days: 5
 
   release:
     runs-on: ubuntu-latest
