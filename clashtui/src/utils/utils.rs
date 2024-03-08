@@ -1,4 +1,4 @@
-pub fn get_file_names<P>(dir: P) -> std::io::Result<Vec<String>>
+pub(super) fn get_file_names<P>(dir: P) -> std::io::Result<Vec<String>>
 where
     P: AsRef<std::path::Path>,
 {
@@ -15,7 +15,7 @@ where
     Ok(file_names)
 }
 /// Judging by format
-pub fn is_yaml(path: &std::path::Path) -> bool {
+pub(super) fn is_yaml(path: &std::path::Path) -> bool {
     std::fs::File::open(path).is_ok_and(|f| {
         serde_yaml::from_reader::<std::fs::File, serde_yaml::Value>(f).is_ok_and(|v| v.is_mapping())
     })

@@ -26,7 +26,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(flags: &Flags, clashtui_config_dir: &PathBuf) -> (Option<Self>, Vec<CfgError>) {
+    pub fn new(flags: &Flags<Flag>, clashtui_config_dir: &PathBuf) -> (Option<Self>, Vec<CfgError>) {
         #[cfg(debug_assertions)]
         let _ = std::fs::remove_file(clashtui_config_dir.join("clashtui.log")); // auto rm old log for debug
         setup_logging(clashtui_config_dir.join("clashtui.log").to_str().unwrap());

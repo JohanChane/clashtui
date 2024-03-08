@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{VERSION}");
         std::process::exit(0);
     }
-    let mut flags = Flags::with_capacity(3);
+    let mut flags = Flags::empty();
     if cli.update_all_profiles {
         flags.insert(utils::Flag::UpdateOnly);
     };
@@ -43,11 +43,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-pub fn run(mut flags: Flags, tick_rate: Duration) -> std::io::Result<()> {
+pub fn run(mut flags: Flags<Flag>, tick_rate: Duration) -> std::io::Result<()> {
     let res;
     let config_dir = load_app_dir(&mut flags);
-    log::debug!("Current flags: {:?}", flags);
     let (app, err_track) = App::new(&flags, &config_dir);
+    log::debug!("Current flags: {:?}", flags);
     if let Some(mut app) = app {
         use crossterm::{
             event::{DisableMouseCapture, EnableMouseCapture},
@@ -95,7 +95,7 @@ fn run_app<B: Backend>(
     app: &mut App,
     tick_rate: Duration,
     mut err_track: Vec<CfgError>,
-    flags: Flags,
+    flags: Flags<Flag>,
 ) -> std::io::Result<()> {
     {
         if flags.contains(utils::Flag::FirstInit) {
@@ -119,7 +119,6 @@ fn run_app<B: Backend>(
             app.popup_txt_msg(showstr);
         }
     }
-    drop(flags);
     log::info!("App init finished");
 
     let mut last_tick = Instant::now();
@@ -149,7 +148,7 @@ fn run_app<B: Backend>(
     Ok(())
 }
 
-fn load_app_dir(flags: &mut Flags) -> std::path::PathBuf {
+fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
     let clashtui_config_dir = {
         use std::{env, path::PathBuf};
         let exe_dir = env::current_exe().unwrap().parent().unwrap().to_path_buf();

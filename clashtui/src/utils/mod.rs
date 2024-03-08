@@ -10,10 +10,10 @@ mod tui;
 mod utils;
 
 pub type SharedClashTuiUtil = std::rc::Rc<tui::ClashTuiUtil>;
-pub type SharedClashTuiState = std::rc::Rc<std::cell::RefCell<State>>;
+pub type SharedClashTuiState = std::rc::Rc<core::cell::RefCell<State>>;
 
 pub use config::{init_config, CfgError};
-pub use flags::{Flag, Flags};
+pub use flags::{Flag, BitFlags as Flags};
 pub use state::State;
 pub use tui::ClashTuiUtil;
 pub use utils::*;

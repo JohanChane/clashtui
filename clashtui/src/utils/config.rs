@@ -1,4 +1,3 @@
-use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -13,7 +12,7 @@ pub struct ClashTuiConfig {
     pub edit_cmd: String,
     pub open_dir_cmd: String,
 
-    pub current_profile: RefCell<String>,
+    pub current_profile: core::cell::RefCell<String>,
 }
 impl ClashTuiConfig {
     pub fn from_file(config_path: &str) -> Result<Self> {
@@ -37,31 +36,33 @@ impl ClashTuiConfig {
     }
 }
 #[cfg(test)]
-#[test]
-fn test_save_and_load() {
-    let mut flag = true;
-    let exe_dir = std::env::current_dir().unwrap();
-    println!("{exe_dir:?}");
-    let path_ = exe_dir.parent().unwrap().join("Example/config.yaml");
-    println!("{path_:?}");
-    assert!(path_.is_file());
-    let path = path_.as_path().to_str().unwrap();
-    let conf = match ClashTuiConfig::from_file(path) {
-        Ok(v) => v,
-        Err(e) => {
-            flag = false;
-            println!("{}", e);
-            ClashTuiConfig::default()
-        }
-    };
-    println!("{:?}", conf);
-    match conf.to_file(path) {
-        Ok(_) => flag &= true,
-        Err(v) => println!("{}", v),
-    };
-    assert!(flag);
+mod test {
+    use super::*;
+    #[test]
+    fn test_save_and_load() {
+        let mut flag = true;
+        let exe_dir = std::env::current_dir().unwrap();
+        println!("{exe_dir:?}");
+        let path_ = exe_dir.parent().unwrap().join("Example/config.yaml");
+        println!("{path_:?}");
+        assert!(path_.is_file());
+        let path = path_.as_path().to_str().unwrap();
+        let conf = match ClashTuiConfig::from_file(path) {
+            Ok(v) => v,
+            Err(e) => {
+                flag = false;
+                println!("{}", e);
+                ClashTuiConfig::default()
+            }
+        };
+        println!("{:?}", conf);
+        match conf.to_file(path) {
+            Ok(_) => flag &= true,
+            Err(v) => println!("{}", v),
+        };
+        assert!(flag);
+    }
 }
-
 #[derive(Debug)]
 pub enum ErrKind {
     IO,

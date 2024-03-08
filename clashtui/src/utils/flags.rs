@@ -1,23 +1,28 @@
-#[derive(Eq, Hash, PartialEq, Debug)]
+use enumflags2::bitflags;
+pub use enumflags2::BitFlags;
+
+#[derive(Clone, Copy, Debug)]
+#[bitflags]
+#[repr(u8)]
 pub enum Flag {
-    UpdateOnly,
-    FirstInit,
-    ErrorDuringInit,
-    PortableMode,
+    UpdateOnly = 1,
+    FirstInit = 1 << 1,
+    ErrorDuringInit = 1 << 2,
+    PortableMode = 1 << 3,
 }
-#[derive(Debug)]
-pub struct Flags(std::collections::HashSet<Flag>);
-impl Flags {
-    pub fn with_capacity(capacity: usize) -> Self {
-        Self(std::collections::HashSet::with_capacity(capacity))
-    }
-    pub fn insert(&mut self, k: Flag) {
-        // current, flag should not be add more than once
-        if !self.0.insert(k) {
-            unreachable!()
-        }
-    }
-    pub fn contains(&self, k: Flag) -> bool {
-        self.0.contains(&k)
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_flags() {
+        let mut flags = BitFlags::EMPTY;
+        flags.insert(Flag::UpdateOnly);
+        println!("{flags:?}");
+        assert!(flags.contains(Flag::UpdateOnly));
+        println!("{:?}", flags.exactly_one());
+        flags.insert(Flag::FirstInit);
+        println!("{flags:?}");
+        assert!(flags.contains(Flag::FirstInit));
+        println!("{:?}", flags.exactly_one())
     }
 }
