@@ -13,15 +13,7 @@ use crate::tui::{
 };
 use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
 use crate::{msgpopup_methods, utils::get_modify_time};
-crate::define_enum!(
-    PTOp,
-    [
-        ProfileUpdate,
-        ProfileUpdateAll,
-        ProfileSelect,
-        ProfileDelete
-    ]
-);
+crate::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);
 
 #[derive(PartialEq)]
 enum Fouce {
@@ -121,14 +113,13 @@ impl ProfileTab {
     }
     fn handle_delete_profile_ev(&mut self) {
         if let Some(profile_name) = self.profile_list.selected() {
-            match remove_file(self.clashtui_util.get_profile_path_unchecked(profile_name)) {
-                Ok(_) => {
-                    self.update_profile_list();
-                }
-                Err(err) => {
-                    self.popup_txt_msg(err.to_string());
-                }
+            let _ = remove_file(self.clashtui_util.get_profile_cache_unchecked(profile_name));
+            if let Err(err) =
+                remove_file(self.clashtui_util.get_profile_path_unchecked(profile_name))
+            {
+                self.popup_txt_msg(err.to_string());
             }
+            self.update_profile_list();
         }
     }
 
@@ -196,13 +187,14 @@ impl ProfileTab {
                 self.clashtui_util
                     .get_profile_yaml_path(v)
                     .and_then(get_modify_time)
+                    .map_err(|e| log::error!("{v} => {e}"))
+                    .ok()
             })
-            .map(|p| p.map_err(|e| log::error!("{e}")).ok())
             .collect();
         let now = std::time::SystemTime::now();
-        if !profile_times.iter().filter_map(|t| t.as_ref()).any(|t| {
+        if profile_times.iter().filter_map(|t| t.as_ref()).any(|t| {
             // Within one day
-            *t > now - std::time::Duration::from_secs(24 * 60 * 60)
+            *t < now - std::time::Duration::from_secs(24 * 60 * 60)
         }) {
             self.popup_txt_msg(
                 "Some profile might haven't updated for more than one day".to_string(),
@@ -232,7 +224,7 @@ impl super::TabEvent for ProfileTab {
         if event_state.is_notconsumed() {
             event_state = match self.confirm_popup.event(ev)? {
                 EventState::Yes => {
-                    self.op.replace(PTOp::ProfileDelete);
+                    self.op.replace(PTOp::Delete);
                     EventState::WorkDone
                 }
                 EventState::Cancel | EventState::WorkDone => EventState::WorkDone,
@@ -278,17 +270,17 @@ impl super::TabEvent for ProfileTab {
                         }
                         Keys::Select => {
                             self.popup_txt_msg("Selecting...".to_string());
-                            self.op.replace(PTOp::ProfileSelect);
+                            self.op.replace(PTOp::Select);
                             EventState::WorkDone
                         }
                         Keys::ProfileUpdate => {
                             self.popup_txt_msg("Updating...".to_string());
-                            self.op.replace(PTOp::ProfileUpdate);
+                            self.op.replace(PTOp::Update);
                             EventState::WorkDone
                         }
                         Keys::ProfileUpdateAll => {
                             self.popup_txt_msg("Updating...".to_string());
-                            self.op.replace(PTOp::ProfileUpdateAll);
+                            self.op.replace(PTOp::UpdateAll);
                             EventState::WorkDone
                         }
                         Keys::ProfileImport => {
@@ -430,10 +422,10 @@ impl super::TabEvent for ProfileTab {
         if let Some(op) = self.op.take() {
             self.hide_msgpopup();
             match op {
-                PTOp::ProfileUpdate => self.handle_update_profile_ev(false),
-                PTOp::ProfileUpdateAll => self.handle_update_profile_ev(true),
-                PTOp::ProfileSelect => self.handle_select_profile_ev(),
-                PTOp::ProfileDelete => self.handle_delete_profile_ev(),
+                PTOp::Update => self.handle_update_profile_ev(false),
+                PTOp::UpdateAll => self.handle_update_profile_ev(true),
+                PTOp::Select => self.handle_select_profile_ev(),
+                PTOp::Delete => self.handle_delete_profile_ev(),
             }
         }
     }

@@ -434,7 +434,7 @@ impl ClashTuiUtil {
             "No valid yaml file",
         ))
     }
-    fn get_profile_cache_unchecked<P>(&self, profile_name: P) -> PathBuf
+    pub fn get_profile_cache_unchecked<P>(&self, profile_name: P) -> PathBuf
     where
         P: AsRef<Path> + AsRef<std::ffi::OsStr>,
     {

@@ -265,6 +265,13 @@ fn setup_logging(log_path: &str) {
     use log4rs::append::file::FileAppender;
     use log4rs::config::{Appender, Config, Root};
     use log4rs::encode::pattern::PatternEncoder;
+    let mut flag = false;
+    if let Ok(m) = std::fs::File::open(log_path).and_then(|f| f.metadata()) {
+        if m.len() > 1024 * 1024 {
+            let _ = std::fs::remove_file(log_path);
+            flag = true
+        };
+    }
     // No need to change. This is set to auto switch to Info level when build release
     #[allow(unused_variables)]
     let log_level = log::LevelFilter::Info;
@@ -281,6 +288,9 @@ fn setup_logging(log_path: &str) {
         .unwrap();
 
     log4rs::init_config(config).unwrap();
+    if flag {
+        log::info!("Log file too large, clear")
+    }
     log::info!("Start Log, level: {}", log_level);
 }
 
