@@ -29,21 +29,15 @@ impl ClashTuiUtil {
         let ret = load_app_config(clashtui_dir, is_inited);
         let mut err_track = ret.3;
         let clash_api = ClashUtil::new(ret.1, ret.2);
-        let cur_remote = match clash_api.config_get() {
-            Ok(v) => v,
-            Err(_) => String::new(),
-        };
-        let remote = match ClashConfig::from_str(cur_remote.as_str()) {
-            Ok(v) => Some(v),
-            Err(_) => {
+        let remote = ClashConfig::from_str(clash_api.config_get().unwrap_or_default().as_str())
+            .map_err(|_| {
                 err_track.push(CfgError::new(
                     ErrKind::LoadClashConfig,
                     "Fail to load config from clash core. Is it Running?".to_string(),
                 ));
-                log::warn!("Fail to connect to clash. Is it Running?");
-                None
-            }
-        };
+                log::warn!("Fail to connect to clash. Is it Running?")
+            })
+            .ok();
         (
             Self {
                 clashtui_dir: clashtui_dir.clone(),
@@ -97,9 +91,9 @@ impl ClashTuiUtil {
     }
 
     pub fn fetch_recent_logs(&self, num_lines: usize) -> Vec<String> {
-        let log = std::fs::read_to_string(self.clashtui_dir.join("clashtui.log"))
-            .unwrap_or_else(|_| String::new());
-        log.lines()
+        std::fs::read_to_string(self.clashtui_dir.join("clashtui.log"))
+            .unwrap_or_default()
+            .lines()
             .rev()
             .take(num_lines)
             .map(String::from)

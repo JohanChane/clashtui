@@ -19,7 +19,7 @@ pub enum Keys {
     Esc,
     Tab,
 
-    ClashsrvctlRestart,
+    SoftRestart,
     LogCat,
     AppQuit,
     AppConfig,
@@ -43,7 +43,7 @@ impl From<KeyCode> for Keys {
             KeyCode::Char('e') => Keys::Edit,
             KeyCode::Char('p') => Keys::Preview,
 
-            KeyCode::Char('R') => Keys::ClashsrvctlRestart,
+            KeyCode::Char('R') => Keys::SoftRestart,
 
             KeyCode::Down | KeyCode::Char('j') => Keys::Down,
             KeyCode::Up | KeyCode::Char('k') => Keys::Up,

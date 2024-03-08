@@ -53,7 +53,7 @@ impl App {
 
         let clashtui_state =
             SharedClashTuiState::new(RefCell::new(State::new(Rc::clone(&clashtui_util))));
-        let _ = Theme::load(None).map_err(|e| log::error!("Loading Theme:{}", e));
+        let _ = Theme::load(None).map_err(|e| log::error!("Loading Theme:{e}"));
 
         let tabs: Vec<Tabs> = vec![
             Tabs::Profile(ProfileTab::new(
@@ -154,7 +154,7 @@ impl App {
                     self.popup_list_msg(log);
                     EventState::WorkDone
                 }
-                Keys::ClashsrvctlRestart => {
+                Keys::SoftRestart => {
                     match self.clashtui_util.restart_clash() {
                         Ok(output) => {
                             self.popup_list_msg(output.lines().map(|line| line.trim().to_string()));

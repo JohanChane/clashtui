@@ -50,8 +50,6 @@ impl PopUp {
                 match key.code.into() {
                     Keys::Esc => self.0.hide(),
 
-                    Keys::Select => self.0.hide(),
-
                     _ => return self.0.event(ev),
                 };
             }
