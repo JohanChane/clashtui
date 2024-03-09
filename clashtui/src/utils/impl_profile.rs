@@ -6,27 +6,27 @@ use std::{
 };
 
 impl ClashTuiUtil {
-    pub fn create_yaml_with_template(&self, template_name: &String) -> Result<(), String> {
+    pub fn crt_yaml_with_template(&self, template_name: &String) -> Result<(), String> {
         use std::borrow::Cow;
         use std::collections::HashMap;
         use std::io::{BufRead, BufReader};
         let template_dir = self.clashtui_dir.join("templates");
         let template_path = template_dir.join(template_name);
-        let tpl_parsed_yaml = parse_yaml(&template_path).map_err(|e| e.to_string())?;
+        let tpl_parsed_yaml =
+            parse_yaml(&template_path).map_err(|e| format!("parse failed: {e:?}"))?;
         let mut out_parsed_yaml = Cow::Borrowed(&tpl_parsed_yaml);
 
         let proxy_url_file =
             File::open(self.clashtui_dir.join("templates/template_proxy_providers"))
-                .map_err(|e| e.to_string())?;
-        let mut proxy_urls = Vec::new();
-        BufReader::new(proxy_url_file)
+                .map_err(|e| format!("open template_proxy_providers: {e:?}"))?;
+        let proxy_urls: Vec<String> = BufReader::new(proxy_url_file)
             .lines()
             .map_while(Result::ok)
             .filter(|v| {
                 let val = v.trim();
                 !(val.is_empty() || val.starts_with('#'))
             })
-            .for_each(|v| proxy_urls.push(v));
+            .collect();
 
         // ## proxy-providers
         // e.g. {provider: [provider0, provider1, ...]}
@@ -52,10 +52,9 @@ impl ClashTuiUtil {
                 return Err(String::from("Failed to parse `proxy-providers` value"));
             };
 
-            let mut new_pp = pp.clone();
-            new_pp.remove("tpl_param");
-
             for (i, url) in proxy_urls.iter().enumerate() {
+                let mut new_pp = pp.clone();
+                new_pp.remove("tpl_param");
                 // name: e.g. provier0, provider1, ...
                 let the_pp_name = format!("{}{}", pp_key.as_str().unwrap(), i);
                 pp_names
@@ -220,6 +219,42 @@ impl ClashTuiUtil {
         Ok(())
     }
 
+    pub fn crt_profile(&self, profile_name: String, uri: String) -> Result<(), String> {
+        let profile_name = profile_name.trim();
+        let uri = uri.trim();
+
+        if uri.is_empty() || profile_name.is_empty() {
+            return Err("Url or Name is empty!".to_string());
+        }
+
+        if uri.starts_with("http://") || uri.starts_with("https://") {
+            use std::io::Write as _;
+            std::fs::OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(self.get_profile_path_unchecked(profile_name))
+                .and_then(|mut f| write!(f, "{}", uri))
+                .map_err(|e| e.to_string())
+        } else if Path::new(uri).is_file() {
+            let uri_path = self.get_profile_path_unchecked(uri);
+            if uri_path.exists() {
+                return Err("Failed to import: file exists".to_string());
+            }
+            std::fs::copy(uri, uri_path)
+                .map_err(|e| e.to_string())
+                .map(|_| ())
+        } else {
+            Err("Url is invalid.".to_string())
+        }
+    }
+    
+    pub fn rmf_profile(&self, profile_name: &String) -> Result<(), String> {
+        use std::fs::remove_file;
+        remove_file(self.get_profile_path_unchecked(&profile_name))
+            .and_then(|_| remove_file(self.get_profile_cache_unchecked(profile_name)))
+            .map_err(|e| e.to_string())
+    }
+    
     pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> Result<String, Error> {
         use super::ipc::exec;
         let cmd = format!(
@@ -297,7 +332,7 @@ impl ClashTuiUtil {
         Ok(())
     }
 
-    pub fn update_local_profile(
+    pub fn update_profile(
         &self,
         profile_name: &String,
         does_update_all: bool,
@@ -434,7 +469,7 @@ impl ClashTuiUtil {
             "No valid yaml file",
         ))
     }
-    pub fn get_profile_cache_unchecked<P>(&self, profile_name: P) -> PathBuf
+    fn get_profile_cache_unchecked<P>(&self, profile_name: P) -> PathBuf
     where
         P: AsRef<Path> + AsRef<std::ffi::OsStr>,
     {
@@ -453,4 +488,24 @@ impl ClashTuiUtil {
         let profile_path = self.get_profile_path_unchecked(profile_name);
         is_yaml(&profile_path)
     }
+}
+/// # Limitations
+///
+/// Windows treats symlink creation as a [privileged action][symlink-security],
+/// therefore this function is likely to fail unless the user makes changes to
+/// their system to permit symlink creation. Users can try enabling Developer
+/// Mode, granting the `SeCreateSymbolicLinkPrivilege` privilege, or running
+/// the process as an administrator.
+///
+/// [symlink-security]: https://docs.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/create-symbolic-links
+#[allow(unused)]
+fn crt_symlink_file<P>(original: P, target: P) -> std::io::Result<()>
+where
+    P: AsRef<std::path::Path>,
+{
+    use std::os;
+    #[cfg(target_os = "windows")]
+    return os::windows::fs::symlink_file(original, target);
+    #[cfg(target_os = "linux")]
+    os::unix::fs::symlink(original, target)
 }

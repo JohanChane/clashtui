@@ -1,9 +1,3 @@
-use std::{
-    fs::{self, remove_file, OpenOptions},
-    io::Write,
-    path::Path,
-};
-
 use super::profile_input::ProfileInputPopup;
 use crate::tui::{
     symbols::{PROFILE, TEMPALTE},
@@ -87,24 +81,24 @@ impl ProfileTab {
         if let Some(profile_name) = self.profile_list.selected() {
             match self
                 .clashtui_util
-                .update_local_profile(profile_name, does_update_all)
+                .update_profile(profile_name, does_update_all)
             {
                 Ok(mut msg) => {
                     if profile_name == self.clashtui_state.borrow().get_profile() {
                         if let Err(err) = self.clashtui_util.select_profile(profile_name) {
-                            log::error!("{profile_name} => {err}");
+                            log::error!("{profile_name} => {err:?}");
                             msg.push(err.to_string());
                         } else {
                             msg.push("Update and selected".to_string());
                         }
                     } else {
-                        msg.push("Update sucess".to_string());
+                        msg.push("Update success".to_string());
                     }
 
                     self.popup_list_msg(msg);
                 }
                 Err(err) => {
-                    log::error!("{profile_name} => {err}");
+                    log::error!("{profile_name} => {err:?}");
                     self.popup_txt_msg(format!("Failed to Update: {err}"));
                 }
             };
@@ -113,12 +107,9 @@ impl ProfileTab {
     }
     fn handle_delete_profile_ev(&mut self) {
         if let Some(profile_name) = self.profile_list.selected() {
-            let _ = remove_file(self.clashtui_util.get_profile_cache_unchecked(profile_name));
-            if let Err(err) =
-                remove_file(self.clashtui_util.get_profile_path_unchecked(profile_name))
-            {
-                self.popup_txt_msg(err.to_string());
-            }
+            if let Err(e) = self.clashtui_util.rmf_profile(profile_name) {
+                self.popup_txt_msg(e);
+            };
             self.update_profile_list();
         }
     }
@@ -126,52 +117,17 @@ impl ProfileTab {
     fn handle_import_profile_ev(&mut self) {
         let profile_name = self.profile_input.name_input.get_input_data();
         let uri = self.profile_input.uri_input.get_input_data();
-        let profile_name = profile_name.trim();
-        let uri = uri.trim();
-
-        if uri.is_empty() || profile_name.is_empty() {
-            self.popup_txt_msg("Url or Name is empty!".to_string());
-            return;
-        }
-
-        if uri.starts_with("http://") || uri.starts_with("https://") {
-            match OpenOptions::new()
-                .create_new(true)
-                .write(true)
-                .open(self.clashtui_util.get_profile_path_unchecked(profile_name))
-            {
-                Ok(mut file) => {
-                    if let Err(err) = write!(file, "{}", uri) {
-                        self.popup_txt_msg(err.to_string());
-                    } else {
-                        self.update_profile_list();
-                    }
-                }
-                Err(err) => self.popup_txt_msg(err.to_string()),
-            }
-        } else if Path::new(uri).is_file() {
-            let uri_path = Path::new(uri);
-            if uri_path.exists() {
-                self.popup_txt_msg("Failed to import: file exists".to_string());
-                return;
-            }
-            self.clashtui_util
-                .get_profile_yaml_path(profile_name)
-                .map_err(|e| self.popup_txt_msg(e.to_string()))
-                .into_iter()
-                .map_while(|path| fs::copy(Path::new(uri), path).err())
-                .for_each(|e| self.popup_txt_msg(e.to_string()));
-
-            self.update_profile_list();
-        } else {
-            self.popup_txt_msg("Url is invalid.".to_string());
-        }
+        match self.clashtui_util.crt_profile(profile_name, uri) {
+            Ok(_) => self.update_profile_list(),
+            Err(err) => self.popup_txt_msg(err),
+        };
     }
 
     fn handle_create_template_ev(&mut self) {
         if let Some(template_name) = self.template_list.selected() {
-            if let Err(err) = self.clashtui_util.create_yaml_with_template(template_name) {
-                self.popup_txt_msg(err.to_string());
+            if let Err(err) = self.clashtui_util.crt_yaml_with_template(template_name) {
+                log::error!("Create Template => {err}");
+                self.popup_txt_msg(err);
             } else {
                 self.popup_txt_msg("Created".to_string());
                 self.update_profile_list();

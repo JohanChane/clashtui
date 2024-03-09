@@ -40,7 +40,7 @@ impl App {
                 .into_iter()
                 .inspect(|s| println!("\nProfile: {s}"))
                 .filter_map(|v| {
-                    util.update_local_profile(&v, false)
+                    util.update_profile(&v, false)
                         .map_err(|e| println!("- Error! {e}"))
                         .ok()
                 })
