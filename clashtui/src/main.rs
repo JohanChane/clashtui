@@ -1,3 +1,4 @@
+#![warn(clippy::all)]
 use core::time::Duration;
 use ratatui::{
     backend::{Backend, CrosstermBackend},
@@ -29,16 +30,20 @@ struct CliEnv {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cli: CliEnv = argh::from_env();
-    if cli.version {
+    let CliEnv {
+        tick_rate,
+        update_all_profiles,
+        version,
+    } = argh::from_env();
+    if version {
         println!("{VERSION}");
         std::process::exit(0);
     }
     let mut flags = Flags::empty();
-    if cli.update_all_profiles {
+    if update_all_profiles {
         flags.insert(utils::Flag::UpdateOnly);
     };
-    let tick_rate = Duration::from_millis(cli.tick_rate);
+    let tick_rate = Duration::from_millis(tick_rate);
     run(flags, tick_rate)?;
 
     Ok(())
@@ -46,6 +51,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 pub fn run(mut flags: Flags<Flag>, tick_rate: Duration) -> std::io::Result<()> {
     let res;
     let config_dir = load_app_dir(&mut flags);
+
+    setup_logging(config_dir.join("clashtui.log").to_str().unwrap());
+
     let (app, err_track) = App::new(&flags, &config_dir);
     log::debug!("Current flags: {:?}", flags);
     if let Some(mut app) = app {
@@ -58,22 +66,21 @@ pub fn run(mut flags: Flags<Flag>, tick_rate: Duration) -> std::io::Result<()> {
         };
         // setup terminal
         enable_raw_mode()?;
-        let mut stdout = std::io::stdout();
-        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-        let backend = CrosstermBackend::new(stdout);
-        let mut terminal = Terminal::new(backend)?;
+        execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
+        let terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
 
         // create app and run it
-        res = run_app(&mut terminal, &mut app, tick_rate, err_track, flags);
+        res = run_app(terminal, &mut app, tick_rate, err_track, flags);
 
         // restore terminal
         disable_raw_mode()?;
         execute!(
-            terminal.backend_mut(),
+            std::io::stdout(),
             LeaveAlternateScreen,
-            DisableMouseCapture
+            DisableMouseCapture,
+            crossterm::cursor::Show
         )?;
-        terminal.show_cursor()?;
+
         app.save(config_dir.join("config.yaml").to_str().unwrap())?;
     } else {
         if !err_track.is_empty() {
@@ -91,7 +98,7 @@ pub fn run(mut flags: Flags<Flag>, tick_rate: Duration) -> std::io::Result<()> {
 
 use utils::CfgError;
 fn run_app<B: Backend>(
-    terminal: &mut Terminal<B>,
+    mut terminal: Terminal<B>,
     app: &mut App,
     tick_rate: Duration,
     mut err_track: Vec<CfgError>,
@@ -182,4 +189,38 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
         }
     }
     clashtui_config_dir
+}
+fn setup_logging(log_path: &str) {
+    use log4rs::append::file::FileAppender;
+    use log4rs::config::{Appender, Config, Root};
+    use log4rs::encode::pattern::PatternEncoder;
+    #[cfg(debug_assertions)]
+    let _ = std::fs::remove_file(log_path); // auto rm old log for debug
+    let mut flag = false;
+    if let Ok(m) = std::fs::File::open(log_path).and_then(|f| f.metadata()) {
+        if m.len() > 1024 * 1024 {
+            let _ = std::fs::remove_file(log_path);
+            flag = true
+        };
+    }
+    // No need to change. This is set to auto switch to Info level when build release
+    #[allow(unused_variables)]
+    let log_level = log::LevelFilter::Info;
+    #[cfg(debug_assertions)]
+    let log_level = log::LevelFilter::Debug;
+    let file_appender = FileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new("[{l}] {t} - {m}{n}")))
+        .build(log_path)
+        .unwrap();
+
+    let config = Config::builder()
+        .appender(Appender::builder().build("file", Box::new(file_appender)))
+        .build(Root::builder().appender("file").build(log_level))
+        .unwrap();
+
+    log4rs::init_config(config).unwrap();
+    if flag {
+        log::info!("Log file too large, clear")
+    }
+    log::info!("Start Log, level: {}", log_level);
 }
