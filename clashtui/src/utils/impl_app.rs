@@ -5,7 +5,7 @@ impl ClashTuiUtil {
     /// Exec `cmd` for given `path`
     ///
     /// Auto detect `cmd` is_empty and use system default app to open `path`
-    fn spawn_open(cmd: &String, path: &Path) -> Result<(), Error> {
+    fn spawn_open(cmd: &str, path: &Path) -> Result<(), Error> {
         use super::ipc::spawn;
         if !cmd.is_empty() {
             let opendir_cmd_with_path = cmd.replace("%s", path.to_str().unwrap_or(""));

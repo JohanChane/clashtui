@@ -1,29 +1,54 @@
-use std::{
-    cell::OnceCell,
-    io::{Error, ErrorKind, Write},
-};
-
-use reqwest::blocking::Client;
-use std::io::Result;
-
 const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
+#[deprecated]
+#[cfg(target_feature = "none")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
+#[deprecated]
+#[cfg(target_feature = "none")]
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-fn process_err(e: reqwest::Error) -> Error {
-    if e.is_connect() {
-        Error::new(ErrorKind::ConnectionRefused, e)
-    } else if e.is_timeout() {
-        Error::new(ErrorKind::TimedOut, e)
-    } else {
-        Error::new(ErrorKind::Other, e)
+use std::io::Result;
+trait ResProcess {
+    fn process(self) -> core::result::Result<String, minreq::Error>;
+}
+impl ResProcess for minreq::Response {
+    fn process(self) -> core::result::Result<String, minreq::Error> {
+        self.as_str().map(|s| s.to_owned())
     }
 }
+
+fn process(e: minreq::Error) -> std::io::Error {
+    use std::io::{Error, ErrorKind};
+    match e {
+        minreq::Error::AddressNotFound | minreq::Error::PunycodeConversionFailed => {
+            Error::new(ErrorKind::AddrNotAvailable, e)
+        }
+        minreq::Error::IoError(e) => e,
+        minreq::Error::HeadersOverflow
+        | minreq::Error::StatusLineOverflow
+        | minreq::Error::InvalidUtf8InBody(_)
+        | minreq::Error::InvalidUtf8InResponse
+        | minreq::Error::MalformedChunkLength
+        | minreq::Error::MalformedChunkEnd
+        | minreq::Error::MalformedContentLength => Error::new(ErrorKind::InvalidData, e),
+        minreq::Error::RedirectLocationMissing
+        | minreq::Error::InfiniteRedirectionLoop
+        | minreq::Error::TooManyRedirections => Error::new(ErrorKind::ConnectionAborted, e),
+        minreq::Error::HttpsFeatureNotEnabled => unreachable!("https should already be enabled"),
+        minreq::Error::PunycodeFeatureNotEnabled => panic!("{}", e),
+        minreq::Error::RustlsCreateConnection(_) => Error::new(ErrorKind::ConnectionRefused, e),
+        minreq::Error::BadProxy
+        | minreq::Error::BadProxyCreds
+        | minreq::Error::ProxyConnect
+        | minreq::Error::InvalidProxyCreds => Error::new(ErrorKind::PermissionDenied, e),
+        minreq::Error::Other(i) => Error::new(ErrorKind::Other, i),
+    }
+}
+
 pub struct Resp {
-    inner: reqwest::blocking::Response,
+    inner: minreq::ResponseLazy,
 }
 impl Resp {
-    pub fn copy_to<W: ?Sized>(self, w: &mut W) -> Result<u64>
+    pub fn copy_to<W: ?Sized>(self, w: &mut W) -> std::io::Result<u64>
     where
         W: std::io::Write,
     {
@@ -32,72 +57,56 @@ impl Resp {
     }
 }
 pub struct ClashUtil {
-    client: OnceCell<Client>,
     api: String,
     pub proxy_addr: String,
-    clash_client: OnceCell<Client>,
 }
 
 impl ClashUtil {
     pub fn new(controller_api: String, proxy_addr: String) -> Self {
         Self {
-            client: OnceCell::new(),
             api: controller_api,
             proxy_addr,
-            clash_client: OnceCell::new(),
         }
     }
     fn get(
         &self,
         url: &str,
         payload: Option<String>,
-    ) -> core::result::Result<String, reqwest::Error> {
+    ) -> core::result::Result<String, minreq::Error> {
         let api = format!("{}{}", self.api, url);
-        let response = match payload {
-            Some(kv) => self
-                .client
-                .get_or_init(Client::new)
-                .get(format!("{}{}", api, kv)),
-            None => self.client.get_or_init(Client::new).get(api),
+        match payload {
+            Some(_kv) => todo!(),
+            None => minreq::get(api).with_timeout(3),
         }
-        .send();
-        match response {
-            Ok(r) => r.text(),
-            Err(e) => Err(e),
-        }
+        .send()
+        .and_then(|r| r.process())
     }
     fn post(
         &self,
         url: &str,
         payload: Option<String>,
-    ) -> core::result::Result<String, reqwest::Error> {
+    ) -> core::result::Result<String, minreq::Error> {
         let api = format!("{}{}", self.api, url);
-        let response = match payload {
-            Some(kv) => self.client.get_or_init(Client::new).post(api).body(kv),
-            None => self.client.get_or_init(Client::new).post(api),
+        match payload {
+            Some(kv) => minreq::post(api).with_timeout(3).with_body(kv),
+            None => minreq::post(api).with_timeout(3),
         }
-        .send();
-        match response {
-            Ok(r) => r.text(),
-            Err(e) => Err(e),
-        }
+        .send()
+        .and_then(|r| r.process())
     }
 
     fn put(
         &self,
         url: &str,
         payload: Option<String>,
-    ) -> core::result::Result<String, reqwest::Error> {
+    ) -> core::result::Result<String, minreq::Error> {
         let api = format!("{}{}", self.api, url);
-        let response = match payload {
-            Some(kv) => self.client.get_or_init(Client::new).put(api).body(kv),
-            None => self.client.get_or_init(Client::new).put(api),
+        match payload {
+            Some(kv) => minreq::put(api).with_timeout(3).with_body(kv),
+            None => minreq::put(api).with_timeout(3),
         }
-        .send();
-        match response {
-            Ok(r) => r.text(),
-            Err(e) => Err(e),
-        }
+        .send()
+        .and_then(|r| r.process())
     }
 
     pub fn restart(&self, payload: Option<String>) -> Result<String> {
@@ -105,50 +114,38 @@ impl ClashUtil {
             Some(load) => self.post("/restart", Some(load)),
             None => self.post("/restart", Some(DEFAULT_PAYLOAD.to_string())),
         }
-        .map_err(process_err)
+        .map_err(process)
     }
     pub fn version(&self) -> Result<String> {
-        self.get("/version", None).map_err(process_err)
+        self.get("/version", None).map_err(process)
     }
     pub fn config_get(&self) -> Result<String> {
-        self.get("/configs", None).map_err(process_err)
+        self.get("/configs", None).map_err(process)
     }
     pub fn config_reload(&self, payload: String) -> Result<()> {
-        match self.put("/configs?force=true", Some(payload)) {
-            Err(e) => Err(process_err(e)),
-            _ => Ok(()),
-        }
+        self.put("/configs?force=true", Some(payload))
+            .map(|_| ())
+            .map_err(process)
     }
-    pub fn mock_clash_core(&self, url: &str) -> Result<Resp> {
-        self.clash_client
-            .get_or_init(|| {
-                // [TODO] When get_or_try_init is stable...
-                let proxy = reqwest::Proxy::http(&self.proxy_addr)
-                    .map_err(process_err)
-                    .unwrap(); //?;
-                Client::builder()
-                    .user_agent("clash.meta")
-                    .proxy(proxy)
-                    .build()
-                    .unwrap()
-                //.map_err(process_err)?
-            })
-            .get(url)
-            .send()
+    pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S) -> Result<Resp> {
+        minreq::get(url)
+            .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process)?)
+            .with_header("user-agent", "clash.meta")
+            .with_timeout(3)
+            .send_lazy()
             .map(|v| Resp { inner: v })
-            .map_err(process_err)
+            .map_err(process)
     }
     pub fn config_patch(&self, payload: String) -> Result<String> {
-        self.client
-            .get_or_init(Client::new)
-            .patch(self.api.clone() + "/configs")
-            .body(payload)
+        minreq::patch(self.api.clone() + "/configs")
+            .with_body(payload)
+            .with_timeout(3)
             .send()
-            .map_err(process_err)?
-            .text()
-            .map_err(process_err)
+            .and_then(|r| r.process())
+            .map_err(process)
     }
     #[deprecated]
+    #[cfg(target_feature = "none")]
     pub fn check_geo_update(
         &self,
         old_id: Option<&String>,
@@ -302,22 +299,57 @@ impl ClashUtil {
 #[cfg(test)]
 mod tests {
     use super::ClashUtil;
-
     #[test]
-    fn test() {
-        let mut flag = true;
+    fn version_test() {
         let sym = ClashUtil::new(
             "http://127.0.0.1:9090".to_string(),
             "http://127.0.0.1:7890".to_string(),
         );
-        match sym.version() {
-            Ok(r) => println!("{:?}", r),
-            Err(_) => flag = false,
-        }
-        assert!(flag)
+        println!("{}", sym.version().unwrap());
     }
     #[test]
-    #[allow(deprecated)]
+    fn config_get_test() {
+        let sym = ClashUtil::new(
+            "http://127.0.0.1:9090".to_string(),
+            "http://127.0.0.1:7890".to_string(),
+        );
+        println!("{}", sym.config_get().unwrap());
+    }
+    #[test]
+    fn config_patch_test() {
+        let sym = ClashUtil::new(
+            "http://127.0.0.1:9090".to_string(),
+            "http://127.0.0.1:7890".to_string(),
+        );
+        println!("{}", sym.config_patch("".to_string()).unwrap());
+    }
+    #[test]
+    fn config_reload_test() {
+        let sym = ClashUtil::new(
+            "http://127.0.0.1:9090".to_string(),
+            "http://127.0.0.1:7890".to_string(),
+        );
+        sym.config_reload(super::DEFAULT_PAYLOAD.to_string())
+            .unwrap();
+    }
+    #[test]
+    fn mock_clash_core_test() {
+        let sym = ClashUtil::new(
+            "http://127.0.0.1:9090".to_string(),
+            "http://127.0.0.1:7890".to_string(),
+        );
+        let r = sym.mock_clash_core("https://www.google.com").unwrap();
+        let mut tf = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open("test")
+            .unwrap();
+        r.copy_to(&mut tf).unwrap();
+        drop(tf);
+        std::fs::remove_file("test").unwrap();
+    }
+    #[test]
+    #[cfg(target_feature = "none")]
     fn test_geo_update() {
         let mut flag = true;
         let sym = ClashUtil::new(

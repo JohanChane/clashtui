@@ -250,7 +250,7 @@ impl ClashTuiUtil {
     
     pub fn rmf_profile(&self, profile_name: &String) -> Result<(), String> {
         use std::fs::remove_file;
-        remove_file(self.get_profile_path_unchecked(&profile_name))
+        remove_file(self.get_profile_path_unchecked(profile_name))
             .and_then(|_| remove_file(self.get_profile_cache_unchecked(profile_name)))
             .map_err(|e| e.to_string())
     }
