@@ -34,3 +34,8 @@ encoding = "0.2.33"
 [workspace]
 resolver = '2'
 members = ["api", "ui", "ui-derive"]
+
+[profile.release]
+lto = "fat"
+opt-level = 'z'
+strip = true
