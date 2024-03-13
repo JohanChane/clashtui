@@ -1,12 +1,13 @@
 const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
-#[deprecated]
-#[cfg(target_feature = "none")]
+const TIMEOUT: u8 = 3;
+#[cfg(target_feature = "deprecated")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
-#[deprecated]
-#[cfg(target_feature = "none")]
+#[cfg(target_feature = "deprecated")]
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 use std::io::Result;
+
+use minreq::Method;
 trait ResProcess {
     fn process(self) -> core::result::Result<String, minreq::Error>;
 }
@@ -16,7 +17,7 @@ impl ResProcess for minreq::Response {
     }
 }
 
-fn process(e: minreq::Error) -> std::io::Error {
+fn process_err(e: minreq::Error) -> std::io::Error {
     use std::io::{Error, ErrorKind};
     match e {
         minreq::Error::AddressNotFound | minreq::Error::PunycodeConversionFailed => {
@@ -58,94 +59,66 @@ impl Resp {
 }
 pub struct ClashUtil {
     api: String,
+    secret: String,
     pub proxy_addr: String,
 }
 
 impl ClashUtil {
-    pub fn new(controller_api: String, proxy_addr: String) -> Self {
+    pub fn new(controller_api: String, secret: String, proxy_addr: String) -> Self {
         Self {
             api: controller_api,
+            secret,
             proxy_addr,
         }
     }
-    fn get(
+    fn request(
         &self,
-        url: &str,
+        method: minreq::Method,
+        sub_url: &str,
         payload: Option<String>,
-    ) -> core::result::Result<String, minreq::Error> {
-        let api = format!("{}{}", self.api, url);
-        match payload {
-            Some(_kv) => todo!(),
-            None => minreq::get(api).with_timeout(3),
+    ) -> Result<String> {
+        let mut req = minreq::Request::new(method, self.api.to_owned() + sub_url);
+        if let Some(kv) = payload {
+            req = req.with_body(kv);
         }
-        .send()
-        .and_then(|r| r.process())
-    }
-    fn post(
-        &self,
-        url: &str,
-        payload: Option<String>,
-    ) -> core::result::Result<String, minreq::Error> {
-        let api = format!("{}{}", self.api, url);
-        match payload {
-            Some(kv) => minreq::post(api).with_timeout(3).with_body(kv),
-            None => minreq::post(api).with_timeout(3),
+        if !self.secret.is_empty() {
+            req = req.with_header("Authorization", format!("Bearer {0}", self.secret));
         }
-        .send()
-        .and_then(|r| r.process())
+        req.with_timeout(TIMEOUT.into())
+            .send()
+            .and_then(|r| r.as_str().map(|s| s.to_owned()))
+            .map_err(process_err)
     }
-
-    fn put(
-        &self,
-        url: &str,
-        payload: Option<String>,
-    ) -> core::result::Result<String, minreq::Error> {
-        let api = format!("{}{}", self.api, url);
-        match payload {
-            Some(kv) => minreq::put(api).with_timeout(3).with_body(kv),
-            None => minreq::put(api).with_timeout(3),
-        }
-        .send()
-        .and_then(|r| r.process())
-    }
-
     pub fn restart(&self, payload: Option<String>) -> Result<String> {
-        match payload {
-            Some(load) => self.post("/restart", Some(load)),
-            None => self.post("/restart", Some(DEFAULT_PAYLOAD.to_string())),
-        }
-        .map_err(process)
+        self.request(
+            Method::Post,
+            "/restart",
+            Some(payload.unwrap_or(DEFAULT_PAYLOAD.to_string())),
+        )
     }
     pub fn version(&self) -> Result<String> {
-        self.get("/version", None).map_err(process)
+        self.request(Method::Get, "/version", None)
     }
     pub fn config_get(&self) -> Result<String> {
-        self.get("/configs", None).map_err(process)
+        self.request(Method::Get, "/configs", None)
     }
     pub fn config_reload(&self, payload: String) -> Result<()> {
-        self.put("/configs?force=true", Some(payload))
+        self.request(Method::Put, "/configs?force=true", Some(payload))
             .map(|_| ())
-            .map_err(process)
     }
     pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S) -> Result<Resp> {
         minreq::get(url)
-            .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process)?)
+            .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
             .with_header("user-agent", "clash.meta")
             .with_timeout(3)
             .send_lazy()
             .map(|v| Resp { inner: v })
-            .map_err(process)
+            .map_err(process_err)
     }
     pub fn config_patch(&self, payload: String) -> Result<String> {
-        minreq::patch(self.api.clone() + "/configs")
-            .with_body(payload)
-            .with_timeout(3)
-            .send()
-            .and_then(|r| r.process())
-            .map_err(process)
+        self.request(Method::Patch, "/configs", Some(payload))
     }
-    #[deprecated]
-    #[cfg(target_feature = "none")]
+    #[cfg(target_feature = "deprecated")]
     pub fn check_geo_update(
         &self,
         old_id: Option<&String>,
@@ -299,45 +272,37 @@ impl ClashUtil {
 #[cfg(test)]
 mod tests {
     use super::ClashUtil;
+    fn sym() -> ClashUtil {
+        ClashUtil::new(
+            "http://127.0.0.1:9090".to_string(),
+            "test".to_string(),
+            "http://127.0.0.1:7890".to_string(),
+        )
+    }
     #[test]
     fn version_test() {
-        let sym = ClashUtil::new(
-            "http://127.0.0.1:9090".to_string(),
-            "http://127.0.0.1:7890".to_string(),
-        );
+        let sym = sym();
         println!("{}", sym.version().unwrap());
     }
     #[test]
     fn config_get_test() {
-        let sym = ClashUtil::new(
-            "http://127.0.0.1:9090".to_string(),
-            "http://127.0.0.1:7890".to_string(),
-        );
+        let sym = sym();
         println!("{}", sym.config_get().unwrap());
     }
     #[test]
     fn config_patch_test() {
-        let sym = ClashUtil::new(
-            "http://127.0.0.1:9090".to_string(),
-            "http://127.0.0.1:7890".to_string(),
-        );
+        let sym = sym();
         println!("{}", sym.config_patch("".to_string()).unwrap());
     }
     #[test]
     fn config_reload_test() {
-        let sym = ClashUtil::new(
-            "http://127.0.0.1:9090".to_string(),
-            "http://127.0.0.1:7890".to_string(),
-        );
+        let sym = sym();
         sym.config_reload(super::DEFAULT_PAYLOAD.to_string())
             .unwrap();
     }
     #[test]
     fn mock_clash_core_test() {
-        let sym = ClashUtil::new(
-            "http://127.0.0.1:9090".to_string(),
-            "http://127.0.0.1:7890".to_string(),
-        );
+        let sym = sym();
         let r = sym.mock_clash_core("https://www.google.com").unwrap();
         let mut tf = std::fs::OpenOptions::new()
             .write(true)
@@ -349,7 +314,7 @@ mod tests {
         std::fs::remove_file("test").unwrap();
     }
     #[test]
-    #[cfg(target_feature = "none")]
+    #[cfg(target_feature = "deprecated")]
     fn test_geo_update() {
         let mut flag = true;
         let sym = ClashUtil::new(

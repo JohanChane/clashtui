@@ -1,6 +1,6 @@
 mod clash;
 mod config;
-#[cfg(target_feature="none")]
+#[cfg(target_feature="deprecated")]
 mod geo;
 
 pub use clash::{ClashUtil, Resp};

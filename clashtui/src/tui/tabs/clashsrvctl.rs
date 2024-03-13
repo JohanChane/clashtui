@@ -29,8 +29,7 @@ pub struct ClashSrvCtlTab {
 
 impl ClashSrvCtlTab {
     pub fn new(clashtui_util: SharedClashTuiUtil, clashtui_state: SharedClashTuiState) -> Self {
-        let title = CLASHSRVCTL.to_string();
-        let mut operations = List::new(title);
+        let mut operations = List::new(CLASHSRVCTL.to_string());
         operations.set_items(vec![
             #[cfg(target_os = "linux")]
             ClashSrvOp::SetPermission.into(),

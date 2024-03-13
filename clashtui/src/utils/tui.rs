@@ -1,4 +1,4 @@
-use core::cell::RefCell;
+use core::cell::OnceCell;
 use core::str::FromStr as _;
 use std::{
     io::Error,
@@ -20,31 +20,34 @@ pub struct ClashTuiUtil {
 
     clash_api: ClashUtil,
     pub tui_cfg: ClashTuiConfig,
-    clash_remote_config: RefCell<Option<ClashConfig>>,
+    clash_remote_config: OnceCell<ClashConfig>,
 }
 
 // Misc
 impl ClashTuiUtil {
     pub fn new(clashtui_dir: &PathBuf, is_inited: bool) -> (Self, Vec<CfgError>) {
         let ret = load_app_config(clashtui_dir, is_inited);
-        let mut err_track = ret.3;
-        let clash_api = ClashUtil::new(ret.1, ret.2);
-        let remote = ClashConfig::from_str(clash_api.config_get().unwrap_or_default().as_str())
-            .map_err(|_| {
+        let mut err_track = ret.2;
+        let clash_api = ret.1;
+        let clash_remote_config = OnceCell::default();
+        match ClashConfig::from_str(clash_api.config_get().unwrap_or_default().as_str()) {
+            // That must be empty, call unwrap is fine
+            Ok(remote) => clash_remote_config.set(remote).unwrap(),
+            Err(_) => {
                 err_track.push(CfgError::new(
                     ErrKind::LoadClashConfig,
                     "Fail to load config from clash core. Is it Running?".to_string(),
                 ));
                 log::warn!("Fail to connect to clash. Is it Running?")
-            })
-            .ok();
+            }
+        }
         (
             Self {
                 clashtui_dir: clashtui_dir.clone(),
                 profile_dir: clashtui_dir.join("profiles").to_path_buf(),
                 clash_api,
                 tui_cfg: ret.0,
-                clash_remote_config: RefCell::new(remote),
+                clash_remote_config,
             },
             err_track,
         )
@@ -116,8 +119,7 @@ impl ClashTuiUtil {
         let remote = ClashConfig::from_str(cur_remote.as_str())
             .map_err(|_| Error::new(std::io::ErrorKind::InvalidData, "Failed to prase str"))?;
         log::debug!("{:#?}", remote);
-        self.clash_remote_config.borrow_mut().replace(remote);
-        log::debug!("{:#?}", self.clash_remote_config.borrow());
+        let _ = self.clash_remote_config.set(remote);
         Ok(())
     }
     pub fn restart_clash(&self) -> Result<String, Error> {
@@ -156,7 +158,7 @@ impl ClashTuiUtil {
                 log::warn!("{}", e);
             }
         }
-        let (mode, tun) = match self.clash_remote_config.borrow().as_ref() {
+        let (mode, tun) = match self.clash_remote_config.get() {
             Some(v) => (
                 Some(v.mode),
                 if v.tun.enable {
@@ -174,7 +176,7 @@ impl ClashTuiUtil {
 fn load_app_config(
     clashtui_dir: &PathBuf,
     skip_init_conf: bool,
-) -> (ClashTuiConfig, String, String, Vec<CfgError>) {
+) -> (ClashTuiConfig, ClashUtil, Vec<CfgError>) {
     let mut err_collect = Vec::new();
     let basic_clash_config_path = Path::new(clashtui_dir).join(BASIC_FILE);
     let basic_clash_config_value: serde_yaml::Value =
@@ -203,6 +205,12 @@ fn load_app_config(
     let proxy_addr = get_proxy_addr(&basic_clash_config_value);
     log::debug!("proxy_addr: {}", proxy_addr);
 
+    let secret = basic_clash_config_value
+        .get("secret")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+
     let configs = if skip_init_conf {
         let config_path = clashtui_dir.join("config.yaml");
         match ClashTuiConfig::from_file(config_path.to_str().unwrap()) {
@@ -229,8 +237,11 @@ fn load_app_config(
     } else {
         ClashTuiConfig::default()
     };
-
-    (configs, controller_api, proxy_addr, err_collect)
+    (
+        configs,
+        ClashUtil::new(controller_api, secret, proxy_addr),
+        err_collect,
+    )
 }
 
 fn get_proxy_addr(yaml_data: &serde_yaml::Value) -> String {

@@ -24,7 +24,7 @@ pub struct ProfileTab {
     template_list: List,
     msgpopup: MsgPopup,
     confirm_popup: ConfirmPopup,
-    profile_input: ProfileInputPopup,
+    profile_input: Box<ProfileInputPopup>,
 
     clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
@@ -43,7 +43,7 @@ impl ProfileTab {
             msgpopup: Default::default(),
             confirm_popup: ConfirmPopup::new(),
             fouce: Fouce::Profile,
-            profile_input: ProfileInputPopup::new(),
+            profile_input: ProfileInputPopup::new().into(),
 
             clashtui_util,
             clashtui_state,

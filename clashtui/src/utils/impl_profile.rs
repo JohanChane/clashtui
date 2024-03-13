@@ -247,14 +247,14 @@ impl ClashTuiUtil {
             Err("Url is invalid.".to_string())
         }
     }
-    
+
     pub fn rmf_profile(&self, profile_name: &String) -> Result<(), String> {
         use std::fs::remove_file;
         remove_file(self.get_profile_path_unchecked(profile_name))
             .and_then(|_| remove_file(self.get_profile_cache_unchecked(profile_name)))
             .map_err(|e| e.to_string())
     }
-    
+
     pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> Result<String, Error> {
         use super::ipc::exec;
         let cmd = format!(
@@ -410,8 +410,6 @@ impl ClashTuiUtil {
     }
 
     fn download_file(&self, url: &str, path: &PathBuf) -> Result<(), Error> {
-        let response = self.dl_remote_profile(url)?;
-
         let directory = path
             .parent()
             .ok_or_else(|| Error::new(std::io::ErrorKind::NotFound, "Invalid file path"))?;
@@ -420,6 +418,7 @@ impl ClashTuiUtil {
         }
 
         let mut output_file = File::create(path)?;
+        let response = self.dl_remote_profile(url)?;
         response.copy_to(&mut output_file)?;
         Ok(())
     }
