@@ -1,5 +1,5 @@
-use crate::utils::{is_yaml, utils as Utils};
 use super::ClashTuiUtil;
+use crate::utils::{is_yaml, utils as Utils};
 use std::{
     fs::{create_dir_all, File},
     io::Error,

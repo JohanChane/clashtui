@@ -26,7 +26,10 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(flags: &Flags<Flag>, clashtui_config_dir: &PathBuf) -> (Option<Self>, Vec<CfgError>) {
+    pub fn new(
+        flags: &Flags<Flag>,
+        clashtui_config_dir: &PathBuf,
+    ) -> (Option<Self>, Vec<CfgError>) {
         let (util, err_track) =
             ClashTuiUtil::new(clashtui_config_dir, !flags.contains(Flag::FirstInit));
         if flags.contains(Flag::UpdateOnly) {

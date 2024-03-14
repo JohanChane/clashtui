@@ -7,7 +7,6 @@ use std::{
 mod impl_app;
 mod impl_clashsrv;
 mod impl_profile;
-mod impl_update;
 
 use super::{
     config::{CfgError, ClashTuiConfig, ErrKind},
