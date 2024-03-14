@@ -1,10 +1,11 @@
-name: Rust
+name: Pull Request
 
 on:
-  push:
+  pull_request:
 
 env:
   CARGO_TERM_COLOR: always
+  CLASHTUI_VERSION: ${{ github.head_ref }}
 
 jobs:
   build-linux:
@@ -12,8 +13,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Mihomo
         run: |
@@ -22,25 +21,14 @@ jobs:
           chmod +x mihomo
           nohup ./mihomo -d Example -f Example/basic_clash_config.yaml &
 
-      - name: Cache Target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ./clashtui/target
-            ~/.cargo
-          key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
-          restore-keys: |
-            ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
-            ci-${{ runner.os }}-
-
       - name: Download Dependencies
         run: cd clashtui && cargo fetch
 
+      - name: Build
+        run: cd clashtui && cargo build --verbose
+
       - name: Run tests
         run: cd clashtui && cargo test --all --verbose
-
-      - name: Build
-        run: cd clashtui && cargo build --verbose --locked && cargo build --release --locked
 
       - name: Build Version
         run: cd clashtui && cargo r -- -v
@@ -48,7 +36,6 @@ jobs:
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashtui/target/release/clashtui ./artifacts/clashtui.release
           mv ./clashtui/target/debug/clashtui ./artifacts/clashtui.debug
 
       - name: upload artifacts
@@ -62,8 +49,6 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Mihomo
         run: |
@@ -71,25 +56,14 @@ jobs:
           7z x mihomo.zip
           mihomo-windows-amd64.exe -d Example -f Example/basic_clash_config.yaml &
 
-      - name: Cache Target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ./clashtui/target
-            ~/.cargo
-          key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
-          restore-keys: |
-            ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
-            ci-${{ runner.os }}-
-
       - name: Download Dependencies
         run: cd clashtui && cargo fetch
 
-      # - name: Run tests
-      #   run: cd clashtui && cargo test --all --verbose
-        
       - name: Build
         run: cd clashtui && cargo build --verbose && cargo build --release
+
+      # - name: Run tests
+      #   run: cd clashtui && cargo test --all --verbose
 
       - name: Build Version
         run: cd clashtui && cargo r -- -v
@@ -97,7 +71,6 @@ jobs:
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashtui/target/release/clashtui.exe ./artifacts/clashtui.release.exe
           mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui.debug.exe
 
       - name: upload artifacts
@@ -106,26 +79,3 @@ jobs:
           name: Windows_Build
           path: artifacts
           retention-days: 5
-
-  release:
-    runs-on: ubuntu-latest
-
-    needs: [build-linux, build-windows]
-
-    if: startsWith(github.ref, 'refs/tags/')
-
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          merge-multiple: true
-          path: ./artifacts
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            artifacts/*

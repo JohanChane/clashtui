@@ -17,14 +17,20 @@ fn get_git_version() -> String {
 }
 
 fn main() {
-    let version = get_git_version();
-    let build_type: bool = env::var("DEBUG").unwrap().parse().unwrap();
-    let mut version = version.trim_end().to_owned();
-    version.push_str(if build_type { "-debug" } else { "-release" });
-    use std::io::Write;
-    let io = std::io::stdout();
-    writeln!(&io, "cargo:rustc-env=CLASHTUI_VERSION={}", version).unwrap();
-    writeln!(&io, "cargo:rerun-if-changed=../.git/HEAD").unwrap();
-    writeln!(&io, "cargo:rerun-if-changed=../.git/refs/heads/dev").unwrap();
-    writeln!(&io, "cargo:rerun-if-changed=build.rs",).unwrap();
+    if let Ok(v) = env::var("CLASHTUI_VERSION") {
+        println!(
+            "cargo:rustc-env=CLASHTUI_VERSION={}-{}",
+            env::var("CARGO_PKG_VERSION").unwrap(),
+            v.trim_end()
+        );
+    } else {
+        let version = get_git_version();
+        let mut version = version.trim_end().to_owned();
+        let build_type: bool = env::var("DEBUG").unwrap().parse().unwrap();
+        version.push_str(if build_type { "-debug" } else { "-release" });
+        println!("cargo:rustc-env=CLASHTUI_VERSION={}", version);
+    }
+    println!("cargo:rerun-if-changed=../.git/HEAD");
+    println!("cargo:rerun-if-changed=../.git/refs/heads/dev");
+    println!("cargo:rerun-if-changed=build.rs",);
 }
