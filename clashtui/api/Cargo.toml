@@ -12,5 +12,5 @@ serde_json = "1.0"
 serde-this-or-that = { version = "0.4.2", optional = true }
 
 [features]
-deprecated = ["serde-this-or-that", "github_api"]
+deprecated = ["github_api"]
 github_api = ["serde-this-or-that"]

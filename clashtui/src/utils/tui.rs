@@ -4,6 +4,10 @@ use std::{
     io::Error,
     path::{Path, PathBuf},
 };
+mod impl_app;
+mod impl_clashsrv;
+mod impl_profile;
+mod impl_update;
 
 use super::{
     config::{CfgError, ClashTuiConfig, ErrKind},
@@ -12,11 +16,11 @@ use super::{
 };
 use api::{ClashConfig, ClashUtil, Resp};
 
-pub(super) const BASIC_FILE: &str = "basic_clash_config.yaml";
+const BASIC_FILE: &str = "basic_clash_config.yaml";
 
 pub struct ClashTuiUtil {
     pub clashtui_dir: PathBuf,
-    pub(super) profile_dir: PathBuf,
+    profile_dir: PathBuf,
 
     clash_api: ClashUtil,
     pub tui_cfg: ClashTuiConfig,
@@ -125,10 +129,10 @@ impl ClashTuiUtil {
     pub fn restart_clash(&self) -> Result<String, Error> {
         self.clash_api.restart(None)
     }
-    pub(super) fn dl_remote_profile(&self, url: &str) -> Result<Resp, Error> {
+    fn dl_remote_profile(&self, url: &str) -> Result<Resp, Error> {
         self.clash_api.mock_clash_core(url)
     }
-    pub(super) fn config_reload(&self, body: String) -> Result<(), Error> {
+    fn config_reload(&self, body: String) -> Result<(), Error> {
         self.clash_api.config_reload(body)
     }
 

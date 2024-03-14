@@ -1,6 +1,6 @@
-use super::ipc::exec;
 use super::ClashTuiUtil;
 use crate::tui::tabs::ClashSrvOp;
+use crate::utils::ipc::{self, exec};
 use std::io::Error;
 
 impl ClashTuiUtil {
@@ -29,7 +29,7 @@ impl ClashTuiUtil {
                     vec!["status", self.tui_cfg.clash_srv_name.as_str()],
                 )
             }
-            ClashSrvOp::SetPermission => super::ipc::exec_with_sbin(
+            ClashSrvOp::SetPermission => ipc::exec_with_sbin(
                 "setcap",
                 vec![
                     "'cap_net_admin,cap_net_bind_service=+ep'",

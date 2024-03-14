@@ -1,4 +1,5 @@
-use super::{is_yaml, parse_yaml, utils as Utils, ClashTuiUtil};
+use crate::utils::{is_yaml, utils as Utils};
+use super::ClashTuiUtil;
 use std::{
     fs::{create_dir_all, File},
     io::Error,
@@ -13,7 +14,7 @@ impl ClashTuiUtil {
         let template_dir = self.clashtui_dir.join("templates");
         let template_path = template_dir.join(template_name);
         let tpl_parsed_yaml =
-            parse_yaml(&template_path).map_err(|e| format!("parse failed: {e:?}"))?;
+            Utils::parse_yaml(&template_path).map_err(|e| format!("parse failed: {e:?}"))?;
         let mut out_parsed_yaml = Cow::Borrowed(&tpl_parsed_yaml);
 
         let proxy_url_file =
@@ -256,7 +257,7 @@ impl ClashTuiUtil {
     }
 
     pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> Result<String, Error> {
-        use super::ipc::exec;
+        use crate::utils::ipc::exec;
         let cmd = format!(
             "{} {} -d {} -f {} -t",
             self.tui_cfg.clash_core_path,
@@ -296,10 +297,10 @@ impl ClashTuiUtil {
     }
 
     fn merge_profile(&self, profile_name: &String) -> std::io::Result<()> {
-        let basic_clash_cfg_path = self.clashtui_dir.join(super::tui::BASIC_FILE);
-        let mut dst_parsed_yaml = parse_yaml(&basic_clash_cfg_path)?;
+        let basic_clash_cfg_path = self.clashtui_dir.join(super::BASIC_FILE);
+        let mut dst_parsed_yaml = Utils::parse_yaml(&basic_clash_cfg_path)?;
         let profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
-        let profile_parsed_yaml = parse_yaml(&profile_yaml_path).map_err(|e| {
+        let profile_parsed_yaml = Utils::parse_yaml(&profile_yaml_path).map_err(|e| {
             Error::new(
                 e.kind(),
                 format!(
@@ -346,7 +347,7 @@ impl ClashTuiUtil {
 
             profile_yaml_path = self.get_profile_cache_unchecked(profile_name);
             // Update the file to keep up-to-date
-            self.download_file(sub_url, &profile_yaml_path)?;
+            self.download_profile(sub_url, &profile_yaml_path)?;
 
             net_res.push((
                 sub_url.to_string(),
@@ -398,7 +399,9 @@ impl ClashTuiUtil {
         Ok(net_res
             .into_iter()
             .map(|(url, path)| {
-                match self.download_file(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(path)) {
+                match self
+                    .download_profile(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(path))
+                {
                     Ok(_) => format!("Updated: {url}"),
                     Err(err) => {
                         log::error!("Update profile:{err}");
@@ -409,7 +412,7 @@ impl ClashTuiUtil {
             .collect::<Vec<String>>())
     }
 
-    fn download_file(&self, url: &str, path: &PathBuf) -> Result<(), Error> {
+    fn download_profile(&self, url: &str, path: &PathBuf) -> Result<(), Error> {
         let directory = path
             .parent()
             .ok_or_else(|| Error::new(std::io::ErrorKind::NotFound, "Invalid file path"))?;

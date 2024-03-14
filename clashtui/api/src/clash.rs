@@ -2,7 +2,6 @@ const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
 const TIMEOUT: u8 = 3;
 #[cfg(target_feature = "deprecated")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
-#[cfg(target_feature = "deprecated")]
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 use std::io::Result;
@@ -110,13 +109,22 @@ impl ClashUtil {
         minreq::get(url)
             .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
             .with_header("user-agent", "clash.meta")
-            .with_timeout(3)
+            .with_timeout(TIMEOUT.into())
             .send_lazy()
             .map(|v| Resp { inner: v })
             .map_err(process_err)
     }
     pub fn config_patch(&self, payload: String) -> Result<String> {
         self.request(Method::Patch, "/configs", Some(payload))
+    }
+    pub fn download_via_proxy<S: Into<minreq::URL>>(&self, url: S) -> Result<Resp>{
+        minreq::get(url)
+            .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
+            .with_header("user-agent", USER_AGENT)
+            .with_timeout(TIMEOUT.into())
+            .send_lazy()
+            .map(|v| Resp { inner: v })
+            .map_err(process_err)
     }
     #[cfg(target_feature = "deprecated")]
     pub fn check_geo_update(

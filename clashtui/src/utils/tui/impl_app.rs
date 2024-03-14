@@ -6,7 +6,7 @@ impl ClashTuiUtil {
     ///
     /// Auto detect `cmd` is_empty and use system default app to open `path`
     fn spawn_open(cmd: &str, path: &Path) -> Result<(), Error> {
-        use super::ipc::spawn;
+        use crate::utils::ipc::spawn;
         if !cmd.is_empty() {
             let opendir_cmd_with_path = cmd.replace("%s", path.to_str().unwrap_or(""));
             #[cfg(target_os = "windows")]
