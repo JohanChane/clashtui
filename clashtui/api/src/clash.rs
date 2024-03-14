@@ -110,7 +110,7 @@ impl ClashUtil {
             .with_header("user-agent", "clash.meta")
             .with_timeout(TIMEOUT.into())
             .send_lazy()
-            .map(|v| Resp(v))
+            .map(Resp)
             .map_err(process_err)
     }
     pub fn config_patch(&self, payload: String) -> Result<String> {
