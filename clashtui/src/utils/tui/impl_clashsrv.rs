@@ -52,7 +52,7 @@ impl ClashTuiUtil {
         //let nssm_path = exe_dir.join("nssm");
         //let nssm_path_str = nssm_path.to_str().unwrap();
         let nssm_pgm = "nssm";
-        use super::ipc::start_process_as_admin;
+        use ipc::start_process_as_admin;
 
         match op {
             ClashSrvOp::StartClashService => {
@@ -98,7 +98,7 @@ impl ClashTuiUtil {
                 )
             }
 
-            ClashSrvOp::UnInstallSrv => super::ipc::execute_powershell_script_as_admin(
+            ClashSrvOp::UnInstallSrv => ipc::execute_powershell_script_as_admin(
                 &format!(
                     "{0} stop {1}; {0} remove {1}",
                     nssm_pgm, self.tui_cfg.clash_srv_name
