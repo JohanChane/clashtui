@@ -47,11 +47,9 @@ impl ClashTuiUtil {
                 continue;
             }
 
-            let pp = if let serde_yaml::Value::Mapping(pp) = pp_value {
-                pp
-            } else {
-                return Err(String::from("Failed to parse `proxy-providers` value"));
-            };
+            let pp = pp_value
+                .as_mapping()
+                .ok_or("Failed to parse `proxy-providers` value".to_string())?;
 
             for (i, url) in proxy_urls.iter().enumerate() {
                 let mut new_pp = pp.clone();
@@ -256,7 +254,7 @@ impl ClashTuiUtil {
             .map_err(|e| e.to_string())
     }
 
-    pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> Result<String, Error> {
+    pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> std::io::Result<String> {
         use crate::utils::ipc::exec;
         let cmd = format!(
             "{} {} -d {} -f {} -t",
@@ -271,7 +269,7 @@ impl ClashTuiUtil {
         exec("sh", vec!["-c", cmd.as_str()])
     }
 
-    pub fn select_profile(&self, profile_name: &String) -> Result<(), Error> {
+    pub fn select_profile(&self, profile_name: &String) -> std::io::Result<()> {
         if let Err(err) = self.merge_profile(profile_name) {
             log::error!(
                 "Failed to Merge Profile `{}`: {}",
@@ -337,7 +335,7 @@ impl ClashTuiUtil {
         &self,
         profile_name: &String,
         does_update_all: bool,
-    ) -> Result<Vec<String>, Error> {
+    ) -> std::io::Result<Vec<String>> {
         let mut profile_yaml_path = self.profile_dir.join(profile_name);
         let mut net_res: Vec<(String, String)> = Vec::new();
         // if it's just the link
@@ -412,7 +410,7 @@ impl ClashTuiUtil {
             .collect::<Vec<String>>())
     }
 
-    fn download_profile(&self, url: &str, path: &PathBuf) -> Result<(), Error> {
+    fn download_profile(&self, url: &str, path: &PathBuf) -> std::io::Result<()> {
         let directory = path
             .parent()
             .ok_or_else(|| Error::new(std::io::ErrorKind::NotFound, "Invalid file path"))?;
@@ -428,34 +426,28 @@ impl ClashTuiUtil {
 }
 
 impl ClashTuiUtil {
-    pub fn get_profile_names(&self) -> Result<Vec<String>, Error> {
+    pub fn get_profile_names(&self) -> std::io::Result<Vec<String>> {
         Utils::get_file_names(&self.profile_dir).map(|mut v| {
             v.sort();
             v
         })
     }
-    pub fn get_template_names(&self) -> Result<Vec<String>, Error> {
+    pub fn get_template_names(&self) -> std::io::Result<Vec<String>> {
         Utils::get_file_names(self.clashtui_dir.join("templates")).map(|mut v| {
             v.sort();
             v
         })
     }
     /// Wrapped `self.profile_dir.join(profile_name)`
-    pub fn get_profile_path_unchecked<P>(&self, profile_name: P) -> PathBuf
-    where
-        P: AsRef<Path>,
-    {
+    pub fn get_profile_path_unchecked<P: AsRef<Path>>(&self, profile_name: P) -> PathBuf {
         self.profile_dir.join(profile_name)
     }
     /// Wrapped `self.profile_dir.join(profile_name)`
-    pub fn get_template_path_unchecked<P>(&self, name: P) -> PathBuf
-    where
-        P: AsRef<Path>,
-    {
+    pub fn get_template_path_unchecked<P: AsRef<Path>>(&self, name: P) -> PathBuf {
         self.clashtui_dir.join("templates").join(name)
     }
     /// Check the `profiles` and `profile_cache` path
-    pub fn get_profile_yaml_path<P>(&self, profile_name: P) -> Result<PathBuf, Error>
+    pub fn get_profile_yaml_path<P>(&self, profile_name: P) -> std::io::Result<PathBuf>
     where
         P: AsRef<Path> + AsRef<std::ffi::OsStr>,
     {
@@ -483,10 +475,7 @@ impl ClashTuiUtil {
     /// Check file only in `profiles`
     ///
     /// Judging by format
-    pub fn is_profile_yaml<P>(&self, profile_name: P) -> bool
-    where
-        P: AsRef<Path>,
-    {
+    pub fn is_profile_yaml<P: AsRef<Path>>(&self, profile_name: P) -> bool {
         let profile_path = self.get_profile_path_unchecked(profile_name);
         is_yaml(&profile_path)
     }
@@ -501,10 +490,7 @@ impl ClashTuiUtil {
 ///
 /// [symlink-security]: https://docs.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/create-symbolic-links
 #[allow(unused)]
-fn crt_symlink_file<P>(original: P, target: P) -> std::io::Result<()>
-where
-    P: AsRef<std::path::Path>,
-{
+fn crt_symlink_file<P: AsRef<std::path::Path>>(original: P, target: P) -> std::io::Result<()> {
     use std::os;
     #[cfg(target_os = "windows")]
     return os::windows::fs::symlink_file(original, target);

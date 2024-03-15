@@ -1,22 +1,18 @@
 #![warn(clippy::all)]
 use core::time::Duration;
-use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    Terminal,
-};
-use std::time::Instant;
 mod app;
 mod tui;
 mod utils;
 
 use crate::app::App;
-use crate::tui::EventState;
 use crate::utils::{Flag, Flags};
 
 pub const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
 
 /// Mihomo (Clash.Meta) TUI Client
-#[derive(Debug, argh::FromArgs)]
+///
+/// A tui tool for mihomo
+#[derive(argh::FromArgs)]
 struct CliEnv {
     /// time in ms between two ticks.
     #[argh(option, default = "250")]
@@ -29,7 +25,7 @@ struct CliEnv {
     version: bool,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let CliEnv {
         tick_rate,
         update_all_profiles,
@@ -37,19 +33,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     } = argh::from_env();
     if version {
         println!("{VERSION}");
-        std::process::exit(0);
+    } else {
+        let mut flags = Flags::empty();
+        if update_all_profiles {
+            flags.insert(utils::Flag::UpdateOnly);
+        };
+        if let Err(e) = run(flags, tick_rate) {
+            eprintln!("{e}");
+            std::process::exit(-1)
+        }
     }
-    let mut flags = Flags::empty();
-    if update_all_profiles {
-        flags.insert(utils::Flag::UpdateOnly);
-    };
-    let tick_rate = Duration::from_millis(tick_rate);
-    run(flags, tick_rate)?;
-
-    Ok(())
+    std::process::exit(0);
 }
-pub fn run(mut flags: Flags<Flag>, tick_rate: Duration) -> std::io::Result<()> {
-    let res;
+pub fn run(mut flags: Flags<Flag>, tick_rate: u64) -> std::io::Result<()> {
     let config_dir = load_app_dir(&mut flags);
 
     setup_logging(config_dir.join("clashtui.log").to_str().unwrap());
@@ -60,82 +56,54 @@ pub fn run(mut flags: Flags<Flag>, tick_rate: Duration) -> std::io::Result<()> {
         use ui::setup::*;
         // setup terminal
         setup()?;
-        let terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
-
         // create app and run it
-        res = run_app(terminal, &mut app, tick_rate, err_track, flags);
-
+        run_app(&mut app, tick_rate, err_track, flags)?;
         // restore terminal
         restore()?;
 
         app.save(config_dir.join("config.yaml").to_str().unwrap())?;
     } else {
-        if !err_track.is_empty() {
-            err_track.into_iter().for_each(|v| eprintln!("{v}"));
-        }
-        res = Ok(());
+        err_track.into_iter().for_each(|v| eprintln!("{v}"));
     }
-
-    if let Err(err) = res {
-        eprintln!("{err:?}");
-    }
-
     Ok(())
 }
 
 use utils::CfgError;
-fn run_app<B: Backend>(
-    mut terminal: Terminal<B>,
+fn run_app(
     app: &mut App,
-    tick_rate: Duration,
-    mut err_track: Vec<CfgError>,
+    tick_rate: u64,
+    err_track: Vec<CfgError>,
     flags: Flags<Flag>,
 ) -> std::io::Result<()> {
-    {
-        if flags.contains(utils::Flag::FirstInit) {
-            app.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
-            app.popup_txt_msg(
-                "Please go to Config Tab to set configs so that program can work properly"
-                    .to_string(),
-            );
-        };
-        if flags.contains(utils::Flag::ErrorDuringInit) {
-            app.popup_txt_msg(
-                "Some Error happened during app init, Check the log for detail".to_string(),
-            );
-        }
-        while !err_track.is_empty() {
-            let err: Option<CfgError> = err_track.pop();
-            let showstr = match err {
-                Some(v) => v.reason.to_string(),
-                None => unreachable!(),
-            };
-            app.popup_txt_msg(showstr);
-        }
+    if flags.contains(utils::Flag::FirstInit) {
+        app.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
+        app.popup_txt_msg(
+            "Please go to Config Tab to set configs so that program can work properly".to_string(),
+        );
+    };
+    if flags.contains(utils::Flag::ErrorDuringInit) {
+        app.popup_txt_msg(
+            "Some Error happened during app init, Check the log for detail".to_string(),
+        );
     }
+    err_track
+        .into_iter()
+        .for_each(|e| app.popup_txt_msg(e.reason));
     log::info!("App init finished");
 
-    let mut last_tick = Instant::now();
-    let mut last_ev = EventState::NotConsumed;
+    use ratatui::{backend::CrosstermBackend, Terminal};
+    let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
+    let tick_rate = Duration::from_millis(tick_rate);
     use ui::event;
     while !app.should_quit {
         terminal.draw(|f| app.draw(f))?;
 
-        last_ev = app.handle_last_ev(&last_ev);
+        app.late_event();
 
-        let timeout = tick_rate
-            .checked_sub(last_tick.elapsed())
-            .unwrap_or_else(|| Duration::from_secs(0));
-        if ui::event::poll(timeout)? {
-            last_ev = app
-                .event(&event::read()?)
-                .map_err(|e| app.popup_txt_msg(e.to_string()))
-                .unwrap_or(EventState::NotConsumed);
-        }
-
-        if last_tick.elapsed() >= tick_rate {
-            app.on_tick();
-            last_tick = Instant::now();
+        if event::poll(tick_rate)? {
+            if let Err(e) = app.event(&event::read()?) {
+                app.popup_txt_msg(e.to_string())
+            };
         }
     }
     log::info!("App Exit");

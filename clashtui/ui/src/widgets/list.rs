@@ -103,10 +103,7 @@ impl List {
             return None;
         }
 
-        match self.list_state.selected() {
-            Some(i) => Some(&self.items[i]),
-            None => None,
-        }
+        self.list_state.selected().map(|i| &self.items[i])
     }
 
     fn next(&mut self) {

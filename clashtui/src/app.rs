@@ -189,19 +189,11 @@ impl App {
 
         Ok(event_state)
     }
-    fn late_event(&mut self) {
+    pub fn late_event(&mut self) {
         self.tabs.iter_mut().for_each(|v| match v {
             Tabs::Profile(tab) => tab.late_event(),
             Tabs::ClashSrvCtl(tab) => tab.late_event(),
         })
-    }
-    // For refreshing the interface before performing lengthy operation.
-    pub fn handle_last_ev(&mut self, last_ev: &EventState) -> EventState {
-        self.late_event();
-        match last_ev {
-            EventState::NotConsumed | EventState::WorkDone => EventState::NotConsumed,
-            EventState::Yes | EventState::Cancel => unreachable!(),
-        }
     }
 
     pub fn draw(&mut self, f: &mut ratatui::prelude::Frame) {
@@ -235,8 +227,6 @@ impl App {
         self.info_popup.draw(f, help_area);
         self.msgpopup.draw(f, help_area);
     }
-
-    pub fn on_tick(&mut self) {}
 
     fn update_tabbar(&mut self) {
         let tabname = self
