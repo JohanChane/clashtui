@@ -38,3 +38,17 @@ members = ["api", "ui", "ui-derive"]
 lto = "fat"
 opt-level = 'z'
 strip = true
+
+[package.metadata.deb]
+maintainer = 'Jackhr-arch <63526062+Jackhr-arch@users.noreply.github.com>'
+extended-description = """
+A tui tool for mihomo
+"""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+  ['target/release/clashtui', 'usr/bin/clashtui', '755'],
+  ['../README.md', 'usr/share/doc/hust-network-login/README.md', '644'],
+]
+maintainer-scripts = 'debian/'
