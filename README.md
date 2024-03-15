@@ -32,6 +32,12 @@
 <!-- vim-markdown-toc -->
 </details>
 
+> ### NOTE
+>
+> This app is now **passively-maintained**, There are no plans for new features, but the maintainer intends to respond to issues that get filed.
+>
+> But if you've got some good ideas, feel free to open a feature request.
+
 ## Supported Platforms
 
 - Windows

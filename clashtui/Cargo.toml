@@ -13,6 +13,9 @@ readme = "README.md"
 
 exclude = ["PKGBUILD", "Scoop/*", "Example/*", ".github/*"]
 
+[badges]
+maintenance = { status = "passively-maintained" }
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
