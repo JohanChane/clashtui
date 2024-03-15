@@ -10,15 +10,16 @@ impl ClashTuiUtil {
         new_mode: Option<String>,
         new_sysp: Option<bool>,
     ) -> _State {
+        use crate::utils::ipc;
         if let Some(b) = new_sysp {
             let _ = if b {
-                super::ipc::enable_system_proxy(&self.clash_api.proxy_addr)
+                ipc::enable_system_proxy(&self.clash_api.proxy_addr)
             } else {
-                super::ipc::disable_system_proxy()
+                ipc::disable_system_proxy()
             };
         }
         let (pf, mode, tun) = self._update_state(new_pf, new_mode);
-        let sysp = super::ipc::is_system_proxy_enabled().map_or_else(
+        let sysp = ipc::is_system_proxy_enabled().map_or_else(
             |v| {
                 log::error!("{}", v);
                 None
