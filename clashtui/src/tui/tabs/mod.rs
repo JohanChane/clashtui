@@ -28,11 +28,11 @@ pub trait TabEvent {
     fn draw(&mut self, f: &mut ratatui::prelude::Frame, area: ratatui::prelude::Rect);
     fn popup_event(
         &mut self,
-        ev: &crossterm::event::Event,
+        ev: &ui::event::Event,
     ) -> Result<ui::EventState, impl std::error::Error>;
     fn event(
         &mut self,
-        ev: &crossterm::event::Event,
+        ev: &ui::event::Event,
     ) -> Result<ui::EventState, impl std::error::Error>;
     fn late_event(&mut self);
 }

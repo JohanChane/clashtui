@@ -1,5 +1,6 @@
 #![allow(clippy::new_without_default)]
 extern crate ui_derive;
+pub use crossterm::event;
 pub use ui_derive::Visibility;
 /// Visibility-related functions, can be impl using `derive`
 ///
@@ -13,6 +14,28 @@ pub trait Visibility {
 pub mod utils;
 pub mod widgets;
 pub use utils::{EventState, Infailable, Theme};
+
+pub mod setup {
+    use crossterm::{
+        cursor,
+        event::{DisableMouseCapture, EnableMouseCapture},
+        execute,
+        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    };
+    pub fn setup() -> Result<(), std::io::Error> {
+        enable_raw_mode()?;
+        execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture)
+    }
+    pub fn restore() -> Result<(), std::io::Error> {
+        disable_raw_mode()?;
+        execute!(
+            std::io::stdout(),
+            LeaveAlternateScreen,
+            DisableMouseCapture,
+            cursor::Show
+        )
+    }
+}
 
 #[cfg(test)]
 mod tests {

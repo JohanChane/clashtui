@@ -65,7 +65,7 @@ impl ClashSrvCtlTab {
     }
 }
 impl super::TabEvent for ClashSrvCtlTab {
-    fn popup_event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ui::Infailable> {
+    fn popup_event(&mut self, ev: &ui::event::Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -75,7 +75,7 @@ impl super::TabEvent for ClashSrvCtlTab {
             if event_state == EventState::WorkDone {
                 return Ok(event_state);
             }
-            if let crossterm::event::Event::Key(key) = ev {
+            if let ui::event::Event::Key(key) = ev {
                 if &Keys::Select == key {
                     if let Some(new) = self.mode_selector.selected() {
                         self.clashtui_state.borrow_mut().set_mode(new.clone());
@@ -93,14 +93,14 @@ impl super::TabEvent for ClashSrvCtlTab {
 
         Ok(event_state)
     }
-    fn event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ui::Infailable> {
+    fn event(&mut self, ev: &ui::event::Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
 
         let event_state;
-        if let crossterm::event::Event::Key(key) = ev {
-            if key.kind != crossterm::event::KeyEventKind::Press {
+        if let ui::event::Event::Key(key) = ev {
+            if key.kind != ui::event::KeyEventKind::Press {
                 return Ok(EventState::NotConsumed);
             }
             // override `Enter`

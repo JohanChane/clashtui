@@ -1,5 +1,5 @@
 use crate::tui::{EventState, Visibility};
-use crossterm::event::Event;
+use ui::event::Event;
 use ratatui::prelude as Ra;
 use std::collections::HashMap;
 

@@ -169,9 +169,9 @@ impl ProfileTab {
             }))
     }
 }
-use crossterm::event::{Event, KeyEventKind};
+use ui::event::{Event, KeyEventKind};
 impl super::TabEvent for ProfileTab {
-    fn popup_event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ui::Infailable> {
+    fn popup_event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
@@ -205,7 +205,7 @@ impl super::TabEvent for ProfileTab {
         Ok(event_state)
     }
 
-    fn event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, std::io::Error> {
+    fn event(&mut self, ev: &Event) -> Result<EventState, std::io::Error> {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }

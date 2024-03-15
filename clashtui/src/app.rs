@@ -1,6 +1,8 @@
 use core::cell::{OnceCell, RefCell};
 use std::{path::PathBuf, rc::Rc};
 
+use ui::event;
+
 use crate::msgpopup_methods;
 use crate::tui::{
     tabs::{ClashSrvCtlTab, ProfileTab, TabEvent, Tabs},
@@ -82,7 +84,7 @@ impl App {
         (Some(app), err_track)
     }
 
-    fn popup_event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, ui::Infailable> {
+    fn popup_event(&mut self, ev: &event::Event) -> Result<EventState, ui::Infailable> {
         // ## Self Popups
         let mut event_state = self
             .help_popup
@@ -107,7 +109,7 @@ impl App {
         Ok(event_state)
     }
 
-    pub fn event(&mut self, ev: &crossterm::event::Event) -> Result<EventState, std::io::Error> {
+    pub fn event(&mut self, ev: &event::Event) -> Result<EventState, std::io::Error> {
         let mut event_state = self.msgpopup.event(ev)?;
         if event_state.is_notconsumed() {
             event_state = self.popup_event(ev)?;
@@ -116,8 +118,8 @@ impl App {
             return Ok(event_state);
         }
 
-        if let crossterm::event::Event::Key(key) = ev {
-            if key.kind != crossterm::event::KeyEventKind::Press {
+        if let event::Event::Key(key) = ev {
+            if key.kind != event::KeyEventKind::Press {
                 return Ok(EventState::NotConsumed);
             }
             event_state = match key.code.into() {

@@ -57,29 +57,16 @@ pub fn run(mut flags: Flags<Flag>, tick_rate: Duration) -> std::io::Result<()> {
     let (app, err_track) = App::new(&flags, &config_dir);
     log::debug!("Current flags: {:?}", flags);
     if let Some(mut app) = app {
-        use crossterm::{
-            event::{DisableMouseCapture, EnableMouseCapture},
-            execute,
-            terminal::{
-                disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-            },
-        };
+        use ui::setup::*;
         // setup terminal
-        enable_raw_mode()?;
-        execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
+        setup()?;
         let terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
 
         // create app and run it
         res = run_app(terminal, &mut app, tick_rate, err_track, flags);
 
         // restore terminal
-        disable_raw_mode()?;
-        execute!(
-            std::io::stdout(),
-            LeaveAlternateScreen,
-            DisableMouseCapture,
-            crossterm::cursor::Show
-        )?;
+        restore()?;
 
         app.save(config_dir.join("config.yaml").to_str().unwrap())?;
     } else {
@@ -130,7 +117,7 @@ fn run_app<B: Backend>(
 
     let mut last_tick = Instant::now();
     let mut last_ev = EventState::NotConsumed;
-    use crossterm::event;
+    use ui::event;
     while !app.should_quit {
         terminal.draw(|f| app.draw(f))?;
 
@@ -139,7 +126,7 @@ fn run_app<B: Backend>(
         let timeout = tick_rate
             .checked_sub(last_tick.elapsed())
             .unwrap_or_else(|| Duration::from_secs(0));
-        if crossterm::event::poll(timeout)? {
+        if ui::event::poll(timeout)? {
             last_ev = app
                 .event(&event::read()?)
                 .map_err(|e| app.popup_txt_msg(e.to_string()))

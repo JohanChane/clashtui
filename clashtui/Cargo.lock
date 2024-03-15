@@ -166,7 +166,6 @@ version = "0.2.4"
 dependencies = [
  "api",
  "argh",
- "crossterm",
  "encoding",
  "enumflags2",
  "log",

@@ -19,7 +19,6 @@ exclude = ["PKGBUILD", "Scoop/*", "Example/*", ".github/*"]
 ui = { path = "ui" }
 api = { path = "api" }
 ratatui = {version = "*", default-features = false, features = ["crossterm"]}
-crossterm = {version = "*", default-features = false}
 serde = {version = "*", default-features = false}
 argh = "0.1"
 serde_yaml = "0.9"

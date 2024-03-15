@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use ui::event::{KeyCode, KeyEvent};
 #[derive(PartialEq)]
 pub enum Keys {
     ProfileSwitch,
