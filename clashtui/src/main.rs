@@ -1,63 +1,61 @@
 #![warn(clippy::all)]
-use core::time::Duration;
 mod app;
 mod tui;
 mod utils;
+
+use core::time::Duration;
+use nix::sys;
 
 use crate::app::App;
 use crate::utils::{Flag, Flags};
 
 pub const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
 
-/// Mihomo (Clash.Meta) TUI Client
-///
-/// A tui tool for mihomo
-#[derive(argh::FromArgs)]
-struct CliEnv {
-    /// time in ms between two ticks.
-    #[argh(option, default = "250")]
-    tick_rate: u64,
-    /// don't show UI but only update all profiles
-    #[argh(switch, short = 'u')]
-    update_all_profiles: bool,
-    /// print version information and exit
-    #[argh(switch, short = 'v')]
-    version: bool,
-}
-
 fn main() {
-    let CliEnv {
-        tick_rate,
-        update_all_profiles,
-        version,
-    } = argh::from_env();
-    if version {
-        println!("{VERSION}");
-    } else {
-        let mut flags = Flags::empty();
-        if update_all_profiles {
-            flags.insert(utils::Flag::UpdateOnly);
-        };
-        if let Err(e) = run(flags, tick_rate) {
-            eprintln!("{e}");
-            std::process::exit(-1)
-        }
-    }
-    std::process::exit(0);
-}
-pub fn run(mut flags: Flags<Flag>, tick_rate: u64) -> std::io::Result<()> {
-    let config_dir = load_app_dir(&mut flags);
+    let mut warning_list_msg = Vec::<String>::new();
 
+    // ## Paser param
+    let cli_env: app::CliEnv = argh::from_env();
+    if cli_env.version {
+        println!("{VERSION}");
+        std::process::exit(0);
+    }
+
+    let mut flags = Flags::empty();
+
+    // ## Is CliMode
+    if cli_env.update_all_profiles {
+        flags.insert(Flag::CliMode)
+    }
+
+    // ## Setup logging as early as possible. So We can log.
+    let config_dir = load_app_dir(&mut flags);
     setup_logging(config_dir.join("clashtui.log").to_str().unwrap());
 
-    let (app, err_track) = App::new(&flags, &config_dir);
+    // To allow the mihomo process to read and write files created by clashtui in clash_cfg_dir, set the umask to 0o002and Users manually add SGID to clash_cfg_dir.
+    if utils::is_clashtui_ep() {
+        utils::mock_fileop_as_sudo_user();
+    }
+    sys::stat::umask(sys::stat::Mode::from_bits_truncate(0o002));
+
+    let tick_rate = 250;    // time in ms between two ticks.
+    if let Err(e) = run(&mut flags, tick_rate, &config_dir, &mut warning_list_msg) {
+        eprintln!("{e}");
+        std::process::exit(-1)
+    }
+
+    std::process::exit(0);
+}
+pub fn run(flags: &mut Flags<Flag>, tick_rate: u64, config_dir: &std::path::PathBuf, warning_list_msg: &mut Vec<String>) -> std::io::Result<()> {
+    let (app, err_track) = App::new(&flags, config_dir);
     log::debug!("Current flags: {:?}", flags);
+
     if let Some(mut app) = app {
         use ui::setup::*;
         // setup terminal
         setup()?;
         // create app and run it
-        run_app(&mut app, tick_rate, err_track, flags)?;
+        run_app(&mut app, tick_rate, err_track, flags, warning_list_msg)?;
         // restore terminal
         restore()?;
 
@@ -73,18 +71,15 @@ fn run_app(
     app: &mut App,
     tick_rate: u64,
     err_track: Vec<CfgError>,
-    flags: Flags<Flag>,
+    flags: &mut Flags<Flag>,
+    warning_list_msg: &mut Vec<String>,
 ) -> std::io::Result<()> {
     if flags.contains(utils::Flag::FirstInit) {
-        app.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
-        app.popup_txt_msg(
-            "Please go to Config Tab to set configs so that program can work properly".to_string(),
-        );
+        warning_list_msg.push("Welcome to ClashTui!".to_string());
+        warning_list_msg.push("Please go to Config Tab to set configs so that program can work properly".to_string());
     };
     if flags.contains(utils::Flag::ErrorDuringInit) {
-        app.popup_txt_msg(
-            "Some Error happened during app init, Check the log for detail".to_string(),
-        );
+        warning_list_msg.push("Some Error happened during app init, Check the log for detail".to_string());
     }
     err_track
         .into_iter()
@@ -93,8 +88,10 @@ fn run_app(
 
     use ratatui::{backend::CrosstermBackend, Terminal};
     let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
+    terminal.clear()?;  // Clear terminal residual text before draw.
     let tick_rate = Duration::from_millis(tick_rate);
     use ui::event;
+    app.popup_list_msg(warning_list_msg.to_owned());   // Set msg popup before draw
     while !app.should_quit {
         terminal.draw(|f| app.draw(f))?;
 
@@ -121,7 +118,7 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
             data_dir
         } else {
             #[cfg(target_os = "linux")]
-            let clashtui_config_dir_str = env::var("XDG_CONFIG_HOME")
+            let clashtui_config_dir_str = env::var("XDG_CONFIG_HOME").map(|p| format!("{}/clashtui", p))
                 .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)))
                 .unwrap();
             #[cfg(target_os = "windows")]
@@ -145,6 +142,7 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
     }
     clashtui_config_dir
 }
+
 fn setup_logging(log_path: &str) {
     use log4rs::append::file::FileAppender;
     use log4rs::config::{Appender, Config, Root};
@@ -164,7 +162,7 @@ fn setup_logging(log_path: &str) {
     #[cfg(debug_assertions)]
     let log_level = log::LevelFilter::Debug;
     let file_appender = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("[{l}] {t} - {m}{n}")))
+        .encoder(Box::new(PatternEncoder::new("{d(%H:%M:%S)} [{l}] {t} - {m}{n}")))  // Having a timestamp would be better.
         .build(log_path)
         .unwrap();
 

@@ -1,0 +1,100 @@
+pp:
+  interval: 3600
+  intehealth-check:
+    enable: true
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+delay_test:
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+proxy-groups:
+- name: Entry
+  type: select
+  proxies:
+  - FilterFbAll
+- name: FilterFbAll
+  type: fallback
+  use:
+  - provider0
+  - provider1
+  filter: (?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore
+  <<:
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+- name: Entry-RuleMode
+  type: select
+  proxies:
+  - DIRECT
+  - Entry
+- name: Entry-LastMatch
+  type: select
+  proxies:
+  - Entry
+  - DIRECT
+proxy-providers:
+  provider1:
+    <<:
+      interval: 3600
+      intehealth-check:
+        enable: true
+        url: https://www.gstatic.com/generate_204
+        interval: 300
+    type: http
+    url: https://www.example.com
+    path: proxy-providers/tpl/provider1.yaml
+  provider0:
+    <<:
+      interval: 3600
+      intehealth-check:
+        enable: true
+        url: https://www.gstatic.com/generate_204
+        interval: 300
+    type: http
+    url: https://www.example.com
+    path: proxy-providers/tpl/provider0.yaml
+rule-anchor:
+  ip:
+    interval: 86400
+    behavior: ipcidr
+    format: yaml
+  domain:
+    type: http
+    interval: 86400
+    behavior: domain
+    format: yaml
+rule-providers:
+  private:
+    type: http
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/private.yaml
+    path: ./rule-providers/tpl/private.yaml
+    <<:
+      type: http
+      interval: 86400
+      behavior: domain
+      format: yaml
+rules:
+- RULE-SET,private,DIRECT
+- DOMAIN-SUFFIX,cn.bing.com,DIRECT
+- DOMAIN-SUFFIX,bing.com,Entry
+- DOMAIN,aur.archlinux.org,Entry
+- GEOIP,lan,DIRECT,no-resolve
+- GEOSITE,biliintl,Entry
+- GEOSITE,ehentai,Entry
+- GEOSITE,github,Entry
+- GEOSITE,twitter,Entry
+- GEOSITE,youtube,Entry
+- GEOSITE,google,Entry
+- GEOSITE,telegram,Entry
+- GEOSITE,netflix,Entry
+- GEOSITE,bilibili,Entry-RuleMode
+- GEOSITE,bahamut,Entry
+- GEOSITE,spotify,Entry
+- GEOSITE,geolocation-!cn,Entry
+- GEOIP,google,Entry
+- GEOIP,netflix,Entry
+- GEOIP,telegram,Entry
+- GEOIP,twitter,Entry
+- GEOSITE,pixiv,Entry
+- GEOSITE,CN,Entry-RuleMode
+- GEOIP,CN,Entry-RuleMode
+- MATCH,Entry-LastMatch

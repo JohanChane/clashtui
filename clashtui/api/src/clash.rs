@@ -6,8 +6,29 @@ const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/rel
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 use std::io::Result;
+use std::time::SystemTime;
 
-use minreq::Method;
+use minreq::{Method, Proxy};
+use chrono::{DateTime, Local, TimeZone};
+
+// format: {type: [(name, modifytime)]}
+pub type ProfileTimeMap = std::collections::HashMap<ProfileSectionType, Vec<(String, Option<std::time::SystemTime>)>>;
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ProfileSectionType {
+    Profile,
+    ProxyProvider,
+    RuleProvider,
+}
+
+pub fn provider_str_in_api(section_type: ProfileSectionType) -> Option<String> {
+    match section_type {
+        ProfileSectionType::ProxyProvider => Some("proxies".to_string()),
+        ProfileSectionType::RuleProvider => Some("rules".to_string()),
+        _ => None,
+    }
+}
+
 trait ResProcess {
     fn process(self) -> core::result::Result<String, minreq::Error>;
 }
@@ -59,14 +80,16 @@ pub struct ClashUtil {
     api: String,
     secret: String,
     pub proxy_addr: String,
+    clash_ua: String,
 }
 
 impl ClashUtil {
-    pub fn new(controller_api: String, secret: String, proxy_addr: String) -> Self {
+    pub fn new(controller_api: String, secret: String, proxy_addr: String, clash_ua: String) -> Self {
         Self {
             api: controller_api,
             secret,
             proxy_addr,
+            clash_ua,
         }
     }
     fn request(
@@ -107,7 +130,7 @@ impl ClashUtil {
     pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S) -> Result<Resp> {
         minreq::get(url)
             .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
-            .with_header("user-agent", "clash.meta")
+            .with_header("user-agent", self.clash_ua.clone())
             .with_timeout(TIMEOUT.into())
             .send_lazy()
             .map(Resp)
@@ -116,6 +139,86 @@ impl ClashUtil {
     pub fn config_patch(&self, payload: String) -> Result<String> {
         self.request(Method::Patch, "/configs", Some(payload))
     }
+
+    pub fn update_providers(&self, provider_type: ProfileSectionType) -> Result<Vec<(String, Result<String>)>> {
+        self.extract_net_providers(provider_type).and_then(|names| self.update_providers_helper(names, provider_type))
+    }
+
+    pub fn update_providers_helper(&self, provider_names: Vec<String>, provider_type: ProfileSectionType) -> Result<Vec<(String, Result<String>)>> {
+        let mut result = Vec::<(String, Result<String>)>::new();
+        for name in provider_names {
+            let sub_url = format!("/providers/{}/{}", provider_str_in_api(provider_type).unwrap(), name);
+            result.push((name, self.request(Method::Put, sub_url.as_str(), None)));
+        }
+        Ok(result)
+    }
+
+    pub fn extract_net_providers(&self, provider_type: ProfileSectionType) -> Result<Vec<String>>{
+        let sub_url = format!("/providers/{}", provider_str_in_api(provider_type).unwrap());
+        let response_str = self.request(Method::Get, sub_url.as_str(), None)?;
+
+        let json_data: serde_json::Value = serde_json::from_str(response_str.as_str())?;
+        let mut net_providers = Vec::new();
+        if let Some(providers) = json_data["providers"].as_object() {
+            let provider_type_str = match provider_type {
+                ProfileSectionType::ProxyProvider => Some("Proxy"),
+                ProfileSectionType::RuleProvider => Some("Rule"),
+                _ => None,
+            };
+            for (_, provider) in providers.iter() {
+                if let (Some(p_name), Some(p_type), Some(vehicle_type)) = (
+                    provider.get("name").and_then(serde_json::Value::as_str),
+                    provider.get("type").and_then(serde_json::Value::as_str),
+                    provider.get("vehicleType").and_then(serde_json::Value::as_str),
+                ) {
+                    if vehicle_type == "HTTP" {
+                        if Some(p_type) == provider_type_str {
+                            net_providers.push(p_name.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(net_providers)
+    }
+
+    // Sometime mihomo updated the provider but not update it to the file.
+    pub fn extract_provider_utimes_with_api(&self, provider_type: ProfileSectionType) -> Result<Vec<(String, Option<SystemTime>)>>{
+        let sub_url = format!("/providers/{}", provider_str_in_api(provider_type).unwrap());
+        let response_str = self.request(Method::Get, sub_url.as_str(), None)?;
+
+        let json_data: serde_json::Value = serde_json::from_str(response_str.as_str())?;
+        let mut net_providers = Vec::new();
+        if let Some(providers) = json_data["providers"].as_object() {
+            let provider_type_str = match provider_type {
+                ProfileSectionType::ProxyProvider => Some("Proxy"),
+                ProfileSectionType::RuleProvider => Some("Rule"),
+                _ => None,
+            };
+            for (_, provider) in providers.iter() {
+                if let (Some(p_name), Some(p_type), Some(vehicle_type), Some(time_str)) = (
+                    provider.get("name").and_then(serde_json::Value::as_str),
+                    provider.get("type").and_then(serde_json::Value::as_str),
+                    provider.get("vehicleType").and_then(serde_json::Value::as_str),
+                    provider.get("updatedAt").and_then(serde_json::Value::as_str),
+                ) {
+                    if vehicle_type == "HTTP" {
+                        if Some(p_type) == provider_type_str {
+                                let parsed_time = DateTime::parse_from_rfc3339(time_str);
+                                net_providers.push((
+                                    p_name.to_string(),
+                                    parsed_time.ok().map(|t| t.with_timezone(&Local).into())
+                                ));
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(net_providers)
+    }
+
     #[cfg(target_feature = "deprecated")]
     pub fn check_geo_update(
         &self,
@@ -170,9 +273,36 @@ impl ClashUtil {
             Ok("Already Up to dated".to_string())
         }
     }
+
     /*
     pub fn flush_fakeip(&self) -> Result<String, reqwest::Error> {
         self.post("/cache/fakeip/flush", None)
+    }
+    pub fn provider(&self, is_rule: bool, name:Option<&String>, is_update: bool, is_check: bool) -> Result<String, reqwest::Error>{
+        //
+        if !is_rule{
+            let api = "/providers/proxies";
+            match name {
+                Some(v) => {
+                    if is_update{
+                        self.put(&format!("{}/{}", api, v), None)
+                    } else {
+                        if is_check{
+                            self.get(&format!("{}/{}/healthcheck", api, v), None)
+                        } else {
+                            self.get(&format!("{}/{}", api, v), None)
+                        }
+                    }
+                },
+                None => self.get(api, None),
+            }
+        } else {
+            let api = "/providers/rules";
+            match name {
+                Some(v) => self.put(&format!("{}/{}", api, v), None),
+                None => self.get(api, None)
+            }
+        }
     }
     pub fn update_geo(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
         match payload {
@@ -233,32 +363,6 @@ impl ClashUtil {
             }
         }
     }
-    pub fn provider(&self, is_rule: bool, name:Option<&String>, is_update: bool, is_check: bool) -> Result<String, reqwest::Error>{
-        //
-        if !is_rule{
-            let api = "/providers/proxies";
-            match name {
-                Some(v) => {
-                    if is_update{
-                        self.put(&format!("{}/{}", api, v), None)
-                    } else {
-                        if is_check{
-                            self.get(&format!("{}/{}/healthcheck", api, v), None)
-                        } else {
-                            self.get(&format!("{}/{}", api, v), None)
-                        }
-                    }
-                },
-                None => self.get(api, None),
-            }
-        } else {
-            let api = "/providers/rules";
-            match name {
-                Some(v) => self.put(&format!("{}/{}", api, v), None),
-                None => self.get(api, None)
-            }
-        }
-    }
     pub fn dns_resolve(&self, name:&String, _type:Option<&String>) -> Result<String, reqwest::Error>{
         match _type {
             Some(v) => self.get(&format!("/dns/query?name={}&type={}", name, v), None),
@@ -269,7 +373,7 @@ impl ClashUtil {
 }
 #[cfg(test)]
 mod tests {
-    use super::ClashUtil;
+    use super::{ClashUtil, ProfileSectionType};
     fn sym() -> ClashUtil {
         ClashUtil::new(
             "http://127.0.0.1:9090".to_string(),
@@ -336,5 +440,20 @@ mod tests {
             }
         );
         assert!(flag)
+    }
+
+    #[test]
+    fn test_update_all_providers() {
+        let sym = sym();
+
+        if let Ok(names) = sym.extract_net_providers(ProfileSectionType::ProxyProvider) {
+            println!("extract_net_providers: {:?}", names);
+            if let Ok(r) = sym.update_providers_helper(names, ProfileSectionType::RuleProvider) {
+                let res_str: Vec<String> = r.iter().map(|(name, b)| {
+                    format!("{}-{}", name, b).to_string()
+                }).collect();
+                println!("names: {:?}", res_str)
+            }
+        }
     }
 }

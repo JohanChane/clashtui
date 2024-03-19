@@ -33,26 +33,34 @@ pub enum Keys {
 impl From<KeyCode> for Keys {
     fn from(value: KeyCode) -> Self {
         match value {
-            KeyCode::Char('P') => Keys::ProfileSwitch,
-            KeyCode::Char('u') => Keys::ProfileUpdate,
-            KeyCode::Char('U') => Keys::ProfileUpdateAll,
-            KeyCode::Char('i') => Keys::ProfileImport,
-            KeyCode::Char('d') => Keys::ProfileDelete,
-            KeyCode::Char('t') => Keys::ProfileTestConfig,
-            KeyCode::Char('T') => Keys::TemplateSwitch,
-            KeyCode::Char('e') => Keys::Edit,
-            KeyCode::Char('p') => Keys::Preview,
+            // Convention: Global Shortcuts As much as possible use uppercase. And Others as much as possible use lowcase to avoid conflicts with global shortcuts.
 
-            KeyCode::Char('R') => Keys::SoftRestart,
-
+            // ## Common shortcuts
             KeyCode::Down | KeyCode::Char('j') => Keys::Down,
             KeyCode::Up | KeyCode::Char('k') => Keys::Up,
             KeyCode::Enter => Keys::Select,
             KeyCode::Esc => Keys::Esc,
             KeyCode::Tab => Keys::Tab,
 
+            // ## Profile Tab shortcuts
+            KeyCode::Char('p') => Keys::ProfileSwitch,      // Not Global shortcuts
+            KeyCode::Char('t') => Keys::TemplateSwitch,     // Not Global shortcuts
+
+            // ## For operating file in Profile and Template Windows
+            KeyCode::Char('e') => Keys::Edit,
+            KeyCode::Char('v') => Keys::Preview,
+
+            // ## Profile windows shortcuts
+            KeyCode::Char('u') => Keys::ProfileUpdate,
+            KeyCode::Char('a') => Keys::ProfileUpdateAll,
+            KeyCode::Char('i') => Keys::ProfileImport,
+            KeyCode::Char('d') => Keys::ProfileDelete,
+            KeyCode::Char('s') => Keys::ProfileTestConfig,
+
+            // ## Global Shortcuts (As much as possible use uppercase. And Others as much as possible use lowcase to avoid conflicts with global shortcuts.)
+            KeyCode::Char('q') => Keys::AppQuit,   // Exiting is a common operation, and most software also exits with "q", so let's use "q".
+            KeyCode::Char('R') => Keys::SoftRestart,
             KeyCode::Char('L') => Keys::LogCat,
-            KeyCode::Char('Q') => Keys::AppQuit,
             KeyCode::Char('?') => Keys::AppHelp,
             KeyCode::Char('I') => Keys::AppInfo,
             KeyCode::Char('H') => Keys::AppConfig,

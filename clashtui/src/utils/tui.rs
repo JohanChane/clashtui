@@ -4,6 +4,8 @@ use std::{
     io::Error,
     path::{Path, PathBuf},
 };
+use api::ProfileSectionType;
+
 mod impl_app;
 mod impl_clashsrv;
 mod impl_profile;
@@ -13,6 +15,17 @@ use super::{
     parse_yaml,
 };
 use api::{ClashConfig, ClashUtil, Resp};
+
+// format: {section_key: [(name, url, path)]}
+pub type NetProviderMap = std::collections::HashMap<ProfileSectionType, Vec<(String, String, String)>>;
+// format: {type, [(name, result)]}
+pub type UpdateProviderType = std::collections::HashMap<ProfileSectionType, Vec<(String, std::io::Result<String>)>>;
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ProfileType {
+    Url,
+    Yaml,
+}
 
 const BASIC_FILE: &str = "basic_clash_config.yaml";
 
@@ -120,6 +133,12 @@ fn load_app_config(
         .unwrap_or_default()
         .to_string();
 
+    let clash_ua = basic_clash_config_value
+        .get("global-ua")
+        .and_then(|v| v.as_str())
+        .unwrap_or("clash.meta")
+        .to_string();
+
     let configs = if skip_init_conf {
         let config_path = clashtui_dir.join("config.yaml");
         match ClashTuiConfig::from_file(config_path.to_str().unwrap()) {
@@ -148,7 +167,7 @@ fn load_app_config(
     };
     (
         configs,
-        ClashUtil::new(controller_api, secret, proxy_addr),
+        ClashUtil::new(controller_api, secret, proxy_addr, clash_ua),
         err_collect,
     )
 }

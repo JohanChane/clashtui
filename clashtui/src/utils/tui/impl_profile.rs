@@ -1,5 +1,13 @@
+use std::os::unix::fs::{PermissionsExt, MetadataExt};
+use std::io::BufRead;
+use regex::Regex;
+
+use crate::utils::tui::{NetProviderMap, UpdateProviderType, ProfileType};
+use api::ProfileTimeMap;
+
 use super::ClashTuiUtil;
 use crate::utils::{is_yaml, utils as Utils};
+use api::ProfileSectionType;
 use std::{
     fs::{create_dir_all, File},
     io::Error,
@@ -210,7 +218,6 @@ impl ClashTuiUtil {
             }
         }
 
-        log::error!("testssdfs");
         let out_yaml_path = self.profile_dir.join(template_name);
         let out_yaml_file = File::create(out_yaml_path).map_err(|e| e.to_string())?;
         serde_yaml::to_writer(out_yaml_file, &out_parsed_yaml).map_err(|e| e.to_string())?;
@@ -249,9 +256,10 @@ impl ClashTuiUtil {
 
     pub fn rmf_profile(&self, profile_name: &String) -> Result<(), String> {
         use std::fs::remove_file;
-        remove_file(self.get_profile_path_unchecked(profile_name))
-            .and_then(|_| remove_file(self.get_profile_cache_unchecked(profile_name)))
-            .map_err(|e| e.to_string())
+        if self.get_profile_type(profile_name).is_some_and(|t| t == ProfileType::Url) {
+            let _ = remove_file(self.get_profile_cache_unchecked(profile_name));  // Not important
+        }
+        remove_file(self.get_profile_path_unchecked(profile_name)).map_err(|e| e.to_string())
     }
 
     pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> std::io::Result<String> {
@@ -336,10 +344,21 @@ impl ClashTuiUtil {
         profile_name: &String,
         does_update_all: bool,
     ) -> std::io::Result<Vec<String>> {
+        self.update_profile_with_clashtui(profile_name, does_update_all)
+        //self.update_profile_with_api(profile_name, does_update_all)
+    }
+
+    // The advantage of using this interface for updates is that you can know the reason for update failures without needing to check mihomo's logs. The downside is that it requires resolving file permission issues.
+    pub fn update_profile_with_clashtui(
+        &self,
+        profile_name: &String,
+        does_update_all: bool,
+    ) -> std::io::Result<Vec<String>> {
         let mut profile_yaml_path = self.profile_dir.join(profile_name);
-        let mut net_res: Vec<(String, String)> = Vec::new();
-        // if it's just the link
-        if !self.is_profile_yaml(profile_name) {
+        let mut result = Vec::new();
+        if self.get_profile_type(profile_name)
+            .is_some_and(|t| t == ProfileType::Url)
+        {
             let file_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
             let sub_url = file_content.trim();
 
@@ -347,67 +366,96 @@ impl ClashTuiUtil {
             // Update the file to keep up-to-date
             self.download_profile(sub_url, &profile_yaml_path)?;
 
-            net_res.push((
-                sub_url.to_string(),
-                profile_yaml_path.to_string_lossy().to_string(),
-            ))
+            result.push(format!("Updated: {}, {}", profile_name, sub_url));
         }
 
-        // Update the resouce in the file (if there is)
-        {
-            let yaml_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
-            let parsed_yaml = serde_yaml::Value::from(yaml_content.as_str());
-            drop(yaml_content);
-            net_res.extend(
-                if !does_update_all {
-                    vec!["proxy-providers"]
-                } else {
-                    vec!["proxy-providers", "rule-providers"]
+        let mut section_types = vec![ProfileSectionType::ProxyProvider];
+        if does_update_all {
+            section_types.push(ProfileSectionType::RuleProvider);
+        }
+
+        let mut net_providers = NetProviderMap::new();
+        if let Ok(providers) = self.extract_net_providers(&profile_yaml_path, &section_types) {
+            net_providers.extend(providers);
+        }
+
+        for (_, providers) in net_providers {
+            for (name, url, path) in providers {
+                match self.download_profile(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(&path)) {
+                    Ok(_) => result.push(format!("Updated: {}, {}", name, url)),
+                    Err(e) => result.push(format!("Not updated: {}, {}, {}", name, url, e)),
+
                 }
-                .into_iter()
-                .filter_map(|key| parsed_yaml.get(key))
-                .filter_map(|val| val.as_mapping())
-                // flatten inner iter
-                .flat_map(|providers| {
-                    providers
-                        .into_iter()
-                        .filter_map(|(_, provider_value)| provider_value.as_mapping())
-                        // pass only when type is http
-                        .filter(|&provider_content| {
-                            provider_content
-                                .get("type")
-                                .and_then(|v| v.as_str())
-                                .is_some_and(|t| t == "http")
-                        })
-                        .filter_map(|provider_content| {
-                            if let (
-                                Some(serde_yaml::Value::String(url)),
-                                Some(serde_yaml::Value::String(path)),
-                            ) = (provider_content.get("url"), provider_content.get("path"))
-                            {
-                                Some((url.clone(), path.clone()))
-                            } else {
-                                None
-                            }
-                        })
-                }),
+            }
+        }
+
+        Ok(result)
+    }
+
+    // Using api update, the user needs to check the logs to understand why the updates failed. The success rate of my testing updates is not as high as using clashtui.
+    pub fn update_profile_with_api(
+        &self,
+        profile_name: &String,
+        does_update_all: bool,
+    ) -> std::io::Result<Vec<String>> {
+        let mut profile_yaml_path = self.profile_dir.join(profile_name);
+        let mut result = Vec::new();
+        if self.get_profile_type(profile_name)
+            .is_some_and(|t| t == ProfileType::Url)
+        {
+            let file_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
+            let sub_url = file_content.trim();
+
+            profile_yaml_path = self.get_profile_cache_unchecked(profile_name);
+            // Update the file to keep up-to-date
+            self.download_profile(sub_url, &profile_yaml_path)?;
+
+            result.push(
+                format!("Updated: {}, {}", profile_name, sub_url)
             );
         }
 
-        Ok(net_res
-            .into_iter()
-            .map(|(url, path)| {
-                match self
-                    .download_profile(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(path))
-                {
-                    Ok(_) => format!("Updated: {url}"),
-                    Err(err) => {
-                        log::error!("Update profile:{err}");
-                        format!("Not Updated: {url}")
+        let mut provider_types = vec![ProfileSectionType::ProxyProvider];
+        if does_update_all {
+            provider_types.push(ProfileSectionType::RuleProvider);
+        }
+
+        let mut update_providers_result = UpdateProviderType::new();
+        let mut update_times = ProfileTimeMap::new();
+        for t in provider_types {
+            // Get result of update providers
+            update_providers_result.insert(t, self.clash_api.update_providers(t)?);
+
+            // Get update times after update providers
+            if let Ok(name_times) = self.clash_api.extract_provider_utimes_with_api(t) {
+                update_times.insert(t, name_times);
+            }
+        }
+
+        // Add results of updating providers
+        for (section_type, res) in update_providers_result {
+            for (name, r) in res {
+                // Generate duration_str
+                let duration_str = if let Ok(d) = Self::cal_mtime_duration(&update_times, section_type, &name) {
+                    Utils::str_duration(d)
+                } else {
+                    "No update times or can't cal the duration".to_string()
+                };
+
+                let line = match r {
+                    Ok(_) => {
+                        format!("Sent update request: {}, duration = '{}'", name, duration_str)
                     }
-                }
-            })
-            .collect::<Vec<String>>())
+                    Err(err) => {
+                        log::error!("Not Sent update request:{err}");
+                        format!("Not Sent update request: {}, duration = '{}'", name, duration_str)
+                    }
+                };
+                result.push(line);
+            }
+        }
+
+        Ok(result)
     }
 
     fn download_profile(&self, url: &str, path: &PathBuf) -> std::io::Result<()> {
@@ -418,11 +466,136 @@ impl ClashTuiUtil {
             create_dir_all(directory)?;
         }
 
-        let mut output_file = File::create(path)?;
         let response = self.dl_remote_profile(url)?;
+        let mut output_file = File::create(path)?;      // will truncate the file
         response.copy_to(&mut output_file)?;
         Ok(())
     }
+
+    fn get_provider_mtime(&self, section_types: Vec<ProfileSectionType>, profile_yaml_path: &PathBuf) -> std::io::Result<ProfileTimeMap> {
+        let mut modify_info = ProfileTimeMap::new();
+        if let Ok(net_res) = self.extract_net_providers(profile_yaml_path, &section_types) {
+            for (key, res) in net_res {
+                let name_and_times = res.into_iter().map(|(name, _, path)| {
+                    let clash_cfg_dir = Path::new(&self.tui_cfg.clash_cfg_dir);
+                    let time = Utils::get_mtime(clash_cfg_dir.join(path)).ok();
+                    (name, time)
+                }).collect();
+                modify_info.insert(key, name_and_times);
+            }
+        }
+
+        Ok(modify_info)
+    }
+
+    pub fn extract_net_providers(&self, profile_yaml_path: &PathBuf, provider_types: &Vec<ProfileSectionType>) -> std::io::Result<NetProviderMap> {
+        let yaml_content = std::fs::read_to_string(&profile_yaml_path)?;
+        let parsed_yaml = match serde_yaml::from_str::<serde_yaml::Value>(&yaml_content) {
+            Ok(value) => value,
+            Err(err) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
+        };
+
+        let provider_keys: Vec<_> = provider_types.iter().filter_map(|s_type| {
+            match s_type {
+                ProfileSectionType::ProxyProvider => Some("proxy-providers"),
+                ProfileSectionType::RuleProvider => Some("rule-providers"),
+                _ => None,
+            }
+        }).collect();
+
+        let mut net_providers = NetProviderMap::new();
+        for section_key in provider_keys {
+            let section_val = if let Some(val) = parsed_yaml.get(section_key) {
+                val
+            } else {
+                continue;
+            };
+
+            let the_section_val = if let serde_yaml::Value::Mapping(val) = section_val {
+                val
+            } else {
+                continue;
+            };
+
+            let mut providers: Vec<(String, String, String)> = Vec::new();
+            for (provider_key, provider_val) in the_section_val {
+                let provider = if let Some(val) = provider_val.as_mapping() {
+                    val
+                } else {
+                    continue;
+                };
+
+                if let (Some(name), Some(url), Some(path)) = (
+                    Some(provider_key),
+                    provider.get(&serde_yaml::Value::String("url".to_string())),
+                    provider.get(&serde_yaml::Value::String("path".to_string())),
+                ) {
+                    if let (serde_yaml::Value::String(name), serde_yaml::Value::String(url), serde_yaml::Value::String(path)) = (name, url, path) {
+                        providers.push((name.clone(), url.clone(), path.clone()));
+                    }
+                }
+            }
+
+            if section_key == "proxy-providers" {
+                net_providers.insert(ProfileSectionType::ProxyProvider, providers);
+            } else if section_key == "rule-providers" {
+                net_providers.insert(ProfileSectionType::RuleProvider, providers);
+            }
+        }
+
+        Ok(net_providers)
+    }
+
+    // duration: now - mtime
+    fn cal_mtime_duration(mtimes: &ProfileTimeMap, section_type: ProfileSectionType, name: &String) -> std::io::Result<std::time::Duration> {
+        let mt = Self::extract_the_mtime(mtimes, section_type, name).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "No the mtime in mtimes"))?;
+        let now = std::time::SystemTime::now();
+        now.duration_since(mt).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+
+    fn extract_the_mtime<'a>(mtimes: &'a ProfileTimeMap, section_type: ProfileSectionType, name: &String) -> &'a Option<std::time::SystemTime> {
+        if let Some(times) = mtimes.get(&section_type) {
+            for (n, the_mtime) in times {
+                if n == name {
+                    return the_mtime;
+                }
+            }
+        }
+
+        &None
+    }
+
+    // Check if need to correct perms of files in clash_cfg_dir. If perm is incorrect return false.
+    pub fn check_perms_of_ccd_files(&self) -> bool {
+        let dir = Path::new(self.tui_cfg.clash_cfg_dir.as_str());
+        //let group_name = Utils::get_file_group_name(&dir.to_path_buf());
+        //if group_name.is_none() {
+        //    return false;
+        //}
+
+        // check set-group-id
+        if let Ok(metadata) = std::fs::metadata(dir) {
+            let permissions = metadata.permissions();
+            if permissions.mode() & 0o2000 == 0 {
+                return false;
+            }
+        }
+
+        if let Ok(metadata) = std::fs::metadata(dir) {
+            if let Some(dir_group) = 
+                nix::unistd::Group::from_gid(nix::unistd::Gid::from_raw(metadata.gid())).unwrap()
+            {
+                if  Utils::find_files_not_in_group(&dir.to_path_buf(), dir_group.name.as_str()).len() > 0
+                    || Utils::find_files_not_group_writable(&dir.to_path_buf()).len() > 0
+                    {
+                        return false;
+                    }
+            }
+        }
+
+        return true;
+    }
+
 }
 
 impl ClashTuiUtil {
@@ -472,12 +645,44 @@ impl ClashTuiUtil {
             .join(profile_name)
             .with_extension("yaml")
     }
-    /// Check file only in `profiles`
-    ///
-    /// Judging by format
-    pub fn is_profile_yaml<P: AsRef<Path>>(&self, profile_name: P) -> bool {
+
+    pub fn get_profile_type(&self, profile_name: &str) -> Option<ProfileType> {
         let profile_path = self.get_profile_path_unchecked(profile_name);
-        is_yaml(&profile_path)
+        if is_yaml(&profile_path) {
+            return Some(ProfileType::Yaml);
+        }
+
+        match self.extract_profile_url(profile_name) {
+            Ok(_) => return Some(ProfileType::Url),
+            Err(e) => {
+                log::warn!("{}", e);
+            }
+        }
+
+        None
+    }
+
+    pub fn extract_profile_url(&self, profile_name: &str) -> std::io::Result<String> {
+        let profile_path = self.profile_dir.join(profile_name);
+        let file = File::open(profile_path)?;
+        let reader = std::io::BufReader::new(file);
+
+        let url_regex = Regex::new(r#"(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])"#)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("Invalid regex: {}", e)))?;
+
+
+        for line in reader.lines() {
+            let line = line?;
+            let line = line.trim();
+
+            if !line.starts_with("#") {     // `#` is comment char
+                if url_regex.is_match(&line) {
+                    return Ok(line.to_string());
+                }
+            }
+        }
+
+        Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("No URL found in {}", profile_name)))
     }
 }
 /// # Limitations
@@ -496,4 +701,34 @@ fn crt_symlink_file<P: AsRef<std::path::Path>>(original: P, target: P) -> std::i
     return os::windows::fs::symlink_file(original, target);
     #[cfg(target_os = "linux")]
     os::unix::fs::symlink(original, target)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn sym() -> ClashTuiUtil {
+        let exe_dir = std::env::current_dir().unwrap();
+        println!("{exe_dir:?}");
+        let clashtui_dir = exe_dir.parent().unwrap().join("Example");
+        let (util, _) = ClashTuiUtil::new(
+            &clashtui_dir.to_path_buf(),
+            true
+        );
+        util
+    }
+
+    #[test]
+    fn test_extrat_profile_net_res() {
+        let sym = sym();
+
+        let profile_name = "profile1.yaml";
+        let mut profile_yaml_path = sym.profile_dir.join(profile_name);
+        if sym.get_profile_type(profile_name)
+            .is_some_and(|t| t == ProfileType::Url)
+        {
+            profile_yaml_path = sym.get_profile_cache_unchecked(profile_name);
+        }
+        let net_providers = sym.extract_net_providers(&profile_yaml_path, &vec![ProfileSectionType::ProxyProvider]);
+    }
+
 }

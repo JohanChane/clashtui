@@ -5,30 +5,29 @@ proxy-groups:
   - name: "Entry"
     type: select
     proxies:
-      - FilterFallback
-      - FilterSelect
-      - <Auto>
-      - <Select>
+      - FilterSelectAll
+      - <FilterFb>            # use proxy-groups which name is `FilterFb`.
+      - <Auto>                # Empathize with `FilterFb`
+      - <Select>              # Empathize with `FilterFb`
 
-  - name: "FilterSelect"
+  - name: "FilterSelectAll"
     type: select
     use: 
-      - <provider>
+      - <provider>            # use proxy-providers which name is `provider`: provider0, provider1, ...
     filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
 
-  - name: "FilterFallback"
+  - name: "FilterFb"          # `FilterFb` name is customizable. Generate proxy-providers: FilterFb-provider0, FilterFb-provider1, ...
+    tpl_param:
+      providers: ["provider"]
     type: fallback
-    use: 
-      - <provider>
     filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
-    <<: *delay_test
 
-  - name: "Select"
+  - name: "Select"            # Empathize with `FilterFb`
     tpl_param:
       providers: ["provider"]
     type: select
 
-  - name: "Auto"
+  - name: "Auto"            # Empathize with `FilterFb`
     tpl_param:
       providers: ["provider"]
     type: url-test
@@ -47,12 +46,13 @@ proxy-groups:
       - DIRECT
 
 proxy-providers:
-  provider:
+  provider:           # `provider` name is customizable. Generate proxy-providers which name is `provider`: provider0, provider1, ...
     tpl_param:
     type: http
     <<: *pp
 
 rules:
+  #- IN-TYPE,INNER,DIRECT       # set inner type connection. e.g. update proxy-providers, rule-providers etc.
   - GEOIP,lan,DIRECT,no-resolve
   - GEOSITE,biliintl,Entry
   - GEOSITE,ehentai,Entry

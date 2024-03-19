@@ -41,13 +41,26 @@ pub trait TabEvent {
 macro_rules! msgpopup_methods {
     ($type:ident) => {
         impl $type {
+            // single-line popup
             pub fn popup_txt_msg(&mut self, msg: String) {
-                self.msgpopup.push_txt_msg(msg);
-                self.msgpopup.show();
+                if ! msg.is_empty() {
+                    self.msgpopup.push_txt_msg(msg);
+                    self.msgpopup.show();
+                }
             }
-            pub fn popup_list_msg(&mut self, msg: impl IntoIterator<Item = String>) {
-                self.msgpopup.push_list_msg(msg);
-                self.msgpopup.show();
+            // multi-lines popup
+            pub fn popup_list_msg<I>(&mut self, msg: I)
+            where
+                I: IntoIterator<Item = String>,
+            {
+                let mut list_msg = Vec::<String>::new();
+                for m in msg.into_iter() {
+                    list_msg.push(m);
+                }
+                if list_msg.len() > 0 {
+                    self.msgpopup.push_list_msg(list_msg);
+                    self.msgpopup.show();
+                }
             }
             #[allow(unused)]
             pub fn hide_msgpopup(&mut self) {

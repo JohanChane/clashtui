@@ -5,9 +5,9 @@ use crate::tui::{
     widgets::{ConfirmPopup, List, MsgPopup},
     EventState, Visibility,
 };
-use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
-use crate::{msgpopup_methods, utils::get_modify_time};
-crate::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);
+use crate::utils::{self, SharedClashTuiState, SharedClashTuiUtil, ProfileType};
+use crate::{msgpopup_methods, utils::get_mtime};
+crate::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);   // PTOp: ProfileTabOperation
 
 #[derive(PartialEq)]
 enum Fouce {
@@ -29,6 +29,7 @@ pub struct ProfileTab {
     clashtui_util: SharedClashTuiUtil,
     clashtui_state: SharedClashTuiState,
     op: Option<PTOp>,
+    confirm_op: Option<PTOp>,
 }
 
 impl ProfileTab {
@@ -48,6 +49,7 @@ impl ProfileTab {
             clashtui_util,
             clashtui_state,
             op: None,
+            confirm_op: None,
         };
 
         instance.update_profile_list();
@@ -142,7 +144,7 @@ impl ProfileTab {
             .map(|v| {
                 self.clashtui_util
                     .get_profile_yaml_path(v)
-                    .and_then(get_modify_time)
+                    .and_then(get_mtime)
                     .map_err(|e| log::error!("{v} => {e}"))
                     .ok()
             })
@@ -160,12 +162,12 @@ impl ProfileTab {
         self.profile_list
             .set_extras(profile_times.into_iter().map(|t| {
                 t.map(|t| {
-                    display_duration(
+                    utils::str_duration(
                         now.duration_since(t)
                             .expect("Clock may have gone backwards"),
                     )
                 })
-                .unwrap_or("Never/Error".to_string())
+                .unwrap_or("Never/Err".to_string())
             }))
     }
 }
@@ -180,7 +182,7 @@ impl super::TabEvent for ProfileTab {
         if event_state.is_notconsumed() {
             event_state = match self.confirm_popup.event(ev)? {
                 EventState::Yes => {
-                    self.op.replace(PTOp::Delete);
+                    self.op = self.confirm_op.take();
                     EventState::WorkDone
                 }
                 EventState::Cancel | EventState::WorkDone => EventState::WorkDone,
@@ -246,12 +248,15 @@ impl super::TabEvent for ProfileTab {
                         Keys::ProfileDelete => {
                             self.confirm_popup
                                 .popup_msg("`y` to Delete, `Esc` to cancel".to_string());
+                            self.confirm_op.replace(PTOp::Delete);
                             EventState::WorkDone
                         }
                         Keys::Edit => {
                             // Hmm, now every time I call edit, an window will pop up
                             // even if there is no error. But I think it's fine, maybe
                             // I'll solve it one day
+                            //
+                            // I fix it, because msg is empty.
                             self.popup_txt_msg(
                                 self.profile_list
                                     .selected()
@@ -283,7 +288,10 @@ impl super::TabEvent for ProfileTab {
                                         .map(|s| s.to_string())
                                         .collect();
 
-                                if !self.clashtui_util.is_profile_yaml(profile_name) {
+                                if self.clashtui_util.get_profile_type(profile_name)
+                                    .is_some_and(|t| t == ProfileType::Url)
+                                {
+                                    log::debug!("get_profile_type: is url");
                                     lines.push(String::new());
                                     profile_path =
                                         self.clashtui_util.get_profile_yaml_path(profile_name).ok();
@@ -355,7 +363,7 @@ impl super::TabEvent for ProfileTab {
                                         self.clashtui_util.edit_file(&tpl_file_path).err()
                                     })
                                     .map(|err| err.to_string())
-                                    .collect(),
+                                    .collect()
                             );
                             EventState::WorkDone
                         }
@@ -411,21 +419,6 @@ impl super::TabEvent for ProfileTab {
         self.profile_input.draw(f, input_area);
         self.msgpopup.draw(f, area);
         self.confirm_popup.draw(f, area);
-    }
-}
-fn display_duration(t: std::time::Duration) -> String {
-    use std::time::Duration;
-    if t.is_zero() {
-        "Just Now".to_string()
-    } else if t < Duration::from_secs(60 * 59) {
-        let min = t.as_secs() / 60;
-        format!("In {} mins", min + 1)
-    } else if t < Duration::from_secs(3600 * 24) {
-        let hou = t.as_secs() / 3600;
-        format!("In {hou} hours")
-    } else {
-        let day = t.as_secs() / (3600 * 24);
-        format!("In about {day} days")
     }
 }
 msgpopup_methods!(ProfileTab);

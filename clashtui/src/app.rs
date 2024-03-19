@@ -1,9 +1,10 @@
 use core::cell::{OnceCell, RefCell};
 use std::{path::PathBuf, rc::Rc};
+use std::io::{Write, BufRead, Read};
 
 use ui::event;
 
-use crate::msgpopup_methods;
+use crate::{msgpopup_methods, utils};
 use crate::tui::{
     tabs::{ClashSrvCtlTab, ProfileTab, TabEvent, Tabs},
     tools,
@@ -15,6 +16,19 @@ use crate::utils::{
     CfgError, ClashTuiUtil, Flag, Flags, SharedClashTuiState, SharedClashTuiUtil, State,
 };
 
+/// Mihomo (Clash.Meta) TUI Client
+///
+/// A tui tool for mihomo
+#[derive(argh::FromArgs)]
+pub struct CliEnv {
+    /// don't show UI but only update all profiles
+    #[argh(switch, short = 'u')]
+    pub update_all_profiles: bool,
+    /// print version information and exit
+    #[argh(switch, short = 'v')]
+    pub version: bool,
+}
+
 pub struct App {
     tabbar: TabBar,
     tabs: Vec<Tabs>,
@@ -23,7 +37,7 @@ pub struct App {
     info_popup: InfoPopUp,
     msgpopup: MsgPopup,
 
-    clashtui_util: SharedClashTuiUtil,
+    pub clashtui_util: SharedClashTuiUtil,
     statusbar: StatusBar,
 }
 
@@ -34,22 +48,6 @@ impl App {
     ) -> (Option<Self>, Vec<CfgError>) {
         let (util, err_track) =
             ClashTuiUtil::new(clashtui_config_dir, !flags.contains(Flag::FirstInit));
-        if flags.contains(Flag::UpdateOnly) {
-            log::info!("Cron Mode!");
-            util.get_profile_names()
-                .unwrap()
-                .into_iter()
-                .inspect(|s| println!("\nProfile: {s}"))
-                .filter_map(|v| {
-                    util.update_profile(&v, false)
-                        .map_err(|e| println!("- Error! {e}"))
-                        .ok()
-                })
-                .flatten()
-                .for_each(|s| println!("- {s}"));
-
-            return (None, err_track);
-        } // Finish cron
         let clashtui_util = SharedClashTuiUtil::new(util);
 
         let clashtui_state =
@@ -70,7 +68,7 @@ impl App {
         let statusbar = StatusBar::new(Rc::clone(&clashtui_state));
         let info_popup = InfoPopUp::with_items(&clashtui_util.clash_version());
 
-        let app = Self {
+        let mut app = Self {
             tabbar,
             should_quit: false,
             help_popup: Default::default(),
@@ -81,6 +79,8 @@ impl App {
             tabs,
         };
 
+        app.do_some_job_after_initapp_before_setupui();
+        
         (Some(app), err_track)
     }
 
@@ -139,14 +139,14 @@ impl App {
                 Keys::ClashConfig => {
                     let _ = self
                         .clashtui_util
-                        .open_dir(self.clashtui_util.clashtui_dir.as_path())
+                        .open_dir(&PathBuf::from(&self.clashtui_util.tui_cfg.clash_cfg_dir))
                         .map_err(|e| log::error!("ODIR: {}", e));
                     EventState::WorkDone
                 }
                 Keys::AppConfig => {
                     let _ = self
                         .clashtui_util
-                        .open_dir(&PathBuf::from(&self.clashtui_util.tui_cfg.clash_cfg_dir))
+                        .open_dir(self.clashtui_util.clashtui_dir.as_path())
                         .map_err(|e| log::error!("ODIR: {}", e));
                     EventState::WorkDone
                 }
@@ -247,6 +247,67 @@ impl App {
             .tui_cfg
             .to_file(config_path)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+
+    fn do_some_job_after_initapp_before_setupui(&mut self) {
+        // ## Correct the perm of files in clash_cfg_dir.
+        if ! self.clashtui_util.check_perms_of_ccd_files() {
+            let ccd_str = self.clashtui_util.tui_cfg.clash_cfg_dir.as_str();
+            if ! utils::is_run_as_root() {
+                print!("The permissions of the '{}' files are incorrect. clashtui need to run as root to correct. Proceed with running as root? [Y/n] ", ccd_str);
+                std::io::stdout().flush().expect("Failed to flush stdout");
+
+                let mut input = String::new();
+                let stdin = std::io::stdin();
+                stdin.lock().read_line(&mut input).unwrap();
+
+                if input.trim().to_lowercase().as_str() == "y" {
+                    utils::run_as_root();
+                }
+
+            } else {
+                if utils::is_clashtui_ep() {
+                    println!("\nStart correct the permissions of files in '{}':\n", ccd_str);
+                    let dir = std::path::Path::new(ccd_str);
+                    if let Some(group_name) = utils::get_file_group_name(&dir.to_path_buf()) {
+                        utils::restore_fileop_as_root();
+                        utils::modify_file_perms_in_dir(&dir.to_path_buf(), group_name.as_str());
+                        utils::mock_fileop_as_sudo_user();
+                    }
+                    print!("\nEnd correct the permissions of files in '{}'. \n\nPress any key to continue. ", ccd_str);
+                    std::io::stdout().flush().expect("Failed to flush stdout");
+                    let _ = std::io::stdin().read(&mut [0u8]);
+                } else {      // user manually executing `sudo clashtui`
+                    // Do nothing, as root is unaffected by permissions.
+                }
+            }
+        }
+
+        let cli_env: CliEnv = argh::from_env();
+
+        // ## CliMode
+        let mut is_cli_mode = false;
+
+        if cli_env.update_all_profiles {
+            is_cli_mode = true;
+
+            log::info!("Cron Mode!");
+            self.clashtui_util.get_profile_names()
+                .unwrap()
+                .into_iter()
+                .inspect(|s| println!("\nProfile: {s}"))
+                .filter_map(|v| {
+                    self.clashtui_util.update_profile(&v, false)
+                        .map_err(|e| println!("- Error! {e}"))
+                        .ok()
+                })
+                .flatten()
+                .for_each(|s| println!("- {s}"));
+        }
+
+        if is_cli_mode {
+            std::process::exit(0);
+        }
     }
 }
 

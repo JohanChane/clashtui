@@ -12,5 +12,5 @@ pub type SharedClashTuiState = std::rc::Rc<core::cell::RefCell<State>>;
 pub use config::{init_config, CfgError};
 pub use flags::{BitFlags as Flags, Flag};
 pub use state::State;
-pub use tui::ClashTuiUtil;
+pub use tui::{ClashTuiUtil, ProfileType};
 pub use utils::*;
