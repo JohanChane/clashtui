@@ -379,7 +379,7 @@ mod tests {
             "http://127.0.0.1:9090".to_string(),
             "test".to_string(),
             "http://127.0.0.1:7890".to_string(),
-            "clash.meta",
+            "clash.meta".to_string(),
         )
     }
     #[test]
