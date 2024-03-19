@@ -271,9 +271,6 @@ impl ClashTuiUtil {
             self.tui_cfg.clash_cfg_dir,
             path,
         );
-        #[cfg(target_os = "windows")]
-        return exec("cmd", vec!["/C", cmd.as_str()]);
-        #[cfg(target_os = "linux")]
         exec("sh", vec!["-c", cmd.as_str()])
     }
 
@@ -693,9 +690,6 @@ impl ClashTuiUtil {
 #[allow(unused)]
 fn crt_symlink_file<P: AsRef<std::path::Path>>(original: P, target: P) -> std::io::Result<()> {
     use std::os;
-    #[cfg(target_os = "windows")]
-    return os::windows::fs::symlink_file(original, target);
-    #[cfg(target_os = "linux")]
     os::unix::fs::symlink(original, target)
 }
 

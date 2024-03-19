@@ -117,13 +117,8 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
             flags.insert(Flag::PortableMode);
             data_dir
         } else {
-            #[cfg(target_os = "linux")]
             let clashtui_config_dir_str = env::var("XDG_CONFIG_HOME").map(|p| format!("{}/clashtui", p))
                 .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)))
-                .unwrap();
-            #[cfg(target_os = "windows")]
-            let clashtui_config_dir_str = env::var("APPDATA")
-                .map(|appdata| format!("{}/clashtui", appdata))
                 .unwrap();
             PathBuf::from(&clashtui_config_dir_str)
         }

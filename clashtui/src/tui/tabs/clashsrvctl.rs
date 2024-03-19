@@ -31,19 +31,10 @@ impl ClashSrvCtlTab {
     pub fn new(clashtui_util: SharedClashTuiUtil, clashtui_state: SharedClashTuiState) -> Self {
         let mut operations = List::new(CLASHSRVCTL.to_string());
         operations.set_items(vec![
-            #[cfg(target_os = "linux")]
             ClashSrvOp::SetPermission.into(),
             ClashSrvOp::StartClashService.into(),
             ClashSrvOp::StopClashService.into(),
             ClashSrvOp::SwitchMode.into(),
-            #[cfg(target_os = "windows")]
-            ClashSrvOp::SwitchSysProxy.into(),
-            #[cfg(target_os = "windows")]
-            ClashSrvOp::EnableLoopback.into(),
-            #[cfg(target_os = "windows")]
-            ClashSrvOp::InstallSrv.into(),
-            #[cfg(target_os = "windows")]
-            ClashSrvOp::UnInstallSrv.into(),
         ]);
         let mut modes = List::new("Mode".to_string());
         modes.set_items(vec![
@@ -127,16 +118,6 @@ impl super::TabEvent for ClashSrvCtlTab {
             self.hide_msgpopup();
             match op {
                 ClashSrvOp::SwitchMode => unreachable!(),
-                #[cfg(target_os = "windows")]
-                ClashSrvOp::SwitchSysProxy => {
-                    let cur = self
-                        .clashtui_state
-                        .borrow()
-                        .get_sysproxy()
-                        .map_or(true, |b| !b);
-                    self.clashtui_state.borrow_mut().set_sysproxy(cur);
-                    self.hide_msgpopup();
-                }
                 _ => match self.clashtui_util.clash_srv_ctl(op) {
                     Ok(output) => {
                         self.popup_list_msg(output.lines().map(|line| line.trim().to_string()));

@@ -33,9 +33,6 @@ nix = {version = "0.28.0", features = ["fs", "user"]}
 libc = "0.2.153"
 regex = "1.10.3"
 
-[target.'cfg(target_os = "windows")'.dependencies]
-encoding = "0.2.33"
-
 [workspace]
 resolver = '2'
 members = ["api", "ui", "ui-derive"]
