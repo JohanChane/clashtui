@@ -5,8 +5,8 @@ proxy-groups:
   - name: "Entry"
     type: select
     proxies:
-      - FilterSelectAll
       - <FilterFb>            # use proxy-groups which name is `FilterFb`.
+      - FilterSelectAll
       - <Auto>                # Empathize with `FilterFb`
       - <Select>              # Empathize with `FilterFb`
 

@@ -359,12 +359,10 @@ impl ClashTuiUtil {
         if self.get_profile_type(profile_name)
             .is_some_and(|t| t == ProfileType::Url)
         {
-            let file_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
-            let sub_url = file_content.trim();
-
+            let sub_url = self.extract_profile_url(profile_name)?;
             profile_yaml_path = self.get_profile_cache_unchecked(profile_name);
             // Update the file to keep up-to-date
-            self.download_profile(sub_url, &profile_yaml_path)?;
+            self.download_profile(sub_url.as_str(), &profile_yaml_path)?;
 
             result.push(format!("Updated: {}, {}", profile_name, sub_url));
         }
@@ -393,22 +391,20 @@ impl ClashTuiUtil {
     }
 
     // Using api update, the user needs to check the logs to understand why the updates failed. The success rate of my testing updates is not as high as using clashtui.
+    #[cfg(target_feature = "deprecated")]
     pub fn update_profile_with_api(
         &self,
         profile_name: &String,
         does_update_all: bool,
     ) -> std::io::Result<Vec<String>> {
-        let mut profile_yaml_path = self.profile_dir.join(profile_name);
         let mut result = Vec::new();
         if self.get_profile_type(profile_name)
             .is_some_and(|t| t == ProfileType::Url)
         {
-            let file_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
-            let sub_url = file_content.trim();
-
-            profile_yaml_path = self.get_profile_cache_unchecked(profile_name);
+            let sub_url = self.extract_profile_url(profile_name)?;
+            let profile_yaml_path = self.get_profile_cache_unchecked(profile_name);
             // Update the file to keep up-to-date
-            self.download_profile(sub_url, &profile_yaml_path)?;
+            self.download_profile(sub_url.as_str(), &profile_yaml_path)?;
 
             result.push(
                 format!("Updated: {}, {}", profile_name, sub_url)

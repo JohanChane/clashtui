@@ -76,10 +76,10 @@ fn run_app(
 ) -> std::io::Result<()> {
     if flags.contains(utils::Flag::FirstInit) {
         warning_list_msg.push("Welcome to ClashTui!".to_string());
-        warning_list_msg.push("Please go to Config Tab to set configs so that program can work properly".to_string());
+        warning_list_msg.push(format!("Please go to config the clashtui_cfg_dir '{}' so that program can work properly", app.clashtui_util.clashtui_dir.to_str().unwrap_or("Failed to get the path")));
     };
     if flags.contains(utils::Flag::ErrorDuringInit) {
-        warning_list_msg.push("Some Error happened during app init, Check the log for detail".to_string());
+        warning_list_msg.push("Some error happened during app init, check the log for detail".to_string());
     }
     err_track
         .into_iter()
