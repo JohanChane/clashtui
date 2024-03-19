@@ -379,6 +379,7 @@ mod tests {
             "http://127.0.0.1:9090".to_string(),
             "test".to_string(),
             "http://127.0.0.1:7890".to_string(),
+            "clash.meta",
         )
     }
     #[test]
@@ -440,20 +441,5 @@ mod tests {
             }
         );
         assert!(flag)
-    }
-
-    #[test]
-    fn test_update_all_providers() {
-        let sym = sym();
-
-        if let Ok(names) = sym.extract_net_providers(ProfileSectionType::ProxyProvider) {
-            println!("extract_net_providers: {:?}", names);
-            if let Ok(r) = sym.update_providers_helper(names, ProfileSectionType::RuleProvider) {
-                let res_str: Vec<String> = r.iter().map(|(name, b)| {
-                    format!("{}-{}", name, b).to_string()
-                }).collect();
-                println!("names: {:?}", res_str)
-            }
-        }
     }
 }
