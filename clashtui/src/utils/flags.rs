@@ -5,10 +5,9 @@ pub use enumflags2::BitFlags;
 #[bitflags]
 #[repr(u8)]
 pub enum Flag {
-    CliMode = 1,
-    FirstInit = 1 << 1,
-    ErrorDuringInit = 1 << 2,
-    PortableMode = 1 << 3,
+    FirstInit = 1,
+    ErrorDuringInit = 1 << 1,
+    PortableMode = 1 << 2,
 }
 #[cfg(test)]
 mod test {

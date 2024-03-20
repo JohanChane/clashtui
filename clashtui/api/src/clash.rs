@@ -1,32 +1,20 @@
 const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
-const TIMEOUT: u8 = 3;
+//const TIMEOUT: u8 = 3;
+const TIMEOUT: u8 = 10;     // Adapting to poor network conditions.
+                            // ToDo: Users can adjust settings based on their network quality.
 #[cfg(target_feature = "deprecated")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
 #[cfg(target_feature = "deprecated")]
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 use std::io::Result;
-use std::time::SystemTime;
-
-use minreq::{Method, Proxy};
-use chrono::{DateTime, Local, TimeZone};
-
-// format: {type: [(name, modifytime)]}
-pub type ProfileTimeMap = std::collections::HashMap<ProfileSectionType, Vec<(String, Option<std::time::SystemTime>)>>;
+use minreq::Method;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ProfileSectionType {
     Profile,
     ProxyProvider,
     RuleProvider,
-}
-
-pub fn provider_str_in_api(section_type: ProfileSectionType) -> Option<String> {
-    match section_type {
-        ProfileSectionType::ProxyProvider => Some("proxies".to_string()),
-        ProfileSectionType::RuleProvider => Some("rules".to_string()),
-        _ => None,
-    }
 }
 
 trait ResProcess {
@@ -140,6 +128,7 @@ impl ClashUtil {
         self.request(Method::Patch, "/configs", Some(payload))
     }
 
+    /*** update_providers_with_api
     pub fn update_providers(&self, provider_type: ProfileSectionType) -> Result<Vec<(String, Result<String>)>> {
         self.extract_net_providers(provider_type).and_then(|names| self.update_providers_helper(names, provider_type))
     }
@@ -184,7 +173,9 @@ impl ClashUtil {
     }
 
     // Sometime mihomo updated the provider but not update it to the file.
-    pub fn extract_provider_utimes_with_api(&self, provider_type: ProfileSectionType) -> Result<Vec<(String, Option<SystemTime>)>>{
+    pub fn extract_provider_utimes_with_api(&self, provider_type: ProfileSectionType) -> Result<Vec<(String, Option<std::time::SystemTime>)>>{
+        use chrono::{DateTime, Local};
+
         let sub_url = format!("/providers/{}", provider_str_in_api(provider_type).unwrap());
         let response_str = self.request(Method::Get, sub_url.as_str(), None)?;
 
@@ -218,6 +209,15 @@ impl ClashUtil {
 
         Ok(net_providers)
     }
+
+    pub fn provider_str_in_api(section_type: ProfileSectionType) -> Option<String> {
+        match section_type {
+            ProfileSectionType::ProxyProvider => Some("proxies".to_string()),
+            ProfileSectionType::RuleProvider => Some("rules".to_string()),
+            _ => None,
+        }
+    }
+    ***/
 
     #[cfg(target_feature = "deprecated")]
     pub fn check_geo_update(

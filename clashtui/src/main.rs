@@ -23,11 +23,6 @@ fn main() {
 
     let mut flags = Flags::empty();
 
-    // ## Is CliMode
-    if cli_env.update_all_profiles {
-        flags.insert(Flag::CliMode)
-    }
-
     // ## Setup logging as early as possible. So We can log.
     let config_dir = load_app_dir(&mut flags);
     setup_logging(config_dir.join("clashtui.log").to_str().unwrap());

@@ -1,9 +1,8 @@
 use std::{fs, process, env};
 use std::os::unix::fs::{PermissionsExt, MetadataExt};
-use nix::unistd::{Uid, Gid, Group, User, geteuid, setfsuid, setfsgid, getgroups, setgroups, initgroups, setuid, setgid};
-use std::path::{Path, PathBuf};
-//use libc::{getlogin, setreuid, setuid, setgid};
-use std::ffi::{CStr, CString};
+use nix::unistd::{Uid, Gid, Group, geteuid, setfsuid, setfsgid, initgroups};
+use std::path::PathBuf;
+use std::ffi::CString;
 use std::os::unix::process::CommandExt;
 
 pub(super) fn get_file_names<P>(dir: P) -> std::io::Result<Vec<String>>

@@ -52,7 +52,7 @@ checksum = "5ad32ce52e4161730f7098c077cd2ed6229b5804ccf99e5366be1ab72a98b4e1"
 
 [[package]]
 name = "api"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "minreq",
@@ -180,12 +180,11 @@ dependencies = [
 
 [[package]]
 name = "clashtui"
-version = "0.2.4"
+version = "0.2.0"
 dependencies = [
  "api",
  "argh",
  "enumflags2",
- "libc",
  "log",
  "log4rs",
  "nix",

@@ -1,9 +1,4 @@
-use std::os::unix::fs::{PermissionsExt, MetadataExt};
-use std::io::BufRead;
-use regex::Regex;
-
-use crate::utils::tui::{NetProviderMap, UpdateProviderType, ProfileType};
-use api::ProfileTimeMap;
+use crate::utils::tui::{NetProviderMap, ProfileType};
 
 use super::ClashTuiUtil;
 use crate::utils::{is_yaml, utils as Utils};
@@ -342,7 +337,6 @@ impl ClashTuiUtil {
         does_update_all: bool,
     ) -> std::io::Result<Vec<String>> {
         self.update_profile_with_clashtui(profile_name, does_update_all)
-        //self.update_profile_with_api(profile_name, does_update_all)
     }
 
     // The advantage of using this interface for updates is that you can know the reason for update failures without needing to check mihomo's logs. The downside is that it requires resolving file permission issues.
@@ -387,70 +381,6 @@ impl ClashTuiUtil {
         Ok(result)
     }
 
-    // Using api update, the user needs to check the logs to understand why the updates failed. The success rate of my testing updates is not as high as using clashtui.
-    #[cfg(target_feature = "deprecated")]
-    pub fn update_profile_with_api(
-        &self,
-        profile_name: &String,
-        does_update_all: bool,
-    ) -> std::io::Result<Vec<String>> {
-        let mut result = Vec::new();
-        if self.get_profile_type(profile_name)
-            .is_some_and(|t| t == ProfileType::Url)
-        {
-            let sub_url = self.extract_profile_url(profile_name)?;
-            let profile_yaml_path = self.get_profile_cache_unchecked(profile_name);
-            // Update the file to keep up-to-date
-            self.download_profile(sub_url.as_str(), &profile_yaml_path)?;
-
-            result.push(
-                format!("Updated: {}, {}", profile_name, sub_url)
-            );
-        }
-
-        let mut provider_types = vec![ProfileSectionType::ProxyProvider];
-        if does_update_all {
-            provider_types.push(ProfileSectionType::RuleProvider);
-        }
-
-        let mut update_providers_result = UpdateProviderType::new();
-        let mut update_times = ProfileTimeMap::new();
-        for t in provider_types {
-            // Get result of update providers
-            update_providers_result.insert(t, self.clash_api.update_providers(t)?);
-
-            // Get update times after update providers
-            if let Ok(name_times) = self.clash_api.extract_provider_utimes_with_api(t) {
-                update_times.insert(t, name_times);
-            }
-        }
-
-        // Add results of updating providers
-        for (section_type, res) in update_providers_result {
-            for (name, r) in res {
-                // Generate duration_str
-                let duration_str = if let Ok(d) = Self::cal_mtime_duration(&update_times, section_type, &name) {
-                    Utils::str_duration(d)
-                } else {
-                    "No update times or can't cal the duration".to_string()
-                };
-
-                let line = match r {
-                    Ok(_) => {
-                        format!("Sent update request: {}, duration = '{}'", name, duration_str)
-                    }
-                    Err(err) => {
-                        log::error!("Not Sent update request:{err}");
-                        format!("Not Sent update request: {}, duration = '{}'", name, duration_str)
-                    }
-                };
-                result.push(line);
-            }
-        }
-
-        Ok(result)
-    }
-
     fn download_profile(&self, url: &str, path: &PathBuf) -> std::io::Result<()> {
         let directory = path
             .parent()
@@ -463,22 +393,6 @@ impl ClashTuiUtil {
         let mut output_file = File::create(path)?;      // will truncate the file
         response.copy_to(&mut output_file)?;
         Ok(())
-    }
-
-    fn get_provider_mtime(&self, section_types: Vec<ProfileSectionType>, profile_yaml_path: &PathBuf) -> std::io::Result<ProfileTimeMap> {
-        let mut modify_info = ProfileTimeMap::new();
-        if let Ok(net_res) = self.extract_net_providers(profile_yaml_path, &section_types) {
-            for (key, res) in net_res {
-                let name_and_times = res.into_iter().map(|(name, _, path)| {
-                    let clash_cfg_dir = Path::new(&self.tui_cfg.clash_cfg_dir);
-                    let time = Utils::get_mtime(clash_cfg_dir.join(path)).ok();
-                    (name, time)
-                }).collect();
-                modify_info.insert(key, name_and_times);
-            }
-        }
-
-        Ok(modify_info)
     }
 
     pub fn extract_net_providers(&self, profile_yaml_path: &PathBuf, provider_types: &Vec<ProfileSectionType>) -> std::io::Result<NetProviderMap> {
@@ -539,27 +453,10 @@ impl ClashTuiUtil {
         Ok(net_providers)
     }
 
-    // duration: now - mtime
-    fn cal_mtime_duration(mtimes: &ProfileTimeMap, section_type: ProfileSectionType, name: &String) -> std::io::Result<std::time::Duration> {
-        let mt = Self::extract_the_mtime(mtimes, section_type, name).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "No the mtime in mtimes"))?;
-        let now = std::time::SystemTime::now();
-        now.duration_since(mt).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-    }
-
-    fn extract_the_mtime<'a>(mtimes: &'a ProfileTimeMap, section_type: ProfileSectionType, name: &String) -> &'a Option<std::time::SystemTime> {
-        if let Some(times) = mtimes.get(&section_type) {
-            for (n, the_mtime) in times {
-                if n == name {
-                    return the_mtime;
-                }
-            }
-        }
-
-        &None
-    }
-
     // Check if need to correct perms of files in clash_cfg_dir. If perm is incorrect return false.
     pub fn check_perms_of_ccd_files(&self) -> bool {
+        use std::os::unix::fs::{PermissionsExt, MetadataExt};
+
         let dir = Path::new(self.tui_cfg.clash_cfg_dir.as_str());
         //let group_name = Utils::get_file_group_name(&dir.to_path_buf());
         //if group_name.is_none() {
@@ -589,6 +486,112 @@ impl ClashTuiUtil {
         return true;
     }
 
+    /*** Update profile with api
+    // format: {type, [(name, result)]}
+    pub type UpdateProviderType = std::collections::HashMap<ProfileSectionType, Vec<(String, std::io::Result<String>)>>;
+
+    // Using api update, the user needs to check the logs to understand why the updates failed. The success rate of my testing updates is not as high as using clashtui.
+    pub fn update_profile_with_api(
+        &self,
+        profile_name: &String,
+        does_update_all: bool,
+    ) -> std::io::Result<Vec<String>> {
+
+        let mut result = Vec::new();
+        if self.get_profile_type(profile_name)
+            .is_some_and(|t| t == ProfileType::Url)
+        {
+            let sub_url = self.extract_profile_url(profile_name)?;
+            let profile_yaml_path = self.get_profile_cache_unchecked(profile_name);
+            // Update the file to keep up-to-date
+            self.download_profile(sub_url.as_str(), &profile_yaml_path)?;
+
+            result.push(
+                format!("Updated: {}, {}", profile_name, sub_url)
+            );
+        }
+
+        let mut provider_types = vec![ProfileSectionType::ProxyProvider];
+        if does_update_all {
+            provider_types.push(ProfileSectionType::RuleProvider);
+        }
+
+        let mut update_providers_result = UpdateProviderType::new();
+        let mut update_times = ProfileTimeMap::new();
+        for t in provider_types {
+            // Get result of update providers
+            update_providers_result.insert(t, self.clash_api.update_providers(t)?);
+
+            // Get update times after update providers
+            if let Ok(name_times) = self.clash_api.extract_provider_utimes_with_api(t) {
+                update_times.insert(t, name_times);
+            }
+        }
+
+        // Add results of updating providers
+        for (section_type, res) in update_providers_result {
+            for (name, r) in res {
+                // Generate duration_str
+                let duration_str = if let Ok(d) = Self::cal_mtime_duration(&update_times, section_type, &name) {
+                    Utils::str_duration(d)
+                } else {
+                    "No update times or can't cal the duration".to_string()
+                };
+
+                let line = match r {
+                    Ok(_) => {
+                        format!("Sent update request: {}, duration = '{}'", name, duration_str)
+                    }
+                    Err(err) => {
+                        log::error!("Not Sent update request:{err}");
+                        format!("Not Sent update request: {}, duration = '{}'", name, duration_str)
+                    }
+                };
+                result.push(line);
+            }
+        }
+
+        Ok(result)
+    }
+
+    // duration: now - mtime
+    fn cal_mtime_duration(mtimes: &ProfileTimeMap, section_type: ProfileSectionType, name: &String) -> std::io::Result<std::time::Duration> {
+        let mt = Self::extract_the_mtime(mtimes, section_type, name).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "No the mtime in mtimes"))?;
+        let now = std::time::SystemTime::now();
+        now.duration_since(mt).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+
+    fn extract_the_mtime<'a>(mtimes: &'a ProfileTimeMap, section_type: ProfileSectionType, name: &String) -> &'a Option<std::time::SystemTime> {
+        if let Some(times) = mtimes.get(&section_type) {
+            for (n, the_mtime) in times {
+                if n == name {
+                    return the_mtime;
+                }
+            }
+        }
+
+        &None
+    }
+
+    // For Showing provider duration (now - mtime) in `update_profile_with_api`.
+    // format: {type: [(name, modifytime)]}
+    pub type ProfileTimeMap = std::collections::HashMap<ProfileSectionType, Vec<(String, Option<std::time::SystemTime>)>>;
+    fn get_provider_mtime(&self, section_types: Vec<ProfileSectionType>, profile_yaml_path: &PathBuf) -> std::io::Result<ProfileTimeMap> {
+        let mut modify_info = ProfileTimeMap::new();
+        if let Ok(net_res) = self.extract_net_providers(profile_yaml_path, &section_types) {
+            for (key, res) in net_res {
+                let name_and_times = res.into_iter().map(|(name, _, path)| {
+                    let clash_cfg_dir = Path::new(&self.tui_cfg.clash_cfg_dir);
+                    let time = Utils::get_mtime(clash_cfg_dir.join(path)).ok();
+                    (name, time)
+                }).collect();
+                modify_info.insert(key, name_and_times);
+            }
+        }
+
+        Ok(modify_info)
+    }
+    ***/
 }
 
 impl ClashTuiUtil {
@@ -656,6 +659,9 @@ impl ClashTuiUtil {
     }
 
     pub fn extract_profile_url(&self, profile_name: &str) -> std::io::Result<String> {
+        use std::io::BufRead;
+        use regex::Regex;
+
         let profile_path = self.profile_dir.join(profile_name);
         let file = File::open(profile_path)?;
         let reader = std::io::BufReader::new(file);
@@ -718,7 +724,7 @@ mod tests {
         {
             profile_yaml_path = sym.get_profile_cache_unchecked(profile_name);
         }
-        let net_providers = sym.extract_net_providers(&profile_yaml_path, &vec![ProfileSectionType::ProxyProvider]);
+        let _ = sym.extract_net_providers(&profile_yaml_path, &vec![ProfileSectionType::ProxyProvider]);
     }
 
 }
