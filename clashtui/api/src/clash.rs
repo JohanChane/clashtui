@@ -1,5 +1,7 @@
 const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
-const TIMEOUT: u8 = 3;
+//const TIMEOUT: u8 = 3;
+const TIMEOUT: u8 = 10;     // Adapting to poor network conditions.
+                            // ToDo: Users can adjust settings based on their network quality.
 #[cfg(target_feature = "deprecated")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
 #[cfg(target_feature = "deprecated")]

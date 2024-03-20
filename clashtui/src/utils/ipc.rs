@@ -1,4 +1,3 @@
-#[cfg(target_os = "windows")]
 use encoding::{all::GBK, DecoderTrap, Encoding};
 use std::process::{Command, Output, Stdio};
 
@@ -20,16 +19,7 @@ pub fn spawn(pgm: &str, args: Vec<&str>) -> Result<()> {
         .spawn()?;
     Ok(())
 }
-#[cfg(target_os = "linux")]
-pub fn exec_with_sbin(pgm: &str, args: Vec<&str>) -> Result<String> {
-    log::debug!("LIPC: {} {:?}", pgm, args);
-    let mut path = std::env::var("PATH").unwrap_or_default();
-    path.push_str(":/usr/sbin");
-    let output = Command::new(pgm).env("PATH", path).args(args).output()?;
-    string_process_output(output)
-}
 
-#[cfg(target_os = "windows")]
 fn execute_powershell_script(script: &str) -> Result<String> {
     string_process_output(
         Command::new("powershell")
@@ -38,7 +28,7 @@ fn execute_powershell_script(script: &str) -> Result<String> {
             .output()?,
     )
 }
-#[cfg(target_os = "windows")]
+
 pub fn start_process_as_admin(path: &str, arg_list: &str, does_wait: bool) -> Result<String> {
     let wait_op = if does_wait { "-Wait" } else { "" };
     let arg_op = if arg_list.is_empty() {
@@ -57,7 +47,6 @@ pub fn start_process_as_admin(path: &str, arg_list: &str, does_wait: bool) -> Re
 
     string_process_output(output)
 }
-#[cfg(target_os = "windows")]
 pub fn execute_powershell_script_as_admin(cmd: &str, does_wait: bool) -> Result<String> {
     let wait_op = if does_wait { "-Wait" } else { "" };
     let cmd_op: String = if cmd.is_empty() {
@@ -75,7 +64,7 @@ pub fn execute_powershell_script_as_admin(cmd: &str, does_wait: bool) -> Result<
 
     string_process_output(output)
 }
-#[cfg(target_os = "windows")]
+
 pub fn enable_system_proxy(proxy_addr: &str) -> Result<String> {
     let enable_script = format!(
         r#"
@@ -91,7 +80,6 @@ pub fn enable_system_proxy(proxy_addr: &str) -> Result<String> {
     execute_powershell_script(&enable_script)
 }
 
-#[cfg(target_os = "windows")]
 pub fn disable_system_proxy() -> Result<String> {
     let disable_script = r#"
         $regPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
@@ -103,7 +91,6 @@ pub fn disable_system_proxy() -> Result<String> {
     execute_powershell_script(disable_script)
 }
 
-#[cfg(target_os = "windows")]
 pub fn is_system_proxy_enabled() -> Result<bool> {
     let reg_query_output = Command::new("reg")
         .args(&[
@@ -124,7 +111,6 @@ pub fn is_system_proxy_enabled() -> Result<bool> {
     Ok(is_enabled)
 }
 
-#[cfg(target_os = "windows")]
 fn string_process_output(output: Output) -> Result<String> {
     let stdout_vec: Vec<u8> = output.stdout;
     use std::io::{Error, ErrorKind};
@@ -146,27 +132,6 @@ fn string_process_output(output: Output) -> Result<String> {
                 format!("Failed to decode stderr: {err}"),
             )
         })?;
-
-    let result_str = format!(
-        r#"
-        Status:
-        {}
-
-        Stdout:
-        {}
-
-        Stderr:
-        {}
-        "#,
-        output.status, stdout_str, stderr_str
-    );
-
-    Ok(result_str)
-}
-#[cfg(target_os = "linux")]
-fn string_process_output(output: Output) -> Result<String> {
-    let stdout_str = String::from_utf8(output.stdout).unwrap();
-    let stderr_str = String::from_utf8(output.stderr).unwrap();
 
     let result_str = format!(
         r#"

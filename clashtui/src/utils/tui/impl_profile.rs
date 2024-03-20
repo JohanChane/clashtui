@@ -1,7 +1,3 @@
-use std::os::unix::fs::{PermissionsExt, MetadataExt};
-use std::io::BufRead;
-use regex::Regex;
-
 use crate::utils::tui::{NetProviderMap, UpdateProviderType, ProfileType};
 use api::ProfileTimeMap;
 
@@ -271,10 +267,7 @@ impl ClashTuiUtil {
             self.tui_cfg.clash_cfg_dir,
             path,
         );
-        #[cfg(target_os = "windows")]
         return exec("cmd", vec!["/C", cmd.as_str()]);
-        #[cfg(target_os = "linux")]
-        exec("sh", vec!["-c", cmd.as_str()])
     }
 
     pub fn select_profile(&self, profile_name: &String) -> std::io::Result<()> {
@@ -560,38 +553,6 @@ impl ClashTuiUtil {
 
         &None
     }
-
-    // Check if need to correct perms of files in clash_cfg_dir. If perm is incorrect return false.
-    pub fn check_perms_of_ccd_files(&self) -> bool {
-        let dir = Path::new(self.tui_cfg.clash_cfg_dir.as_str());
-        //let group_name = Utils::get_file_group_name(&dir.to_path_buf());
-        //if group_name.is_none() {
-        //    return false;
-        //}
-
-        // check set-group-id
-        if let Ok(metadata) = std::fs::metadata(dir) {
-            let permissions = metadata.permissions();
-            if permissions.mode() & 0o2000 == 0 {
-                return false;
-            }
-        }
-
-        if let Ok(metadata) = std::fs::metadata(dir) {
-            if let Some(dir_group) = 
-                nix::unistd::Group::from_gid(nix::unistd::Gid::from_raw(metadata.gid())).unwrap()
-            {
-                if  Utils::find_files_not_in_group(&dir.to_path_buf(), dir_group.name.as_str()).len() > 0
-                    || Utils::find_files_not_group_writable(&dir.to_path_buf()).len() > 0
-                    {
-                        return false;
-                    }
-            }
-        }
-
-        return true;
-    }
-
 }
 
 impl ClashTuiUtil {
@@ -659,6 +620,9 @@ impl ClashTuiUtil {
     }
 
     pub fn extract_profile_url(&self, profile_name: &str) -> std::io::Result<String> {
+        use std::io::BufRead;
+        use regex::Regex;
+
         let profile_path = self.profile_dir.join(profile_name);
         let file = File::open(profile_path)?;
         let reader = std::io::BufReader::new(file);
@@ -693,10 +657,7 @@ impl ClashTuiUtil {
 #[allow(unused)]
 fn crt_symlink_file<P: AsRef<std::path::Path>>(original: P, target: P) -> std::io::Result<()> {
     use std::os;
-    #[cfg(target_os = "windows")]
     return os::windows::fs::symlink_file(original, target);
-    #[cfg(target_os = "linux")]
-    os::unix::fs::symlink(original, target)
 }
 
 #[cfg(test)]

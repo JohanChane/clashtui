@@ -3,7 +3,6 @@ use crate::utils::state::_State;
 use std::path::Path;
 // IPC Related
 impl ClashTuiUtil {
-    #[cfg(target_os = "windows")]
     pub fn update_state(
         &self,
         new_pf: Option<String>,
@@ -34,16 +33,6 @@ impl ClashTuiUtil {
         }
     }
 
-    #[cfg(target_os = "linux")]
-    pub fn update_state(&self, new_pf: Option<String>, new_mode: Option<String>) -> _State {
-        let (pf, mode, tun) = self._update_state(new_pf, new_mode);
-        _State {
-            profile: pf,
-            mode,
-            tun,
-        }
-    }
-
     pub fn fetch_recent_logs(&self, num_lines: usize) -> Vec<String> {
         std::fs::read_to_string(self.clashtui_dir.join("clashtui.log"))
             .unwrap_or_default()
@@ -60,15 +49,9 @@ impl ClashTuiUtil {
         use crate::utils::ipc::spawn;
         if !cmd.is_empty() {
             let opendir_cmd_with_path = cmd.replace("%s", path.to_str().unwrap_or(""));
-            #[cfg(target_os = "windows")]
             return spawn("cmd", vec!["/C", opendir_cmd_with_path.as_str()]);
-            #[cfg(target_os = "linux")]
-            spawn("sh", vec!["-c", opendir_cmd_with_path.as_str()])
         } else {
-            #[cfg(target_os = "windows")]
             return spawn("cmd", vec!["/C", "start", path.to_str().unwrap_or("")]);
-            #[cfg(target_os = "linux")]
-            spawn("xdg-open", vec![path.to_str().unwrap_or("")])
         }
     }
 

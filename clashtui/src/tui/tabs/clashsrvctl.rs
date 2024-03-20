@@ -31,18 +31,12 @@ impl ClashSrvCtlTab {
     pub fn new(clashtui_util: SharedClashTuiUtil, clashtui_state: SharedClashTuiState) -> Self {
         let mut operations = List::new(CLASHSRVCTL.to_string());
         operations.set_items(vec![
-            #[cfg(target_os = "linux")]
-            ClashSrvOp::SetPermission.into(),
             ClashSrvOp::StartClashService.into(),
             ClashSrvOp::StopClashService.into(),
             ClashSrvOp::SwitchMode.into(),
-            #[cfg(target_os = "windows")]
             ClashSrvOp::SwitchSysProxy.into(),
-            #[cfg(target_os = "windows")]
             ClashSrvOp::EnableLoopback.into(),
-            #[cfg(target_os = "windows")]
             ClashSrvOp::InstallSrv.into(),
-            #[cfg(target_os = "windows")]
             ClashSrvOp::UnInstallSrv.into(),
         ]);
         let mut modes = List::new("Mode".to_string());
@@ -69,24 +63,33 @@ impl super::TabEvent for ClashSrvCtlTab {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
-        let event_state;
+
+        let mut event_state;
+
         if self.mode_selector.is_visible() {
             event_state = self.mode_selector.event(ev)?;
-            if event_state == EventState::WorkDone {
+            if event_state.is_consumed() {
                 return Ok(event_state);
             }
+            
             if let ui::event::Event::Key(key) = ev {
+                // One-click key will trigger two KeyEventKind, Press and Release.
+                //log::info!("{:?}", ev);
+                if key.kind != ui::event::KeyEventKind::Press {
+                    return Ok(EventState::NotConsumed);
+                }
+
                 if &Keys::Select == key {
                     if let Some(new) = self.mode_selector.selected() {
                         self.clashtui_state.borrow_mut().set_mode(new.clone());
                     }
                     self.mode_selector.hide();
-                }
-                if &Keys::Esc == key {
+                } else if &Keys::Esc == key {
                     self.mode_selector.hide();
                 }
+
+                return Ok(EventState::WorkDone);
             }
-            return Ok(EventState::WorkDone);
         }
 
         event_state = self.msgpopup.event(ev)?;
@@ -97,7 +100,6 @@ impl super::TabEvent for ClashSrvCtlTab {
         if !self.is_visible {
             return Ok(EventState::NotConsumed);
         }
-
         let event_state;
         if let ui::event::Event::Key(key) = ev {
             if key.kind != ui::event::KeyEventKind::Press {
@@ -127,7 +129,6 @@ impl super::TabEvent for ClashSrvCtlTab {
             self.hide_msgpopup();
             match op {
                 ClashSrvOp::SwitchMode => unreachable!(),
-                #[cfg(target_os = "windows")]
                 ClashSrvOp::SwitchSysProxy => {
                     let cur = self
                         .clashtui_state

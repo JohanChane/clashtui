@@ -98,17 +98,6 @@ macro_rules! define_enum {
     };
 }
 
-#[cfg(target_os = "linux")]
-define_enum!(
-    pub ClashSrvOp,
-    [
-        StartClashService,
-        StopClashService,
-        SetPermission,
-        SwitchMode
-    ]
-);
-#[cfg(target_os = "windows")]
 define_enum!(
     pub ClashSrvOp,
     [

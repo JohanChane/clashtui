@@ -111,6 +111,7 @@ impl App {
 
     pub fn event(&mut self, ev: &event::Event) -> Result<EventState, std::io::Error> {
         let mut event_state = self.msgpopup.event(ev)?;
+        // Popup Priority Event Handling. Because popups always appear above non-popups.
         if event_state.is_notconsumed() {
             event_state = self.popup_event(ev)?;
         }
@@ -250,39 +251,6 @@ impl App {
     }
 
     fn do_some_job_after_initapp_before_setupui(&mut self) {
-        // ## Correct the perm of files in clash_cfg_dir.
-        if ! self.clashtui_util.check_perms_of_ccd_files() {
-            let ccd_str = self.clashtui_util.tui_cfg.clash_cfg_dir.as_str();
-            if ! utils::is_run_as_root() {
-                print!("The permissions of the '{}' files are incorrect. clashtui need to run as root to correct. Proceed with running as root? [Y/n] ", ccd_str);
-                std::io::stdout().flush().expect("Failed to flush stdout");
-
-                let mut input = String::new();
-                let stdin = std::io::stdin();
-                stdin.lock().read_line(&mut input).unwrap();
-
-                if input.trim().to_lowercase().as_str() == "y" {
-                    utils::run_as_root();
-                }
-
-            } else {
-                if utils::is_clashtui_ep() {
-                    println!("\nStart correct the permissions of files in '{}':\n", ccd_str);
-                    let dir = std::path::Path::new(ccd_str);
-                    if let Some(group_name) = utils::get_file_group_name(&dir.to_path_buf()) {
-                        utils::restore_fileop_as_root();
-                        utils::modify_file_perms_in_dir(&dir.to_path_buf(), group_name.as_str());
-                        utils::mock_fileop_as_sudo_user();
-                    }
-                    print!("\nEnd correct the permissions of files in '{}'. \n\nPress any key to continue. ", ccd_str);
-                    std::io::stdout().flush().expect("Failed to flush stdout");
-                    let _ = std::io::stdin().read(&mut [0u8]);
-                } else {      // user manually executing `sudo clashtui`
-                    // Do nothing, as root is unaffected by permissions.
-                }
-            }
-        }
-
         let cli_env: CliEnv = argh::from_env();
 
         // ## CliMode
@@ -291,7 +259,6 @@ impl App {
         if cli_env.update_all_profiles {
             is_cli_mode = true;
 
-            log::info!("Cron Mode!");
             self.clashtui_util.get_profile_names()
                 .unwrap()
                 .into_iter()

@@ -138,6 +138,7 @@ fn load_app_config(
         .and_then(|v| v.as_str())
         .unwrap_or("clash.meta")
         .to_string();
+    log::info!("clash_ua: {}", clash_ua);
 
     let configs = if skip_init_conf {
         let config_path = clashtui_dir.join("config.yaml");

@@ -3,11 +3,10 @@ mod app;
 mod tui;
 mod utils;
 
-use core::time::Duration;
-use nix::sys;
-
 use crate::app::App;
 use crate::utils::{Flag, Flags};
+
+use core::time::Duration;
 
 pub const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
 
@@ -23,20 +22,9 @@ fn main() {
 
     let mut flags = Flags::empty();
 
-    // ## Is CliMode
-    if cli_env.update_all_profiles {
-        flags.insert(Flag::CliMode)
-    }
-
     // ## Setup logging as early as possible. So We can log.
     let config_dir = load_app_dir(&mut flags);
     setup_logging(config_dir.join("clashtui.log").to_str().unwrap());
-
-    // To allow the mihomo process to read and write files created by clashtui in clash_cfg_dir, set the umask to 0o002and Users manually add SGID to clash_cfg_dir.
-    if utils::is_clashtui_ep() {
-        utils::mock_fileop_as_sudo_user();
-    }
-    sys::stat::umask(sys::stat::Mode::from_bits_truncate(0o002));
 
     let tick_rate = 250;    // time in ms between two ticks.
     if let Err(e) = run(&mut flags, tick_rate, &config_dir, &mut warning_list_msg) {
@@ -66,6 +54,7 @@ pub fn run(flags: &mut Flags<Flag>, tick_rate: u64, config_dir: &std::path::Path
     Ok(())
 }
 
+use ui::event::KeyCode;
 use utils::CfgError;
 fn run_app(
     app: &mut App,
@@ -98,6 +87,8 @@ fn run_app(
         app.late_event();
 
         if event::poll(tick_rate)? {
+            //println!("{:?}", &event::read()?);    // debug
+
             if let Err(e) = app.event(&event::read()?) {
                 app.popup_txt_msg(e.to_string())
             };
@@ -117,11 +108,6 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
             flags.insert(Flag::PortableMode);
             data_dir
         } else {
-            #[cfg(target_os = "linux")]
-            let clashtui_config_dir_str = env::var("XDG_CONFIG_HOME").map(|p| format!("{}/clashtui", p))
-                .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)))
-                .unwrap();
-            #[cfg(target_os = "windows")]
             let clashtui_config_dir_str = env::var("APPDATA")
                 .map(|appdata| format!("{}/clashtui", appdata))
                 .unwrap();
