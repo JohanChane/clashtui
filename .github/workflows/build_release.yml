@@ -45,7 +45,8 @@ jobs:
         run: cd clashtui && cargo build --release --locked
 
       - name: Build Version
-        run: cd clashtui && cargo run --release -- -v
+        run: |
+          cd clashtui && cargo run --release -- -v
 
       - name: Pre Upload
         run: |
@@ -76,9 +77,19 @@ jobs:
           merge-multiple: true
           path: ./artifacts
 
-      - name: Create Release
+      - name: Get version
+        run: |
+          cd ./artifacts
+          chmod a+x clashtui
+          echo CLASHTUI_VERSION="$(./clashtui -v)" >> $GITHUB_ENV
+          chmod a-x clashtui
+
+      - name: Archive Release
+        run:
+          gzip -c ./artifacts/clashtui > clashtui-linux-amd64-v${{ env.CLASHTUI_VERSION }}.gz
+
+      - name: Upload Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/*
-          name: clashtui-${{ steps.get_platform.outputs.platform }}-${{ steps.get_version.outputs.version }}
+            clashtui-linux-amd64-v${{ env.CLASHTUI_VERSION }}.gz
