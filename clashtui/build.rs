@@ -1,5 +1,5 @@
 use std::env;
-use std::process::Command;
+//use std::process::Command;
 
 /***
 fn get_git_version() -> String {

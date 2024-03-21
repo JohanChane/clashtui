@@ -272,11 +272,12 @@ impl App {
                     if let Some(group_name) = utils::get_file_group_name(&dir.to_path_buf()) {
                         utils::restore_fileop_as_root();
                         utils::modify_file_perms_in_dir(&dir.to_path_buf(), group_name.as_str());
-                        utils::mock_fileop_as_sudo_user();
                     }
-                    print!("\nEnd correct the permissions of files in '{}'. \n\nPress any key to continue. ", ccd_str);
+                    print!("\nEnd correct the permissions of files in '{}'. \n\nPrepare to restart clashtui. Press any key to continue. ", ccd_str);
                     std::io::stdout().flush().expect("Failed to flush stdout");
                     let _ = std::io::stdin().read(&mut [0u8]);
+
+                    utils::run_as_previous_user();      // 
                 } else {      // user manually executing `sudo clashtui`
                     // Do nothing, as root is unaffected by permissions.
                 }

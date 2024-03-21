@@ -68,9 +68,10 @@ impl ClashTuiUtil {
                     serde_yaml::Value::String("url".to_string()),
                     serde_yaml::Value::String(url.clone()),
                 );
+                let tpl_name_no_ext = Path::new(template_name).file_stem().unwrap_or_else(|| Path::new(template_name).as_os_str()).to_str().unwrap_or(template_name);
                 new_pp.insert(
                     serde_yaml::Value::String("path".to_string()),
-                    serde_yaml::Value::String(format!("proxy-providers/tpl/{}.yaml", the_pp_name)),
+                    serde_yaml::Value::String(format!("proxy-providers/tpl/{}/{}.yaml", tpl_name_no_ext, the_pp_name)),
                 );
                 new_proxy_providers.insert(
                     serde_yaml::Value::String(the_pp_name.clone()),

@@ -65,6 +65,22 @@ pub fn str_duration(t: std::time::Duration) -> String {
 }
 
 pub fn modify_file_perms_in_dir(dir: &PathBuf, group_name: &str) {
+    // dir add set-group-id: `chmod g+s dir`
+    if let Ok(metadata) = std::fs::metadata(dir) {
+        let permissions = metadata.permissions();
+        if permissions.mode() & 0o2000 == 0 {
+            if let Ok(metadata) = fs::metadata(dir) {
+                let permissions = metadata.permissions();
+                let mut new_permissions = permissions.clone();
+                new_permissions.set_mode(permissions.mode() | 0o2020);
+                println!("Adding `g+s` permission to '{:?}'", dir);
+                if let Err(e) = fs::set_permissions(dir, new_permissions) {
+                    eprintln!("Failed to set `g+s` permissions for '{:?}': {}", dir, e);
+                }
+            }
+        }
+    }
+
     let files_not_in_group = find_files_not_in_group(dir, group_name);
     for file in &files_not_in_group {
         let path = std::path::Path::new(dir).join(file);
@@ -86,17 +102,6 @@ pub fn modify_file_perms_in_dir(dir: &PathBuf, group_name: &str) {
             if let Err(e) = fs::set_permissions(file, new_permissions) {
                 eprintln!("Failed to set `g+w` permissions for '{:?}': {}", file, e);
             }
-        }
-    }
-
-    // dir add set-group-id: `chmod g+s dir`
-    if let Ok(metadata) = fs::metadata(dir) {
-        let permissions = metadata.permissions();
-        let mut new_permissions = permissions.clone();
-        new_permissions.set_mode(permissions.mode() | 0o2020);
-        println!("Adding `g+s` permission to '{:?}'", dir);
-        if let Err(e) = fs::set_permissions(dir, new_permissions) {
-            eprintln!("Failed to set `g+s` permissions for '{:?}': {}", dir, e);
         }
     }
 }
@@ -237,6 +242,32 @@ pub fn run_as_root() {
     let _ = process::Command::new("sudo")
         .args(vec!["--preserve-env=CLASHTUI_EP,XDG_CONFIG_HOME,HOME,USER"])
         //.args(vec!["--preserve-env"])
+        .args(&sudo_cmd)
+        .exec();
+}
+
+pub fn run_as_previous_user() {
+    if ! is_clashtui_ep() || env::var("SUDO_USER").is_err() {
+        return;
+    }
+
+    let user_name = env::var("SUDO_USER").unwrap();
+
+    let app_path_binding = env::current_exe()
+        .expect("Failed to get current executable path");
+    let app_path = app_path_binding.to_str()
+        .expect("Failed to convert path to string");
+
+    // Skip the param of exe path
+    let params: Vec<String> = env::args().skip(1).collect();
+
+    let mut sudo_cmd = vec![app_path];
+
+    sudo_cmd.extend(params.iter().map(|s| s.as_str()));
+
+    log::info!("run_as_previous_user: {}", user_name);
+    let _ = process::Command::new("sudo")
+        .args(["-i", "-u", user_name.as_str()])
         .args(&sudo_cmd)
         .exec();
 }

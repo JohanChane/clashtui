@@ -12,6 +12,13 @@ use crate::utils::{Flag, Flags};
 pub const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
 
 fn main() {
+    // Prevent create root files before fixing files permissions.
+    if utils::is_clashtui_ep() {
+        utils::mock_fileop_as_sudo_user();
+    }
+    // To allow the mihomo process to read and write files created by clashtui in clash_cfg_dir, set the umask to 0o002.
+    sys::stat::umask(sys::stat::Mode::from_bits_truncate(0o002));
+
     let mut warning_list_msg = Vec::<String>::new();
 
     // ## Paser param
@@ -26,12 +33,6 @@ fn main() {
     // ## Setup logging as early as possible. So We can log.
     let config_dir = load_app_dir(&mut flags);
     setup_logging(config_dir.join("clashtui.log").to_str().unwrap());
-
-    // To allow the mihomo process to read and write files created by clashtui in clash_cfg_dir, set the umask to 0o002and Users manually add SGID to clash_cfg_dir.
-    if utils::is_clashtui_ep() {
-        utils::mock_fileop_as_sudo_user();
-    }
-    sys::stat::umask(sys::stat::Mode::from_bits_truncate(0o002));
 
     let tick_rate = 250;    // time in ms between two ticks.
     if let Err(e) = run(&mut flags, tick_rate, &config_dir, &mut warning_list_msg) {
