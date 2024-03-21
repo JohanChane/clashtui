@@ -11,16 +11,19 @@ proxy-groups:
 - name: Entry
   type: select
   proxies:
-  - FilterFbAll
-- name: FilterFbAll
-  type: fallback
+  - Auto-provider0
+  - Select-provider0
+- name: Select-provider0
+  type: select
   use:
   - provider0
-  - provider1
-  filter: (?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore
+- name: Auto-provider0
   <<:
     url: https://www.gstatic.com/generate_204
     interval: 300
+  type: url-test
+  use:
+  - provider0
 - name: Entry-RuleMode
   type: select
   proxies:
@@ -32,16 +35,6 @@ proxy-groups:
   - Entry
   - DIRECT
 proxy-providers:
-  provider1:
-    <<:
-      interval: 3600
-      intehealth-check:
-        enable: true
-        url: https://www.gstatic.com/generate_204
-        interval: 300
-    type: http
-    url: https://www.example.com
-    path: proxy-providers/tpl/provider1.yaml
   provider0:
     <<:
       interval: 3600
@@ -50,7 +43,7 @@ proxy-providers:
         url: https://www.gstatic.com/generate_204
         interval: 300
     type: http
-    url: https://www.example.com
+    url: https://cdn.jsdelivr.net/gh/anaer/Sub@main/clash.yaml
     path: proxy-providers/tpl/provider0.yaml
 rule-anchor:
   ip:
@@ -74,27 +67,6 @@ rule-providers:
       format: yaml
 rules:
 - RULE-SET,private,DIRECT
-- DOMAIN-SUFFIX,cn.bing.com,DIRECT
-- DOMAIN-SUFFIX,bing.com,Entry
-- DOMAIN,aur.archlinux.org,Entry
 - GEOIP,lan,DIRECT,no-resolve
 - GEOSITE,biliintl,Entry
-- GEOSITE,ehentai,Entry
-- GEOSITE,github,Entry
-- GEOSITE,twitter,Entry
-- GEOSITE,youtube,Entry
-- GEOSITE,google,Entry
-- GEOSITE,telegram,Entry
-- GEOSITE,netflix,Entry
-- GEOSITE,bilibili,Entry-RuleMode
-- GEOSITE,bahamut,Entry
-- GEOSITE,spotify,Entry
-- GEOSITE,geolocation-!cn,Entry
-- GEOIP,google,Entry
-- GEOIP,netflix,Entry
-- GEOIP,telegram,Entry
-- GEOIP,twitter,Entry
-- GEOSITE,pixiv,Entry
-- GEOSITE,CN,Entry-RuleMode
-- GEOIP,CN,Entry-RuleMode
 - MATCH,Entry-LastMatch

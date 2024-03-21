@@ -33,7 +33,7 @@ pub enum Keys {
 impl From<KeyCode> for Keys {
     fn from(value: KeyCode) -> Self {
         match value {
-            // Convention: Global Shortcuts As much as possible use uppercase. And Others as much as possible use lowcase to avoid conflicts with global shortcuts.
+            // Convention: Global Shortcuts As much as possible use uppercase. And Others as much as possible use lowcase to avoid conflicts with global shortcuts. ToDo: User can config shortcuts.
 
             // ## Common shortcuts
             KeyCode::Down | KeyCode::Char('j') => Keys::Down,

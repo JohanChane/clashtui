@@ -1,7 +1,9 @@
-name: Rust
+name: Build Release
 
 on:
   push:
+    paths:
+      - 'clashtui/**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -37,19 +39,18 @@ jobs:
         run: cd clashtui && cargo fetch
 
       - name: Run tests
-        run: cd clashtui && cargo test --all --verbose
+        run: cd clashtui && cargo test --release --all --verbose
 
       - name: Build
-        run: cd clashtui && cargo build --verbose --locked && cargo build --release --locked
+        run: cd clashtui && cargo build --release --locked
 
       - name: Build Version
-        run: cd clashtui && cargo r -- -v
+        run: cd clashtui && cargo run --release -- -v
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashtui/target/release/clashtui ./artifacts/clashtui.release
-          mv ./clashtui/target/debug/clashtui ./artifacts/clashtui.debug
+          mv ./clashtui/target/release/clashtui ./artifacts/clashtui
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -80,3 +81,4 @@ jobs:
         with:
           files: |
             artifacts/*
+          name: clashtui-${{ steps.get_platform.outputs.platform }}-${{ steps.get_version.outputs.version }}
