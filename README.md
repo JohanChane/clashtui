@@ -3,16 +3,21 @@
 **This demo is OUTDATED**
 ![Demo](./assets/clashtui_demo.gif)
 
+Language: [English (out-of-date)](./README.md) | [中文](./README_ZH.md)
+
 <details>
 <summary>Table of Contents</summary>
 <!-- vim-markdown-toc GFM -->
 
 * [Supported Platforms](#supported-platforms)
-* [Target Audience](#target-audience)
-* [Installing Mihomo Service (Enabling Tun Mode)](#installing-mihomo-service-enabling-tun-mode)
+* [Target User](#target-user)
+* [Features](#features)
+* [Installing Mihomo Service (With Tun Mode Avaliable)](#installing-mihomo-service-with-tun-mode-avaliable)
     * [Linux](#linux)
+        * [Set Up Trigger:](#set-up-trigger)
+        * [Set Up Systemd User Service:](#set-up-systemd-user-service)
     * [Windows](#windows)
-* [Installing clashtui](#installing-clashtui)
+* [Install clashtui](#install-clashtui)
     * [Linux](#linux-1)
     * [Windows](#windows-1)
     * [Configuring `basic_clash_config.yaml`](#configuring-basic_clash_configyaml)
