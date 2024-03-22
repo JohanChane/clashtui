@@ -1,5 +1,4 @@
-use crate::utils::tui::{NetProviderMap, UpdateProviderType, ProfileType};
-use api::ProfileTimeMap;
+use crate::utils::tui::{NetProviderMap, ProfileType};
 
 use super::ClashTuiUtil;
 use crate::utils::{is_yaml, utils as Utils};
@@ -69,9 +68,12 @@ impl ClashTuiUtil {
                     serde_yaml::Value::String("url".to_string()),
                     serde_yaml::Value::String(url.clone()),
                 );
+                let tpl_name_no_ext = Path::new(template_name).file_stem()
+                    .unwrap_or_else(|| Path::new(template_name).as_os_str())
+                    .to_str().unwrap_or(template_name);
                 new_pp.insert(
                     serde_yaml::Value::String("path".to_string()),
-                    serde_yaml::Value::String(format!("proxy-providers/tpl/{}.yaml", the_pp_name)),
+                    serde_yaml::Value::String(format!("proxy-providers/tpl/{}/{}.yaml", tpl_name_no_ext, the_pp_name)),
                 );
                 new_proxy_providers.insert(
                     serde_yaml::Value::String(the_pp_name.clone()),
@@ -383,8 +385,84 @@ impl ClashTuiUtil {
         Ok(result)
     }
 
+    fn download_profile(&self, url: &str, path: &PathBuf) -> std::io::Result<()> {
+        let directory = path
+            .parent()
+            .ok_or_else(|| Error::new(std::io::ErrorKind::NotFound, "Invalid file path"))?;
+        if !directory.exists() {
+            create_dir_all(directory)?;
+        }
+
+        let response = self.dl_remote_profile(url)?;
+        let mut output_file = File::create(path)?;      // will truncate the file
+        response.copy_to(&mut output_file)?;
+        Ok(())
+    }
+    
+    pub fn extract_net_providers(&self, profile_yaml_path: &PathBuf, provider_types: &Vec<ProfileSectionType>) -> std::io::Result<NetProviderMap> {
+        let yaml_content = std::fs::read_to_string(&profile_yaml_path)?;
+        let parsed_yaml = match serde_yaml::from_str::<serde_yaml::Value>(&yaml_content) {
+            Ok(value) => value,
+            Err(err) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
+        };
+
+        let provider_keys: Vec<_> = provider_types.iter().filter_map(|s_type| {
+            match s_type {
+                ProfileSectionType::ProxyProvider => Some("proxy-providers"),
+                ProfileSectionType::RuleProvider => Some("rule-providers"),
+                _ => None,
+            }
+        }).collect();
+
+        let mut net_providers = NetProviderMap::new();
+        for section_key in provider_keys {
+            let section_val = if let Some(val) = parsed_yaml.get(section_key) {
+                val
+            } else {
+                continue;
+            };
+
+            let the_section_val = if let serde_yaml::Value::Mapping(val) = section_val {
+                val
+            } else {
+                continue;
+            };
+
+            let mut providers: Vec<(String, String, String)> = Vec::new();
+            for (provider_key, provider_val) in the_section_val {
+                let provider = if let Some(val) = provider_val.as_mapping() {
+                    val
+                } else {
+                    continue;
+                };
+
+                if let (Some(name), Some(url), Some(path)) = (
+                    Some(provider_key),
+                    provider.get(&serde_yaml::Value::String("url".to_string())),
+                    provider.get(&serde_yaml::Value::String("path".to_string())),
+                ) {
+                    if let (serde_yaml::Value::String(name), serde_yaml::Value::String(url), serde_yaml::Value::String(path)) = (name, url, path) {
+                        providers.push((name.clone(), url.clone(), path.clone()));
+                    }
+                }
+            }
+
+            if section_key == "proxy-providers" {
+                net_providers.insert(ProfileSectionType::ProxyProvider, providers);
+            } else if section_key == "rule-providers" {
+                net_providers.insert(ProfileSectionType::RuleProvider, providers);
+            }
+        }
+
+        Ok(net_providers)
+    }
+
+    /***
+    use api::ProfileTimeMap;
+    // format: {type, [(name, result)]}
+    pub type UpdateProviderType = std::collections::HashMap<ProfileSectionType, Vec<(String, std::io::Result<String>)>>;
+
     // Using api update, the user needs to check the logs to understand why the updates failed. The success rate of my testing updates is not as high as using clashtui.
-    #[cfg(target_feature = "deprecated")]
     pub fn update_profile_with_api(
         &self,
         profile_name: &String,
@@ -447,94 +525,6 @@ impl ClashTuiUtil {
         Ok(result)
     }
 
-    fn download_profile(&self, url: &str, path: &PathBuf) -> std::io::Result<()> {
-        let directory = path
-            .parent()
-            .ok_or_else(|| Error::new(std::io::ErrorKind::NotFound, "Invalid file path"))?;
-        if !directory.exists() {
-            create_dir_all(directory)?;
-        }
-
-        let response = self.dl_remote_profile(url)?;
-        let mut output_file = File::create(path)?;      // will truncate the file
-        response.copy_to(&mut output_file)?;
-        Ok(())
-    }
-
-    fn get_provider_mtime(&self, section_types: Vec<ProfileSectionType>, profile_yaml_path: &PathBuf) -> std::io::Result<ProfileTimeMap> {
-        let mut modify_info = ProfileTimeMap::new();
-        if let Ok(net_res) = self.extract_net_providers(profile_yaml_path, &section_types) {
-            for (key, res) in net_res {
-                let name_and_times = res.into_iter().map(|(name, _, path)| {
-                    let clash_cfg_dir = Path::new(&self.tui_cfg.clash_cfg_dir);
-                    let time = Utils::get_mtime(clash_cfg_dir.join(path)).ok();
-                    (name, time)
-                }).collect();
-                modify_info.insert(key, name_and_times);
-            }
-        }
-
-        Ok(modify_info)
-    }
-
-    pub fn extract_net_providers(&self, profile_yaml_path: &PathBuf, provider_types: &Vec<ProfileSectionType>) -> std::io::Result<NetProviderMap> {
-        let yaml_content = std::fs::read_to_string(&profile_yaml_path)?;
-        let parsed_yaml = match serde_yaml::from_str::<serde_yaml::Value>(&yaml_content) {
-            Ok(value) => value,
-            Err(err) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
-        };
-
-        let provider_keys: Vec<_> = provider_types.iter().filter_map(|s_type| {
-            match s_type {
-                ProfileSectionType::ProxyProvider => Some("proxy-providers"),
-                ProfileSectionType::RuleProvider => Some("rule-providers"),
-                _ => None,
-            }
-        }).collect();
-
-        let mut net_providers = NetProviderMap::new();
-        for section_key in provider_keys {
-            let section_val = if let Some(val) = parsed_yaml.get(section_key) {
-                val
-            } else {
-                continue;
-            };
-
-            let the_section_val = if let serde_yaml::Value::Mapping(val) = section_val {
-                val
-            } else {
-                continue;
-            };
-
-            let mut providers: Vec<(String, String, String)> = Vec::new();
-            for (provider_key, provider_val) in the_section_val {
-                let provider = if let Some(val) = provider_val.as_mapping() {
-                    val
-                } else {
-                    continue;
-                };
-
-                if let (Some(name), Some(url), Some(path)) = (
-                    Some(provider_key),
-                    provider.get(&serde_yaml::Value::String("url".to_string())),
-                    provider.get(&serde_yaml::Value::String("path".to_string())),
-                ) {
-                    if let (serde_yaml::Value::String(name), serde_yaml::Value::String(url), serde_yaml::Value::String(path)) = (name, url, path) {
-                        providers.push((name.clone(), url.clone(), path.clone()));
-                    }
-                }
-            }
-
-            if section_key == "proxy-providers" {
-                net_providers.insert(ProfileSectionType::ProxyProvider, providers);
-            } else if section_key == "rule-providers" {
-                net_providers.insert(ProfileSectionType::RuleProvider, providers);
-            }
-        }
-
-        Ok(net_providers)
-    }
-
     // duration: now - mtime
     fn cal_mtime_duration(mtimes: &ProfileTimeMap, section_type: ProfileSectionType, name: &String) -> std::io::Result<std::time::Duration> {
         let mt = Self::extract_the_mtime(mtimes, section_type, name).ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "No the mtime in mtimes"))?;
@@ -553,6 +543,24 @@ impl ClashTuiUtil {
 
         &None
     }
+
+    fn get_provider_mtime(&self, section_types: Vec<ProfileSectionType>, profile_yaml_path: &PathBuf) -> std::io::Result<ProfileTimeMap> {
+        let mut modify_info = ProfileTimeMap::new();
+        if let Ok(net_res) = self.extract_net_providers(profile_yaml_path, &section_types) {
+            for (key, res) in net_res {
+                let name_and_times = res.into_iter().map(|(name, _, path)| {
+                    let clash_cfg_dir = Path::new(&self.tui_cfg.clash_cfg_dir);
+                    let time = Utils::get_mtime(clash_cfg_dir.join(path)).ok();
+                    (name, time)
+                }).collect();
+                modify_info.insert(key, name_and_times);
+            }
+        }
+
+        Ok(modify_info)
+    }
+    ***/
+
 }
 
 impl ClashTuiUtil {

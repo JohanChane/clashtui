@@ -8,13 +8,7 @@ const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/rel
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 use std::io::Result;
-use std::time::SystemTime;
-
-use minreq::{Method, Proxy};
-use chrono::{DateTime, Local, TimeZone};
-
-// format: {type: [(name, modifytime)]}
-pub type ProfileTimeMap = std::collections::HashMap<ProfileSectionType, Vec<(String, Option<std::time::SystemTime>)>>;
+use minreq::Method;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ProfileSectionType {
@@ -142,6 +136,11 @@ impl ClashUtil {
         self.request(Method::Patch, "/configs", Some(payload))
     }
 
+    /*** Update profile with api
+    use std::time::SystemTime;
+    // format: {type: [(name, modifytime)]}
+    pub type ProfileTimeMap = std::collections::HashMap<ProfileSectionType, Vec<(String, Option<std::time::SystemTime>)>>;
+
     pub fn update_providers(&self, provider_type: ProfileSectionType) -> Result<Vec<(String, Result<String>)>> {
         self.extract_net_providers(provider_type).and_then(|names| self.update_providers_helper(names, provider_type))
     }
@@ -187,6 +186,8 @@ impl ClashUtil {
 
     // Sometime mihomo updated the provider but not update it to the file.
     pub fn extract_provider_utimes_with_api(&self, provider_type: ProfileSectionType) -> Result<Vec<(String, Option<SystemTime>)>>{
+        use chrono::{DateTime, Local};
+
         let sub_url = format!("/providers/{}", provider_str_in_api(provider_type).unwrap());
         let response_str = self.request(Method::Get, sub_url.as_str(), None)?;
 
@@ -220,6 +221,7 @@ impl ClashUtil {
 
         Ok(net_providers)
     }
+    ***/
 
     #[cfg(target_feature = "deprecated")]
     pub fn check_geo_update(

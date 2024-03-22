@@ -1,5 +1,6 @@
-pp: &pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
-delay_test: &delay_test {url: https://www.gstatic.com/generate_204, interval: 300}
+proxy-anchor:
+  - delay_test: &pa_dt {url: https://www.gstatic.com/generate_204, interval: 300}
+  - proxy_provider: &pa_pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
 
 proxy-groups:
   - name: "Entry"
@@ -31,7 +32,7 @@ proxy-groups:
     tpl_param:
       providers: ["provider"]
     type: url-test
-    <<: *delay_test
+    <<: *pa_dt
 
   - name: "Entry-RuleMode"
     type: select
@@ -49,7 +50,7 @@ proxy-providers:
   provider:           # `provider` name is customizable. Generate proxy-providers which name is `provider`: provider0, provider1, ...
     tpl_param:
     type: http
-    <<: *pp
+    <<: *pa_pp
 
 rules:
   #- IN-TYPE,INNER,DIRECT       # set inner type connection. e.g. update proxy-providers, rule-providers etc.

@@ -1,10 +1,8 @@
 use core::cell::{OnceCell, RefCell};
 use std::{path::PathBuf, rc::Rc};
-use std::io::{Write, BufRead, Read};
-
 use ui::event;
 
-use crate::{msgpopup_methods, utils};
+use crate::msgpopup_methods;
 use crate::tui::{
     tabs::{ClashSrvCtlTab, ProfileTab, TabEvent, Tabs},
     tools,

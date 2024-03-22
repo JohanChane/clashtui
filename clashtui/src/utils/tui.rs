@@ -18,8 +18,6 @@ use api::{ClashConfig, ClashUtil, Resp};
 
 // format: {section_key: [(name, url, path)]}
 pub type NetProviderMap = std::collections::HashMap<ProfileSectionType, Vec<(String, String, String)>>;
-// format: {type, [(name, result)]}
-pub type UpdateProviderType = std::collections::HashMap<ProfileSectionType, Vec<(String, std::io::Result<String>)>>;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ProfileType {

@@ -54,7 +54,6 @@ pub fn run(flags: &mut Flags<Flag>, tick_rate: u64, config_dir: &std::path::Path
     Ok(())
 }
 
-use ui::event::KeyCode;
 use utils::CfgError;
 fn run_app(
     app: &mut App,
