@@ -68,8 +68,9 @@ clash_srv_name = "mihomo"       # nssm {install | remove | restart | stop | edit
 
 运行 clashtui。在 `ClashSrvCtl` Tab 选择 `InstallSrv`, 程序会根据上面的配置安装 `mihomo` 内核服务。该服务会开机启动。安装之后启动内核服务, 使用 ClashSrvCtl Tab 的 StartClashService 启动 mihomo 服务。
 
-下载 Loopback Manager, 将其改名为 `EnableLoopback.exe`, 然后将其加入 PATH 或者放在 clashtui 所在的目录下即可:
--   [Windows-Loopback-Exemption-Manager](https://github.com/tiagonmas/Windows-Loopback-Exemption-Manager0
+如果不使用 scoop 安装 nssm, 可以手动下载 [nssm](https://nssm.cc/download), 将其改名为 `nssm.exe`, 并将其加入 PATH 或者放在 clashtui 所在的目录即可。
+
+Loopback Manager 同理。下载 [Loopback Manager](https://github.com/tiagonmas/Windows-Loopback-Exemption-Manager), 将其改名为 `EnableLoopback.exe`, 然后将其加入 PATH 或者放在 clashtui 所在的目录下即可。
 
 ### 配置 `basic_clash_config.yaml`
 
