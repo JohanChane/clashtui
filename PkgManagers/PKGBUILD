@@ -1,39 +1,42 @@
 # Maintainer: Kimiblock Moe
+# Contributor: JohanChane
+
 pkgname=clashtui-git
-pkgdesc="Mihomo TUI Client"
+pkgdesc="Clash Meta TUI Client"
 url="https://github.com/JohanChane/clashtui"
 license=("MIT")
 arch=("any")
-pkgver=r4.a1e9deb
+pkgver=r204.36b49d2
 pkgrel=1
 makedepends=("rust" "cargo" "git")
-depends=("openssl")
+depends=()
 source=("git+https://github.com/JohanChane/clashtui.git#branch=dev")
 md5sums=("SKIP")
 provides=("clashtui")
+options=(!lto)
 
 function pkgver() {
-  cd "${srcdir}/clashtui/clashtui"
+	cd "${srcdir}/clashtui/clashtui"
 	printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
 }
 
 function prepare() {
-  cd "${srcdir}/clashtui/clashtui"
+	cd "${srcdir}/clashtui/clashtui"
 	export RUSTUP_TOOLCHAIN=stable
 	cargo fetch --target "$CARCH-unknown-linux-gnu"
 }
 
 function build() {
-  cd "${srcdir}/clashtui/clashtui"
+	cd "${srcdir}/clashtui/clashtui"
 	export RUSTUP_TOOLCHAIN=stable
 	export CARGO_TARGET_DIR=target
-	cargo build --release --all-features --locked --frozen
+	cargo build --release --frozen --all-features --locked
 }
 
 function check() {
-  cd "${srcdir}/clashtui/clashtui"
+	cd "${srcdir}/clashtui/clashtui"
 	export RUSTUP_TOOLCHAIN=stable
-	cargo test --release --all-features --locked --frozen
+	cargo test --release --frozen --all-features --locked
 }
 
 function package() {
