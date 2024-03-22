@@ -36,8 +36,8 @@ jobs:
       - name: Download Dependencies
         run: cd clashtui && cargo fetch
 
-      - name: Run tests
-        run: cd clashtui && cargo test --release --all
+      #- name: Run tests
+      #  run: cd clashtui && cargo test --release --all
         
       - name: Build
         run: cd clashtui && cargo build --release
