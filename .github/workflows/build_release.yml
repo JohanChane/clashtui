@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'clashtui/**'
+      - '.github/**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -39,19 +40,21 @@ jobs:
         run: cd clashtui && cargo fetch
 
       - name: Run tests
-        run: cd clashtui && cargo test --release --all --verbose
+        run: cd clashtui && cargo test --release --all
 
       - name: Build
         run: cd clashtui && cargo build --release --locked
 
       - name: Build Version
         run: |
-          cd clashtui && cargo run --release -- -v
+          cd clashtui
+          cargo run --release -- -v >> version.txt
 
       - name: Pre Upload
         run: |
           mkdir artifacts
           mv ./clashtui/target/release/clashtui ./artifacts/clashtui
+          mv ./clashtui/version.txt ./artifacts/version.txt
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -80,9 +83,7 @@ jobs:
       - name: Get version
         run: |
           cd ./artifacts
-          chmod a+x clashtui
-          echo CLASHTUI_VERSION="$(./clashtui -v)" >> $GITHUB_ENV
-          chmod a-x clashtui
+          echo CLASHTUI_VERSION="$(cat version.txt)" >> $GITHUB_ENV
 
       - name: Archive Release
         run:
