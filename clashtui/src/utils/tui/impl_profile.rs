@@ -35,7 +35,7 @@ impl ClashTuiUtil {
         // ## proxy-providers
         // e.g. {provider: [provider0, provider1, ...]}
         let mut pp_names: HashMap<String, Vec<String>> = HashMap::new(); // proxy-provider names
-        let mut new_proxy_providers = HashMap::new();
+        let mut new_proxy_providers = serde_yaml::Mapping::new();
         let pp_mapping = if let Some(serde_yaml::Value::Mapping(pp_mapping)) =
             tpl_parsed_yaml.get("proxy-providers")
         {
@@ -81,8 +81,7 @@ impl ClashTuiUtil {
                 );
             }
         }
-        out_parsed_yaml.to_mut()["proxy-providers"] =
-            serde_yaml::to_value(new_proxy_providers).unwrap();
+        out_parsed_yaml.to_mut()["proxy-providers"] = serde_yaml::Value::Mapping(new_proxy_providers);
 
         // ## proxy-groups
         // e.g. {Auto: [Auto-provider0, Auto-provider1, ...], Select: [Select-provider0, ...]}
