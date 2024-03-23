@@ -7,7 +7,9 @@ ipv6: true
 
 secret: ''
 external-controller: 127.0.0.1:9090
-external-ui: /usr/share/metacubexd
+#external-ui: /usr/share/metacubexd
+external-ui: uis/metacubexd     # In case of permission issues, placing the ui files under the clash_cfg_dir.
+                                # `git clone https://github.com/metacubex/metacubexd.git -b gh-pages <clash_cfg_dir>/uis/metacubexd`
 external-ui-name: metacubexd
 external-ui-url: https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip
 
