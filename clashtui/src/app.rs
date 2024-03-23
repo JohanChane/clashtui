@@ -289,6 +289,8 @@ impl App {
         // ## CliMode
         let mut is_cli_mode = false;
 
+        // ToDo: Check MD5s(profile, proxy-providers) of the current profile. If they are changed, reload the profile.
+        //self.clashtui_util.tui_cfg.current_profile;
         if cli_env.update_all_profiles {
             is_cli_mode = true;
 
