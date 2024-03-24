@@ -133,9 +133,9 @@ clashtui -u         # 以命令行的模式更新所有 profiles。如果 profil
 
 ```sh
 # crontab -e
-@hourly /usr/bin/env clashtui -u >> ~/cron.out
+@daily /usr/bin/env clashtui -u >> ~/cron.out 2>&1
 # OR
-@hourly /usr/bin/env clashtui -u        # 不保存更新结果
+@daily /usr/bin/env clashtui -u        # 不保存更新结果
 ```
 
 cronie 的使用, See [ref](https://wiki.archlinuxcn.org/wiki/Cron)。
