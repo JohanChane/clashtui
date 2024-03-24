@@ -300,7 +300,7 @@ impl App {
             if let Ok(profile_names) = self.clashtui_util.get_profile_names() {
                 let mut ok_profiles = Vec::new();
                 for p_name in profile_names {
-                    println!("Profile: {p_name}");
+                    println!("Update Profile `{p_name}`:");
                     match self.clashtui_util.update_profile(&p_name, false) {
                         Ok(r) => {
                             for u in r {
@@ -318,7 +318,11 @@ impl App {
                 // ToDo: Check Content(profile, proxy-providers) of the current profile. If they are changed, reload the profile. However, the update times of proxy providers in mihomo will not be updated. So ?
                 let current_profile = &self.clashtui_util.tui_cfg.current_profile.borrow();
                 if ok_profiles.contains(current_profile) {
-                    let _ = self.clashtui_util.select_profile(current_profile);
+                    println!("\nSelect profile `{current_profile}`:");
+                    match self.clashtui_util.select_profile(current_profile) {
+                        Ok(_) => println!("-   Ok"),
+                        Err(e) => println!("-   Err: {e}"),
+                    }
                 }
             }
 
