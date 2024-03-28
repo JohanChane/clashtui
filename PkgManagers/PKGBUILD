@@ -10,7 +10,7 @@ pkgver=r204.36b49d2
 pkgrel=1
 makedepends=("rust" "cargo" "git")
 depends=()
-source=("git+https://github.com/JohanChane/clashtui.git#branch=dev")
+source=("git+https://github.com/JohanChane/clashtui.git#branch=main")
 md5sums=("SKIP")
 provides=("clashtui")
 options=(!lto)
