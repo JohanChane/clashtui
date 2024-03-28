@@ -1,15 +1,15 @@
 {
-  "version": "v0.0.2",
-  "description": "Mihomo TUI Client",
+  "version": "v0.2.0",
+  "description": "Mihomo (Clash.Meta) TUI Client",
   "homepage": "https://github.com/JohanChane/clashtui",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/JohanChane/clashtui/releases/download/v0.0.2/clashtui-win.zip",
-      "hash": "fc144fd1ba7487007e144cdb8cd2c52ecd9f409d56e1c9062f8f3059a853788c"
+      "url": "https://github.com/JohanChane/clashtui/releases/download/v0.2.0/clashtui-windows-amd64-v0.2.0.zip",
+      "hash": "4516AB109C9314458CD35857F3D15C008F2D240D258B153D00FFAC9F72197C1B"
     }
   },
-  "pre_install": "Move-Item -Path \"$dir/clashtui-win/clashtui*.exe\" -Destination \"$dir/\" -Force; Move-Item -Path \"$dir/clashtui-win/EnableLoopback.exe\" -Destination \"$dir/\" -Force; Remove-Item -Path \"$dir/clashtui-win\" -Force -Recurse; Get-ChildItem \"$dir/clashtui*.exe\" | Rename-Item -NewName \"clashtui.exe\"",
+  "pre_install": "Get-ChildItem \"$dir/clashtui*.exe\" | Rename-Item -NewName \"clashtui.exe\"",
   "bin": "clashtui.exe",
   "suggest": {
     "nssm": "nssm",
@@ -22,7 +22,7 @@
   "autoupdate": {
     "architecture": {
       "64bit": {
-        "url": "https://github.com/JohanChane/clashtui/releases/download/v$version/clashtui-win.zip"
+        "url": "https://github.com/JohanChane/clashtui/releases/download/v$version/clashtui-windows-amd64-v$version.zip"
       }
     }
   }
