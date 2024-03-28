@@ -257,17 +257,51 @@ impl App {
         if cli_env.update_all_profiles {
             is_cli_mode = true;
 
-            self.clashtui_util.get_profile_names()
-                .unwrap()
-                .into_iter()
-                .inspect(|s| println!("\nProfile: {s}"))
-                .filter_map(|v| {
-                    self.clashtui_util.update_profile(&v, false)
-                        .map_err(|e| println!("- Error! {e}"))
-                        .ok()
-                })
-                .flatten()
-                .for_each(|s| println!("- {s}"));
+            log::info!("Cron Mode!");
+
+            let current_time = std::time::SystemTime::now();
+            let datetime: chrono::DateTime<chrono::Local> = current_time.into();
+            println!("## {}", datetime.format("%Y-%m-%d %H:%M:%S"));
+            if let Ok(profile_names) = self.clashtui_util.get_profile_names() {
+                let mut ok_profiles = Vec::new();
+                for p_name in profile_names {
+                    println!("Update Profile `{p_name}`:");
+                    match self.clashtui_util.update_profile(&p_name, false) {
+                        Ok(r) => {
+                            for u in r {
+                                println!("-   {u}");
+                                ok_profiles.push(p_name.clone());
+                            }
+                        }
+                        Err(e) => {
+                            println!("-   Err: {e}");
+                        }
+                    }
+                }
+
+                // To avoid affecting the updates of other profiles, load the current profile after updating all profiles.
+                // ToDo: Check Content(profile, proxy-providers) of the current profile. If they are changed, reload the profile. However, the update times of proxy providers in mihomo will not be updated. So ?
+                let current_profile = &self.clashtui_util.tui_cfg.current_profile.borrow();
+                if ok_profiles.contains(current_profile) {
+                    println!("\nSelect profile `{current_profile}`:");
+                    match self.clashtui_util.select_profile(current_profile) {
+                        Ok(_) => println!("-   Ok"),
+                        Err(e) => println!("-   Err: {e}"),
+                    }
+                }
+            }
+
+            //self.clashtui_util.get_profile_names()
+            //    .unwrap()
+            //    .into_iter()
+            //    .inspect(|s| println!("\nProfile: {s}"))
+            //    .filter_map(|v| {
+            //        self.clashtui_util.update_profile(&v, false)
+            //            .map_err(|e| println!("- Error! {e}"))
+            //            .ok()
+            //    })
+            //    .flatten()
+            //    .for_each(|s| println!("- {s}"));
         }
 
         if is_cli_mode {

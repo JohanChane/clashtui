@@ -150,14 +150,6 @@ impl ProfileTab {
             })
             .collect();
         let now = std::time::SystemTime::now();
-        if profile_times.iter().filter_map(|t| t.as_ref()).any(|t| {
-            // Within one day
-            *t < now - std::time::Duration::from_secs(24 * 60 * 60)
-        }) {
-            self.popup_txt_msg(
-                "Some profile might haven't updated for more than one day".to_string(),
-            )
-        };
         self.profile_list.set_items(profile_names);
         self.profile_list
             .set_extras(profile_times.into_iter().map(|t| {

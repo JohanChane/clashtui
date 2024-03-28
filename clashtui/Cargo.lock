@@ -178,6 +178,7 @@ version = "0.2.0"
 dependencies = [
  "api",
  "argh",
+ "chrono",
  "encoding",
  "enumflags2",
  "log",
