@@ -14,7 +14,7 @@
 * [便携模式](#便携模式)
 * [使用说明](#使用说明)
     * [导入链接](#导入链接)
-    * [结合 cronie 定时更新 profiles (Windows 没有 cronie 自己想办法吧)](#结合-cronie-定时更新-profiles-windows-没有-cronie-自己想办法吧)
+    * [可结合 Windows 的任务计划程序定时更新 profiles](#可结合-windows-的任务计划程序定时更新-profiles)
     * [使用配置模板](#使用配置模板)
     * [高级使用](#高级使用)
         * [配置打开文件和目录的命令](#配置打开文件和目录的命令)
@@ -110,22 +110,11 @@ Loopback Manager 同理。下载 [Loopback Manager](https://github.com/tiagonmas
 
 支持导入文件配置。`Uri` 输入是文件路径即可。
 
-### 结合 cronie 定时更新 profiles (Windows 没有 cronie 自己想办法吧)
+### 可结合 Windows 的任务计划程序定时更新 profiles
 
-```shell
+```sh
 clashtui -u         # 以命令行的模式更新所有 profiles。如果 profile 有 proxy-providers, 同时也会更新它们。
 ```
-
-所以可以结合 cronie 来定时更新 profiles:
-
-```shell
-# crontab -e
-@hourly /usr/bin/env clashtui -u >> ~/cron.out
-# OR
-@hourly /usr/bin/env clashtui -u        # 不保存更新结果
-```
-
-cronie 的使用, See [ref](https://wiki.archlinuxcn.org/wiki/Cron)。
 
 ### 使用配置模板
 
