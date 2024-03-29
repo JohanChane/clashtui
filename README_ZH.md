@@ -97,7 +97,6 @@ paru -S clashtui。      # 其他 linux 发行版, 手动下载, 将 clashtui �
 clashtui                # 先运行会在 ~/.config/clashtui 生成一些默认文件。
 
 # nvim ~/.config/clashtui/config.yaml
-[default]
 # 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
 clash_core_path: "mihomo"
 clash_cfg_dir: "/srv/mihomo"

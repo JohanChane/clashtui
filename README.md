@@ -97,7 +97,6 @@ paru -S clashtui.      # For other Linux distributions, manually download and pl
 clashtui                # Running this will generate some default files in ~/.config/clashtui.
 
 # nvim ~/.config/clashtui/config.yaml
-[default]
 # The following parameters correspond to the command <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
 clash_core_path: "mihomo"
 clash_cfg_dir: "/srv/mihomo"
