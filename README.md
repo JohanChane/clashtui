@@ -31,7 +31,7 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
 ## Supported Platforms
 
 - Linux
-- Windows. Please refer to [Windows README](https://github.com/JohanChane/clashtui/blob/win/README_ZH.md)
+- Windows. Please refer to [Windows README](https://github.com/JohanChane/clashtui/blob/win/README.md)
 
 ## Target Audience
 
