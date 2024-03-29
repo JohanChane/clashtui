@@ -1,6 +1,9 @@
 # ClashTui
 
+**This demo is OUTDATED**
 ![Demo](./assets/clashtui_demo.gif)
+
+Language: [English](./README.md) | [中文](./README_ZH.md)
 
 <details>
 <summary>Table of Contents</summary>
@@ -69,7 +72,7 @@ chown -R mihomo:mihomo /srv/mihomo
 usermod -a -G mihomo <user>
 groups <user>       # 查看是否已经加入 mihomo group
 
-# Optional. 0.1.0 之后版本的 clashtui 会自动修复文件的权限。
+# Optional. 0.2.0 之后版本的 clashtui 会自动修复文件的权限。
 chmod g+w /srv/mihomo               # clashtui 要有创建文件的权限。
 chmod g+s /srv/mihomo               # 使 clashtui 创建的文件的组为 mihomo。为了使 clashtui 对该目录的文件有组的读写权限。
 chmod g+w /srv/mihomo/config.yaml   # clashtui 要有写的权限。
@@ -93,13 +96,13 @@ paru -S clashtui。      # 其他 linux 发行版, 手动下载, 将 clashtui �
 # ## 配置 clashtui
 clashtui                # 先运行会在 ~/.config/clashtui 生成一些默认文件。
 
-# nvim ~/.config/clashtui/config.toml
+# nvim ~/.config/clashtui/config.yaml
 [default]
 # 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
-clash_core_path = "mihomo"
-clash_cfg_dir = "/srv/mihomo"
-clash_cfg_path = "/srv/mihomo/config.yaml"
-clash_srv_name = "mihomo"       # systemctl {restart | stop} <clash_srv_name>
+clash_core_path: "mihomo"
+clash_cfg_dir: "/srv/mihomo"
+clash_cfg_path: "/srv/mihomo/config.yaml"
+clash_srv_name: "mihomo"       # systemctl {restart | stop} <clash_srv_name>
 ```
 
 如果有 cargo 则可以使用 `cargo install clashtui` 安装 clashtui。
@@ -110,7 +113,7 @@ clash_srv_name = "mihomo"       # systemctl {restart | stop} <clash_srv_name>
 
 ## 便携模式
 
-在 clashtui 程序所有的目录创建一个名为 `data` 的文件夹。则会将数据放在 `data` 内而不是 `~/.config/clashtui`。
+在 clashtui 程序所在的目录创建一个名为 `data` 的文件夹。则会将数据放在 `data` 内而不是 `~/.config/clashtui`。
 
 ## 使用说明
 
@@ -118,7 +121,7 @@ clash_srv_name = "mihomo"       # systemctl {restart | stop} <clash_srv_name>
 
 ### 导入链接
 
--   在 Profile 区域, 按 `i` 输入 Name (尽量不使用后缀) 和 Uri (url or file path)
+-   在 `Profile` 区域, 按 `i` 输入 Name (尽量不使用后缀) 和 Uri (url or file path)
 -   按 `a` 更新 Profile 的依赖的所有资源。默认使用自身代理更新, 如果开启 tun 模式或系统代理且没有可用节点的情况下, 先停止 mihomo 服务 (ClashSrvCtl Tab 的 StopClashService), 再更新即可。
 -   按 `Enter` 选择该 Profile。
 -   在浏览器输入 `http://127.0.0.1:9090/ui`。前提是你的 mihomo 配置已经配置了 ui 相关的字段, [参考](https://wiki.metacubex.one/config/general/#_7)。
@@ -143,7 +146,7 @@ cronie 的使用, See [ref](https://wiki.archlinuxcn.org/wiki/Cron)。
 ### 使用配置模板
 
 -   按 `t` 切换到 Templates 区域。
--   选择 `template_proxy_providers`, 按 `e` 编辑, 输入订阅链接 (直接复制链接, 不用修改) 即可。
+-   选择 `template_proxy_providers`, 按 `e` 编辑, 输入订阅链接即可。
 
     比如:
 
@@ -155,7 +158,7 @@ cronie 的使用, See [ref](https://wiki.archlinuxcn.org/wiki/Cron)。
     #https://....
     ```
 
--   按 `Enter` 生成配置到 `Profile`。按 `p` 切换回 Profile, `Enter` 选择该配置即可。
+-   按 `Enter` 生成配置到 `Profile`。按 `p` 切换回 `Profile`, `Enter` 选择该配置即可。
 
 在[这里](./Example/templates)有最新的 templates。
 
@@ -163,23 +166,21 @@ cronie 的使用, See [ref](https://wiki.archlinuxcn.org/wiki/Cron)。
 
 #### 配置打开文件和目录的命令
 
-在 `./data/config.toml` 中配置即可。`%s` 会自动替换为选择的文件的路径。
+在 `~/.config/clashtui/config.yaml` 中配置即可。`%s` 会自动替换为选择的文件的路径。
 
 比如:
 
 Linux:
 
-```toml
-[default]
-edit_cmd = "alacritty -e nvim %s"
-opendir_cmd = "alacritty -e ranger %s"
+```yaml
+edit_cmd: "alacritty -e nvim %s"
+opendir_cmd: "alacritty -e ranger %s"
 ```
 
 Windows:
 
-```
-[default]
-edit_cmd = "notepad %s"
+```yaml
+edit_cmd: "notepad %s"
 ```
 
 #### 自定义配置模板
