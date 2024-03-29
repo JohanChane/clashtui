@@ -3,285 +3,174 @@
 **This demo is OUTDATED**
 ![Demo](./assets/clashtui_demo.gif)
 
-Language: [English (out-of-date)](./README.md) | [中文](./README_ZH.md)
+Language: [English](./README.md) | [中文](./README_ZH.md)
 
 <details>
 <summary>Table of Contents</summary>
 <!-- vim-markdown-toc GFM -->
 
-* [Supported Platforms](#supported-platforms)
-* [Target User](#target-user)
-* [Features](#features)
-* [Installing Mihomo Service (With Tun Mode Avaliable)](#installing-mihomo-service-with-tun-mode-avaliable)
-    * [Linux](#linux)
-        * [Set Up Trigger:](#set-up-trigger)
-        * [Set Up Systemd User Service:](#set-up-systemd-user-service)
-    * [Windows](#windows)
+* [Install Mihomo Service (Enable Tun Mode)](#install-mihomo-service-enable-tun-mode)
 * [Install clashtui](#install-clashtui)
-    * [Linux](#linux-1)
-    * [Windows](#windows-1)
-    * [Configuring `basic_clash_config.yaml`](#configuring-basic_clash_configyaml)
-* [Starting](#starting)
-    * [Windows](#windows-2)
+    * [Configure `basic_clash_config.yaml`](#configure-basic_clash_configyaml)
+* [Launching](#launching)
+    * [Windows](#windows)
 * [Portable Mode](#portable-mode)
-* [Usage](#usage)
-    * [Cron Update](#cron-update)
+* [Usage Instructions](#usage-instructions)
     * [Importing Links](#importing-links)
+    * [Automated Profile Updates with Windows Task Scheduler](#automated-profile-updates-with-windows-task-scheduler)
     * [Using Configuration Templates](#using-configuration-templates)
     * [Advanced Usage](#advanced-usage)
         * [Configuring Commands to Open Files and Directories](#configuring-commands-to-open-files-and-directories)
         * [Customizing Configuration Templates](#customizing-configuration-templates)
 * [File Structure of clashtui](#file-structure-of-clashtui)
-* [Project Disclaimer](#project-disclaimer)
+* [Disclaimer](#disclaimer)
 
 <!-- vim-markdown-toc -->
 </details>
 
-> ### NOTE
->
-> This app is now **passively-maintained**, There are no plans for new features, but the maintainer intends to respond to issues that get filed.
->
-> But if you've got some good ideas, feel free to open a feature request.
+## Install Mihomo Service (Enable Tun Mode)
 
-## Supported Platforms
-
-- Windows
-- Linux
-
-## Target User
-
-- Familiarity with clash configurations
-- Preference for TUI software
-
-## Features
- - Cli mode support, use `clashtui --help` to get the usage
- - Support both system and user mode service
- - Generate profile with template
-
-## Installing Mihomo Service (With Tun Mode Avaliable)
-
-### Linux
-
-For example: [ArchLinux](https://aur.archlinux.org/packages/mihomo).
-
-#### Set Up Trigger:
- > This will `setcap` for `mihomo` automatically every time you update via `pacman`
- - `vi /etc/pacman.d/hooks/mihomo.hook`
-```systemd
-[Trigger]
-Operation = Install
-Operation = Upgrade
-Type = Path
-Target = usr/bin/mihomo
-
-[Action]
-When = PostTransaction
-Exec = /usr/bin/setcap 'cap_net_admin,cap_net_bind_service=+ep' /usr/bin/mihomo
-```
- - And then `paru -S mihomo`
-#### Set Up Systemd User Service: 
- > For those want to use system-wide service, please follow [this](https://wiki.metacubex.one/startup/service/#systemd) 
- - Create service: `systemctl --user edit mihomo`
-```systemd
-[Unit]
-Description=mihomo Daemon, Another Clash Kernel.
-After=network.target NetworkManager.service systemd-networkd.service iwd.service
-
-[Service]
-Type=simple
-LimitNPROC=4096
-LimitNOFILE=1000000
-# %h mean HOME
-WorkingDirectory=%h/.local/proxy
-Restart=always
-ExecStartPre=/usr/bin/sleep 1s
-ExecStart=%h/.local/proxy/mihomo -d %h/.local/proxy/config
-ExecReload=/bin/kill -HUP $MAINPID
- 
-[Install]
-WantedBy=default.target
-```
- - To enable at boot: `systemctl --user enable mihomo`
- - To start the service: `systemctl --user start mihomo`
-
- > It's advised to test the mihomo service with a functional mihomo configuration to verify its success. 
- >
- > Check for any missing [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) files.
-
-### Windows
-
-[Install scoop](https://github.com/ScoopInstaller/Install) (optional):
+[Install scoop](https://github.com/ScoopInstaller/Install) (Optional):
 
 ```powershell
 irm get.scoop.sh -outfile 'install.ps1'
-.\install.ps1 -ScoopDir 'D:\Scoop' -ScoopGlobalDir 'D:\ScoopGlobal' -NoProxy    
-# I chose to install it in the D drive.
+.\install.ps1 -ScoopDir 'D:\Scoop' -ScoopGlobalDir 'D:\ScoopGlobal' -NoProxy    # I chose to install it in the D drive.
 ```
 
-For instance:
+For example:
 
-- Use `scoop install mihomo` to install mihomo. Alternatively, download a suitable [mihomo](https://github.com/MetaCubeX/mihomo/releases) for your system and place it in `D:/PortableProgramFiles/mihomo/mihomo.exe`.
-- Create directories `D:/MyAppData/mihomo` and a file `D:/MyAppData/mihomo/config.yaml`.
-- Perform actions after installing clashtui.
+-   Install mihomo via `scoop install mihomo`. Alternatively, download a suitable [mihomo release](https://github.com/MetaCubeX/mihomo/releases) for your system and place it at `D:/PortableProgramFiles/mihomo/mihomo.exe`.
+-   Create the directory `D:/MyAppData/mihomo` and the file `D:/MyAppData/mihomo/config.yaml`.
+-   Install clashtui after these steps.
 
-If mihomo client (e.g. metacubexd) can access but requires a proxy for certain websites:
-- For mihomo installed via Scoop: Allow `D:\Scoop\apps\mihomo\1.17.0\mihomo.exe` instead of the current path. After updating mihomo, repeat this process.
-- For manually downloaded mihomo installations: Allow `D:/PortableProgramFiles/mihomo/mihomo.exe`.
+If you can access the mihomo client (e.g., metacubexd) but cannot access websites that require a proxy, try allowing `mihomo.exe` through the firewall:
+-   For mihomo installed via Scoop: Allow `D:\Scoop\apps\mihomo\1.17.0\mihomo.exe` instead of the current path. After updating mihomo to a newer version, you may need to perform this operation again.
+-   For manually downloaded mihomo installations: Allow `D:/PortableProgramFiles/mihomo/mihomo.exe`.
 
 ## Install clashtui
- > Just download from release, this is a forked repository 
 
-### Linux
+Manually download and install clashtui, or install it via `scoop bucket add extras; scoop install clashtui`. You can find the latest [clashtui.json](./PkgManagers/Scoop/clashtui.json) here.
 
-For instance: ArchLinux
+Run clashtui first, which will generate some default files in `%APPDATA%/clashtui`.
 
- > Check for the latest [PKGBUILD](https://github.com/JohanChane/clashtui/blob/main/PKGBUILD).
- - Run `paru -S clashtui` to install
- - Run `clashtui` to generates default files in ~/.config/clashtui.
-
-Please modify `~/.config/clashtui/config.yaml`
-```yaml
-# You can find the path by `Get-Command mihomo`
-clash_core_path: mihomo
-clash_cfg_dir: ~/.config/mihomo
-clash_cfg_path: ~/.config/mihomo/config.yaml
-clash_srv_name: mihomo      
-
-edit_cmd: ''
-open_dir_cmd: ''
-# Just keep this, clashtui will automatically generate it
-current_profile: ''
-```
-
- > If you have cargo, you can use `cargo install clashtui` to install clashtui.
-
-### Windows
-
- - Manually [download](https://github.com/Jackhr-arch/clashtui/releases) and install clashtui
- - Install via Scoop 
- `scoop bucket add extras; scoop install clashtui; scoop install nssm`.
-
-Please modify `%APPDATA%/clashtui/config.yaml`:
+Modify `%APPDATA%/clashtui/config.yaml`:
 
 ```yaml
-# You can find the path by `Get-Command mihomo`
-clash_core_path: D:/Scoop/shims/mihomo.exe      
-clash_cfg_dir: D:/MyAppData/mihomo
-clash_cfg_path: D:/MyAppData/mihomo/config.yaml
-clash_srv_name: mihomo      
-
-edit_cmd: ''
-open_dir_cmd: ''
-# Just keep this, clashtui will automatically generate it
-current_profile: ''
+# The following parameters correspond to the command <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
+#clash_core_path: "D:/PortableProgramFiles/mihomo/mihomo.exe"
+clash_core_path: "D:/Scoop/shims/mihomo.exe"       # `Get-Command mihomo`
+clash_cfg_dir: "D:/MyAppData/mihomo"
+clash_cfg_path: "D:/MyAppData/mihomo/config.yaml"
+clash_srv_name: "mihomo"       # nssm {install | remove | restart | stop | edit} <clash_srv_name>
 ```
 
- > After editing, add `nssm` and `clashtui`(Optional) to PATH
+Once modified, add clashtui and nssm to PATH:
+-   For clashtui installed via scoop: `scoop install nssm`
+-   For manually downloaded clashtui installations: Add `D:/PortableProgramFiles/clashtui` to PATH.
 
-Run clashtui. In `ClashSrvCtl`, select `InstallSrv`. The program will install the `mihomo` core service based on the configured settings. This service starts automatically at boot. After that, press `R` to start the core service without rebooting.
+Run clashtui. In the `ClashSrvCtl` tab, select `InstallSrv`. The program will install the `mihomo` core service according to the configuration above. This service will start automatically on boot. After installation, start the core service by using the `StartClashService` button in the ClashSrvCtl tab.
 
-### Configuring `basic_clash_config.yaml`
+If you're not using scoop to install nssm, you can manually download [nssm](https://nssm.cc/download), rename it to `nssm.exe`, and add it to PATH or place it in the same directory as clashtui.
 
-Manually configure `{~/.config or %APPDATA%}/clashtui/basic_clash_config.yaml`. Some basic fields in this file merge into `clash_cfg_path`. Refer to [here](./App/basic_clash_config.yaml) to configure tun mode.
+The same applies to Loopback Manager. Download [Loopback Manager](https://github.com/tiagonmas/Windows-Loopback-Exemption-Manager), rename it to `EnableLoopback.exe`, and add it to PATH or place it in the directory where clashtui is located.
 
-## Starting
+### Configure `basic_clash_config.yaml`
+
+Configure `%APPDATA%/clashtui/basic_clash_config.yaml` manually. Some basic fields in this file will be merged into `clash_cfg_path`. Refer to [here](./Example/basic_clash_config.yaml) for configuring tun mode.
+
+## Launching
 
 ### Windows
 
 Choose one of the following methods:
 
-- Add `clashtui` command to PATH. Start by typing `clashtui` in the terminal, `win + r`, or in File Explorer's address bar.
-- Double-click `clashtui`.
+-   Add the clashtui command to PATH. Launch it via terminal, `win + r`, or by entering `clashtui` in the address bar of File Explorer.
+-   Double-click on clashtui.
 
-*clashtui uses [crossterm](https://docs.rs/crossterm/latest/crossterm/) and [ratatui](https://github.com/ratatui-org/ratatui) for implementation. For optimal usage on Windows, consider using [Windows Terminal](https://github.com/microsoft/terminal). Set the command startup method in Windows Terminal to use `Windows Terminal` for executing the `clashtui` command.*
+*clashtui uses [crossterm](https://docs.rs/crossterm/latest/crossterm/) and [ratatui](https://github.com/ratatui-org/ratatui) for implementation. It's recommended to use [Windows Terminal](https://github.com/microsoft/terminal) on Windows. Set the startup command to use `Windows Terminal` in Windows Terminal settings. Then, executing the clashtui command will automatically use Windows Terminal.*
 
 ## Portable Mode
 
-Create a folder named `data` in the clashtui program directory. This stores data in `data` instead of `~/.config/clashtui` OR `%APPDATA%/clashtui`.
+Create a folder named `data` in the directory where clashtui is located. This will store data in the `data` folder instead of `%APPDATA%/clashtui`.
 
-## Usage
+## Usage Instructions
 
 Press `?` to display help.
 
-### Cron Update
-
-- By using `crontab` with `clashtui --update`, users can update their profiles 
-
 ### Importing Links
 
-- In the Profile area, press `i` to input Name (try avoiding suffixes) and Uri.
-- Press `U` to update dependencies for the Profile. It defaults to using its proxy for updates. If using tun mode or system proxy with no available nodes, stop the mihomo service before updating.
-- Press `Enter` to select the Profile.
-- Enter `http://127.0.0.1:9090/ui` in the browser.
+-   In the Profile area, press `i` to input Name (try to avoid suffixes) and Uri (URL or file path).
+-   Press `a` to update all Profile dependencies. By default, it uses its own proxy for updates. If tun mode or system proxy is enabled and there are no available nodes, stop the mihomo service first (StopClashService in the ClashSrvCtl tab), then update.
+-   Press `Enter` to select the Profile.
+-   Enter `http://127.0.0.1:9090/ui` in your browser. Assuming your mihomo configuration has already set up the UI-related fields, [refer here](https://wiki.metacubex.one/config/general/#_7).
 
-If the Windows platform can't open `http://127.0.0.1:9090/ui`:
-- In `ClashSrvCtl`, choose `TestClashConfig` to check syntax and auto-downloaded geo files.
-- Press `L` to view logs. (`H` opens clashtui config dir. `G` opens clash config dir. Check if the related files are correct.)
-- Use `netstat -aon | findstr "9090"` to check if the port exists. If not, consider using a compatible version of mihomo.
-- If it opens but can't access proxy-required sites, allow `mihomo` through the firewall.
+If the Windows platform fails to open `http://127.0.0.1:9090/ui`:
+-   In `ClashSrvCtl`, select `TestClashConfig` to check syntax correctness and automatic downloading of geo files.
+-   Press `L` to view logs. (`H` to open the clashtui config dir. `G` to open the clash config dir. Check if the related files are correct.)
+-   You can use `netstat -aon | findstr "9090"` to check if the port exists. If it doesn't, you may need to use a compatible version of mihomo.
+-   If you can open it but cannot access websites that require a proxy, allow `mihomo` through the firewall.
 
-Supports importing file configurations. Input the file path as `Uri`.
+### Automated Profile Updates with Windows Task Scheduler
+
+```powershell
+clashtui -u         # Update all profiles in command-line mode. If profiles have proxy-providers, they will also be updated.
+```
 
 ### Using Configuration Templates
 
-- Press `t` to switch to Templates.
-- Choose `template_proxy_providers`, press `e` to edit, and input subscription links (copy without modification) as needed.
+-   Press `t` to switch to Templates area.
+-   Select `template_proxy_providers`, press `e` to edit, and enter subscription links (copy the link directly without modification).
 
-For example:
+    For example:
 
-```
-https://....
-https://....
+    ```
+    https://....
+    https://....
 
-# Supports comments
-#https://....
-```
+    # Support comments
+    #https://....
+    ```
 
-- Press `Enter` to generate configurations in `Profile`. Press `p` to switch back to Profile, and `Enter` to select the configuration.
+-   Press `Enter` to generate the configuration to `Profile`. Press `p` to switch back to Profile, then `Enter` to select the configuration.
 
-Downloaded clashtui versions usually include templates. If not, the latest templates are available [here](https://github.com/JohanChane/clashtui/tree/main/App/templates).
+The latest templates are available [here](./Example/templates).
 
 ### Advanced Usage
 
 #### Configuring Commands to Open Files and Directories
 
-Configure in `./data/config.yaml`. `%s` will automatically replace with the selected file's path.
+Configure in `%APPDATA%/clashtui/config.yaml`. `%s` will be automatically replaced with the selected file path.
 
-For Linux:
-
-```yaml
-edit_cmd: alacritty -e nvim %s
-opendir_cmd: alacritty -e ranger %s
-```
-
-For Windows:
+For example:
 
 ```yaml
-edit_cmd: code %s
+edit_cmd = "notepad %s"
+#opendir_cmd: "explorer %s"
 ```
 
 #### Customizing Configuration Templates
 
-The template feature is unique to clashtui. Refer to provided sample templates for usage instructions.
+The template function is unique to clashtui. Refer to the provided example templates for specific usage rules.
 
-Define repeatedly used fields:
+Define fields to be reused:
 
 ```yaml
-pp: &pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
-delay_test: &delay_test {url: https://www.gstatic.com/generate_204, interval: 300}
+proxy-anchor:
+  - delay_test: &pa_dt {url: https://www.gstatic.com/generate_204, interval: 300}
+  - proxy_provider: &pa_pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
 ```
 
-Generate a `proxy-provider` for each link in `template_proxy_providers`:
+Generate a proxy-provider for each link in `template_proxy_providers`:
 
 ```yaml
 proxy-providers:
   provider:
     tpl_param:
-    type: http    # The type field should be placed here, not in pp, as it's used for updating resources.
-    <<: *pp
+    type: http    # The type field must be placed here, not in pa_pp. clashtui detects network resources based on this field.
+    <<: *pa_pp
 ```
 
-Generate a `Select, Auto` `proxy-group` for each proxy-provider:
+Generate a `Select, Auto` proxy-group for each proxy-providers:
 
 ```yaml
 proxy-groups:
@@ -294,7 +183,7 @@ proxy-groups:
     tpl_param:
       providers: ["provider"]
     type: url-test
-    <<: *delay_test
+    <<: *pa_dt
 ```
 
 Use `Select, Auto` proxy-groups:
@@ -310,17 +199,17 @@ proxy-groups:
 
 ## File Structure of clashtui
 
-- `basic_clash_config.yaml`: Contains basic fields for mihomo configuration, which will be merged into `clash_cfg_path`.
-- `config.yaml`: Configuration file for clashtui.
+-   basic_clash_config.yaml: Basic fields for mihomo configuration, merged into `clash_cfg_path`.
+-   config.yaml: Configuration file for clashtui.
 
-## Project Disclaimer
+## Disclaimer
 
-This project is for educational and reference purposes only. The author doesn't guarantee the accuracy, completeness, or applicability of the code in this project. Users should use the code at their own risk.
+This project is for learning and reference purposes only. The author does not guarantee the accuracy, completeness, or applicability of the code in this project. Users should use the code in this project at their own risk.
 
-The author is not responsible for any direct or indirect losses caused by the use of this project's code, including but not limited to data loss, computer damage, or business interruption.
+The author is not responsible for any direct or indirect losses caused by the use of the code in this project, including but not limited to data loss, computer damage, or business interruption.
 
-Before using the code in this project, users should fully understand its functionality and potential risks. Seek professional advice if necessary. The author bears no responsibility for any consequences resulting from the use of this project's code.
+Before using the code in this project, users should fully understand its functionality and potential risks, and seek professional advice if necessary. The author assumes no responsibility for any consequences resulting from the use of the code in this project.
 
-When using the code in this project, abide by relevant laws and regulations. Do not use it for illegal activities or actions that infringe upon others' rights.
+When using the code in this project, users must comply with relevant laws and regulations and refrain from using it for illegal activities or activities that infringe upon the rights of others.
 
-The author reserves the right to interpret this disclaimer and may modify and update it at any time.
+The author reserves the right to interpret and modify this disclaimer at any time.

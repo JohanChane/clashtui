@@ -1,6 +1,9 @@
 # ClashTui
 
+**This demo is OUTDATED**
 ![Demo](./assets/clashtui_demo.gif)
+
+Language: [English](./README.md) | [中文](./README_ZH.md)
 
 <details>
 <summary>Table of Contents</summary>
@@ -50,16 +53,15 @@ irm get.scoop.sh -outfile 'install.ps1'
 
 先运行 clashtui, 会在 `%APPDATA%/clashtui` 生成一些默认文件。
 
-修改 `%APPDATA%/clashtui/config.toml`:
+修改 `%APPDATA%/clashtui/config.yaml`:
 
-```toml
-[default]
+```yaml
 # 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
-#clash_core_path = "D:/PortableProgramFiles/mihomo/mihomo.exe"
-clash_core_path = "D:/Scoop/shims/mihomo.exe"       # `Get-Command mihomo`
-clash_cfg_dir = "D:/MyAppData/mihomo"
-clash_cfg_path = "D:/MyAppData/mihomo/config.yaml"
-clash_srv_name = "mihomo"       # nssm {install | remove | restart | stop | edit} <clash_srv_name>
+#clash_core_path: "D:/PortableProgramFiles/mihomo/mihomo.exe"
+clash_core_path: "D:/Scoop/shims/mihomo.exe"       # `Get-Command mihomo`
+clash_cfg_dir: "D:/MyAppData/mihomo"
+clash_cfg_path: "D:/MyAppData/mihomo/config.yaml"
+clash_srv_name: "mihomo"       # nssm {install | remove | restart | stop | edit} <clash_srv_name>
 ```
 
 改好之后, 将 clashtui, nssm 加入 PATH:
@@ -89,7 +91,7 @@ Loopback Manager 同理。下载 [Loopback Manager](https://github.com/tiagonmas
 
 ## 便携模式
 
-在 clashtui 程序所有的目录创建一个名为 `data` 的文件夹。则会将数据放在 `data` 内而不是 `~/.config/clashtui` 或 `%APPDATA%/clashtui`。
+在 clashtui 程序所在的目录创建一个名为 `data` 的文件夹。则会将数据放在 `data` 内而不是 `%APPDATA%/clashtui`。
 
 ## 使用说明
 
@@ -108,11 +110,9 @@ Loopback Manager 同理。下载 [Loopback Manager](https://github.com/tiagonmas
 -   可以使用 `netstat -aon | findstr "9090"` 查看端口是否存在, 如果不存在可以换一个 compatible 版本的 mihomo。
 -   如果可以打开, 但是无法访问需要代理的网站。可以允许 `mihomo` 通过防火墙。
 
-支持导入文件配置。`Uri` 输入是文件路径即可。
-
 ### 可结合 Windows 的任务计划程序定时更新 profiles
 
-```sh
+```powershell
 clashtui -u         # 以命令行的模式更新所有 profiles。如果 profile 有 proxy-providers, 同时也会更新它们。
 ```
 
@@ -139,23 +139,13 @@ clashtui -u         # 以命令行的模式更新所有 profiles。如果 profil
 
 #### 配置打开文件和目录的命令
 
-在 `./data/config.toml` 中配置即可。`%s` 会自动替换为选择的文件的路径。
+在 `%APPDATA%/clashtui/config.yaml` 中配置即可。`%s` 会自动替换为选择的文件的路径。
 
 比如:
 
-Linux:
-
-```toml
-[default]
-edit_cmd = "alacritty -e nvim %s"
-opendir_cmd = "alacritty -e ranger %s"
-```
-
-Windows:
-
-```
-[default]
+```yaml
 edit_cmd = "notepad %s"
+#opendir_cmd: "explorer %s"
 ```
 
 #### 自定义配置模板
