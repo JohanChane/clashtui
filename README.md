@@ -168,17 +168,11 @@ The latest templates can be found [here](./Example/templates).
 
 Configure in `~/.config/clashtui/config.yaml`. `%s` will be automatically replaced with the path of the selected file.
 
-For Linux:
+For example:
 
 ```yaml
 edit_cmd: "alacritty -e nvim %s"
 opendir_cmd: "alacritty -e ranger %s"
-```
-
-For Windows:
-
-```yaml
-edit_cmd: "notepad %s"
 ```
 
 #### Customizing Configuration Templates
