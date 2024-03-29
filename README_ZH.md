@@ -170,17 +170,9 @@ cronie 的使用, See [ref](https://wiki.archlinuxcn.org/wiki/Cron)。
 
 比如:
 
-Linux:
-
 ```yaml
 edit_cmd: "alacritty -e nvim %s"
 opendir_cmd: "alacritty -e ranger %s"
-```
-
-Windows:
-
-```yaml
-edit_cmd: "notepad %s"
 ```
 
 #### 自定义配置模板
