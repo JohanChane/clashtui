@@ -120,14 +120,17 @@ Press `?` to display help.
 
 ### Importing Links
 
-- In the `Profile` area, press `i` to input Name (preferably without suffix) and Uri (url or file path).
-- If it's the first time installing clashtui:
-  - Press Enter to select an available profile so that the fields of `basic_clash_config` are merged into `clash_cfg_path`.
-  - Restart clashtui to reparse changes such as `basic_clash_config`.
-  - Restart the mihomo service (StartClashService in the ClashSrvCtl tab).
-- Press `a` to update all resources dependent on the Profile. By default, it uses its own proxy for updates. If tun mode or system proxy is enabled and there are no available nodes, stop the mihomo service first (ClashSrvCtl Tab's StopClashService), then update.
-- Press `Enter` to select the Profile.
-- Enter `http://127.0.0.1:9090/ui` in the browser. Provided your mihomo configuration has already set up ui related fields, [reference](https://wiki.metacubex.one/config/general/#_7).
+- Import profile: In the `Profile` area, press `i` to input Name (preferably without suffix) and Uri (url or file path).
+- Update profile: Press `a` to update all resources dependent on the Profile. By default, it uses its own proxy for updates. If tun mode or system proxy is enabled and there are no available nodes, stop the mihomo service first (ClashSrvCtl Tab's StopClashService), then update.
+- Select profile: Press `Enter` to select the Profile.
+- Open mihomo ui: Enter `http://127.0.0.1:9090/ui` in the browser. Provided your mihomo configuration has already set up ui related fields, [reference](https://wiki.metacubex.one/config/general/#_7).
+
+If it is the first time installing clashtui:
+- If you have changed the `basic_clash_config` or other configurations, restart clashtui to reparse the changes in `basic_clash_config`, etc.
+- Import a profile that does not require updating with a proxy.
+- Press `a` to update all resources dependent on the profile.
+- Press `Enter` to select this profile, merging the fields of `basic_clash_config` into `clash_cfg_path`.
+- Restart the mihomo service (StartClashService in ClashSrvCtl Tab).
 
 ### Scheduled Updates with cronie
 
