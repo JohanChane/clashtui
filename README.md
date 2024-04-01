@@ -121,6 +121,10 @@ Press `?` to display help.
 ### Importing Links
 
 - In the `Profile` area, press `i` to input Name (preferably without suffix) and Uri (url or file path).
+- If it's the first time installing clashtui:
+  - Press Enter to select an available profile so that the fields of `basic_clash_config` are merged into `clash_cfg_path`.
+  - Restart clashtui to reparse changes such as `basic_clash_config`.
+  - Restart the mihomo service (StartClashService in the ClashSrvCtl tab).
 - Press `a` to update all resources dependent on the Profile. By default, it uses its own proxy for updates. If tun mode or system proxy is enabled and there are no available nodes, stop the mihomo service first (ClashSrvCtl Tab's StopClashService), then update.
 - Press `Enter` to select the Profile.
 - Enter `http://127.0.0.1:9090/ui` in the browser. Provided your mihomo configuration has already set up ui related fields, [reference](https://wiki.metacubex.one/config/general/#_7).
