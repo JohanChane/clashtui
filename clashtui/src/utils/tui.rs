@@ -113,17 +113,22 @@ fn load_app_config(
     let controller_api = basic_clash_config_value
         .get("external-controller")
         .and_then(|v| {
-            format!(
-                "http://{}",
-                v.as_str().expect("external-controller not str?")
-            )
-            .into()
+                let controller_address = v.as_str().expect("external-controller not str?");
+                if controller_address.starts_with("0.0.0.0:") {
+                    // replace 0.0.0.0 with 127.0.0.1
+                    let port_index = controller_address.find(':').unwrap_or(0) + 1;
+                    let port = &controller_address[port_index..];
+                    let machine_ip = "127.0.0.1";
+                    Some(format!("http://{machine_ip}:{port}"))
+                } else {
+                    Some(format!("http://{}", controller_address))
+                }
         })
         .unwrap_or_else(|| panic!("No external-controller in {BASIC_FILE}"));
-    log::debug!("controller_api: {}", controller_api);
+    log::info!("controller_api: {}", controller_api);
 
     let proxy_addr = get_proxy_addr(&basic_clash_config_value);
-    log::debug!("proxy_addr: {}", proxy_addr);
+    log::info!("proxy_addr: {}", proxy_addr);
 
     let secret = basic_clash_config_value
         .get("secret")

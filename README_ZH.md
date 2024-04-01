@@ -121,6 +121,10 @@ clash_srv_name: "mihomo"       # systemctl {restart | stop} <clash_srv_name>
 ### 导入链接
 
 -   在 `Profile` 区域, 按 `i` 输入 Name (尽量不使用后缀) 和 Uri (url or file path)
+-   如果是首次安装 clashtui:
+    -   先回车选择一个可用的 profile, 使得 `basic_clash_config` 的字段合并到 `clash_cfg_path`。
+    -   重启 clashtui, 使其重新解析 `basic_clash_config` 等的更改。
+    -   重启 mihomo 服务 (ClashSrvCtl Tab 的 StartClashService)。
 -   按 `a` 更新 Profile 的依赖的所有资源。默认使用自身代理更新, 如果开启 tun 模式或系统代理且没有可用节点的情况下, 先停止 mihomo 服务 (ClashSrvCtl Tab 的 StopClashService), 再更新即可。
 -   按 `Enter` 选择该 Profile。
 -   在浏览器输入 `http://127.0.0.1:9090/ui`。前提是你的 mihomo 配置已经配置了 ui 相关的字段, [参考](https://wiki.metacubex.one/config/general/#_7)。
