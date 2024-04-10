@@ -16,7 +16,7 @@ use api::{ClashConfig, ClashUtil, Resp};
 
 const BASIC_FILE: &str = "basic_clash_config.yaml";
 
-pub struct ClashTuiUtil {
+pub struct ClashBackend {
     pub clashtui_dir: PathBuf,
     profile_dir: PathBuf,
 
@@ -26,7 +26,7 @@ pub struct ClashTuiUtil {
 }
 
 // Misc
-impl ClashTuiUtil {
+impl ClashBackend {
     pub fn new(clashtui_dir: &PathBuf, is_inited: bool) -> (Self, Vec<CfgError>) {
         let ret = load_app_config(clashtui_dir, is_inited);
         let mut err_track = ret.2;
@@ -79,6 +79,45 @@ impl ClashTuiUtil {
     }
     fn config_reload(&self, body: String) -> Result<(), Error> {
         self.clash_api.config_reload(body)
+    }
+    fn _update_state(
+        &self,
+        new_pf: Option<String>,
+        new_mode: Option<String>,
+    ) -> (String, Option<api::Mode>, Option<api::TunStack>) {
+        if let Some(v) = new_mode {
+            let load = format!(r#"{{"mode": "{}"}}"#, v);
+            let _ = self
+                .clash_api
+                .config_patch(load)
+                .map_err(|e| log::error!("Patch Errr: {}", e));
+        }
+
+        let pf = match new_pf {
+            Some(v) => {
+                self.tui_cfg.update_profile(&v);
+                v
+            }
+            None => self.tui_cfg.current_profile.borrow().clone(),
+        };
+
+        if let Err(e) = self.fetch_remote() {
+            if e.kind() != std::io::ErrorKind::ConnectionRefused {
+                log::warn!("{}", e);
+            }
+        }
+        let (mode, tun) = match self.clash_remote_config.get() {
+            Some(v) => (
+                Some(v.mode),
+                if v.tun.enable {
+                    Some(v.tun.stack)
+                } else {
+                    None
+                },
+            ),
+            None => (None, None),
+        };
+        (pf, mode, tun)
     }
 }
 

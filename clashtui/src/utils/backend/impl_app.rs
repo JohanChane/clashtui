@@ -1,8 +1,8 @@
-use super::ClashTuiUtil;
+use super::ClashBackend;
 use crate::utils::state::_State;
 use std::path::Path;
 // IPC Related
-impl ClashTuiUtil {
+impl ClashBackend {
     #[cfg(target_os = "windows")]
     pub fn update_state(
         &self,
@@ -77,44 +77,5 @@ impl ClashTuiUtil {
     }
     pub fn open_dir(&self, path: &Path) -> std::io::Result<()> {
         Self::spawn_open(&self.tui_cfg.open_dir_cmd, path)
-    }
-    fn _update_state(
-        &self,
-        new_pf: Option<String>,
-        new_mode: Option<String>,
-    ) -> (String, Option<api::Mode>, Option<api::TunStack>) {
-        if let Some(v) = new_mode {
-            let load = format!(r#"{{"mode": "{}"}}"#, v);
-            let _ = self
-                .clash_api
-                .config_patch(load)
-                .map_err(|e| log::error!("Patch Errr: {}", e));
-        }
-
-        let pf = match new_pf {
-            Some(v) => {
-                self.tui_cfg.update_profile(&v);
-                v
-            }
-            None => self.tui_cfg.current_profile.borrow().clone(),
-        };
-
-        if let Err(e) = self.fetch_remote() {
-            if e.kind() != std::io::ErrorKind::ConnectionRefused {
-                log::warn!("{}", e);
-            }
-        }
-        let (mode, tun) = match self.clash_remote_config.get() {
-            Some(v) => (
-                Some(v.mode),
-                if v.tun.enable {
-                    Some(v.tun.stack)
-                } else {
-                    None
-                },
-            ),
-            None => (None, None),
-        };
-        (pf, mode, tun)
     }
 }

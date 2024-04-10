@@ -1,10 +1,8 @@
 #![warn(clippy::all)]
-use core::time::Duration;
-mod app;
+#[cfg(feature = "tui")]
 mod tui;
 mod utils;
 
-use crate::app::App;
 use crate::utils::{Flag, Flags};
 
 pub const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
@@ -14,9 +12,6 @@ pub const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
 /// A tui tool for mihomo
 #[derive(argh::FromArgs)]
 struct CliEnv {
-    /// time in ms between two ticks.
-    #[argh(option, default = "250")]
-    tick_rate: u64,
     /// don't show UI but only update all profiles
     #[argh(switch, short = 'u')]
     update_all_profiles: bool,
@@ -27,7 +22,6 @@ struct CliEnv {
 
 fn main() {
     let CliEnv {
-        tick_rate,
         update_all_profiles,
         version,
     } = argh::from_env();
@@ -38,75 +32,59 @@ fn main() {
         if update_all_profiles {
             flags.insert(utils::Flag::UpdateOnly);
         };
-        if let Err(e) = run(flags, tick_rate) {
+        if let Err(e) = run(flags) {
             eprintln!("{e}");
             std::process::exit(-1)
         }
     }
     std::process::exit(0);
 }
-pub fn run(mut flags: Flags<Flag>, tick_rate: u64) -> std::io::Result<()> {
+pub fn run(mut flags: Flags<Flag>) -> std::io::Result<()> {
     let config_dir = load_app_dir(&mut flags);
 
     setup_logging(config_dir.join("clashtui.log").to_str().unwrap());
-
-    let (app, err_track) = App::new(&flags, &config_dir);
     log::debug!("Current flags: {:?}", flags);
-    if let Some(mut app) = app {
-        use ui::setup::*;
-        // setup terminal
-        setup()?;
-        // create app and run it
-        run_app(&mut app, tick_rate, err_track, flags)?;
-        // restore terminal
-        restore()?;
+    let (backend, err_track) =
+        utils::ClashBackend::new(&config_dir, !flags.contains(Flag::FirstInit));
 
-        app.save(config_dir.join("config.yaml").to_str().unwrap())?;
-    } else {
-        err_track.into_iter().for_each(|v| eprintln!("{v}"));
+    if flags.contains(Flag::UpdateOnly) {
+        log::info!("Cron Mode!");
+        backend
+            .get_profile_names()
+            .unwrap()
+            .into_iter()
+            .inspect(|s| println!("\nProfile: {s}"))
+            .filter_map(|v| {
+                backend
+                    .update_profile(&v, false)
+                    .map_err(|e| println!("- Error! {e}"))
+                    .ok()
+            })
+            .flatten()
+            .for_each(|s| println!("- {s}"));
+
+        return Ok(());
     }
-    Ok(())
-}
+    // Finish cron
+    else {
+        #[cfg(feature = "tui")]
+        {
+            let mut app = tui::App::new(backend);
+            use ui::setup::*;
+            // setup terminal
+            setup()?;
+            // create app and run it
+            tui::run_app(&mut app, err_track, flags)?;
+            // restore terminal
+            restore()?;
 
-use utils::CfgError;
-fn run_app(
-    app: &mut App,
-    tick_rate: u64,
-    err_track: Vec<CfgError>,
-    flags: Flags<Flag>,
-) -> std::io::Result<()> {
-    if flags.contains(utils::Flag::FirstInit) {
-        app.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
-        app.popup_txt_msg(
-            "Please go to Config Tab to set configs so that program can work properly".to_string(),
-        );
-    };
-    if flags.contains(utils::Flag::ErrorDuringInit) {
-        app.popup_txt_msg(
-            "Some Error happened during app init, Check the log for detail".to_string(),
-        );
-    }
-    err_track
-        .into_iter()
-        .for_each(|e| app.popup_txt_msg(e.reason));
-    log::info!("App init finished");
-
-    use ratatui::{backend::CrosstermBackend, Terminal};
-    let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
-    let tick_rate = Duration::from_millis(tick_rate);
-    use ui::event;
-    while !app.should_quit {
-        terminal.draw(|f| app.draw(f))?;
-
-        app.late_event();
-
-        if event::poll(tick_rate)? {
-            if let Err(e) = app.event(&event::read()?) {
-                app.popup_txt_msg(e.to_string())
-            };
+            app.save(config_dir.join("config.yaml").to_str().unwrap())?;
+        }
+        #[cfg(not(feature = "tui"))]
+        {
+            eprintln!("Not enable tui feature, No ui set!")
         }
     }
-    log::info!("App Exit");
     Ok(())
 }
 
@@ -133,12 +111,14 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
     };
 
     if !clashtui_config_dir.join("config.yaml").exists() {
-        use tui::symbols;
+        const DEFAULT_BASIC_CLASH_CFG_CONTENT: &str = r#"mixed-port: 7890
+        mode: rule
+        log-level: info
+        external-controller: 127.0.0.1:9090"#;
         flags.insert(Flag::FirstInit);
-        if let Err(err) = crate::utils::init_config(
-            &clashtui_config_dir,
-            symbols::DEFAULT_BASIC_CLASH_CFG_CONTENT,
-        ) {
+        if let Err(err) =
+            crate::utils::init_config(&clashtui_config_dir, DEFAULT_BASIC_CLASH_CFG_CONTENT)
+        {
             flags.insert(Flag::ErrorDuringInit);
             log::error!("{}", err);
         }

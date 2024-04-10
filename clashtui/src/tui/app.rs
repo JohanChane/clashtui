@@ -12,7 +12,7 @@ use crate::tui::{
     EventState, StatusBar, TabBar, Theme, Visibility,
 };
 use crate::utils::{
-    CfgError, ClashTuiUtil, Flag, Flags, SharedClashTuiState, SharedClashTuiUtil, State,
+    ClashBackend, SharedClashTuiState, SharedClashBackend, State,
 };
 
 pub struct App {
@@ -23,34 +23,13 @@ pub struct App {
     info_popup: InfoPopUp,
     msgpopup: MsgPopup,
 
-    clashtui_util: SharedClashTuiUtil,
+    clashtui_util: SharedClashBackend,
     statusbar: StatusBar,
 }
 
 impl App {
-    pub fn new(
-        flags: &Flags<Flag>,
-        clashtui_config_dir: &PathBuf,
-    ) -> (Option<Self>, Vec<CfgError>) {
-        let (util, err_track) =
-            ClashTuiUtil::new(clashtui_config_dir, !flags.contains(Flag::FirstInit));
-        if flags.contains(Flag::UpdateOnly) {
-            log::info!("Cron Mode!");
-            util.get_profile_names()
-                .unwrap()
-                .into_iter()
-                .inspect(|s| println!("\nProfile: {s}"))
-                .filter_map(|v| {
-                    util.update_profile(&v, false)
-                        .map_err(|e| println!("- Error! {e}"))
-                        .ok()
-                })
-                .flatten()
-                .for_each(|s| println!("- {s}"));
-
-            return (None, err_track);
-        } // Finish cron
-        let clashtui_util = SharedClashTuiUtil::new(util);
+    pub fn new(util: ClashBackend) -> Self {
+        let clashtui_util = SharedClashBackend::new(util);
 
         let clashtui_state =
             SharedClashTuiState::new(RefCell::new(State::new(Rc::clone(&clashtui_util))));
@@ -81,7 +60,7 @@ impl App {
             tabs,
         };
 
-        (Some(app), err_track)
+        app
     }
 
     fn popup_event(&mut self, ev: &event::Event) -> Result<EventState, ui::Infailable> {

@@ -1,4 +1,4 @@
-use super::ClashSrvOp;
+use crate::utils::ClashSrvOp;
 use crate::msgpopup_methods;
 use crate::{
     tui::{
@@ -8,7 +8,7 @@ use crate::{
         widgets::{List, MsgPopup},
         EventState, Visibility,
     },
-    utils::{SharedClashTuiState, SharedClashTuiUtil},
+    utils::{SharedClashTuiState, SharedClashBackend},
 };
 use api::Mode;
 
@@ -21,14 +21,14 @@ pub struct ClashSrvCtlTab {
 
     mode_selector: List,
 
-    clashtui_util: SharedClashTuiUtil,
+    clashtui_util: SharedClashBackend,
     clashtui_state: SharedClashTuiState,
 
     op: Option<ClashSrvOp>,
 }
 
 impl ClashSrvCtlTab {
-    pub fn new(clashtui_util: SharedClashTuiUtil, clashtui_state: SharedClashTuiState) -> Self {
+    pub fn new(clashtui_util: SharedClashBackend, clashtui_state: SharedClashTuiState) -> Self {
         let mut operations = List::new(CLASHSRVCTL.to_string());
         operations.set_items(vec![
             #[cfg(target_os = "linux")]
