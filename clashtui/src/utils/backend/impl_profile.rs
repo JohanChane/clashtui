@@ -1,4 +1,4 @@
-use super::ClashTuiUtil;
+use super::ClashBackend;
 use crate::utils::{is_yaml, utils as Utils};
 use std::{
     fs::{create_dir_all, File},
@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-impl ClashTuiUtil {
+impl ClashBackend {
     pub fn crt_yaml_with_template(&self, template_name: &String) -> Result<(), String> {
         use std::borrow::Cow;
         use std::collections::HashMap;
@@ -425,7 +425,7 @@ impl ClashTuiUtil {
     }
 }
 
-impl ClashTuiUtil {
+impl ClashBackend {
     pub fn get_profile_names(&self) -> std::io::Result<Vec<String>> {
         Utils::get_file_names(&self.profile_dir).map(|mut v| {
             v.sort();

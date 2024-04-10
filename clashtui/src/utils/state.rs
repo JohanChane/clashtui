@@ -1,4 +1,4 @@
-use super::SharedClashTuiUtil;
+use super::SharedClashBackend;
 use api::{Mode, TunStack};
 
 pub struct _State {
@@ -10,10 +10,10 @@ pub struct _State {
 }
 pub struct State {
     st: _State,
-    ct: SharedClashTuiUtil,
+    ct: SharedClashBackend,
 }
 impl State {
-    pub fn new(ct: SharedClashTuiUtil) -> Self {
+    pub fn new(ct: SharedClashBackend) -> Self {
         #[cfg(target_os = "windows")]
         return Self {
             st: ct.update_state(None, None, None),

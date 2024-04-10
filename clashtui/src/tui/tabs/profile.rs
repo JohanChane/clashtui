@@ -5,7 +5,7 @@ use crate::tui::{
     widgets::{ConfirmPopup, List, MsgPopup},
     EventState, Visibility,
 };
-use crate::utils::{SharedClashTuiState, SharedClashTuiUtil};
+use crate::utils::{SharedClashTuiState, SharedClashBackend};
 use crate::{msgpopup_methods, utils::get_modify_time};
 crate::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);
 
@@ -26,13 +26,13 @@ pub struct ProfileTab {
     confirm_popup: ConfirmPopup,
     profile_input: Box<ProfileInputPopup>,
 
-    clashtui_util: SharedClashTuiUtil,
+    clashtui_util: SharedClashBackend,
     clashtui_state: SharedClashTuiState,
     op: Option<PTOp>,
 }
 
 impl ProfileTab {
-    pub fn new(clashtui_util: SharedClashTuiUtil, clashtui_state: SharedClashTuiState) -> Self {
+    pub fn new(clashtui_util: SharedClashBackend, clashtui_state: SharedClashTuiState) -> Self {
         let profiles = List::new(PROFILE.to_string());
         let templates = List::new(TEMPALTE.to_string());
 

@@ -1,9 +1,9 @@
-use super::ClashTuiUtil;
-use crate::tui::tabs::ClashSrvOp;
+use super::ClashBackend;
+use crate::utils::ClashSrvOp;
 use crate::utils::ipc::{self, exec};
 use std::io::Error;
 
-impl ClashTuiUtil {
+impl ClashBackend {
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
         match op {
