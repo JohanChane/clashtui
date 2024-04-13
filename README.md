@@ -1,7 +1,6 @@
 # ClashTui
 
-**This demo is OUTDATED**
-![Demo](./assets/clashtui_demo.gif)
+![Demo](./Assets/clashtui_demo.gif)
 
 Language: [English](./README.md) | [中文](./README_ZH.md)
 
@@ -23,6 +22,7 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
         * [Configuring Commands to Open Files and Directories](#configuring-commands-to-open-files-and-directories)
         * [Customizing Configuration Templates](#customizing-configuration-templates)
 * [File Structure of clashtui](#file-structure-of-clashtui)
+* [See more](#see-more)
 * [Disclaimer](#disclaimer)
 
 <!-- vim-markdown-toc -->
@@ -208,6 +208,10 @@ proxy-groups:
 
 -   basic_clash_config.yaml: Basic fields for mihomo configuration, merged into `clash_cfg_path`.
 -   config.yaml: Configuration file for clashtui.
+
+## See more
+
+[Doc](./Doc)
 
 ## Disclaimer
 

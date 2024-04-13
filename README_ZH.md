@@ -1,7 +1,6 @@
 # ClashTui
 
-**This demo is OUTDATED**
-![Demo](./assets/clashtui_demo.gif)
+![Demo](./Assets/clashtui_demo.gif)
 
 Language: [English](./README.md) | [中文](./README_ZH.md)
 
@@ -23,6 +22,7 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
         * [配置打开文件和目录的命令](#配置打开文件和目录的命令)
         * [自定义配置模板](#自定义配置模板)
 * [clashtui 的文件结构](#clashtui-的文件结构)
+* [See more](#see-more)
 * [项目免责声明](#项目免责声明)
 
 <!-- vim-markdown-toc -->
@@ -208,6 +208,10 @@ proxy-groups:
 
 -   basic_clash_config.yaml: mihomo 配置的基本字段, 会合并到 `clash_cfg_path`。
 -   config.yaml: clashtui 的配置。
+
+## See more
+
+[Doc](./Doc)
 
 ## 项目免责声明
 
