@@ -1,7 +1,6 @@
 # ClashTui
 
-**This demo is OUTDATED**
-![Demo](./assets/clashtui_demo.gif)
+![Demo](./Assets/clashtui_demo.gif)
 
 Language: [English](./README.md) | [中文](./README_ZH.md)
 
@@ -23,6 +22,7 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
         * [Configuring Open File and Open Directory Commands](#configuring-open-file-and-open-directory-commands)
         * [Customizing Configuration Templates](#customizing-configuration-templates)
 * [ClashTui File Structure](#clashtui-file-structure)
+* [See more](#see-more)
 * [Project Disclaimer](#project-disclaimer)
 
 <!-- vim-markdown-toc -->
@@ -84,6 +84,29 @@ systemctl restart mihomo  # Start service
 
 It is recommended to test the mihomo service with a valid configuration to ensure its success. Check if [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) file is missing.
 
+`mihomo.service` of `mihomo` package:
+
+```
+[Unit]
+Description=Mihomo daemon
+After=network.target NetworkManager.service systemd-networkd.service iwd.service
+
+[Service]
+Type=simple
+User=mihomo
+Group=mihomo
+LimitNPROC=500
+LimitNOFILE=1000000
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+Restart=always
+RestartSec=5
+ExecStart=/usr/bin/mihomo -d /etc/mihomo
+
+[Install]
+WantedBy=multi-user.target
+```
+
 ## Install ClashTui
 
 For example: ArchLinux
@@ -98,7 +121,7 @@ clashtui                # Running this will generate some default files in ~/.co
 
 # nvim ~/.config/clashtui/config.yaml
 # The following parameters correspond to the command <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
-clash_core_path: "mihomo"
+clash_core_path: "/usr/bin/mihomo"
 clash_cfg_dir: "/srv/mihomo"
 clash_cfg_path: "/srv/mihomo/config.yaml"
 clash_srv_name: "mihomo"       # systemctl {restart | stop} <clash_srv_name>
@@ -142,9 +165,7 @@ Thus, you can use cronie to schedule updates:
 
 ```sh
 # crontab -e
-@daily /usr/bin/env clashtui -u >> ~/cron.out 2>&1
-# OR
-@daily /usr/bin/env clashtui -u        # Do not save update results
+0 10,14,16,22 * * * /usr/bin/env clashtui -u >> ~/cron.out 2>&1
 ```
 
 For cronie usage, see [ref](https://wiki.archlinuxcn.org/wiki/Cron).
@@ -234,6 +255,10 @@ proxy-groups:
 
 - basic_clash_config.yaml: Basic fields of mihomo configuration, which will be merged into `clash_cfg_path`.
 - config.yaml: Configuration of clashtui.
+
+## See more
+
+[Doc](./Doc)
 
 ## Project Disclaimer
 
