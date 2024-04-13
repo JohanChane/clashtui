@@ -2,22 +2,19 @@
 # Where should we write the GIF?
 Output demo.gif
 
-# Set up a 1200x600 terminal with 46px font.
+# Set up a 1200x600 terminal with 42px font.
 Set FontSize 20
 Set Width 1200
-Set Height 1000
+Set Height 800
 
-Type "./target/release/clashtui"
-Sleep 500ms
+# ## Start clashtui
+Type "clashtui"
+Sleep 1s
 Enter
 Sleep 1s
 
-Set TypingSpeed 1s
-
-# ## Close Welcome
-Escape 
-
 # ## Help
+Set TypingSpeed 1s
 Type "?"
 Type "jjjj"
 Escape
@@ -27,26 +24,30 @@ Type "i"
 Set TypingSpeed 300ms
 Type "sub"
 Tab
-Type "the url"
-Escape
+Type "https://example.com"
+Enter
 
 Set TypingSpeed 1s
 
-Enter
+# scroll list
 Type "j"
-Enter
+Sleep 2s
 Type "k"
+Sleep 2s
 
+# Select and update the profile
+Enter
+Sleep 5s
 Type "u"
 Sleep 10s
 Escape
-Type "P"
-Sleep 1s
-Escape
-Type "L"
-Sleep 1s
-Escape
 
+# Preview the profile
+#Type "v"
+#Sleep 2s
+#Escape
+
+# Generate profile with Template
 Type "t"
 Sleep 1s
 Enter
@@ -54,44 +55,26 @@ Sleep 1s
 Escape
 Sleep 1s
 Type "p"
-Enter
-Sleep 6s
-Escape
-Sleep 1s
-Type "D"
-Sleep 1s
-Type "y"
 Sleep 1s
 
-Type "P"
+# Delete profile
+Type "d"
 Sleep 2s
-Escape
-Sleep 2s
+Type "y"
+Sleep 1s
 
 # ## ClashSrvCtl
 Set TypingSpeed 300ms
 Type "2"
 Type "jjjj"
-Enter
 Type "j"
-Enter
-
-# ## Config
-Tab
-Enter
-Type "the path to clash config dir"
-Enter
-Sleep 1s
-Enter
-Escape
 
 # ## Global
-Type "H"
-Sleep 500ms
-
-# ## Exit And Rerun
-Type "Q"
-Sleep 1s
-Type "./target/release/clashtui"
-Sleep 500ms
+# Show log
+Type "L"
+Sleep 2s
 Escape
+
+# ## Exit
+Type "q"
+Sleep 1s
