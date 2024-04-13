@@ -17,27 +17,31 @@ impl ClashTuiUtil {
 
         match op {
             ClashSrvOp::StartClashService => {
-                start_process_as_admin(
+                let output1 = start_process_as_admin(
                     nssm_pgm,
                     format!("restart {}", self.tui_cfg.clash_srv_name).as_str(),
                     true,
                 )?;
-                exec(
+                let output2 = exec(
                     nssm_pgm,
                     vec!["status", self.tui_cfg.clash_srv_name.as_str()],
-                )
+                )?;
+
+                Ok(format!("# ## restart\n{output1}# ## status\n{output2}"))
             }
 
             ClashSrvOp::StopClashService => {
-                start_process_as_admin(
+                let output1 = start_process_as_admin(
                     nssm_pgm,
                     &format!("stop {}", self.tui_cfg.clash_srv_name),
                     true,
                 )?;
-                exec(
+                let output2 = exec(
                     nssm_pgm,
                     vec!["status", self.tui_cfg.clash_srv_name.as_str()],
-                )
+                )?;
+
+                Ok(format!("# ## stop\n{output1}# ## status\n{output2}"))
             }
 
             ClashSrvOp::InstallSrv => {

@@ -241,13 +241,6 @@ impl App {
             });
     }
 
-    pub fn save(&self, config_path: &str) -> std::io::Result<()> {
-        self.clashtui_util
-            .tui_cfg
-            .to_file(config_path)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-    }
-
     fn do_some_job_after_initapp_before_setupui(&mut self) {
         let cli_env: CliEnv = argh::from_env();
 
