@@ -242,13 +242,6 @@ impl App {
             });
     }
 
-    pub fn save(&self, config_path: &str) -> std::io::Result<()> {
-        self.clashtui_util
-            .tui_cfg
-            .to_file(config_path)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-    }
-
     fn do_some_job_after_initapp_before_setupui(&mut self) {
         // ## Correct the perm of files in clash_cfg_dir.
         if ! self.clashtui_util.check_perms_of_ccd_files() {
