@@ -1,7 +1,6 @@
 # ClashTui
 
-**This demo is OUTDATED**
-![Demo](./assets/clashtui_demo.gif)
+![Demo](./Assets/clashtui_demo.gif)
 
 Language: [English](./README.md) | [中文](./README_ZH.md)
 
@@ -23,6 +22,7 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
         * [配置打开文件和目录的命令](#配置打开文件和目录的命令)
         * [自定义配置模板](#自定义配置模板)
 * [clashtui 的文件结构](#clashtui-的文件结构)
+* [See more](#see-more)
 * [项目免责声明](#项目免责声明)
 
 <!-- vim-markdown-toc -->
@@ -84,6 +84,29 @@ systemctl restart mihomo  # 启动服务
 
 建议先用一个可用的 mihomo 配置测试 mihomo 服务是否成功。检查是否缺少 [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) 文件。
 
+`mihomo` package 提供的 `mihomo.service`:
+
+```
+[Unit]
+Description=Mihomo daemon
+After=network.target NetworkManager.service systemd-networkd.service iwd.service
+
+[Service]
+Type=simple
+User=mihomo
+Group=mihomo
+LimitNPROC=500
+LimitNOFILE=1000000
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+Restart=always
+RestartSec=5
+ExecStart=/usr/bin/mihomo -d /etc/mihomo
+
+[Install]
+WantedBy=multi-user.target
+```
+
 ## 安装 clashtui
 
 比如: ArchLinux
@@ -98,7 +121,7 @@ clashtui                # 先运行会在 ~/.config/clashtui 生成一些默认�
 
 # nvim ~/.config/clashtui/config.yaml
 # 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
-clash_core_path: "mihomo"
+clash_core_path: "/usr/bin/mihomo"
 clash_cfg_dir: "/srv/mihomo"
 clash_cfg_path: "/srv/mihomo/config.yaml"
 clash_srv_name: "mihomo"       # systemctl {restart | stop} <clash_srv_name>
@@ -142,9 +165,7 @@ clashtui -u         # 以命令行的模式更新所有 profiles。如果 profil
 
 ```sh
 # crontab -e
-@daily /usr/bin/env clashtui -u >> ~/cron.out 2>&1
-# OR
-@daily /usr/bin/env clashtui -u        # 不保存更新结果
+0 10,14,16,22 * * * /usr/bin/env clashtui -u >> ~/cron.out 2>&1
 ```
 
 cronie 的使用, See [ref](https://wiki.archlinuxcn.org/wiki/Cron)。
@@ -234,6 +255,10 @@ proxy-groups:
 
 -   basic_clash_config.yaml: mihomo 配置的基本字段, 会合并到 `clash_cfg_path`。
 -   config.yaml: clashtui 的配置。
+
+## See more
+
+[Doc](./Doc)
 
 ## 项目免责声明
 
