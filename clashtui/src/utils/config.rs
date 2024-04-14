@@ -9,8 +9,8 @@ pub struct ClashTuiConfig {
     pub clash_srv_name: String,
     pub clash_srv_is_user: bool,        // true: systemctl --user ...
 
-    pub edit_cmd: Option<String>,
-    pub open_dir_cmd: Option<String>,
+    pub edit_cmd: String,
+    pub open_dir_cmd: String,
 }
 impl ClashTuiConfig {
     pub fn from_file(config_path: &str) -> Result<Self> {
