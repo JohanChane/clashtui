@@ -10,4 +10,4 @@
 -   profile 的更新时间或间隔。
 -   profile 依赖的资源的更新时间或间隔:
     -   proxy-providers
-    -   rules-providers OR meta-rules-dat
+    -   rules-providers OR meta-rules-dat (检查 meta-rules-dat 是否需要更新)
