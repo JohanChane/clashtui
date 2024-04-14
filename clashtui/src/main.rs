@@ -54,6 +54,8 @@ pub fn run(flags: &mut Flags<Flag>, tick_rate: u64, config_dir: &std::path::Path
         run_app(&mut app, tick_rate, err_track, flags, warning_list_msg)?;
         // restore terminal
         restore()?;
+
+        app.save_to_data_file();
     } else {
         err_track.into_iter().for_each(|v| eprintln!("{v}"));
     }

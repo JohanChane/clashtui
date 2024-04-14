@@ -4,15 +4,12 @@ use std::fs::File;
 #[serde(default)]
 pub struct ClashTuiConfig {
     pub clash_cfg_dir: String,
-    pub clash_core_path: String,
     pub clash_cfg_path: String,
+    pub clash_core_path: String,
     pub clash_srv_name: String,
-    pub is_user: bool,
 
-    pub edit_cmd: String,
-    pub open_dir_cmd: String,
-
-    pub current_profile: core::cell::RefCell<String>,
+    pub edit_cmd: Option<String>,
+    pub open_dir_cmd: Option<String>,
 }
 impl ClashTuiConfig {
     pub fn from_file(config_path: &str) -> Result<Self> {
@@ -29,10 +26,6 @@ impl ClashTuiConfig {
         !self.clash_cfg_dir.is_empty()
             && !self.clash_cfg_path.is_empty()
             && !self.clash_core_path.is_empty()
-    }
-
-    pub fn update_profile(&self, profile: &String) {
-        self.current_profile.borrow_mut().clone_from(profile);
     }
 }
 #[cfg(test)]
