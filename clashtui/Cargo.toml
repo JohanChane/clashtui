@@ -3,7 +3,7 @@ name = "clashtui"
 version = "0.2.0"
 edition = "2021"
 
-authors = ["Johan Chane <johanchanex@gmail.com>"]
+authors = ["Johan Chane <johanchanex at gmail dot com>"]
 description = "Mihomo TUI Client"
 license = "MIT"
 repository = "https://github.com/JohanChane/clashtui"
@@ -11,7 +11,7 @@ homepage = "https://github.com/JohanChane/clashtui"
 documentation = "https://github.com/JohanChane/clashtui"
 readme = "README.md"
 
-exclude = ["PKGBUILD", "Scoop/*", "Example/*", ".github/*"]
+include = ["clashtui/*", "LICENSE", "README.md", "README_ZH.md"]
 
 [badges]
 maintenance = { status = "passively-maintained" }
