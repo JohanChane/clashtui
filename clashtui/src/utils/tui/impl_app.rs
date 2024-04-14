@@ -45,25 +45,23 @@ impl ClashTuiUtil {
     /// Exec `cmd` for given `path`
     ///
     /// Auto detect `cmd` is_empty and use system default app to open `path`
-    fn spawn_open(cmd: Option<&String>, path: &Path) -> std::io::Result<()> {
+    fn spawn_open(cmd: &str, path: &Path) -> std::io::Result<()> {
         use crate::utils::ipc::spawn;
-        match cmd {
-            Some(c) => {
-                let open_cmd = c.replace("%s", path.to_str().unwrap_or(""));
-                spawn("cmd", vec!["/C", open_cmd.as_str()])
-            }
-            None => {
-                spawn("cmd", vec!["/C", "start", path.to_str().unwrap_or("")])
-            }
+        if !cmd.is_empty() {
+            let open_cmd = cmd.replace("%s", path.to_str().unwrap_or(""));
+            return spawn("cmd", vec!["/C", open_cmd.as_str()]);
+        } else {
+            return spawn("cmd", vec!["/C", "start", path.to_str().unwrap_or("")]);
         }
     }
 
     pub fn edit_file(&self, path: &Path) -> std::io::Result<()> {
-        Self::spawn_open(self.tui_cfg.edit_cmd.as_ref(), path)
+        Self::spawn_open(self.tui_cfg.edit_cmd.as_str(), path)
     }
     pub fn open_dir(&self, path: &Path) -> std::io::Result<()> {
-        Self::spawn_open(self.tui_cfg.open_dir_cmd.as_ref(), path)
+        Self::spawn_open(self.tui_cfg.open_dir_cmd.as_str(), path)
     }
+
     fn _update_state(
         &self,
         new_pf: Option<String>,
