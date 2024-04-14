@@ -125,6 +125,7 @@ clash_core_path: "/usr/bin/mihomo"
 clash_cfg_dir: "/srv/mihomo"
 clash_cfg_path: "/srv/mihomo/config.yaml"
 clash_srv_name: "mihomo"       # systemctl {restart | stop} <clash_srv_name>
+clash_srv_is_user: false        # true: systemctl --user ...
 ```
 
 If you have cargo, you can use `cargo install clashtui` to install clashtui.

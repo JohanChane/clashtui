@@ -7,6 +7,7 @@ pub struct ClashTuiConfig {
     pub clash_cfg_path: String,
     pub clash_core_path: String,
     pub clash_srv_name: String,
+    pub clash_srv_is_user: bool,        // true: systemctl --user ...
 
     pub edit_cmd: Option<String>,
     pub open_dir_cmd: Option<String>,
