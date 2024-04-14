@@ -1,4 +1,4 @@
-use core::cell::OnceCell;
+use core::cell::{OnceCell, RefCell};
 use core::str::FromStr as _;
 use std::{
     io::Error,
@@ -13,6 +13,7 @@ mod impl_profile;
 use super::{
     config::{CfgError, ClashTuiConfig, ErrKind},
     parse_yaml,
+    ClashTuiData,
 };
 use api::{ClashConfig, ClashUtil, Resp};
 
@@ -26,6 +27,7 @@ pub enum ProfileType {
 }
 
 const BASIC_FILE: &str = "basic_clash_config.yaml";
+const DATA_FILE: &str = "data.yaml";
 
 pub struct ClashTuiUtil {
     pub clashtui_dir: PathBuf,
@@ -34,6 +36,7 @@ pub struct ClashTuiUtil {
     clash_api: ClashUtil,
     pub tui_cfg: ClashTuiConfig,
     clash_remote_config: OnceCell<ClashConfig>,
+    pub clashtui_data: RefCell<ClashTuiData>,
 }
 
 // Misc
@@ -54,6 +57,10 @@ impl ClashTuiUtil {
                 log::warn!("Fail to connect to clash. Is it Running?")
             }
         }
+
+        let data_path = clashtui_dir.join(DATA_FILE);
+        let clashtui_data = RefCell::new(ClashTuiData::from_file(data_path.to_str().unwrap()).unwrap_or_default());
+
         (
             Self {
                 clashtui_dir: clashtui_dir.clone(),
@@ -61,6 +68,7 @@ impl ClashTuiUtil {
                 clash_api,
                 tui_cfg: ret.0,
                 clash_remote_config,
+                clashtui_data,
             },
             err_track,
         )
@@ -90,6 +98,11 @@ impl ClashTuiUtil {
     }
     fn config_reload(&self, body: String) -> Result<(), Error> {
         self.clash_api.config_reload(body)
+    }
+
+    pub fn save_to_data_file(&self) {
+        let data_path = self.clashtui_dir.join(DATA_FILE);
+        let _ = self.clashtui_data.borrow_mut().to_file(data_path.to_str().unwrap());
     }
 }
 

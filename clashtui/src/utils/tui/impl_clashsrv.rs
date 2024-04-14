@@ -12,7 +12,7 @@ impl ClashTuiUtil {
         match op {
             ClashSrvOp::StartClashService => {
                 let mut args = vec!["restart", self.tui_cfg.clash_srv_name.as_str()];
-                if self.tui_cfg.is_user {
+                if !toolkit::is_run_as_root() {
                     args.push("--user")
                 }
                 let output1 = exec("systemctl", args)?;     // Although the command execution is successful,
@@ -27,7 +27,7 @@ impl ClashTuiUtil {
             }
             ClashSrvOp::StopClashService => {
                 let mut args = vec!["stop", self.tui_cfg.clash_srv_name.as_str()];
-                if self.tui_cfg.is_user {
+                if !toolkit::is_run_as_root() {
                     args.push("--user")
                 }
                 let output1 = exec("systemctl", args)?;

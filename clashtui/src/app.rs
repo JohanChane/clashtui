@@ -242,6 +242,10 @@ impl App {
             });
     }
 
+    pub fn save_to_data_file(&self) {
+        self.clashtui_util.save_to_data_file();
+    }
+
     fn do_some_job_after_initapp_before_setupui(&mut self) {
         // ## Correct the perm of files in clash_cfg_dir.
         if ! self.clashtui_util.check_perms_of_ccd_files() {
@@ -309,7 +313,7 @@ impl App {
 
                 // To avoid affecting the updates of other profiles, load the current profile after updating all profiles.
                 // ToDo: Check Content(profile, proxy-providers) of the current profile. If they are changed, reload the profile. However, the update times of proxy providers in mihomo will not be updated. So ?
-                let current_profile = &self.clashtui_util.tui_cfg.current_profile.borrow();
+                let current_profile = &self.clashtui_util.clashtui_data.borrow().current_profile;
                 if ok_profiles.contains(current_profile) {
                     println!("\nSelect profile `{current_profile}`:");
                     match self.clashtui_util.select_profile(current_profile) {
