@@ -6,17 +6,17 @@ proxy-groups:
   - name: "Entry"
     type: select
     proxies:
-      - <Auto>
-      - <Select>
+      - <At>
+      - <Sl>
 
-  - name: "Select"
+  - name: "Sl"
     tpl_param:
-      providers: ["provider"]
+      providers: ["pvd"]
     type: select
 
-  - name: "Auto"
+  - name: "At"
     tpl_param:
-      providers: ["provider"]
+      providers: ["pvd"]
     type: url-test
     <<: *pa_dt
 
@@ -33,9 +33,9 @@ proxy-groups:
       - DIRECT
 
 proxy-providers:
-  provider:
+  pvd:
     tpl_param:
-    type: http    # type 字段要放在此处, 不能放入 pp。原因是要用于更新资源。
+    type: http
     <<: *pa_pp
 
 rule-anchor:

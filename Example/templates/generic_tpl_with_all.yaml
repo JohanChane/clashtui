@@ -7,30 +7,30 @@ proxy-groups:
   - name: "Entry"
     type: select
     proxies:
-      - AllAuto
-      - AllSelect
-      - <Auto>
-      - <Select>
+      - AllAt
+      - AllSl
+      - <At>
+      - <Sl>
 
-  - name: "AllSelect"
+  - name: "AllSl"
     type: select
     use:
-      - <provider>
+      - <pvd>
 
-  - name: "Select"
+  - name: "Sl"
     tpl_param:
-      providers: ["provider"]
+      providers: ["pvd"]
     type: select
 
-  - name: "AllAuto"
+  - name: "AllAt"
     type: url-test
     proxies:
-      - <Auto>
+      - <At>
     <<: *pa_dt
 
-  - name: "Auto"
+  - name: "At"
     tpl_param:
-      providers: ["provider"]
+      providers: ["pvd"]
     type: url-test
     <<: *pa_dt
 
@@ -47,7 +47,7 @@ proxy-groups:
       - DIRECT
 
 proxy-providers:
-  provider:
+  pvd:
     tpl_param:
     type: http
     <<: *pa_pp

@@ -8,8 +8,9 @@ ipv6: true
 secret: ''
 external-controller: 127.0.0.1:9090
 #external-ui: /usr/share/metacubexd
-external-ui: uis/metacubexd     # In case of permission issues, placing the ui files under the clash_cfg_dir.
+external-ui: uis/metacubexd     # 以防出现权限问题, 将 metacubexd 放在 clash_cfg_dir 目录下.
                                 # `git clone https://github.com/metacubex/metacubexd.git -b gh-pages <clash_cfg_dir>/uis/metacubexd`
+                                # OR pacman metacubexd-bin hook: Exec = /bin/sh -c 'rm -rf /srv/mihomo/uis/metacubexd && cp -r /usr/share/metacubexd /srv/mihomo/uis/'
 external-ui-name: metacubexd
 external-ui-url: https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip
 
