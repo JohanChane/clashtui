@@ -6,31 +6,40 @@ proxy-groups:
   - name: "Entry"
     type: select
     proxies:
-      - <FilterFb>            # use proxy-groups which name is `FilterFb`.
-      - FilterSelectAll
-      - <Auto>                # Empathize with `FilterFb`
-      - <Select>              # Empathize with `FilterFb`
+      - <FltLb>
+      - FltAllSl
+      - <FltFb>
+      - <At>
+      - <Sl>
 
-  - name: "FilterSelectAll"
+  - name: "FltAllSl"
     type: select
     use: 
-      - <provider>            # use proxy-providers which name is `provider`: provider0, provider1, ...
+      - <pvd>
     filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
 
-  - name: "FilterFb"          # `FilterFb` name is customizable. Generate proxy-providers: FilterFb-provider0, FilterFb-provider1, ...
+  - name: "Sl"
     tpl_param:
-      providers: ["provider"]
+      providers: ["pvd"]
+    type: select
+
+  - name: "FltLb"
+    tpl_param:
+      providers: ["pvd"]
+    type: load-balance
+    strategy: consistent-hashing
+    #strategy: round-robin
+    filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
+
+  - name: "FltFb"
+    tpl_param:
+      providers: ["pvd"]
     type: fallback
     filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
 
-  - name: "Select"            # Empathize with `FilterFb`
+  - name: "At"
     tpl_param:
-      providers: ["provider"]
-    type: select
-
-  - name: "Auto"            # Empathize with `FilterFb`
-    tpl_param:
-      providers: ["provider"]
+      providers: ["pvd"]
     type: url-test
     <<: *pa_dt
 
@@ -47,13 +56,12 @@ proxy-groups:
       - DIRECT
 
 proxy-providers:
-  provider:           # `provider` name is customizable. Generate proxy-providers which name is `provider`: provider0, provider1, ...
+  pvd:
     tpl_param:
     type: http
     <<: *pa_pp
 
 rules:
-  #- IN-TYPE,INNER,DIRECT       # set inner type connection. e.g. update proxy-providers, rule-providers etc.
   - GEOIP,lan,DIRECT,no-resolve
   - GEOSITE,biliintl,Entry
   - GEOSITE,ehentai,Entry
