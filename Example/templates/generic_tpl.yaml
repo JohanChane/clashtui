@@ -6,39 +6,40 @@ proxy-groups:
   - name: "Entry"
     type: select
     proxies:
-      - <Auto>
-      - <Select>
+      - <At>                    # 使用 proxy-groups 中的 `At` 模板代理组。
+      - <Sl>                    # 与 `<At>` 同理。
 
-  - name: "Select"
+  - name: "Sl"                  # 定义名称是 `Sl` (名称可自定义) 的模板代理组。根据模板代理提供者 `pvd`, 会生成 `Sl-pvd0`, `Sl-pvd1`, ...
     tpl_param:
-      providers: ["provider"]
+      providers: ["pvd"]        # 表示使用名称是 `pvd` 的模板代理提供者。
     type: select
 
-  - name: "Auto"
+  - name: "At"                  # 与 `Sl` 同理。
     tpl_param:
-      providers: ["provider"]
+      providers: ["pvd"]
     type: url-test
     <<: *pa_dt
 
-  - name: "Entry-RuleMode"
+  - name: "Entry-RuleMode"        # 类似于黑白名单模式。用于控制有无代理都可以访问的网站使用代理或直连。
     type: select
     proxies:
       - DIRECT
       - Entry
 
-  - name: "Entry-LastMatch"
+  - name: "Entry-LastMatch"       # 设置不匹配规则的连接的入口。
     type: select
     proxies:
       - Entry
       - DIRECT
 
 proxy-providers:
-  provider:
+  pvd:             # 定义名称是 `pvd` (名称可自定义) 的模板代理提供者。会生成 `pvd0`, `pvd1`, ...
     tpl_param:
     type: http    # type 字段要放在此处, 不能放入 pp。原因是要用于更新资源。
     <<: *pa_pp
 
 rules:
+  #- IN-TYPE,INNER,DIRECT       # 设置 mihomo 内部的网络连接(比如: 更新 proxy-providers, rule-providers 等)是直连。
   - GEOIP,lan,DIRECT,no-resolve
   - GEOSITE,biliintl,Entry
   - GEOSITE,ehentai,Entry

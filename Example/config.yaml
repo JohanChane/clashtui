@@ -1,8 +1,7 @@
-clash_cfg_dir: ~/.local/proxy/mihomo
-clash_core_path: mihomo
-clash_cfg_path: ~/.local/proxy/mihomo/config.yaml
-clash_srv_name: mihomo
-is_user: true
-edit_cmd: alacritty -e nvim %s
-open_dir_cmd: alacritty -e ranger %s
-current_profile: ''
+clash_core_path: "D:/Scoop/shims/mihomo.exe"       # `Get-Command mihomo`
+clash_cfg_dir: "D:/MyAppData/mihomo"
+clash_cfg_path: "D:/MyAppData/mihomo/config.yaml"
+clash_srv_name: "mihomo"       # nssm {install | remove | restart | stop | edit} <clash_srv_name>
+
+edit_cmd: "notepad %s"
+open_dir_cmd: ''
