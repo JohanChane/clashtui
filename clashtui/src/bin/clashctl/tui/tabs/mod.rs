@@ -30,10 +30,7 @@ pub trait TabEvent {
         &mut self,
         ev: &ui::event::Event,
     ) -> Result<ui::EventState, impl std::error::Error>;
-    fn event(
-        &mut self,
-        ev: &ui::event::Event,
-    ) -> Result<ui::EventState, impl std::error::Error>;
+    fn event(&mut self, ev: &ui::event::Event) -> Result<ui::EventState, impl std::error::Error>;
     fn late_event(&mut self);
 }
 

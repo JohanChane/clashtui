@@ -1,18 +1,18 @@
+mod backend;
 mod config;
 mod flags;
 mod ipc;
 mod state;
-mod backend;
 #[allow(clippy::module_inception)]
 mod utils;
 
 pub type SharedClashBackend = std::rc::Rc<backend::ClashBackend>;
 pub type SharedClashTuiState = std::rc::Rc<core::cell::RefCell<State>>;
 
+pub use backend::ClashBackend;
 pub use config::{init_config, CfgError};
 pub use flags::{BitFlags as Flags, Flag};
 pub use state::State;
-pub use backend::ClashBackend;
 pub use utils::*;
 
 #[macro_export]

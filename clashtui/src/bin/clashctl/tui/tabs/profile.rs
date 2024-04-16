@@ -5,9 +5,8 @@ use crate::tui::{
     widgets::{ConfirmPopup, List, MsgPopup},
     EventState, Visibility,
 };
-use crate::utils::{SharedClashTuiState, SharedClashBackend};
-use crate::{msgpopup_methods, utils::get_modify_time};
-crate::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);
+use crate::utils::{get_modify_time, SharedClashBackend, SharedClashTuiState};
+crate::utils::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);
 
 #[derive(PartialEq)]
 enum Fouce {
@@ -428,4 +427,4 @@ fn display_duration(t: std::time::Duration) -> String {
         format!("In about {day} days")
     }
 }
-msgpopup_methods!(ProfileTab);
+crate::msgpopup_methods!(ProfileTab);

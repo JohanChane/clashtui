@@ -1,8 +1,8 @@
 const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
 const TIMEOUT: u8 = 3;
-#[cfg(target_feature = "deprecated")]
+#[cfg(feature = "deprecated")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
-#[cfg(target_feature = "deprecated")]
+#[cfg(feature = "deprecated")]
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 use std::io::Result;

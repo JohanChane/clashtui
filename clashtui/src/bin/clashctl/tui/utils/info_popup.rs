@@ -1,7 +1,7 @@
 use crate::tui::{EventState, Visibility};
-use ui::event::Event;
 use ratatui::prelude as Ra;
 use std::collections::HashMap;
+use ui::event::Event;
 
 use super::list_popup::PopUp;
 
