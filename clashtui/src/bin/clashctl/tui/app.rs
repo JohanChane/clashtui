@@ -1,6 +1,7 @@
 use core::cell::{OnceCell, RefCell};
 use std::{path::PathBuf, rc::Rc};
 
+use crate::utils::{CfgError, Flag, Flags};
 use ui::event;
 
 use crate::msgpopup_methods;
@@ -11,9 +12,7 @@ use crate::tui::{
     widgets::MsgPopup,
     EventState, StatusBar, TabBar, Theme, Visibility,
 };
-use crate::utils::{
-    ClashBackend, SharedClashTuiState, SharedClashBackend, State,
-};
+use crate::utils::{ClashBackend, SharedClashBackend, SharedClashTuiState, State};
 
 pub struct App {
     tabbar: TabBar,
@@ -61,6 +60,44 @@ impl App {
         };
 
         app
+    }
+
+    pub fn run(&mut self, err_track: Vec<CfgError>, flags: Flags<Flag>) -> std::io::Result<()> {
+        const TICK_RATE: u64 = 250;
+        use core::time::Duration;
+        if flags.contains(Flag::FirstInit) {
+            self.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
+            self.popup_txt_msg(
+                "Please go to Config Tab to set configs so that program can work properly"
+                    .to_string(),
+            );
+        };
+        if flags.contains(Flag::ErrorDuringInit) {
+            self.popup_txt_msg(
+                "Some Error happened during app init, Check the log for detail".to_string(),
+            );
+        }
+        err_track
+            .into_iter()
+            .for_each(|e| self.popup_txt_msg(e.reason));
+        log::info!("App init finished");
+
+        use ratatui::{backend::CrosstermBackend, Terminal};
+        let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
+        let tick_rate = Duration::from_millis(TICK_RATE);
+        while !self.should_quit {
+            terminal.draw(|f| self.draw(f))?;
+
+            self.late_event();
+
+            if event::poll(tick_rate)? {
+                if let Err(e) = self.event(&event::read()?) {
+                    self.popup_txt_msg(e.to_string())
+                };
+            }
+        }
+        log::info!("App Exit");
+        Ok(())
     }
 
     fn popup_event(&mut self, ev: &event::Event) -> Result<EventState, ui::Infailable> {

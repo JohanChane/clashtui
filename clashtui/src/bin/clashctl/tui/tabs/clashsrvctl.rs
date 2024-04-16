@@ -1,5 +1,5 @@
-use crate::utils::ClashSrvOp;
 use crate::msgpopup_methods;
+use crate::utils::ClashSrvOp;
 use crate::{
     tui::{
         symbols::CLASHSRVCTL,
@@ -8,7 +8,7 @@ use crate::{
         widgets::{List, MsgPopup},
         EventState, Visibility,
     },
-    utils::{SharedClashTuiState, SharedClashBackend},
+    utils::{SharedClashBackend, SharedClashTuiState},
 };
 use api::Mode;
 

@@ -1,7 +1,7 @@
 use super::list_popup::PopUp;
 use crate::tui::{symbols::HELP, EventState, Visibility};
-use ui::event::Event;
 use ratatui::prelude as Ra;
+use ui::event::Event;
 
 pub struct HelpPopUp {
     inner: PopUp,

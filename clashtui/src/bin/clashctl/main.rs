@@ -3,13 +3,13 @@
 mod tui;
 mod utils;
 
-use crate::utils::{Flag, Flags};
+use utils::{
+    VERSION, {init_config, ClashBackend, Flag, Flags},
+};
 
-pub const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
-
-/// Mihomo (Clash.Meta) TUI Client
+/// Mihomo (Clash.Meta) Control Client
 ///
-/// A tui tool for mihomo
+/// A tool for mihomo
 #[derive(argh::FromArgs)]
 struct CliEnv {
     /// don't show UI but only update all profiles
@@ -24,13 +24,14 @@ fn main() {
     let CliEnv {
         update_all_profiles,
         version,
+        ..
     } = argh::from_env();
     if version {
         println!("{VERSION}");
     } else {
         let mut flags = Flags::empty();
         if update_all_profiles {
-            flags.insert(utils::Flag::UpdateOnly);
+            flags.insert(Flag::UpdateOnly);
         };
         if let Err(e) = run(flags) {
             eprintln!("{e}");
@@ -44,11 +45,13 @@ pub fn run(mut flags: Flags<Flag>) -> std::io::Result<()> {
 
     setup_logging(config_dir.join("clashtui.log").to_str().unwrap());
     log::debug!("Current flags: {:?}", flags);
-    let (backend, err_track) =
-        utils::ClashBackend::new(&config_dir, !flags.contains(Flag::FirstInit));
+    let (backend, err_track) = ClashBackend::new(&config_dir, !flags.contains(Flag::FirstInit));
 
     if flags.contains(Flag::UpdateOnly) {
-        log::info!("Cron Mode!");
+        if !err_track.is_empty() {
+            println!("Some err happened, you may have to fix them before this program can work as expected");
+            err_track.into_iter().for_each(|e| println!("{e}"));
+        }
         backend
             .get_profile_names()
             .unwrap()
@@ -62,11 +65,7 @@ pub fn run(mut flags: Flags<Flag>) -> std::io::Result<()> {
             })
             .flatten()
             .for_each(|s| println!("- {s}"));
-
-        return Ok(());
-    }
-    // Finish cron
-    else {
+    } else {
         #[cfg(feature = "tui")]
         {
             let mut app = tui::App::new(backend);
@@ -74,7 +73,7 @@ pub fn run(mut flags: Flags<Flag>) -> std::io::Result<()> {
             // setup terminal
             setup()?;
             // create app and run it
-            tui::run_app(&mut app, err_track, flags)?;
+            app.run(err_track, flags)?;
             // restore terminal
             restore()?;
 
@@ -116,9 +115,7 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
         log-level: info
         external-controller: 127.0.0.1:9090"#;
         flags.insert(Flag::FirstInit);
-        if let Err(err) =
-            crate::utils::init_config(&clashtui_config_dir, DEFAULT_BASIC_CLASH_CFG_CONTENT)
-        {
+        if let Err(err) = init_config(&clashtui_config_dir, DEFAULT_BASIC_CLASH_CFG_CONTENT) {
             flags.insert(Flag::ErrorDuringInit);
             log::error!("{}", err);
         }

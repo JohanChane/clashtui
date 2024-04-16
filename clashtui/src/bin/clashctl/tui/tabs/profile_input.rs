@@ -1,5 +1,5 @@
-use ui::event::{Event, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
+use ui::event::{Event, KeyEventKind};
 
 use crate::tui::{utils::Keys, widgets::InputPopup, EventState, Visibility};
 
