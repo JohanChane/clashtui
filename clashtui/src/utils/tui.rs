@@ -94,7 +94,8 @@ impl ClashTuiUtil {
         self.clash_api.restart(None)
     }
     fn dl_remote_profile(&self, url: &str) -> Result<Resp, Error> {
-        self.clash_api.mock_clash_core(url)
+        let with_proxy = self.clash_remote_config.get().is_some();
+        self.clash_api.mock_clash_core(url, with_proxy)
     }
     fn config_reload(&self, body: String) -> Result<(), Error> {
         self.clash_api.config_reload(body)
