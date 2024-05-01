@@ -4,23 +4,17 @@ mod commands;
 mod tui;
 mod utils;
 
-use utils::{
-    VERSION, {init_config, ClashBackend, Flag, Flags},
-};
+use utils::{init_config, ClashBackend, Flag, Flags};
 
 fn main() {
     if let Ok(infos) = commands::parse_args() {
-        if infos.flags.contains(commands::Flag::Version) {
-            println!("{VERSION}");
-        } else {
-            let mut flags = Flags::empty();
-            if !infos.flags.contains(commands::Flag::Tui) {
-                flags.insert(Flag::CliMode)
-            }
-            if let Err(e) = run(flags) {
-                eprintln!("{e}");
-                std::process::exit(-1)
-            }
+        let mut flags = Flags::empty();
+        if !infos.flags.contains(commands::Flag::Tui) {
+            flags.insert(Flag::CliMode)
+        }
+        if let Err(e) = run(flags) {
+            eprintln!("{e}");
+            std::process::exit(-1)
         }
         std::process::exit(0);
     }
