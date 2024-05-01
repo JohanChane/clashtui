@@ -8,6 +8,9 @@ use crate::utils::VERSION;
 pub struct CliCmds {
     #[command(subcommand)]
     command: Option<ArgCommand>,
+    /// generate completion for current shell
+    #[arg(long)]
+    generate_shell_completion:bool,
 }
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
@@ -118,7 +121,12 @@ pub fn parse_args() -> Result<Clinfo, ()> {
         flags: enumflags2::BitFlags::empty(),
     };
     use clap::Parser;
-    let CliCmds { command } = CliCmds::parse();
+    let CliCmds { command,generate_shell_completion } = CliCmds::parse();
+    println!(">{command:?}");
+    if generate_shell_completion{
+        gen_complete();
+        return Err(());
+    }
     match command {
         Some(command) => match command {
             ArgCommand::Profile(Profile { command }) => match command {
@@ -209,4 +217,11 @@ pub fn handle_flags(
         unreachable!()
     }
     // ignore Tui and Version
+}
+pub fn gen_complete() {
+    use clap::CommandFactory;
+    match clap_complete::shells::Shell::from_env() {
+        Some(gen) => clap_complete::generate(gen, &mut CliCmds::command(), "clashcli", &mut std::io::stdout()),
+        None => eprintln!("Unable to determine what shell this is"),
+    }
 }
