@@ -19,7 +19,7 @@ fn main() {
         std::process::exit(0);
     }
 }
-pub fn run(mut flags: Flags<Flag>) -> Result<(), impl core::fmt::Display> {
+pub fn run(mut flags: Flags<Flag>) -> Result<(), String> {
     let config_dir = load_app_dir(&mut flags);
 
     setup_logging(config_dir.join("clashtui.log").to_str().unwrap());
@@ -37,7 +37,7 @@ pub fn run(mut flags: Flags<Flag>) -> Result<(), impl core::fmt::Display> {
                 Err(e) => eprintln!("{e}"),
             }
         } else {
-            return Err("para error");
+            return Err("para error".to_string());
         }
     } else {
         #[cfg(feature = "tui")]
@@ -45,13 +45,14 @@ pub fn run(mut flags: Flags<Flag>) -> Result<(), impl core::fmt::Display> {
             let mut app = tui::App::new(backend);
             use ui::setup::*;
             // setup terminal
-            setup()?;
+            setup().map_err(|e| e.to_string())?;
             // create app and run it
-            app.run(err_track, flags)?;
+            app.run(err_track, flags).map_err(|e| e.to_string())?;
             // restore terminal
-            restore()?;
+            restore().map_err(|e| e.to_string())?;
 
-            app.save(config_dir.join("config.yaml").to_str().unwrap())?;
+            app.save(config_dir.join("config.yaml").to_str().unwrap())
+                .map_err(|e| e.to_string())?;
         }
         #[cfg(not(feature = "tui"))]
         {
