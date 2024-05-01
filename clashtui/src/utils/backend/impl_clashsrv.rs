@@ -8,26 +8,38 @@ impl ClashBackend {
     pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
         match op {
             ClashSrvOp::StartClashService => {
-                let mut args = vec!["restart", self.tui_cfg.clash_srv_name.as_str()];
-                if self.tui_cfg.is_user {
-                    args.push("--user")
+                let arg = if self.tui_cfg.is_user {
+                    vec!["--user", self.tui_cfg.clash_srv_name.as_str()]
+                } else {
+                    vec![self.tui_cfg.clash_srv_name.as_str()]
+                };
+                {
+                    let mut args = vec!["restart"];
+                    args.extend(arg.iter());
+                    exec("systemctl", args)?;
                 }
-                exec("systemctl", args)?;
-                exec(
-                    "systemctl",
-                    vec!["status", self.tui_cfg.clash_srv_name.as_str()],
-                )
+                {
+                    let mut args = vec!["status"];
+                    args.extend(arg.iter());
+                    exec("systemctl", args)
+                }
             }
             ClashSrvOp::StopClashService => {
-                let mut args = vec!["stop", self.tui_cfg.clash_srv_name.as_str()];
-                if self.tui_cfg.is_user {
-                    args.push("--user")
+                let arg = if self.tui_cfg.is_user {
+                    vec!["--user", self.tui_cfg.clash_srv_name.as_str()]
+                } else {
+                    vec![self.tui_cfg.clash_srv_name.as_str()]
+                };
+                {
+                    let mut args = vec!["stop"];
+                    args.extend(arg.iter());
+                    exec("systemctl", args)?;
                 }
-                exec("systemctl", args)?;
-                exec(
-                    "systemctl",
-                    vec!["status", self.tui_cfg.clash_srv_name.as_str()],
-                )
+                {
+                    let mut args = vec!["status"];
+                    args.extend(arg.iter());
+                    exec("systemctl", args)
+                }
             }
             ClashSrvOp::SetPermission => ipc::exec_with_sbin(
                 "setcap",

@@ -8,6 +8,37 @@ pub struct _State {
     #[cfg(target_os = "windows")]
     pub sysproxy: Option<bool>,
 }
+impl core::fmt::Display for _State {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        #[cfg(target_os = "windows")]
+        let status_str = write!(
+            f,
+            "Profile: {}    Mode: {}    SysProxy: {}    Tun: {}    Help: ?",
+            self.profile,
+            self.mode
+                .as_ref()
+                .map_or("Unknown".to_string(), |v| format!("{}", v)),
+            self.sysproxy
+                .map_or("Unknown".to_string(), |v| format!("{}", v)),
+            self.tun
+                .as_ref()
+                .map_or("Unknown".to_string(), |v| format!("{}", v)),
+        );
+        #[cfg(target_os = "linux")]
+        let status_str = write!(
+            f,
+            "Profile: {}    Mode: {}    Tun: {}    Help: ?",
+            self.profile,
+            self.mode
+                .as_ref()
+                .map_or("Unknown".to_string(), |v| format!("{}", v)),
+            self.tun
+                .as_ref()
+                .map_or("Unknown".to_string(), |v| format!("{}", v)),
+        );
+        status_str
+    }
+}
 pub struct State {
     st: _State,
     ct: SharedClashBackend,
@@ -50,36 +81,7 @@ impl State {
         }
     }
     pub fn render(&self) -> String {
-        #[cfg(target_os = "windows")]
-        let status_str = format!(
-            "Profile: {}    Mode: {}    SysProxy: {}    Tun: {}    Help: ?",
-            self.st.profile,
-            self.st
-                .mode
-                .as_ref()
-                .map_or("Unknown".to_string(), |v| format!("{}", v)),
-            self.st
-                .sysproxy
-                .map_or("Unknown".to_string(), |v| format!("{}", v)),
-            self.st
-                .tun
-                .as_ref()
-                .map_or("Unknown".to_string(), |v| format!("{}", v)),
-        );
-        #[cfg(target_os = "linux")]
-        let status_str = format!(
-            "Profile: {}    Mode: {}    Tun: {}    Help: ?",
-            self.st.profile,
-            self.st
-                .mode
-                .as_ref()
-                .map_or("Unknown".to_string(), |v| format!("{}", v)),
-            self.st
-                .tun
-                .as_ref()
-                .map_or("Unknown".to_string(), |v| format!("{}", v)),
-        );
-        status_str
+        self.st.to_string()
     }
     #[cfg(target_os = "windows")]
     pub fn get_sysproxy(&self) -> Option<bool> {

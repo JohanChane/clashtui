@@ -1,4 +1,5 @@
 #![warn(clippy::all)]
+mod commands;
 #[cfg(feature = "tui")]
 mod tui;
 mod utils;
@@ -7,64 +8,43 @@ use utils::{
     VERSION, {init_config, ClashBackend, Flag, Flags},
 };
 
-/// Mihomo (Clash.Meta) Control Client
-///
-/// A tool for mihomo
-#[derive(argh::FromArgs)]
-struct CliEnv {
-    /// don't show UI but only update all profiles
-    #[argh(switch, short = 'u')]
-    update_all_profiles: bool,
-    /// print version information and exit
-    #[argh(switch, short = 'v')]
-    version: bool,
-}
-
 fn main() {
-    let CliEnv {
-        update_all_profiles,
-        version,
-        ..
-    } = argh::from_env();
-    if version {
-        println!("{VERSION}");
-    } else {
-        let mut flags = Flags::empty();
-        if update_all_profiles {
-            flags.insert(Flag::UpdateOnly);
-        };
-        if let Err(e) = run(flags) {
-            eprintln!("{e}");
-            std::process::exit(-1)
+    if let Ok(infos) = commands::parse_args() {
+        if infos.flags.contains(commands::Flag::Version) {
+            println!("{VERSION}");
+        } else {
+            let mut flags = Flags::empty();
+            if !infos.flags.contains(commands::Flag::Tui) {
+                flags.insert(Flag::CliMode)
+            }
+            if let Err(e) = run(flags) {
+                eprintln!("{e}");
+                std::process::exit(-1)
+            }
         }
+        std::process::exit(0);
     }
-    std::process::exit(0);
 }
-pub fn run(mut flags: Flags<Flag>) -> std::io::Result<()> {
+pub fn run(mut flags: Flags<Flag>) -> Result<(), impl core::fmt::Display> {
     let config_dir = load_app_dir(&mut flags);
 
     setup_logging(config_dir.join("clashtui.log").to_str().unwrap());
     log::debug!("Current flags: {:?}", flags);
     let (backend, err_track) = ClashBackend::new(&config_dir, !flags.contains(Flag::FirstInit));
 
-    if flags.contains(Flag::UpdateOnly) {
+    if flags.contains(Flag::CliMode) {
         if !err_track.is_empty() {
             println!("Some err happened, you may have to fix them before this program can work as expected");
             err_track.into_iter().for_each(|e| println!("{e}"));
         }
-        backend
-            .get_profile_names()
-            .unwrap()
-            .into_iter()
-            .inspect(|s| println!("\nProfile: {s}"))
-            .filter_map(|v| {
-                backend
-                    .update_profile(&v, false)
-                    .map_err(|e| println!("- Error! {e}"))
-                    .ok()
-            })
-            .flatten()
-            .for_each(|s| println!("- {s}"));
+        if let Some(r) = commands::handle_cli_args(backend) {
+            match r {
+                Ok(v) => println!("{v}"),
+                Err(e) => eprintln!("{e}"),
+            }
+        } else {
+            return Err("para error");
+        }
     } else {
         #[cfg(feature = "tui")]
         {
