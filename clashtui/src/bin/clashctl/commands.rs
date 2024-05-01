@@ -1,16 +1,16 @@
+use crate::utils::VERSION;
 /// Mihomo (Clash.Meta) Control Client
 ///
 /// A tool for mihomo
-#[derive(argh::FromArgs)]
-struct CliEnv {
-    /// print version information and exit
-    #[argh(switch, short = 'v')]
-    pub version: bool,
-    #[argh(subcommand)]
+#[derive(clap::Parser)]
+#[cfg_attr(debug_assertions, derive(Debug))]
+#[command(version=VERSION, about, long_about)]
+pub struct CliCmds {
+    #[command(subcommand)]
     command: Option<ArgCommand>,
 }
-#[derive(argh::FromArgs)]
-#[argh(subcommand)]
+#[derive(clap::Subcommand)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 enum ArgCommand {
     Profile(Profile),
     Service(Service),
@@ -18,91 +18,76 @@ enum ArgCommand {
 }
 
 /// proxy mode related
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "mode")]
+#[derive(clap::Args)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 struct Mode {
-    #[argh(subcommand)]
+    #[command(subcommand)]
     command: ModeCommand,
 }
-#[derive(argh::FromArgs)]
-#[argh(subcommand)]
+#[derive(clap::Subcommand)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 enum ModeCommand {
-    Rule(ModeRule),
-    Direct(ModeDirect),
-    Global(ModeGlobal),
+    Rule,
+    Direct,
+    Global,
 }
-/// Rule
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "rule")]
-struct ModeRule {}
-/// Direct
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "direct")]
-struct ModeDirect {}
-/// Global
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "global")]
-struct ModeGlobal {}
 
 /// profile related
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "profile")]
+#[derive(clap::Args)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 struct Profile {
-    #[argh(subcommand)]
+    #[command(subcommand)]
     command: ProfileCommand,
 }
-#[derive(argh::FromArgs)]
-#[argh(subcommand)]
+#[derive(clap::Subcommand)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 enum ProfileCommand {
     Update(ProfileUpdate),
     Select(ProfileSelect),
 }
 /// update the selected profile or all
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "update")]
+#[derive(clap::Args)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 struct ProfileUpdate {
     /// update all profiles
-    #[argh(switch, short = 'a')]
+    #[arg(short, long)]
     all: bool,
     /// the profile name
-    #[argh(option, short = 'n')]
+    #[arg(short, long)]
     name: Option<String>,
 }
 /// select profile
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "select")]
+#[derive(clap::Args)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 struct ProfileSelect {
     /// the profile name
-    #[argh(positional, short = 'n')]
+    #[arg(short, long)]
     name: String,
 }
 
 /// service related
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "service")]
+#[derive(clap::Args)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 struct Service {
-    #[argh(subcommand)]
+    #[command(subcommand)]
     command: ServiceCommand,
 }
-#[derive(argh::FromArgs)]
-#[argh(subcommand)]
+#[derive(clap::Subcommand)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 enum ServiceCommand {
     Restart(ServiceRestart),
-    Stop(ServiceStop),
+    Stop,
 }
 
-/// stop
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "stop")]
-struct ServiceStop {}
 /// restart, can be soft
-#[derive(argh::FromArgs)]
-#[argh(subcommand, name = "restart")]
+#[derive(clap::Args)]
+#[cfg_attr(debug_assertions, derive(Debug))]
 struct ServiceRestart {
     /// restart by send POST request to mihomo
-    #[argh(switch, short = 's')]
+    #[arg(short, long)]
     soft: bool,
 }
+
 pub struct Clinfo {
     // judge usage via flag
     pub profile: Option<String>,
@@ -119,7 +104,6 @@ pub enum Flag {
     Restart,
     RestartSoft,
     Stop,
-    Version,
     Rule,
     Direct,
     Global,
@@ -133,10 +117,8 @@ pub fn parse_args() -> Result<Clinfo, ()> {
         profile: None,
         flags: enumflags2::BitFlags::empty(),
     };
-    let CliEnv { version, command } = argh::from_env();
-    if version {
-        infos.flags.insert(Flag::Version);
-    }
+    use clap::Parser;
+    let CliCmds { command } = CliCmds::parse();
     match command {
         Some(command) => match command {
             ArgCommand::Profile(Profile { command }) => match command {
@@ -161,12 +143,12 @@ pub fn parse_args() -> Result<Clinfo, ()> {
                 } else {
                     Flag::Restart
                 }),
-                ServiceCommand::Stop(_) => infos.flags.insert(Flag::Stop),
+                ServiceCommand::Stop => infos.flags.insert(Flag::Stop),
             },
             ArgCommand::Mode(Mode { command }) => match command {
-                ModeCommand::Rule(_) => infos.flags.insert(Flag::Rule),
-                ModeCommand::Direct(_) => infos.flags.insert(Flag::Direct),
-                ModeCommand::Global(_) => infos.flags.insert(Flag::Global),
+                ModeCommand::Rule => infos.flags.insert(Flag::Rule),
+                ModeCommand::Direct => infos.flags.insert(Flag::Direct),
+                ModeCommand::Global => infos.flags.insert(Flag::Global),
             },
         },
         None => infos.flags.insert(Flag::Tui),
