@@ -104,14 +104,18 @@ impl ClashUtil {
         self.request(Method::Put, "/configs?force=true", Some(payload))
             .map(|_| ())
     }
-    pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S) -> Result<Resp> {
-        minreq::get(url)
-            .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
-            .with_header("user-agent", "clash.meta")
-            .with_timeout(TIMEOUT.into())
-            .send_lazy()
-            .map(Resp)
-            .map_err(process_err)
+    pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S, with_proxy: bool) -> Result<Resp> {
+        if with_proxy {
+            minreq::get(url)
+                .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
+        } else {
+            minreq::get(url)
+        }
+        .with_header("user-agent", "clash.meta")
+        .with_timeout(TIMEOUT.into())
+        .send_lazy()
+        .map(Resp)
+        .map_err(process_err)
     }
     pub fn config_patch(&self, payload: String) -> Result<String> {
         self.request(Method::Patch, "/configs", Some(payload))
@@ -301,7 +305,7 @@ mod tests {
     #[test]
     fn mock_clash_core_test() {
         let sym = sym();
-        let r = sym.mock_clash_core("https://www.google.com").unwrap();
+        let r = sym.mock_clash_core("https://www.google.com", true).unwrap();
         let mut tf = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
