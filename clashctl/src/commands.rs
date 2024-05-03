@@ -33,8 +33,11 @@ struct Mode {
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 enum ModeCommand {
+    /// rule
     Rule,
+    /// direct
     Direct,
+    /// global
     Global,
 }
 
@@ -81,11 +84,12 @@ struct Service {
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 enum ServiceCommand {
+    /// start/restart service, can be soft
     Restart(ServiceRestart),
+    /// stop service
     Stop,
 }
 
-/// restart, can be soft
 #[derive(clap::Args)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 struct ServiceRestart {

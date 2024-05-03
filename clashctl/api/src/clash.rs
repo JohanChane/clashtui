@@ -1,4 +1,4 @@
-const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
+const DEFAULT_PAYLOAD: &str = r#"'{"path": "", "payload": ""}'"#;
 const TIMEOUT: u8 = 3;
 #[cfg(feature = "deprecated")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
@@ -57,15 +57,22 @@ impl Resp {
 }
 pub struct ClashUtil {
     api: String,
-    secret: String,
+    secret: Option<String>,
+    ua: Option<String>,
     pub proxy_addr: String,
 }
 
 impl ClashUtil {
-    pub fn new(controller_api: String, secret: String, proxy_addr: String) -> Self {
+    pub fn new(
+        controller_api: String,
+        secret: Option<String>,
+        proxy_addr: String,
+        ua: Option<String>,
+    ) -> Self {
         Self {
             api: controller_api,
             secret,
+            ua,
             proxy_addr,
         }
     }
@@ -79,8 +86,8 @@ impl ClashUtil {
         if let Some(kv) = payload {
             req = req.with_body(kv);
         }
-        if !self.secret.is_empty() {
-            req = req.with_header("Authorization", format!("Bearer {0}", self.secret));
+        if let Some(s) = self.secret.as_ref() {
+            req = req.with_header("Authorization", format!("Bearer {s}"));
         }
         req.with_timeout(TIMEOUT.into())
             .send()
@@ -105,13 +112,14 @@ impl ClashUtil {
             .map(|_| ())
     }
     pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S, with_proxy: bool) -> Result<Resp> {
+        let mut req = minreq::get(url);
         if with_proxy {
-            minreq::get(url)
-                .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
-        } else {
-            minreq::get(url)
+            req = req.with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
         }
-        .with_header("user-agent", "clash.meta")
+        req.with_header(
+            "user-agent",
+            self.ua.as_deref().unwrap_or("clash.meta"),
+        )
         .with_timeout(TIMEOUT.into())
         .send_lazy()
         .map(Resp)
@@ -277,8 +285,9 @@ mod tests {
     fn sym() -> ClashUtil {
         ClashUtil::new(
             "http://127.0.0.1:9090".to_string(),
-            "test".to_string(),
+            None,
             "http://127.0.0.1:7890".to_string(),
+            None,
         )
     }
     #[test]
