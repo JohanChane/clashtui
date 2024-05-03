@@ -1,4 +1,3 @@
-use core::cell::RefCell;
 use core::str::FromStr as _;
 use std::{
     io::Error,
@@ -22,7 +21,6 @@ pub struct ClashBackend {
 
     clash_api: ClashUtil,
     pub cfg: Config,
-    clash_remote_config: RefCell<Option<ClashConfig>>,
 }
 
 // Misc
@@ -31,19 +29,13 @@ impl ClashBackend {
         let ret = load_app_config(clashtui_dir, is_inited);
         let mut err_track = ret.2;
         let clash_api = ret.1;
-        let clash_remote_config = RefCell::new(None);
-        match ClashConfig::from_str(clash_api.config_get().unwrap_or_default().as_str()) {
-            // That must be empty, call unwrap is fine
-            Ok(remote) => {
-                clash_remote_config.borrow_mut().replace(remote);
-            }
-            Err(_) => {
-                err_track.push(CfgError::new(
-                    ErrKind::LoadClashConfig,
-                    "Fail to load config from clash core. Is it Running?".to_string(),
-                ));
-                log::warn!("Fail to connect to clash. Is it Running?")
-            }
+
+        if clash_api.version().is_err() {
+            err_track.push(CfgError::new(
+                ErrKind::LoadClashConfig,
+                "Fail to load config from clash core. Is it Running?".to_string(),
+            ));
+            log::warn!("Fail to connect to clash. Is it Running?")
         }
         (
             Self {
@@ -51,7 +43,6 @@ impl ClashBackend {
                 profile_dir: clashtui_dir.join("profiles").to_path_buf(),
                 clash_api,
                 cfg: ret.0,
-                clash_remote_config,
             },
             err_track,
         )
@@ -65,20 +56,11 @@ impl ClashBackend {
             }
         }
     }
-    fn fetch_remote(&self) -> Result<(), Error> {
-        match self.clash_api.config_get().and_then(|cur_remote| {
+    fn fetch_remote(&self) -> Result<ClashConfig, Error> {
+        self.clash_api.config_get().and_then(|cur_remote| {
             ClashConfig::from_str(cur_remote.as_str())
                 .map_err(|_| Error::new(std::io::ErrorKind::InvalidData, "Failed to prase str"))
-        }) {
-            Ok(v) => {
-                self.clash_remote_config.borrow_mut().replace(v);
-                Ok(())
-            }
-            Err(e) => {
-                self.clash_remote_config.take();
-                Err(e)
-            }
-        }
+        })
     }
     pub fn restart_clash(&self) -> Result<String, Error> {
         self.clash_api.restart(None)
@@ -110,13 +92,11 @@ impl ClashBackend {
             }
             None => self.cfg.current_profile.borrow().clone(),
         };
-
-        if let Err(e) = self.fetch_remote() {
-            if e.kind() != std::io::ErrorKind::ConnectionRefused {
-                log::warn!("{}", e);
-            }
-        }
-        let (mode, tun) = match self.clash_remote_config.borrow().as_ref() {
+        let clash_cfg = self
+            .fetch_remote()
+            .map_err(|e| log::warn!("Fetch Remote:{e}"))
+            .ok();
+        let (mode, tun) = match clash_cfg {
             Some(v) => (
                 Some(v.mode),
                 if v.tun.enable {
