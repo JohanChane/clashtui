@@ -10,7 +10,10 @@ pub struct CliCmds {
     command: Option<ArgCommand>,
     /// generate completion for current shell
     #[arg(long)]
-    generate_shell_completion:bool,
+    generate_shell_completion: bool,
+    /// specify target shell, only avaliable with --generate-shell-completion option
+    #[arg(long)]
+    shell: Option<clap_complete::Shell>,
 }
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
@@ -121,9 +124,13 @@ pub fn parse_args() -> Result<Clinfo, ()> {
         flags: enumflags2::BitFlags::empty(),
     };
     use clap::Parser;
-    let CliCmds { command,generate_shell_completion } = CliCmds::parse();
-    if generate_shell_completion{
-        gen_complete();
+    let CliCmds {
+        command,
+        generate_shell_completion,
+        shell,
+    } = CliCmds::parse();
+    if generate_shell_completion {
+        gen_complete(shell);
         return Err(());
     }
     match command {
@@ -217,10 +224,28 @@ pub fn handle_flags(
     }
     // ignore Tui and Version
 }
-pub fn gen_complete() {
+pub fn gen_complete(shell: Option<clap_complete::Shell>) {
     use clap::CommandFactory;
-    match clap_complete::shells::Shell::from_env() {
-        Some(gen) => clap_complete::generate(gen, &mut CliCmds::command(), "clashcli", &mut std::io::stdout()),
-        None => eprintln!("Unable to determine what shell this is"),
-    }
+    let gen = if let Some(gen) = shell {
+        eprintln!("Target Shell: {gen}");
+        gen
+    } else {
+        match clap_complete::shells::Shell::from_env() {
+            Some(gen) => {
+                eprintln!("Current Shell: {gen}");
+                gen
+            }
+            None => {
+                eprintln!("Unable to determine what shell this is");
+                eprintln!("Try use --shell to specify");
+                return;
+            }
+        }
+    };
+    clap_complete::generate(
+        gen,
+        &mut CliCmds::command(),
+        "clashctl",
+        &mut std::io::stdout(),
+    )
 }
