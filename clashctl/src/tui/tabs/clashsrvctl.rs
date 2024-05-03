@@ -10,7 +10,7 @@ use crate::{
     },
     utils::{SharedBackend, SharedState},
 };
-use api::Mode;
+use backend::api::Mode;
 
 #[derive(Visibility)]
 pub struct ClashSrvCtlTab {
@@ -129,11 +129,7 @@ impl super::TabEvent for ClashSrvCtlTab {
                 ClashSrvOp::SwitchMode => unreachable!(),
                 #[cfg(target_os = "windows")]
                 ClashSrvOp::SwitchSysProxy => {
-                    let cur = self
-                        .state
-                        .borrow()
-                        .get_sysproxy()
-                        .map_or(true, |b| !b);
+                    let cur = self.state.borrow().get_sysproxy().map_or(true, |b| !b);
                     self.state.borrow_mut().set_sysproxy(cur);
                     self.hide_msgpopup();
                 }

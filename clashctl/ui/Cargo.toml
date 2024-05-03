@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 ui-derive ={ path = "../ui-derive"}
-crossterm = { version = "0.27.0" ,default-features = false}
+crossterm = { version = "0.27.0" ,default-features = false, features = ["events"]}
 ratatui = { version = "0.26.1", default-features = false, features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]

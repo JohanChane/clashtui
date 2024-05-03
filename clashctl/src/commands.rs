@@ -170,10 +170,8 @@ pub fn parse_args() -> Result<Clinfo, ()> {
     Ok(infos)
 }
 
-pub fn handle_flags(
-    infos: Clinfo,
-    backend: crate::utils::ClashBackend,
-) -> std::io::Result<String> {
+pub fn handle_flags(infos: Clinfo, backend: crate::utils::ClashBackend) -> std::io::Result<String> {
+    use crate::utils::api;
     let Clinfo { profile, flags } = infos;
     if flags.contains(Flag::Direct) {
         Ok(backend

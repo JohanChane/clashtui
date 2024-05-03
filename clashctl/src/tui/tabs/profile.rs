@@ -70,18 +70,13 @@ impl ProfileTab {
             if let Err(err) = self.util.select_profile(profile_name) {
                 self.popup_txt_msg(err.to_string())
             } else {
-                self.state
-                    .borrow_mut()
-                    .set_profile(profile_name.clone())
+                self.state.borrow_mut().set_profile(profile_name.clone())
             }
         };
     }
     fn handle_update_profile_ev(&mut self, does_update_all: bool) {
         if let Some(profile_name) = self.profile_list.selected() {
-            match self
-                .util
-                .update_profile(profile_name, does_update_all)
-            {
+            match self.util.update_profile(profile_name, does_update_all) {
                 Ok(mut msg) => {
                     if profile_name == self.state.borrow().get_profile() {
                         if let Err(err) = self.util.select_profile(profile_name) {
@@ -248,9 +243,8 @@ impl super::TabEvent for ProfileTab {
                                     .selected()
                                     .into_iter()
                                     .map(|profile_name| {
-                                        self.util.edit_file(
-                                            &self.util.gen_profile_path(profile_name),
-                                        )
+                                        self.util
+                                            .edit_file(&self.util.gen_profile_path(profile_name))
                                     })
                                     .map_while(|r| r.err())
                                     .map(|err| {
@@ -295,10 +289,7 @@ impl super::TabEvent for ProfileTab {
                         Keys::ProfileTestConfig => {
                             if let Some(profile_name) = self.profile_list.selected() {
                                 let path = self.util.get_profile_yaml(profile_name)?;
-                                match self
-                                    .util
-                                    .test_profile_config(path.to_str().unwrap(), false)
-                                {
+                                match self.util.test_profile_config(path.to_str().unwrap(), false) {
                                     Ok(output) => self.popup_list_msg(
                                         output.lines().map(|line| line.trim().to_string()),
                                     ),
@@ -336,9 +327,7 @@ impl super::TabEvent for ProfileTab {
                                 self.template_list
                                     .selected()
                                     .into_iter()
-                                    .map(|name| {
-                                        self.util.get_template_path_unchecked(name)
-                                    })
+                                    .map(|name| self.util.get_template_path_unchecked(name))
                                     .map_while(|tpl_file_path| {
                                         self.util.edit_file(&tpl_file_path).err()
                                     })

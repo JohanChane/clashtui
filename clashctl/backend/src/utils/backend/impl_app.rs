@@ -1,5 +1,5 @@
 use super::ClashBackend;
-use crate::utils::state::_State;
+use crate::utils::state::State;
 use std::path::Path;
 // IPC Related
 impl ClashBackend {
@@ -9,7 +9,7 @@ impl ClashBackend {
         new_pf: Option<String>,
         new_mode: Option<String>,
         new_sysp: Option<bool>,
-    ) -> _State {
+    ) -> State {
         use crate::utils::ipc;
         if let Some(b) = new_sysp {
             let _ = if b {
@@ -26,7 +26,7 @@ impl ClashBackend {
             },
             Some,
         );
-        _State {
+        State {
             profile: pf,
             mode,
             tun,
@@ -35,9 +35,9 @@ impl ClashBackend {
     }
 
     #[cfg(target_os = "linux")]
-    pub fn update_state(&self, new_pf: Option<String>, new_mode: Option<String>) -> _State {
+    pub fn update_state(&self, new_pf: Option<String>, new_mode: Option<String>) -> State {
         let (pf, mode, tun) = self._update_state(new_pf, new_mode);
-        _State {
+        State {
             profile: pf,
             mode,
             tun,

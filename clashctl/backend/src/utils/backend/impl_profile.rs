@@ -25,9 +25,8 @@ impl ClashBackend {
             Utils::parse_yaml(&template_path).map_err(|e| format!("parse failed: {e:?}"))?;
         let mut out_parsed_yaml = Cow::Borrowed(&tpl_parsed_yaml);
 
-        let proxy_url_file =
-            File::open(self.home_dir.join("templates/template_proxy_providers"))
-                .map_err(|e| format!("open template_proxy_providers: {e:?}"))?;
+        let proxy_url_file = File::open(self.home_dir.join("templates/template_proxy_providers"))
+            .map_err(|e| format!("open template_proxy_providers: {e:?}"))?;
         let proxy_urls: Vec<String> = BufReader::new(proxy_url_file)
             .lines()
             .map_while(Result::ok)
