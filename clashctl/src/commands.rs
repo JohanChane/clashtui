@@ -218,6 +218,9 @@ pub fn handle_flags(infos: Clinfo, backend: crate::utils::ClashBackend) -> std::
             })
             .flatten()
             .for_each(|s| println!("- {s}"));
+        if let Err(e) = backend.select_profile(&backend.cfg.current_profile.borrow()) {
+            eprintln!("Select Profile: {e}")
+        };
         Ok("Done".to_string())
     } else if flags.contains(Flag::Select) {
         todo!()
