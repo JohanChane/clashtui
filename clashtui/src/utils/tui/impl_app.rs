@@ -82,13 +82,11 @@ impl ClashTuiUtil {
             }
             None => self.clashtui_data.borrow().current_profile.clone(),
         };
-
-        if let Err(e) = self.fetch_remote() {
-            if e.kind() != std::io::ErrorKind::ConnectionRefused {
-                log::warn!("{}", e);
-            }
-        }
-        let (mode, tun) = match self.clash_remote_config.get() {
+        let clash_cfg = self
+            .fetch_remote()
+            .map_err(|e| log::warn!("Fetch Remote:{e}"))
+            .ok();
+        let (mode, tun) = match clash_cfg {
             Some(v) => (
                 Some(v.mode),
                 if v.tun.enable {
