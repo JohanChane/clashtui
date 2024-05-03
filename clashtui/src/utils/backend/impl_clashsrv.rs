@@ -8,10 +8,10 @@ impl ClashBackend {
     pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
         match op {
             ClashSrvOp::StartClashService => {
-                let arg = if self.tui_cfg.is_user {
-                    vec!["--user", self.tui_cfg.clash_srv_name.as_str()]
+                let arg = if self.cfg.is_user {
+                    vec!["--user", self.cfg.clash_srv_name.as_str()]
                 } else {
-                    vec![self.tui_cfg.clash_srv_name.as_str()]
+                    vec![self.cfg.clash_srv_name.as_str()]
                 };
                 {
                     let mut args = vec!["restart"];
@@ -25,10 +25,10 @@ impl ClashBackend {
                 }
             }
             ClashSrvOp::StopClashService => {
-                let arg = if self.tui_cfg.is_user {
-                    vec!["--user", self.tui_cfg.clash_srv_name.as_str()]
+                let arg = if self.cfg.is_user {
+                    vec!["--user", self.cfg.clash_srv_name.as_str()]
                 } else {
-                    vec![self.tui_cfg.clash_srv_name.as_str()]
+                    vec![self.cfg.clash_srv_name.as_str()]
                 };
                 {
                     let mut args = vec!["stop"];
@@ -45,7 +45,7 @@ impl ClashBackend {
                 "setcap",
                 vec![
                     "'cap_net_admin,cap_net_bind_service=+ep'",
-                    self.tui_cfg.clash_core_path.as_str(),
+                    self.cfg.clash_core_path.as_str(),
                 ],
             ),
             _ => Err(Error::new(

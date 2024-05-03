@@ -13,6 +13,8 @@ pub struct ClashTuiConfig {
     pub open_dir_cmd: String,
 
     pub current_profile: core::cell::RefCell<String>,
+
+    pub profiles: core::cell::RefCell<std::collections::HashMap<String, String>>,
 }
 impl ClashTuiConfig {
     pub fn from_file(config_path: &str) -> Result<Self> {

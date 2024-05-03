@@ -140,7 +140,7 @@ impl ProfileTab {
             .iter()
             .map(|v| {
                 self.clashtui_util
-                    .get_profile_yaml_path(v)
+                    .get_profile_yaml(v)
                     .and_then(get_modify_time)
                     .map_err(|e| log::error!("{v} => {e}"))
                     .ok()
@@ -257,9 +257,7 @@ impl super::TabEvent for ProfileTab {
                                     .into_iter()
                                     .map(|profile_name| {
                                         self.clashtui_util.edit_file(
-                                            &self
-                                                .clashtui_util
-                                                .get_profile_path_unchecked(profile_name),
+                                            &self.clashtui_util.gen_profile_path(profile_name),
                                         )
                                     })
                                     .map_while(|r| r.err())
@@ -273,31 +271,29 @@ impl super::TabEvent for ProfileTab {
                         }
                         Keys::Preview => {
                             if let Some(profile_name) = self.profile_list.selected() {
-                                let mut profile_path = Some(
-                                    self.clashtui_util.get_profile_path_unchecked(profile_name),
-                                );
-                                let mut lines: Vec<String> =
-                                    std::fs::read_to_string(profile_path.as_ref().unwrap())?
-                                        .lines()
-                                        .map(|s| s.to_string())
-                                        .collect();
-
-                                if !self.clashtui_util.is_profile_yaml(profile_name) {
+                                let mut lines: Vec<String> = vec![];
+                                if self.clashtui_util.test_is_link(profile_name) {
+                                    lines.push(
+                                        self.clashtui_util
+                                            .get_profile_link(profile_name)
+                                            .expect("have a key but no value"),
+                                    );
                                     lines.push(String::new());
-                                    profile_path =
-                                        self.clashtui_util.get_profile_yaml_path(profile_name).ok();
-                                    if let Some(profile_path) = profile_path {
-                                        lines.extend(
-                                            std::fs::read_to_string(profile_path)?
-                                                .lines()
-                                                .map(|s| s.to_string()),
-                                        );
-                                    } else {
-                                        lines.push(
-                                            "yaml file isn't exists. Please update it.".to_string(),
-                                        );
-                                    }
                                 }
+                                let content: Vec<String> = std::fs::read_to_string(
+                                    self.clashtui_util.gen_profile_path(profile_name),
+                                )?
+                                .lines()
+                                .map(|s| s.to_string())
+                                .collect();
+                                if !content.is_empty() {
+                                    lines.extend(content);
+                                } else {
+                                    lines.push(
+                                        "yaml file isn't exists. Please update it.".to_string(),
+                                    );
+                                }
+
                                 self.popup_list_msg(lines);
                             }
                             EventState::WorkDone
@@ -305,7 +301,7 @@ impl super::TabEvent for ProfileTab {
                         Keys::ProfileTestConfig => {
                             if let Some(profile_name) = self.profile_list.selected() {
                                 let path =
-                                    self.clashtui_util.get_profile_yaml_path(profile_name)?;
+                                    self.clashtui_util.get_profile_yaml(profile_name)?;
                                 match self
                                     .clashtui_util
                                     .test_profile_config(path.to_str().unwrap(), false)

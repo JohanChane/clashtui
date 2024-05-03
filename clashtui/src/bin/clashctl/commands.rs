@@ -122,7 +122,6 @@ pub fn parse_args() -> Result<Clinfo, ()> {
     };
     use clap::Parser;
     let CliCmds { command,generate_shell_completion } = CliCmds::parse();
-    println!(">{command:?}");
     if generate_shell_completion{
         gen_complete();
         return Err(());
