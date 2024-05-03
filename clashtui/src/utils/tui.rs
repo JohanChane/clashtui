@@ -1,4 +1,4 @@
-use core::cell::{OnceCell, RefCell};
+use core::cell::RefCell;
 use core::str::FromStr as _;
 use std::{
     io::Error,
@@ -35,7 +35,6 @@ pub struct ClashTuiUtil {
 
     clash_api: ClashUtil,
     pub tui_cfg: ClashTuiConfig,
-    clash_remote_config: OnceCell<ClashConfig>,
     pub clashtui_data: RefCell<ClashTuiData>,
 }
 
@@ -45,17 +44,13 @@ impl ClashTuiUtil {
         let ret = load_app_config(clashtui_dir, is_inited);
         let mut err_track = ret.2;
         let clash_api = ret.1;
-        let clash_remote_config = OnceCell::default();
-        match ClashConfig::from_str(clash_api.config_get().unwrap_or_default().as_str()) {
-            // That must be empty, call unwrap is fine
-            Ok(remote) => clash_remote_config.set(remote).unwrap(),
-            Err(_) => {
-                err_track.push(CfgError::new(
-                    ErrKind::LoadClashConfig,
-                    "Fail to load config from clash core. Is it Running?".to_string(),
-                ));
-                log::warn!("Fail to connect to clash. Is it Running?")
-            }
+
+        if clash_api.version().is_err() {
+            err_track.push(CfgError::new(
+                ErrKind::LoadClashConfig,
+                "Fail to load config from clash core. Is it Running?".to_string(),
+            ));
+            log::warn!("Fail to connect to clash. Is it Running?")
         }
 
         let data_path = clashtui_dir.join(DATA_FILE);
@@ -67,7 +62,6 @@ impl ClashTuiUtil {
                 profile_dir: clashtui_dir.join("profiles").to_path_buf(),
                 clash_api,
                 tui_cfg: ret.0,
-                clash_remote_config,
                 clashtui_data,
             },
             err_track,
@@ -82,19 +76,17 @@ impl ClashTuiUtil {
             }
         }
     }
-    fn fetch_remote(&self) -> Result<(), Error> {
-        let cur_remote = self.clash_api.config_get()?;
-        let remote = ClashConfig::from_str(cur_remote.as_str())
-            .map_err(|_| Error::new(std::io::ErrorKind::InvalidData, "Failed to prase str"))?;
-        log::debug!("{:#?}", remote);
-        let _ = self.clash_remote_config.set(remote);
-        Ok(())
+    fn fetch_remote(&self) -> Result<ClashConfig, Error> {
+        self.clash_api.config_get().and_then(|cur_remote| {
+            ClashConfig::from_str(cur_remote.as_str())
+                .map_err(|_| Error::new(std::io::ErrorKind::InvalidData, "Failed to prase str"))
+        })
     }
     pub fn restart_clash(&self) -> Result<String, Error> {
         self.clash_api.restart(None)
     }
     fn dl_remote_profile(&self, url: &str) -> Result<Resp, Error> {
-        let with_proxy = self.clash_remote_config.get().is_some();
+        let with_proxy = self.clash_api.version().is_ok();
         self.clash_api.mock_clash_core(url, with_proxy)
     }
     fn config_reload(&self, body: String) -> Result<(), Error> {
