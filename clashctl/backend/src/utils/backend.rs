@@ -1,4 +1,3 @@
-use core::str::FromStr as _;
 use std::{
     io::Error,
     path::{Path, PathBuf},
@@ -57,6 +56,7 @@ impl ClashBackend {
         }
     }
     fn fetch_remote(&self) -> Result<ClashConfig, Error> {
+        use core::str::FromStr as _;
         self.clash_api.config_get().and_then(|cur_remote| {
             ClashConfig::from_str(cur_remote.as_str())
                 .map_err(|_| Error::new(std::io::ErrorKind::InvalidData, "Failed to prase str"))
@@ -146,8 +146,11 @@ fn load_app_config(
     let secret = basic_clash_config_value
         .get("secret")
         .and_then(|v| v.as_str())
-        .unwrap_or_default()
-        .to_string();
+        .map(|s| s.to_owned());
+    let ua = basic_clash_config_value
+        .get("global-ua")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_owned());
 
     let configs = if skip_init_conf {
         let config_path = clashtui_dir.join("config.yaml");
@@ -177,7 +180,7 @@ fn load_app_config(
     };
     (
         configs,
-        ClashUtil::new(controller_api, secret, proxy_addr),
+        ClashUtil::new(controller_api, secret, proxy_addr,ua),
         err_collect,
     )
 }
