@@ -73,9 +73,9 @@ impl ClashBackend {
     }
 
     pub fn edit_file(&self, path: &Path) -> std::io::Result<()> {
-        Self::spawn_open(&self.tui_cfg.edit_cmd, path)
+        Self::spawn_open(&self.cfg.edit_cmd, path)
     }
     pub fn open_dir(&self, path: &Path) -> std::io::Result<()> {
-        Self::spawn_open(&self.tui_cfg.open_dir_cmd, path)
+        Self::spawn_open(&self.cfg.open_dir_cmd, path)
     }
 }

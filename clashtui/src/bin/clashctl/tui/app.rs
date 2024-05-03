@@ -162,7 +162,7 @@ impl App {
                 Keys::AppConfig => {
                     let _ = self
                         .clashtui_util
-                        .open_dir(&PathBuf::from(&self.clashtui_util.tui_cfg.clash_cfg_dir))
+                        .open_dir(&PathBuf::from(&self.clashtui_util.cfg.clash_cfg_dir))
                         .map_err(|e| log::error!("ODIR: {}", e));
                     EventState::WorkDone
                 }
@@ -260,7 +260,7 @@ impl App {
 
     pub fn save(&self, config_path: &str) -> std::io::Result<()> {
         self.clashtui_util
-            .tui_cfg
+            .cfg
             .to_file(config_path)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }

@@ -21,7 +21,7 @@ pub struct ClashBackend {
     profile_dir: PathBuf,
 
     clash_api: ClashUtil,
-    pub tui_cfg: ClashTuiConfig,
+    pub cfg: ClashTuiConfig,
     clash_remote_config: OnceCell<ClashConfig>,
 }
 
@@ -48,7 +48,7 @@ impl ClashBackend {
                 clashtui_dir: clashtui_dir.clone(),
                 profile_dir: clashtui_dir.join("profiles").to_path_buf(),
                 clash_api,
-                tui_cfg: ret.0,
+                cfg: ret.0,
                 clash_remote_config,
             },
             err_track,
@@ -96,10 +96,10 @@ impl ClashBackend {
 
         let pf = match new_pf {
             Some(v) => {
-                self.tui_cfg.update_profile(&v);
+                self.cfg.update_profile(&v);
                 v
             }
-            None => self.tui_cfg.current_profile.borrow().clone(),
+            None => self.cfg.current_profile.borrow().clone(),
         };
 
         if let Err(e) = self.fetch_remote() {

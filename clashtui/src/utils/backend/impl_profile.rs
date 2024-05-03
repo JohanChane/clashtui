@@ -5,6 +5,14 @@ use std::{
     io::Error,
     path::{Path, PathBuf},
 };
+enum Merge {
+    /// the target mihomo config file path
+    Target(String),
+    /// the config file storing `Merge::Target`
+    Config(String),
+    /// the profile need to be merged
+    Profile(String),
+}
 
 impl ClashBackend {
     pub fn crt_yaml_with_template(&self, template_name: &String) -> Result<(), String> {
@@ -227,21 +235,27 @@ impl ClashBackend {
         }
 
         if uri.starts_with("http://") || uri.starts_with("https://") {
-            use std::io::Write as _;
-            std::fs::OpenOptions::new()
-                .create_new(true)
-                .write(true)
-                .open(self.get_profile_path_unchecked(profile_name))
-                .and_then(|mut f| write!(f, "{}", uri))
-                .map_err(|e| e.to_string())
+            match self
+                .cfg
+                .profiles
+                .borrow_mut()
+                .insert(profile_name.to_owned(), uri.to_owned())
+            {
+                Some(_) => Err("Already one".to_owned()),
+                None => Ok(()),
+            }
         } else if Path::new(uri).is_file() {
-            let uri_path = self.get_profile_path_unchecked(uri);
+            let uri_path = self.gen_profile_path(profile_name);
             if uri_path.exists() {
+                log::debug!("{uri_path:?}");
                 return Err("Failed to import: file exists".to_string());
             }
-            std::fs::copy(uri, uri_path)
-                .map_err(|e| e.to_string())
-                .map(|_| ())
+            std::fs::copy(uri, uri_path).map_err(|e| e.to_string())?;
+            self.cfg
+                .profiles
+                .borrow_mut()
+                .insert(profile_name.to_owned(), String::new());
+            Ok(())
         } else {
             Err("Url is invalid.".to_string())
         }
@@ -249,18 +263,25 @@ impl ClashBackend {
 
     pub fn rmf_profile(&self, profile_name: &String) -> Result<(), String> {
         use std::fs::remove_file;
-        remove_file(self.get_profile_path_unchecked(profile_name))
-            .and_then(|_| remove_file(self.get_profile_cache_unchecked(profile_name)))
-            .map_err(|e| e.to_string())
+        match self.cfg.profiles.borrow_mut().remove(profile_name) {
+            Some(_) => {
+                if self.cfg.current_profile.borrow().to_owned() == *profile_name {
+                    *self.cfg.current_profile.borrow_mut() = "Removed".to_owned();
+                    // TODO: add one way to refresh state bar
+                };
+                remove_file(self.gen_profile_path(profile_name)).map_err(|e| e.to_string())
+            }
+            None => Err("No such key".to_string()),
+        }
     }
 
     pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> std::io::Result<String> {
         use crate::utils::ipc::exec;
         let cmd = format!(
             "{} {} -d {} -f {} -t",
-            self.tui_cfg.clash_core_path,
+            self.cfg.clash_core_path,
             if geodata_mode { "-m" } else { "" },
-            self.tui_cfg.clash_cfg_dir,
+            self.cfg.clash_cfg_dir,
             path,
         );
         #[cfg(target_os = "windows")]
@@ -271,62 +292,66 @@ impl ClashBackend {
 
     pub fn select_profile(&self, profile_name: &String) -> std::io::Result<()> {
         if let Err(err) = self.merge_profile(profile_name) {
-            log::error!(
-                "Failed to Merge Profile `{}`: {}",
-                profile_name,
-                err.to_string()
+            let emsg = format!(
+                "Failed to Merge Profile `{profile_name}` due to {}",
+                match err {
+                    Merge::Target(e) => format!("Mihomo Config file: {e}"),
+                    Merge::Config(e) => format!("Program Config file: {e}"),
+                    Merge::Profile(e) => format!("Profile: {e}"),
+                }
             );
-            return Err(Error::new(std::io::ErrorKind::Other, err));
+            log::error!("{emsg}");
+            return Err(Error::new(std::io::ErrorKind::Other, emsg));
         };
         let body = serde_json::json!({
-            "path": self.tui_cfg.clash_cfg_path.as_str(),
+            "path": self.cfg.clash_cfg_path.as_str(),
             "payload": ""
         })
         .to_string();
         if let Err(err) = self.config_reload(body) {
-            log::error!(
-                "Failed to Patch Profile `{}`: {}",
-                profile_name,
-                err.to_string()
-            );
-            return Err(Error::new(std::io::ErrorKind::Other, err));
+            let emsg = format!("Failed to Patch Profile `{profile_name}` due to {}", err);
+            log::error!("{emsg}");
+            return Err(Error::new(std::io::ErrorKind::Other, emsg));
         };
         Ok(())
     }
 
-    fn merge_profile(&self, profile_name: &String) -> std::io::Result<()> {
-        let basic_clash_cfg_path = self.clashtui_dir.join(super::BASIC_FILE);
-        let mut dst_parsed_yaml = Utils::parse_yaml(&basic_clash_cfg_path)?;
-        let profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
-        let profile_parsed_yaml = Utils::parse_yaml(&profile_yaml_path).map_err(|e| {
-            Error::new(
-                e.kind(),
-                format!(
-                    "Maybe need to update first. Failed to parse {}: {e}",
-                    profile_yaml_path.to_str().unwrap()
-                ),
-            )
-        })?;
-
-        if let serde_yaml::Value::Mapping(dst_mapping) = &mut dst_parsed_yaml {
-            if let serde_yaml::Value::Mapping(mapping) = &profile_parsed_yaml {
-                for (key, value) in mapping.iter() {
-                    if let serde_yaml::Value::String(k) = key {
-                        match k.as_str() {
-                            "proxy-groups" | "proxy-providers" | "proxies" | "sub-rules"
-                            | "rules" | "rule-providers" => {
-                                dst_mapping.insert(key.clone(), value.clone());
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
+    fn merge_profile(&self, profile_name: &String) -> Result<(), Merge> {
+        let mut dst_parsed_yaml = Utils::parse_yaml(&self.clashtui_dir.join(super::BASIC_FILE))
+            .map_err(|e| Merge::Config(e.to_string()))?;
+        let profile_parsed_yaml = self
+            .get_profile_yaml(profile_name)
+            .map_err(|e| Merge::Profile(format!("{e}. Maybe need to update first.")))
+            .and_then(|p| {
+                Ok(Utils::parse_yaml(&p).expect(
+                    "get_profile_yaml mark it as valid yaml file, call parse should be safe",
+                ))
+            })?;
+        use serde_yaml::Value::Mapping;
+        if let (Mapping(dst_mapping), Mapping(mapping)) =
+            (&mut dst_parsed_yaml, &profile_parsed_yaml)
+        {
+            let _filter = [
+                "proxy-groups",
+                "proxy-providers",
+                "proxies",
+                "sub-rules",
+                "rules",
+                "rule-providers",
+            ];
+            mapping
+                .iter()
+                .map_while(|(k, v)| k.as_str().and_then(|__| Some((k, v))))
+                .filter(|(k, _)| _filter.contains(&k.as_str().unwrap()))
+                .for_each(|(k, v)| {
+                    dst_mapping.insert(k.clone(), v.clone());
+                });
         }
 
-        let final_clash_cfg_file = File::create(&self.tui_cfg.clash_cfg_path)?;
+        let final_clash_cfg_file =
+            File::create(&self.cfg.clash_cfg_path).map_err(|e| Merge::Target(e.to_string()))?;
         serde_yaml::to_writer(final_clash_cfg_file, &dst_parsed_yaml)
-            .map_err(|e| Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| Merge::Target(e.to_string()))?;
 
         Ok(())
     }
@@ -339,13 +364,18 @@ impl ClashBackend {
         let mut profile_yaml_path = self.profile_dir.join(profile_name);
         let mut net_res: Vec<(String, String)> = Vec::new();
         // if it's just the link
-        if !self.is_profile_yaml(profile_name) {
-            let file_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
-            let sub_url = file_content.trim();
+        if self.test_is_link(profile_name) {
+            let sub_url = self
+                .cfg
+                .profiles
+                .borrow()
+                .get(profile_name)
+                .expect("have a key but no value")
+                .to_owned();
 
-            profile_yaml_path = self.get_profile_cache_unchecked(profile_name);
+            profile_yaml_path = self.gen_profile_path(profile_name);
             // Update the file to keep up-to-date
-            self.download_profile(sub_url, &profile_yaml_path)?;
+            self.download_profile(&sub_url, &profile_yaml_path)?;
 
             net_res.push((
                 sub_url.to_string(),
@@ -397,9 +427,7 @@ impl ClashBackend {
         Ok(net_res
             .into_iter()
             .map(|(url, path)| {
-                match self
-                    .download_profile(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(path))
-                {
+                match self.download_profile(&url, &Path::new(&self.cfg.clash_cfg_dir).join(path)) {
                     Ok(_) => format!("Updated: {url}"),
                     Err(err) => {
                         log::error!("Update profile:{err}");
@@ -427,10 +455,28 @@ impl ClashBackend {
 
 impl ClashBackend {
     pub fn get_profile_names(&self) -> std::io::Result<Vec<String>> {
-        Utils::get_file_names(&self.profile_dir).map(|mut v| {
-            v.sort();
-            v
-        })
+        let mut l: Vec<String> = self
+            .cfg
+            .profiles
+            .borrow()
+            .keys()
+            .map(|v| v.to_owned())
+            .collect();
+        l.sort();
+        Ok(l)
+    }
+    /// if that is import via link, return `Some`
+    /// else return `None`
+    pub fn get_profile_link<P: AsRef<Path> + core::fmt::Display>(
+        &self,
+        profile_name: P,
+    ) -> Option<String> {
+        if let Some(s) = self.cfg.profiles.borrow().get(&profile_name.to_string()) {
+            if !s.is_empty() {
+                return Some(s.to_owned());
+            }
+        }
+        None
     }
     pub fn get_template_names(&self) -> std::io::Result<Vec<String>> {
         Utils::get_file_names(self.clashtui_dir.join("templates")).map(|mut v| {
@@ -438,46 +484,35 @@ impl ClashBackend {
             v
         })
     }
+    pub fn test_is_link<P: AsRef<Path> + core::fmt::Display>(&self, profile_name: P) -> bool {
+        self.cfg
+            .profiles
+            .borrow()
+            .get(&profile_name.to_string())
+            .is_some_and(|v| !v.is_empty())
+    }
     /// Wrapped `self.profile_dir.join(profile_name)`
-    pub fn get_profile_path_unchecked<P: AsRef<Path>>(&self, profile_name: P) -> PathBuf {
+    pub fn gen_profile_path<P: AsRef<Path>>(&self, profile_name: P) -> PathBuf {
         self.profile_dir.join(profile_name)
     }
     /// Wrapped `self.profile_dir.join(profile_name)`
     pub fn get_template_path_unchecked<P: AsRef<Path>>(&self, name: P) -> PathBuf {
         self.clashtui_dir.join("templates").join(name)
     }
-    /// Check the `profiles` and `profile_cache` path
-    pub fn get_profile_yaml_path<P>(&self, profile_name: P) -> std::io::Result<PathBuf>
+    /// Make sure that's a valid yaml file
+    pub fn get_profile_yaml<P>(&self, profile_name: P) -> std::io::Result<PathBuf>
     where
         P: AsRef<Path> + AsRef<std::ffi::OsStr>,
     {
-        let mut path = self.get_profile_path_unchecked(&profile_name);
+        let path = self.gen_profile_path(&profile_name);
         if is_yaml(&path) {
-            Some(path)
+            Ok(path)
         } else {
-            path = self.get_profile_cache_unchecked(profile_name);
-            is_yaml(&path).then_some(path)
+            Err(Error::new(
+                std::io::ErrorKind::NotFound,
+                "No valid yaml file",
+            ))
         }
-        .ok_or(Error::new(
-            std::io::ErrorKind::NotFound,
-            "No valid yaml file",
-        ))
-    }
-    fn get_profile_cache_unchecked<P>(&self, profile_name: P) -> PathBuf
-    where
-        P: AsRef<Path> + AsRef<std::ffi::OsStr>,
-    {
-        self.clashtui_dir
-            .join("profile_cache")
-            .join(profile_name)
-            .with_extension("yaml")
-    }
-    /// Check file only in `profiles`
-    ///
-    /// Judging by format
-    pub fn is_profile_yaml<P: AsRef<Path>>(&self, profile_name: P) -> bool {
-        let profile_path = self.get_profile_path_unchecked(profile_name);
-        is_yaml(&profile_path)
     }
 }
 /// # Limitations
