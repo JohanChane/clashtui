@@ -1,4 +1,4 @@
-use core::cell::OnceCell;
+use core::cell::RefCell;
 use core::str::FromStr as _;
 use std::{
     io::Error,
@@ -22,7 +22,7 @@ pub struct ClashBackend {
 
     clash_api: ClashUtil,
     pub cfg: ClashTuiConfig,
-    clash_remote_config: OnceCell<ClashConfig>,
+    clash_remote_config: RefCell<Option<ClashConfig>>,
 }
 
 // Misc
@@ -31,10 +31,12 @@ impl ClashBackend {
         let ret = load_app_config(clashtui_dir, is_inited);
         let mut err_track = ret.2;
         let clash_api = ret.1;
-        let clash_remote_config = OnceCell::default();
+        let clash_remote_config = RefCell::new(None);
         match ClashConfig::from_str(clash_api.config_get().unwrap_or_default().as_str()) {
             // That must be empty, call unwrap is fine
-            Ok(remote) => clash_remote_config.set(remote).unwrap(),
+            Ok(remote) => {
+                clash_remote_config.borrow_mut().replace(remote);
+            }
             Err(_) => {
                 err_track.push(CfgError::new(
                     ErrKind::LoadClashConfig,
@@ -64,12 +66,19 @@ impl ClashBackend {
         }
     }
     fn fetch_remote(&self) -> Result<(), Error> {
-        let cur_remote = self.clash_api.config_get()?;
-        let remote = ClashConfig::from_str(cur_remote.as_str())
-            .map_err(|_| Error::new(std::io::ErrorKind::InvalidData, "Failed to prase str"))?;
-        log::debug!("{:#?}", remote);
-        let _ = self.clash_remote_config.set(remote);
-        Ok(())
+        match self.clash_api.config_get().and_then(|cur_remote| {
+            ClashConfig::from_str(cur_remote.as_str())
+                .map_err(|_| Error::new(std::io::ErrorKind::InvalidData, "Failed to prase str"))
+        }) {
+            Ok(v) => {
+                self.clash_remote_config.borrow_mut().replace(v);
+                Ok(())
+            }
+            Err(e) => {
+                self.clash_remote_config.take();
+                Err(e)
+            }
+        }
     }
     pub fn restart_clash(&self) -> Result<String, Error> {
         self.clash_api.restart(None)
@@ -107,7 +116,7 @@ impl ClashBackend {
                 log::warn!("{}", e);
             }
         }
-        let (mode, tun) = match self.clash_remote_config.get() {
+        let (mode, tun) = match self.clash_remote_config.borrow().as_ref() {
             Some(v) => (
                 Some(v.mode),
                 if v.tun.enable {
