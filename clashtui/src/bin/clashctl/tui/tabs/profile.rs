@@ -147,14 +147,6 @@ impl ProfileTab {
             })
             .collect();
         let now = std::time::SystemTime::now();
-        if profile_times.iter().filter_map(|t| t.as_ref()).any(|t| {
-            // Within one day
-            *t < now - std::time::Duration::from_secs(24 * 60 * 60)
-        }) {
-            self.popup_txt_msg(
-                "Some profile might haven't updated for more than one day".to_string(),
-            )
-        };
         self.profile_list.set_items(profile_names);
         self.profile_list
             .set_extras(profile_times.into_iter().map(|t| {
@@ -278,8 +270,10 @@ impl super::TabEvent for ProfileTab {
                                             .get_profile_link(profile_name)
                                             .expect("have a key but no value"),
                                     );
-                                    lines.push(String::new());
+                                } else {
+                                    lines.push("Imported local file".to_owned());
                                 }
+                                lines.push(String::new());
                                 let content: Vec<String> = std::fs::read_to_string(
                                     self.clashtui_util.gen_profile_path(profile_name),
                                 )?
@@ -300,8 +294,7 @@ impl super::TabEvent for ProfileTab {
                         }
                         Keys::ProfileTestConfig => {
                             if let Some(profile_name) = self.profile_list.selected() {
-                                let path =
-                                    self.clashtui_util.get_profile_yaml(profile_name)?;
+                                let path = self.clashtui_util.get_profile_yaml(profile_name)?;
                                 match self
                                     .clashtui_util
                                     .test_profile_config(path.to_str().unwrap(), false)
