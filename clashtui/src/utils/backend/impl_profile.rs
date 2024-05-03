@@ -322,10 +322,10 @@ impl ClashBackend {
         let profile_parsed_yaml = self
             .get_profile_yaml(profile_name)
             .map_err(|e| Merge::Profile(format!("{e}. Maybe need to update first.")))
-            .and_then(|p| {
-                Ok(Utils::parse_yaml(&p).expect(
+            .map(|p| {
+                Utils::parse_yaml(&p).expect(
                     "get_profile_yaml mark it as valid yaml file, call parse should be safe",
-                ))
+                )
             })?;
         use serde_yaml::Value::Mapping;
         if let (Mapping(dst_mapping), Mapping(mapping)) =
@@ -341,7 +341,7 @@ impl ClashBackend {
             ];
             mapping
                 .iter()
-                .map_while(|(k, v)| k.as_str().and_then(|__| Some((k, v))))
+                .map_while(|(k, v)| k.as_str().map(|_| (k, v)))
                 .filter(|(k, _)| _filter.contains(&k.as_str().unwrap()))
                 .for_each(|(k, v)| {
                     dst_mapping.insert(k.clone(), v.clone());
