@@ -85,12 +85,8 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
     };
 
     if !config_dir.join("config.yaml").exists() {
-        const DEFAULT_BASIC_CLASH_CFG_CONTENT: &str = r#"mixed-port: 7890
-        mode: rule
-        log-level: info
-        external-controller: 127.0.0.1:9090"#;
         flags.insert(Flag::FirstInit);
-        if let Err(err) = init_config(&config_dir, DEFAULT_BASIC_CLASH_CFG_CONTENT) {
+        if let Err(err) = init_config(&config_dir) {
             flags.insert(Flag::ErrorDuringInit);
             log::error!("{}", err);
         }

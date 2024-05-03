@@ -70,6 +70,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1fdabc7756949593fe60f30ec81974b613357de856987752631dea1e3394c80"
 
 [[package]]
+name = "backend"
+version = "0.1.0"
+dependencies = [
+ "api",
+ "enumflags2",
+ "log",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+]
+
+[[package]]
 name = "base64"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -180,7 +192,7 @@ checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 name = "clashctl"
 version = "0.2.4"
 dependencies = [
- "api",
+ "backend",
  "clap",
  "clap_complete",
  "encoding",
@@ -188,9 +200,6 @@ dependencies = [
  "log",
  "log4rs",
  "ratatui",
- "serde",
- "serde_json",
- "serde_yaml",
  "ui",
 ]
 

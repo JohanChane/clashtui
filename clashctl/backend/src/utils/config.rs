@@ -94,10 +94,11 @@ impl From<serde_yaml::Error> for CfgError {
         }
     }
 }
-pub fn init_config(
-    config_dir: &std::path::PathBuf,
-    default_basic_clash_cfg_content: &str,
-) -> Result<()> {
+pub fn init_config(config_dir: &std::path::PathBuf) -> Result<()> {
+    const DEFAULT_BASIC_CLASH_CFG_CONTENT: &str = r#"mixed-port: 7890
+mode: rule
+log-level: info
+external-controller: 127.0.0.1:9090"#;
     use std::fs;
     fs::create_dir_all(config_dir)?;
 
@@ -108,7 +109,7 @@ pub fn init_config(
 
     fs::write(
         config_dir.join("basic_clash_config.yaml"),
-        default_basic_clash_cfg_content,
+        DEFAULT_BASIC_CLASH_CFG_CONTENT,
     )?;
     Ok(())
 }

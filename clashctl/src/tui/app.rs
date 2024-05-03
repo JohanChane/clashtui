@@ -30,19 +30,12 @@ impl App {
     pub fn new(util: ClashBackend) -> Self {
         let util = SharedBackend::new(util);
 
-        let state =
-            SharedState::new(RefCell::new(State::new(Rc::clone(&util))));
+        let state = SharedState::new(RefCell::new(State::new(Rc::clone(&util))));
         let _ = Theme::load(None).map_err(|e| log::error!("Loading Theme:{e}"));
 
         let tabs: Vec<Tabs> = vec![
-            Tabs::Profile(ProfileTab::new(
-                util.clone(),
-                state.clone(),
-            )),
-            Tabs::ClashSrvCtl(ClashSrvCtlTab::new(
-                util.clone(),
-                state.clone(),
-            )),
+            Tabs::Profile(ProfileTab::new(util.clone(), state.clone())),
+            Tabs::ClashSrvCtl(ClashSrvCtlTab::new(util.clone(), state.clone())),
         ]; // Init the tabs
         let tabbar = TabBar::new(tabs.iter().map(|v| v.to_string()).collect());
         let statusbar = StatusBar::new(Rc::clone(&state));
