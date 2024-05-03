@@ -115,7 +115,7 @@ pub enum Flag {
     Global,
     Tui,
 }
-pub fn handle_cli_args(backend: clashtui::utils::ClashBackend) -> Option<std::io::Result<String>> {
+pub fn handle_cli_args(backend: crate::utils::ClashBackend) -> Option<std::io::Result<String>> {
     parse_args().ok().map(|v| handle_flags(v, backend))
 }
 pub fn parse_args() -> Result<Clinfo, ()> {
@@ -172,7 +172,7 @@ pub fn parse_args() -> Result<Clinfo, ()> {
 
 pub fn handle_flags(
     infos: Clinfo,
-    backend: clashtui::utils::ClashBackend,
+    backend: crate::utils::ClashBackend,
 ) -> std::io::Result<String> {
     let Clinfo { profile, flags } = infos;
     if flags.contains(Flag::Direct) {
@@ -188,11 +188,11 @@ pub fn handle_flags(
             .update_state(None, Some(api::Mode::Global.into()))
             .to_string())
     } else if flags.contains(Flag::Restart) {
-        backend.clash_srv_ctl(clashtui::utils::ClashSrvOp::StartClashService)
+        backend.clash_srv_ctl(crate::utils::ClashSrvOp::StartClashService)
     } else if flags.contains(Flag::RestartSoft) {
         backend.restart_clash()
     } else if flags.contains(Flag::Stop) {
-        backend.clash_srv_ctl(clashtui::utils::ClashSrvOp::StopClashService)
+        backend.clash_srv_ctl(crate::utils::ClashSrvOp::StopClashService)
     } else if flags.contains(Flag::Update) {
         if let Some(_name) = profile {
             todo!()

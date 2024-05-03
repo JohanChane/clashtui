@@ -1,18 +1,18 @@
 use ratatui::{prelude as Ra, widgets as Raw};
 
 use super::Theme;
-use crate::utils::SharedClashTuiState;
+use crate::utils::SharedState;
 
 pub struct StatusBar {
     is_visible: bool,
-    clashtui_state: SharedClashTuiState,
+    state: SharedState,
 }
 
 impl StatusBar {
-    pub fn new(clashtui_state: SharedClashTuiState) -> Self {
+    pub fn new(state: SharedState) -> Self {
         Self {
             is_visible: true,
-            clashtui_state,
+            state,
         }
     }
 
@@ -22,7 +22,7 @@ impl StatusBar {
         }
 
         f.render_widget(Raw::Clear, area);
-        let state = self.clashtui_state.borrow();
+        let state = self.state.borrow();
         let status_str = state.render();
         let paragraph = Raw::Paragraph::new(Ra::Span::styled(
             status_str,

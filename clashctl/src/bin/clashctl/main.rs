@@ -22,7 +22,7 @@ fn main() {
 pub fn run(mut flags: Flags<Flag>) -> Result<(), String> {
     let config_dir = load_app_dir(&mut flags);
 
-    setup_logging(config_dir.join("clashtui.log").to_str().unwrap());
+    setup_logging(config_dir.join("clashctl.log").to_str().unwrap());
     log::debug!("Current flags: {:?}", flags);
     let (backend, err_track) = ClashBackend::new(&config_dir, !flags.contains(Flag::FirstInit));
 
@@ -63,7 +63,7 @@ pub fn run(mut flags: Flags<Flag>) -> Result<(), String> {
 }
 
 fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
-    let clashtui_config_dir = {
+    let config_dir = {
         use std::{env, path::PathBuf};
         let exe_dir = env::current_exe().unwrap().parent().unwrap().to_path_buf();
         let data_dir = exe_dir.join("data");
@@ -73,29 +73,29 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
             data_dir
         } else {
             #[cfg(target_os = "linux")]
-            let clashtui_config_dir_str = env::var("XDG_CONFIG_HOME")
-                .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)))
+            let config_dir_str = env::var("XDG_CONFIG_HOME")
+                .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashctl", home)))
                 .unwrap();
             #[cfg(target_os = "windows")]
-            let clashtui_config_dir_str = env::var("APPDATA")
-                .map(|appdata| format!("{}/clashtui", appdata))
+            let config_dir_str = env::var("APPDATA")
+                .map(|appdata| format!("{}/clashctl", appdata))
                 .unwrap();
-            PathBuf::from(&clashtui_config_dir_str)
+            PathBuf::from(&config_dir_str)
         }
     };
 
-    if !clashtui_config_dir.join("config.yaml").exists() {
+    if !config_dir.join("config.yaml").exists() {
         const DEFAULT_BASIC_CLASH_CFG_CONTENT: &str = r#"mixed-port: 7890
         mode: rule
         log-level: info
         external-controller: 127.0.0.1:9090"#;
         flags.insert(Flag::FirstInit);
-        if let Err(err) = init_config(&clashtui_config_dir, DEFAULT_BASIC_CLASH_CFG_CONTENT) {
+        if let Err(err) = init_config(&config_dir, DEFAULT_BASIC_CLASH_CFG_CONTENT) {
             flags.insert(Flag::ErrorDuringInit);
             log::error!("{}", err);
         }
     }
-    clashtui_config_dir
+    config_dir
 }
 fn setup_logging(log_path: &str) {
     use log4rs::append::file::FileAppender;

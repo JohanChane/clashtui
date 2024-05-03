@@ -1,4 +1,4 @@
-use super::SharedClashBackend;
+use super::SharedBackend;
 use api::{Mode, TunStack};
 
 pub struct _State {
@@ -41,10 +41,10 @@ impl core::fmt::Display for _State {
 }
 pub struct State {
     st: _State,
-    ct: SharedClashBackend,
+    ct: SharedBackend,
 }
 impl State {
-    pub fn new(ct: SharedClashBackend) -> Self {
+    pub fn new(ct: SharedBackend) -> Self {
         #[cfg(target_os = "windows")]
         return Self {
             st: ct.update_state(None, None, None),
