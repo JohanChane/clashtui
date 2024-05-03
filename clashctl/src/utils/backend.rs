@@ -9,7 +9,7 @@ mod impl_clashsrv;
 mod impl_profile;
 
 use super::{
-    config::{CfgError, ClashTuiConfig, ErrKind},
+    config::{CfgError, Config, ErrKind},
     parse_yaml,
 };
 use api::{ClashConfig, ClashUtil, Resp};
@@ -17,11 +17,11 @@ use api::{ClashConfig, ClashUtil, Resp};
 const BASIC_FILE: &str = "basic_clash_config.yaml";
 
 pub struct ClashBackend {
-    pub clashtui_dir: PathBuf,
+    pub home_dir: PathBuf,
     profile_dir: PathBuf,
 
     clash_api: ClashUtil,
-    pub cfg: ClashTuiConfig,
+    pub cfg: Config,
     clash_remote_config: RefCell<Option<ClashConfig>>,
 }
 
@@ -47,7 +47,7 @@ impl ClashBackend {
         }
         (
             Self {
-                clashtui_dir: clashtui_dir.clone(),
+                home_dir: clashtui_dir.clone(),
                 profile_dir: clashtui_dir.join("profiles").to_path_buf(),
                 clash_api,
                 cfg: ret.0,
@@ -134,7 +134,7 @@ impl ClashBackend {
 fn load_app_config(
     clashtui_dir: &PathBuf,
     skip_init_conf: bool,
-) -> (ClashTuiConfig, ClashUtil, Vec<CfgError>) {
+) -> (Config, ClashUtil, Vec<CfgError>) {
     let mut err_collect = Vec::new();
     let basic_clash_config_path = Path::new(clashtui_dir).join(BASIC_FILE);
     let basic_clash_config_value: serde_yaml::Value =
@@ -171,7 +171,7 @@ fn load_app_config(
 
     let configs = if skip_init_conf {
         let config_path = clashtui_dir.join("config.yaml");
-        match ClashTuiConfig::from_file(config_path.to_str().unwrap()) {
+        match Config::from_file(config_path.to_str().unwrap()) {
             Ok(v) => {
                 if !v.check() {
                     err_collect.push(CfgError::new(
@@ -189,11 +189,11 @@ fn load_app_config(
                     "Fail to load configs, using Default".to_string(),
                 ));
                 log::error!("Unable to load config file. {}", e);
-                ClashTuiConfig::default()
+                Config::default()
             }
         }
     } else {
-        ClashTuiConfig::default()
+        Config::default()
     };
     (
         configs,

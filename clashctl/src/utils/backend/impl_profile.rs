@@ -19,14 +19,14 @@ impl ClashBackend {
         use std::borrow::Cow;
         use std::collections::HashMap;
         use std::io::{BufRead, BufReader};
-        let template_dir = self.clashtui_dir.join("templates");
+        let template_dir = self.home_dir.join("templates");
         let template_path = template_dir.join(template_name);
         let tpl_parsed_yaml =
             Utils::parse_yaml(&template_path).map_err(|e| format!("parse failed: {e:?}"))?;
         let mut out_parsed_yaml = Cow::Borrowed(&tpl_parsed_yaml);
 
         let proxy_url_file =
-            File::open(self.clashtui_dir.join("templates/template_proxy_providers"))
+            File::open(self.home_dir.join("templates/template_proxy_providers"))
                 .map_err(|e| format!("open template_proxy_providers: {e:?}"))?;
         let proxy_urls: Vec<String> = BufReader::new(proxy_url_file)
             .lines()
@@ -317,7 +317,7 @@ impl ClashBackend {
     }
 
     fn merge_profile(&self, profile_name: &String) -> Result<(), Merge> {
-        let mut dst_parsed_yaml = Utils::parse_yaml(&self.clashtui_dir.join(super::BASIC_FILE))
+        let mut dst_parsed_yaml = Utils::parse_yaml(&self.home_dir.join(super::BASIC_FILE))
             .map_err(|e| Merge::Config(e.to_string()))?;
         let profile_parsed_yaml = self
             .get_profile_yaml(profile_name)
@@ -479,7 +479,7 @@ impl ClashBackend {
         None
     }
     pub fn get_template_names(&self) -> std::io::Result<Vec<String>> {
-        Utils::get_file_names(self.clashtui_dir.join("templates")).map(|mut v| {
+        Utils::get_file_names(self.home_dir.join("templates")).map(|mut v| {
             v.sort();
             v
         })
@@ -497,7 +497,7 @@ impl ClashBackend {
     }
     /// Wrapped `self.profile_dir.join(profile_name)`
     pub fn get_template_path_unchecked<P: AsRef<Path>>(&self, name: P) -> PathBuf {
-        self.clashtui_dir.join("templates").join(name)
+        self.home_dir.join("templates").join(name)
     }
     /// Make sure that's a valid yaml file
     pub fn get_profile_yaml<P>(&self, profile_name: P) -> std::io::Result<PathBuf>

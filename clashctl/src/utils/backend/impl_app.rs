@@ -45,7 +45,7 @@ impl ClashBackend {
     }
 
     pub fn fetch_recent_logs(&self, num_lines: usize) -> Vec<String> {
-        std::fs::read_to_string(self.clashtui_dir.join("clashtui.log"))
+        std::fs::read_to_string(self.home_dir.join("clashctl.log"))
             .unwrap_or_default()
             .lines()
             .rev()

@@ -6,8 +6,8 @@ mod state;
 #[allow(clippy::module_inception)]
 mod utils;
 
-pub type SharedClashBackend = std::rc::Rc<backend::ClashBackend>;
-pub type SharedClashTuiState = std::rc::Rc<core::cell::RefCell<State>>;
+pub type SharedBackend = std::rc::Rc<backend::ClashBackend>;
+pub type SharedState = std::rc::Rc<core::cell::RefCell<State>>;
 
 pub use backend::ClashBackend;
 pub use config::{init_config, CfgError};

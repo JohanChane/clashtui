@@ -8,7 +8,7 @@ use crate::{
         widgets::{List, MsgPopup},
         EventState, Visibility,
     },
-    utils::{SharedClashBackend, SharedClashTuiState},
+    utils::{SharedBackend, SharedState},
 };
 use api::Mode;
 
@@ -21,14 +21,14 @@ pub struct ClashSrvCtlTab {
 
     mode_selector: List,
 
-    clashtui_util: SharedClashBackend,
-    clashtui_state: SharedClashTuiState,
+    util: SharedBackend,
+    state: SharedState,
 
     op: Option<ClashSrvOp>,
 }
 
 impl ClashSrvCtlTab {
-    pub fn new(clashtui_util: SharedClashBackend, clashtui_state: SharedClashTuiState) -> Self {
+    pub fn new(util: SharedBackend, state: SharedState) -> Self {
         let mut operations = List::new(CLASHSRVCTL.to_string());
         operations.set_items(vec![
             #[cfg(target_os = "linux")]
@@ -57,8 +57,8 @@ impl ClashSrvCtlTab {
             is_visible: false,
             main_list: operations,
             mode_selector: modes,
-            clashtui_util,
-            clashtui_state,
+            util,
+            state,
             msgpopup: Default::default(),
             op: None,
         }
@@ -78,7 +78,7 @@ impl super::TabEvent for ClashSrvCtlTab {
             if let ui::event::Event::Key(key) = ev {
                 if &Keys::Select == key {
                     if let Some(new) = self.mode_selector.selected() {
-                        self.clashtui_state.borrow_mut().set_mode(new.clone());
+                        self.state.borrow_mut().set_mode(new.clone());
                     }
                     self.mode_selector.hide();
                 }
@@ -130,14 +130,14 @@ impl super::TabEvent for ClashSrvCtlTab {
                 #[cfg(target_os = "windows")]
                 ClashSrvOp::SwitchSysProxy => {
                     let cur = self
-                        .clashtui_state
+                        .state
                         .borrow()
                         .get_sysproxy()
                         .map_or(true, |b| !b);
-                    self.clashtui_state.borrow_mut().set_sysproxy(cur);
+                    self.state.borrow_mut().set_sysproxy(cur);
                     self.hide_msgpopup();
                 }
-                _ => match self.clashtui_util.clash_srv_ctl(op) {
+                _ => match self.util.clash_srv_ctl(op) {
                     Ok(output) => {
                         self.popup_list_msg(output.lines().map(|line| line.trim().to_string()));
                     }

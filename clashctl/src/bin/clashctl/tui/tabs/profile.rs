@@ -5,7 +5,7 @@ use crate::tui::{
     widgets::{ConfirmPopup, List, MsgPopup},
     EventState, Visibility,
 };
-use crate::utils::{get_modify_time, SharedClashBackend, SharedClashTuiState};
+use crate::utils::{get_modify_time, SharedBackend, SharedState};
 crate::utils::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);
 
 #[derive(PartialEq)]
@@ -25,13 +25,13 @@ pub struct ProfileTab {
     confirm_popup: ConfirmPopup,
     profile_input: Box<ProfileInputPopup>,
 
-    clashtui_util: SharedClashBackend,
-    clashtui_state: SharedClashTuiState,
+    util: SharedBackend,
+    state: SharedState,
     op: Option<PTOp>,
 }
 
 impl ProfileTab {
-    pub fn new(clashtui_util: SharedClashBackend, clashtui_state: SharedClashTuiState) -> Self {
+    pub fn new(util: SharedBackend, state: SharedState) -> Self {
         let profiles = List::new(PROFILE.to_string());
         let templates = List::new(TEMPALTE.to_string());
 
@@ -44,17 +44,17 @@ impl ProfileTab {
             fouce: Fouce::Profile,
             profile_input: ProfileInputPopup::new().into(),
 
-            clashtui_util,
-            clashtui_state,
+            util,
+            state,
             op: None,
         };
 
         instance.update_profile_list();
         instance
             .profile_list
-            .select(instance.clashtui_state.borrow().get_profile());
+            .select(instance.state.borrow().get_profile());
         let template_names: Vec<String> = instance
-            .clashtui_util
+            .util
             .get_template_names()
             .expect("Unable to init ProfileTab");
         instance.template_list.set_items(template_names);
@@ -67,10 +67,10 @@ impl ProfileTab {
 
     fn handle_select_profile_ev(&mut self) {
         if let Some(profile_name) = self.profile_list.selected() {
-            if let Err(err) = self.clashtui_util.select_profile(profile_name) {
+            if let Err(err) = self.util.select_profile(profile_name) {
                 self.popup_txt_msg(err.to_string())
             } else {
-                self.clashtui_state
+                self.state
                     .borrow_mut()
                     .set_profile(profile_name.clone())
             }
@@ -79,12 +79,12 @@ impl ProfileTab {
     fn handle_update_profile_ev(&mut self, does_update_all: bool) {
         if let Some(profile_name) = self.profile_list.selected() {
             match self
-                .clashtui_util
+                .util
                 .update_profile(profile_name, does_update_all)
             {
                 Ok(mut msg) => {
-                    if profile_name == self.clashtui_state.borrow().get_profile() {
-                        if let Err(err) = self.clashtui_util.select_profile(profile_name) {
+                    if profile_name == self.state.borrow().get_profile() {
+                        if let Err(err) = self.util.select_profile(profile_name) {
                             log::error!("{profile_name} => {err:?}");
                             msg.push(err.to_string());
                         } else {
@@ -106,7 +106,7 @@ impl ProfileTab {
     }
     fn handle_delete_profile_ev(&mut self) {
         if let Some(profile_name) = self.profile_list.selected() {
-            if let Err(e) = self.clashtui_util.rmf_profile(profile_name) {
+            if let Err(e) = self.util.rmf_profile(profile_name) {
                 self.popup_txt_msg(e);
             };
             self.update_profile_list();
@@ -116,7 +116,7 @@ impl ProfileTab {
     fn handle_import_profile_ev(&mut self) {
         let profile_name = self.profile_input.name_input.get_input_data();
         let uri = self.profile_input.uri_input.get_input_data();
-        match self.clashtui_util.crt_profile(profile_name, uri) {
+        match self.util.crt_profile(profile_name, uri) {
             Ok(_) => self.update_profile_list(),
             Err(err) => self.popup_txt_msg(err),
         };
@@ -124,7 +124,7 @@ impl ProfileTab {
 
     fn handle_create_template_ev(&mut self) {
         if let Some(template_name) = self.template_list.selected() {
-            if let Err(err) = self.clashtui_util.crt_yaml_with_template(template_name) {
+            if let Err(err) = self.util.crt_yaml_with_template(template_name) {
                 log::error!("Create Template => {err}");
                 self.popup_txt_msg(err);
             } else {
@@ -135,11 +135,11 @@ impl ProfileTab {
     }
 
     fn update_profile_list(&mut self) {
-        let profile_names = self.clashtui_util.get_profile_names().unwrap();
+        let profile_names = self.util.get_profile_names().unwrap();
         let profile_times: Vec<Option<std::time::SystemTime>> = profile_names
             .iter()
             .map(|v| {
-                self.clashtui_util
+                self.util
                     .get_profile_yaml(v)
                     .and_then(get_modify_time)
                     .map_err(|e| log::error!("{v} => {e}"))
@@ -248,8 +248,8 @@ impl super::TabEvent for ProfileTab {
                                     .selected()
                                     .into_iter()
                                     .map(|profile_name| {
-                                        self.clashtui_util.edit_file(
-                                            &self.clashtui_util.gen_profile_path(profile_name),
+                                        self.util.edit_file(
+                                            &self.util.gen_profile_path(profile_name),
                                         )
                                     })
                                     .map_while(|r| r.err())
@@ -264,9 +264,9 @@ impl super::TabEvent for ProfileTab {
                         Keys::Preview => {
                             if let Some(profile_name) = self.profile_list.selected() {
                                 let mut lines: Vec<String> = vec![];
-                                if self.clashtui_util.test_is_link(profile_name) {
+                                if self.util.test_is_link(profile_name) {
                                     lines.push(
-                                        self.clashtui_util
+                                        self.util
                                             .get_profile_link(profile_name)
                                             .expect("have a key but no value"),
                                     );
@@ -275,7 +275,7 @@ impl super::TabEvent for ProfileTab {
                                 }
                                 lines.push(String::new());
                                 let content: Vec<String> = std::fs::read_to_string(
-                                    self.clashtui_util.gen_profile_path(profile_name),
+                                    self.util.gen_profile_path(profile_name),
                                 )?
                                 .lines()
                                 .map(|s| s.to_string())
@@ -294,9 +294,9 @@ impl super::TabEvent for ProfileTab {
                         }
                         Keys::ProfileTestConfig => {
                             if let Some(profile_name) = self.profile_list.selected() {
-                                let path = self.clashtui_util.get_profile_yaml(profile_name)?;
+                                let path = self.util.get_profile_yaml(profile_name)?;
                                 match self
-                                    .clashtui_util
+                                    .util
                                     .test_profile_config(path.to_str().unwrap(), false)
                                 {
                                     Ok(output) => self.popup_list_msg(
@@ -322,7 +322,7 @@ impl super::TabEvent for ProfileTab {
                         }
                         Keys::Preview => {
                             if let Some(name) = self.template_list.selected() {
-                                let path = self.clashtui_util.get_template_path_unchecked(name);
+                                let path = self.util.get_template_path_unchecked(name);
                                 self.popup_list_msg(
                                     std::fs::read_to_string(path)?
                                         .lines()
@@ -337,10 +337,10 @@ impl super::TabEvent for ProfileTab {
                                     .selected()
                                     .into_iter()
                                     .map(|name| {
-                                        self.clashtui_util.get_template_path_unchecked(name)
+                                        self.util.get_template_path_unchecked(name)
                                     })
                                     .map_while(|tpl_file_path| {
-                                        self.clashtui_util.edit_file(&tpl_file_path).err()
+                                        self.util.edit_file(&tpl_file_path).err()
                                     })
                                     .map(|err| err.to_string())
                                     .collect(),

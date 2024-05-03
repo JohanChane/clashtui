@@ -1,10 +1,10 @@
 [package]
-name = "clashtui"
+name = "clashctl"
 version = "0.2.4"
 edition = "2021"
 
 authors = ["Johan Chane <johanchanex@gmail.com>"]
-description = "Mihomo TUI Client"
+description = "Mihomo Control Client"
 license = "MIT"
 repository = "https://github.com/JohanChane/clashtui"
 homepage = "https://github.com/JohanChane/clashtui"
@@ -62,13 +62,13 @@ section = "utility"
 priority = "optional"
 assets = [
   [
-    'target/release/clashtui',
-    'usr/bin/clashtui',
+    'target/release/clashctl',
+    'usr/bin/clashctl',
     '755',
   ],
   [
     '../README.md',
-    'usr/share/doc/clashtui/README.md',
+    'usr/share/doc/clashctl/README.md',
     '644',
   ],
 ]

@@ -12,7 +12,7 @@ use crate::tui::{
     widgets::MsgPopup,
     EventState, StatusBar, TabBar, Theme, Visibility,
 };
-use crate::utils::{ClashBackend, SharedClashBackend, SharedClashTuiState, State};
+use crate::utils::{ClashBackend, SharedBackend, SharedState, State};
 
 pub struct App {
     tabbar: TabBar,
@@ -22,31 +22,31 @@ pub struct App {
     info_popup: InfoPopUp,
     msgpopup: MsgPopup,
 
-    clashtui_util: SharedClashBackend,
+    util: SharedBackend,
     statusbar: StatusBar,
 }
 
 impl App {
     pub fn new(util: ClashBackend) -> Self {
-        let clashtui_util = SharedClashBackend::new(util);
+        let util = SharedBackend::new(util);
 
-        let clashtui_state =
-            SharedClashTuiState::new(RefCell::new(State::new(Rc::clone(&clashtui_util))));
+        let state =
+            SharedState::new(RefCell::new(State::new(Rc::clone(&util))));
         let _ = Theme::load(None).map_err(|e| log::error!("Loading Theme:{e}"));
 
         let tabs: Vec<Tabs> = vec![
             Tabs::Profile(ProfileTab::new(
-                clashtui_util.clone(),
-                clashtui_state.clone(),
+                util.clone(),
+                state.clone(),
             )),
             Tabs::ClashSrvCtl(ClashSrvCtlTab::new(
-                clashtui_util.clone(),
-                clashtui_state.clone(),
+                util.clone(),
+                state.clone(),
             )),
         ]; // Init the tabs
         let tabbar = TabBar::new(tabs.iter().map(|v| v.to_string()).collect());
-        let statusbar = StatusBar::new(Rc::clone(&clashtui_state));
-        let info_popup = InfoPopUp::with_items(&clashtui_util.clash_version());
+        let statusbar = StatusBar::new(Rc::clone(&state));
+        let info_popup = InfoPopUp::with_items(&util.clash_version());
 
         let app = Self {
             tabbar,
@@ -55,7 +55,7 @@ impl App {
             info_popup,
             msgpopup: Default::default(),
             statusbar,
-            clashtui_util,
+            util,
             tabs,
         };
 
@@ -154,25 +154,25 @@ impl App {
                 }
                 Keys::ClashConfig => {
                     let _ = self
-                        .clashtui_util
-                        .open_dir(self.clashtui_util.clashtui_dir.as_path())
+                        .util
+                        .open_dir(self.util.home_dir.as_path())
                         .map_err(|e| log::error!("ODIR: {}", e));
                     EventState::WorkDone
                 }
                 Keys::AppConfig => {
                     let _ = self
-                        .clashtui_util
-                        .open_dir(&PathBuf::from(&self.clashtui_util.cfg.clash_cfg_dir))
+                        .util
+                        .open_dir(&PathBuf::from(&self.util.cfg.clash_cfg_dir))
                         .map_err(|e| log::error!("ODIR: {}", e));
                     EventState::WorkDone
                 }
                 Keys::LogCat => {
-                    let log = self.clashtui_util.fetch_recent_logs(20);
+                    let log = self.util.fetch_recent_logs(20);
                     self.popup_list_msg(log);
                     EventState::WorkDone
                 }
                 Keys::SoftRestart => {
-                    match self.clashtui_util.restart_clash() {
+                    match self.util.restart_clash() {
                         Ok(output) => {
                             self.popup_list_msg(output.lines().map(|line| line.trim().to_string()));
                         }
@@ -259,7 +259,7 @@ impl App {
     }
 
     pub fn save(&self, config_path: &str) -> std::io::Result<()> {
-        self.clashtui_util
+        self.util
             .cfg
             .to_file(config_path)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
