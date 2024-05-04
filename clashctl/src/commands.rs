@@ -11,7 +11,9 @@ pub struct CliCmds {
     /// generate completion for current shell
     #[arg(long)]
     generate_shell_completion: bool,
-    /// specify target shell, only avaliable with --generate-shell-completion option
+    /// specify target shell
+    /// 
+    /// avaliable when --generate-shell-completion is set
     #[arg(long)]
     shell: Option<clap_complete::Shell>,
 }
