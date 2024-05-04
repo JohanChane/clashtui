@@ -5,10 +5,9 @@ pub use enumflags2::BitFlags;
 #[bitflags]
 #[repr(u8)]
 pub enum Flag {
-    CliMode = 1,
-    FirstInit = 1 << 1,
-    ErrorDuringInit = 1 << 2,
-    PortableMode = 1 << 3,
+    FirstInit,
+    ErrorDuringInit,
+    PortableMode,
 }
 #[cfg(test)]
 mod test {
@@ -16,9 +15,9 @@ mod test {
     #[test]
     fn test_flags() {
         let mut flags = BitFlags::EMPTY;
-        flags.insert(Flag::CliMode);
+        flags.insert(Flag::FirstInit);
         println!("{flags:?}");
-        assert!(flags.contains(Flag::CliMode));
+        assert!(flags.contains(Flag::FirstInit));
         println!("{:?}", flags.exactly_one());
         flags.insert(Flag::FirstInit);
         println!("{flags:?}");

@@ -116,14 +116,11 @@ impl ClashUtil {
         if with_proxy {
             req = req.with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
         }
-        req.with_header(
-            "user-agent",
-            self.ua.as_deref().unwrap_or("clash.meta"),
-        )
-        .with_timeout(TIMEOUT.into())
-        .send_lazy()
-        .map(Resp)
-        .map_err(process_err)
+        req.with_header("user-agent", self.ua.as_deref().unwrap_or("clash.meta"))
+            .with_timeout(TIMEOUT.into())
+            .send_lazy()
+            .map(Resp)
+            .map_err(process_err)
     }
     pub fn config_patch(&self, payload: String) -> Result<String> {
         self.request(Method::Patch, "/configs", Some(payload))
