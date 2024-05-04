@@ -9,56 +9,62 @@ use utils::{init_config, ClashBackend, Flag, Flags};
 fn main() {
     if let Ok(infos) = commands::parse_args() {
         let mut flags = Flags::empty();
-        if !infos.flags.contains(commands::Flag::Tui) {
-            flags.insert(Flag::CliMode)
-        }
-        if let Err(e) = run(flags) {
-            eprintln!("{e}");
-            std::process::exit(-1)
+        let config_dir = load_app_dir(&mut flags);
+
+        setup_logging(
+            config_dir
+                .join("clashctl.log")
+                .to_str()
+                .expect("path is not utf-8 form"),
+        );
+        log::debug!("Current flags: {:?}", flags);
+        let (backend, err_track) = ClashBackend::new(&config_dir, !flags.contains(Flag::FirstInit));
+        if let Some(command) = infos {
+            if !err_track.is_empty() {
+                println!("Some err happened, you may have to fix them before this program can work as expected");
+                err_track.into_iter().for_each(|e| println!("{e}"));
+            }
+            match commands::handle_cli(command, backend) {
+                Ok(v) => {
+                    println!("{v}")
+                }
+                Err(e) => {
+                    eprintln!("{e}");
+                    std::process::exit(-1)
+                }
+            }
+        } else {
+            #[cfg(feature = "tui")]
+            if let Err(e) = run_tui(backend, err_track, flags) {
+                eprintln!("{e}");
+                std::process::exit(-1)
+            }
+            #[cfg(not(feature = "tui"))]
+            {
+                eprintln!("Not enable tui feature, No ui set!");
+                std::process::exit(-1)
+            }
         }
         std::process::exit(0);
     }
 }
-pub fn run(mut flags: Flags<Flag>) -> Result<(), String> {
-    let config_dir = load_app_dir(&mut flags);
+#[cfg(feature = "tui")]
+pub fn run_tui(
+    backend: ClashBackend,
+    err_track: Vec<backend::utils::CfgError>,
+    flags: Flags<Flag>,
+) -> Result<(), String> {
+    let mut app = tui::App::new(backend);
+    use ui::setup::*;
+    // setup terminal
+    setup().map_err(|e| e.to_string())?;
+    // create app and run it
+    app.run(err_track, flags).map_err(|e| e.to_string())?;
+    // restore terminal
+    restore().map_err(|e| e.to_string())?;
 
-    setup_logging(config_dir.join("clashctl.log").to_str().unwrap());
-    log::debug!("Current flags: {:?}", flags);
-    let (backend, err_track) = ClashBackend::new(&config_dir, !flags.contains(Flag::FirstInit));
+    app.save().map_err(|e| e.to_string())?;
 
-    if flags.contains(Flag::CliMode) {
-        if !err_track.is_empty() {
-            println!("Some err happened, you may have to fix them before this program can work as expected");
-            err_track.into_iter().for_each(|e| println!("{e}"));
-        }
-        if let Some(r) = commands::handle_cli_args(backend) {
-            match r {
-                Ok(v) => println!("{v}"),
-                Err(e) => eprintln!("{e}"),
-            }
-        } else {
-            return Err("para error".to_string());
-        }
-    } else {
-        #[cfg(feature = "tui")]
-        {
-            let mut app = tui::App::new(backend);
-            use ui::setup::*;
-            // setup terminal
-            setup().map_err(|e| e.to_string())?;
-            // create app and run it
-            app.run(err_track, flags).map_err(|e| e.to_string())?;
-            // restore terminal
-            restore().map_err(|e| e.to_string())?;
-
-            app.save(config_dir.join("config.yaml").to_str().unwrap())
-                .map_err(|e| e.to_string())?;
-        }
-        #[cfg(not(feature = "tui"))]
-        {
-            eprintln!("Not enable tui feature, No ui set!")
-        }
-    }
     Ok(())
 }
 

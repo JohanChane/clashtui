@@ -180,7 +180,7 @@ fn load_app_config(
     };
     (
         configs,
-        ClashUtil::new(controller_api, secret, proxy_addr,ua),
+        ClashUtil::new(controller_api, secret, proxy_addr, ua),
         err_collect,
     )
 }

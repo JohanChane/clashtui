@@ -41,7 +41,7 @@ impl App {
         let statusbar = StatusBar::new(Rc::clone(&state));
         let info_popup = InfoPopUp::with_items(&util.clash_version());
 
-        let app = Self {
+        Self {
             tabbar,
             should_quit: false,
             help_popup: Default::default(),
@@ -50,9 +50,7 @@ impl App {
             statusbar,
             util,
             tabs,
-        };
-
-        app
+        }
     }
 
     pub fn run(&mut self, err_track: Vec<CfgError>, flags: Flags<Flag>) -> std::io::Result<()> {
@@ -251,10 +249,16 @@ impl App {
             });
     }
 
-    pub fn save(&self, config_path: &str) -> std::io::Result<()> {
+    pub fn save(&self) -> std::io::Result<()> {
         self.util
             .cfg
-            .to_file(config_path)
+            .to_file(
+                self.util
+                    .home_dir
+                    .join("config.yaml")
+                    .to_str()
+                    .expect("path is not utf-8 form"),
+            )
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
 }
