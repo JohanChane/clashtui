@@ -1,5 +1,5 @@
 const DEFAULT_PAYLOAD: &str = r#"'{"path": "", "payload": ""}'"#;
-const TIMEOUT: u8 = 3;
+const TIMEOUT: u64 = 3;
 #[cfg(feature = "deprecated")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
 #[cfg(feature = "deprecated")]
@@ -8,14 +8,6 @@ const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KH
 use std::io::Result;
 
 use minreq::Method;
-trait ResProcess {
-    fn process(self) -> core::result::Result<String, minreq::Error>;
-}
-impl ResProcess for minreq::Response {
-    fn process(self) -> core::result::Result<String, minreq::Error> {
-        self.as_str().map(|s| s.to_owned())
-    }
-}
 
 fn process_err(e: minreq::Error) -> std::io::Error {
     use std::io::{Error, ErrorKind};
@@ -89,7 +81,7 @@ impl ClashUtil {
         if let Some(s) = self.secret.as_ref() {
             req = req.with_header("Authorization", format!("Bearer {s}"));
         }
-        req.with_timeout(TIMEOUT.into())
+        req.with_timeout(TIMEOUT)
             .send()
             .and_then(|r| r.as_str().map(|s| s.to_owned()))
             .map_err(process_err)
@@ -117,7 +109,7 @@ impl ClashUtil {
             req = req.with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
         }
         req.with_header("user-agent", self.ua.as_deref().unwrap_or("clash.meta"))
-            .with_timeout(TIMEOUT.into())
+            .with_timeout(TIMEOUT)
             .send_lazy()
             .map(Resp)
             .map_err(process_err)
