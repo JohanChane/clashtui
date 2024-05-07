@@ -6,3 +6,4 @@ is_user: true
 edit_cmd: alacritty -e nvim %s
 open_dir_cmd: alacritty -e ranger %s
 current_profile: ''
+profiles: {}

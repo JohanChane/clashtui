@@ -17,7 +17,14 @@ impl State {
         }
     }
     pub fn refresh(&mut self) {
-        self.st = self.ct.update_state(None, None)
+        #[cfg(target_os = "windows")]
+        {
+            self.st = self.ct.update_state(None, None, None)
+        }
+        #[cfg(target_os = "linux")]
+        {
+            self.st = self.ct.update_state(None, None)
+        }
     }
     pub fn get_profile(&self) -> &String {
         &self.st.profile

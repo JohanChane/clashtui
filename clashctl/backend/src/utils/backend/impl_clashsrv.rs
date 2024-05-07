@@ -70,24 +70,24 @@ impl ClashBackend {
             ClashSrvOp::StartClashService => {
                 start_process_as_admin(
                     nssm_pgm,
-                    format!("restart {}", self.tui_cfg.clash_srv_name).as_str(),
+                    format!("restart {}", self.cfg.clash_srv_name).as_str(),
                     true,
                 )?;
                 exec(
                     nssm_pgm,
-                    vec!["status", self.tui_cfg.clash_srv_name.as_str()],
+                    vec!["status", self.cfg.clash_srv_name.as_str()],
                 )
             }
 
             ClashSrvOp::StopClashService => {
                 start_process_as_admin(
                     nssm_pgm,
-                    &format!("stop {}", self.tui_cfg.clash_srv_name),
+                    &format!("stop {}", self.cfg.clash_srv_name),
                     true,
                 )?;
                 exec(
                     nssm_pgm,
-                    vec!["status", self.tui_cfg.clash_srv_name.as_str()],
+                    vec!["status", self.cfg.clash_srv_name.as_str()],
                 )
             }
 
@@ -96,24 +96,24 @@ impl ClashBackend {
                     nssm_pgm,
                     &format!(
                         "install {} \"{}\" -d \"{}\" -f \"{}\"",
-                        self.tui_cfg.clash_srv_name,
-                        self.tui_cfg.clash_core_path,
-                        self.tui_cfg.clash_cfg_dir,
-                        self.tui_cfg.clash_cfg_path
+                        self.cfg.clash_srv_name,
+                        self.cfg.clash_core_path,
+                        self.cfg.clash_cfg_dir,
+                        self.cfg.clash_cfg_path
                     ),
                     true,
                 )?;
 
                 exec(
                     nssm_pgm,
-                    vec!["status", self.tui_cfg.clash_srv_name.as_str()],
+                    vec!["status", self.cfg.clash_srv_name.as_str()],
                 )
             }
 
             ClashSrvOp::UnInstallSrv => ipc::execute_powershell_script_as_admin(
                 &format!(
                     "{0} stop {1}; {0} remove {1}",
-                    nssm_pgm, self.tui_cfg.clash_srv_name
+                    nssm_pgm, self.cfg.clash_srv_name
                 ),
                 true,
             ),
