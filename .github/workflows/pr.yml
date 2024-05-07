@@ -16,27 +16,27 @@ jobs:
 
       - name: Set up Mihomo
         run: |
-          wget --output-document mihomo.gz https://github.com/MetaCubeX/mihomo/releases/download/v1.18.0/mihomo-linux-amd64-v1.18.0.gz
+          wget --output-document mihomo.gz https://github.com/MetaCubeX/mihomo/releases/download/v1.18.4/mihomo-linux-amd64-v1.18.4.gz
           gunzip mihomo.gz
           chmod +x mihomo
           nohup ./mihomo -d Example -f Example/basic_clash_config.yaml &
 
       - name: Download Dependencies
-        run: cd clashtui && cargo fetch
+        run: cd clashctl && cargo fetch
 
       - name: Build
-        run: cd clashtui && cargo build --verbose
+        run: cd clashctl && cargo build --verbose
 
       - name: Run tests
-        run: cd clashtui && cargo test --all --verbose
+        run: cd clashctl && cargo test --all --verbose
 
       - name: Build Version
-        run: cd clashtui && cargo r -- -v
+        run: cd clashctl && cargo r -- -v
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashtui/target/debug/clashtui ./artifacts/clashtui.debug
+          mv ./clashctl/target/debug/clashctl ./artifacts/clashctl.debug
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -52,26 +52,26 @@ jobs:
 
       - name: Set up Mihomo
         run: |
-          curl -L https://github.com/MetaCubeX/mihomo/releases/download/v1.18.1/mihomo-windows-amd64-v1.18.1.zip --output mihomo.zip 
+          curl -L https://github.com/MetaCubeX/mihomo/releases/download/v1.18.4/mihomo-windows-amd64-v1.18.4.zip --output mihomo.zip 
           7z x mihomo.zip
           mihomo-windows-amd64.exe -d Example -f Example/basic_clash_config.yaml &
 
       - name: Download Dependencies
-        run: cd clashtui && cargo fetch
+        run: cd clashctl && cargo fetch
 
       - name: Build
-        run: cd clashtui && cargo build --verbose && cargo build --release
+        run: cd clashctl && cargo build --verbose && cargo build --release
 
       # - name: Run tests
-      #   run: cd clashtui && cargo test --all --verbose
+      #   run: cd clashctl && cargo test --all --verbose
 
       - name: Build Version
-        run: cd clashtui && cargo r -- -v
+        run: cd clashctl && cargo r -- -v
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui.debug.exe
+          mv ./clashctl/target/debug/clashctl.exe ./artifacts/clashctl.debug.exe
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
