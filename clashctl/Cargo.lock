@@ -235,7 +235,7 @@ checksum = "98cc8fbded0c607b7ba9dd60cd98df59af97e84d24e49c8557331cfc26d301ce"
 
 [[package]]
 name = "clashctl"
-version = "0.2.4"
+version = "0.1.0"
 dependencies = [
  "backend",
  "clap",

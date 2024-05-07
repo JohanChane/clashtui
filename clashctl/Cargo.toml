@@ -1,17 +1,11 @@
 [package]
 name = "clashctl"
-version = "0.2.4"
+version = "0.1.0"
 edition = "2021"
 
-authors = ["Johan Chane <johanchanex@gmail.com>"]
 description = "Mihomo Control Client"
 license = "MIT"
-repository = "https://github.com/JohanChane/clashtui"
-homepage = "https://github.com/JohanChane/clashtui"
-documentation = "https://github.com/JohanChane/clashtui"
 readme = "README.md"
-
-exclude = ["PKGBUILD", "Scoop/*", "Example/*", ".github/*"]
 
 [badges]
 maintenance = { status = "passively-maintained" }
@@ -56,7 +50,7 @@ strip = true
 [package.metadata.deb]
 maintainer = 'Jackhr-arch <63526062+Jackhr-arch@users.noreply.github.com>'
 extended-description = """
-A tui tool for mihomo
+A tool for mihomo
 """
 depends = "$auto"
 section = "utility"

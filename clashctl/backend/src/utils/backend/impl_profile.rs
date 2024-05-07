@@ -1,5 +1,5 @@
 use super::ClashBackend;
-use crate::utils::{ipc::exec, is_yaml, utils as Utils};
+use crate::utils::{ipc,is_yaml, utils as Utils};
 use std::{
     fs::{create_dir_all, File},
     io::Error,
@@ -285,9 +285,9 @@ impl ClashBackend {
             path,
         );
         #[cfg(target_os = "windows")]
-        return exec("cmd", vec!["/C", cmd.as_str()]);
+        return ipc::exec("cmd", vec!["/C", cmd.as_str()]);
         #[cfg(target_os = "linux")]
-        exec("sh", vec!["-c", cmd.as_str()])
+        ipc::exec("sh", vec!["-c", cmd.as_str()])
     }
 
     pub fn select_profile(&self, profile_name: &String) -> std::io::Result<()> {
@@ -354,7 +354,7 @@ impl ClashBackend {
             CrtFile::Tmp(f) => {
                 serde_yaml::to_writer(f, &dst_parsed_yaml)
                     .map_err(|e| Merge::Target(e.to_string()))?;
-                exec("pkexec", vec!["mv", TMP_PATH, &self.cfg.clash_cfg_path])
+                ipc::exec_with_sbin("mv", vec![TMP_PATH, &self.cfg.clash_cfg_path])
                     .map_err(|e| Merge::Target(e.to_string()))?;
                 Ok(())
             }
