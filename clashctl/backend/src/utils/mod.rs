@@ -1,5 +1,7 @@
 mod backend;
 mod config;
+#[cfg_attr(target_os = "windows", path="ipc_windows.rs")]
+#[cfg_attr(target_os = "linux", path="ipc_linux.rs")]
 mod ipc;
 mod state;
 #[allow(clippy::module_inception)]
