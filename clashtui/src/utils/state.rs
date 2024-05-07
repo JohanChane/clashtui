@@ -17,6 +17,9 @@ impl State {
             ct,
         }
     }
+    pub fn refresh(&mut self){
+        self.st = self.ct.update_state(None, None)
+    }
     pub fn get_profile(&self) -> &String {
         &self.st.profile
     }

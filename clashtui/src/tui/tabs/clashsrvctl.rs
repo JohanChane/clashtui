@@ -127,6 +127,7 @@ impl super::TabEvent for ClashSrvCtlTab {
                     }
                 },
             }
+            self.clashtui_state.borrow_mut().refresh();
         }
     }
     fn draw(&mut self, f: &mut ratatui::prelude::Frame, area: ratatui::prelude::Rect) {
