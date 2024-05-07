@@ -168,6 +168,7 @@ pub fn handle_cli(
                 backend.clash_srv_ctl(crate::utils::ClashSrvOp::StopClashService)
             }
         },
+        #[cfg(target_os = "linux")]
         ArgCommand::Mode(Mode { command }) => match command {
             ModeCommand::Rule => Ok(backend
                 .update_state(None, Some(api::Mode::Rule.into()))
@@ -177,6 +178,18 @@ pub fn handle_cli(
                 .to_string()),
             ModeCommand::Global => Ok(backend
                 .update_state(None, Some(api::Mode::Global.into()))
+                .to_string()),
+        },
+        #[cfg(target_os = "windows")]
+        ArgCommand::Mode(Mode { command }) => match command {
+            ModeCommand::Rule => Ok(backend
+                .update_state(None, Some(api::Mode::Rule.into()), None)
+                .to_string()),
+            ModeCommand::Direct => Ok(backend
+                .update_state(None, Some(api::Mode::Direct.into()), None)
+                .to_string()),
+            ModeCommand::Global => Ok(backend
+                .update_state(None, Some(api::Mode::Global.into()), None)
                 .to_string()),
         },
     }

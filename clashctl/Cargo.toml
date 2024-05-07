@@ -44,9 +44,6 @@ clap = { version = "4.5.4", features = [
 clap_complete = "4.5.2"
 
 
-[target.'cfg(target_os = "windows")'.dependencies]
-encoding = "0.2.33"
-
 [workspace]
 resolver = '2'
 members = ["api", "backend", "ui", "ui-derive"]

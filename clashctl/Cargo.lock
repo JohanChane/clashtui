@@ -116,6 +116,7 @@ name = "backend"
 version = "0.1.0"
 dependencies = [
  "api",
+ "encoding",
  "enumflags2",
  "log",
  "serde",
@@ -239,7 +240,6 @@ dependencies = [
  "backend",
  "clap",
  "clap_complete",
- "encoding",
  "enumflags2",
  "log",
  "log4rs",

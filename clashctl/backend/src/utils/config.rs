@@ -44,7 +44,7 @@ mod test {
     fn test_save_and_load() {
         let exe_dir = std::env::current_dir().unwrap();
         println!("{exe_dir:?}");
-        let path_ = exe_dir.parent().unwrap().join("Example/config.yaml");
+        let path_ = exe_dir.parent().unwrap().parent().unwrap().join("Example/config.yaml");
         println!("{path_:?}");
         assert!(path_.is_file());
         let path = path_.as_path().to_str().unwrap();
