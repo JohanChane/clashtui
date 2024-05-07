@@ -104,6 +104,7 @@ impl ProfileTab {
             if let Err(e) = self.util.rmf_profile(profile_name) {
                 self.popup_txt_msg(e);
             };
+            self.state.borrow_mut().refresh();
             self.update_profile_list();
         }
     }

@@ -1,5 +1,5 @@
 use super::ClashBackend;
-use crate::utils::{is_yaml, utils as Utils};
+use crate::utils::{ipc::exec, is_yaml, utils as Utils};
 use std::{
     fs::{create_dir_all, File},
     io::Error,
@@ -260,13 +260,15 @@ impl ClashBackend {
         }
     }
 
+    /// remove profile and check if current profile is removed
+    ///
+    /// need to manually refresh the state
     pub fn rmf_profile(&self, profile_name: &String) -> Result<(), String> {
         use std::fs::remove_file;
         match self.cfg.profiles.borrow_mut().remove(profile_name) {
             Some(_) => {
                 if self.cfg.current_profile.borrow().to_owned() == *profile_name {
                     *self.cfg.current_profile.borrow_mut() = "Removed".to_owned();
-                    // TODO: add one way to refresh state bar
                 };
                 remove_file(self.gen_profile_path(profile_name)).map_err(|e| e.to_string())
             }
@@ -275,7 +277,6 @@ impl ClashBackend {
     }
 
     pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> std::io::Result<String> {
-        use crate::utils::ipc::exec;
         let cmd = format!(
             "{} {} -d {} -f {} -t",
             self.cfg.clash_core_path,
@@ -346,13 +347,18 @@ impl ClashBackend {
                     dst_mapping.insert(k.clone(), v.clone());
                 });
         }
-
-        let final_clash_cfg_file =
-            File::create(&self.cfg.clash_cfg_path).map_err(|e| Merge::Target(e.to_string()))?;
-        serde_yaml::to_writer(final_clash_cfg_file, &dst_parsed_yaml)
-            .map_err(|e| Merge::Target(e.to_string()))?;
-
-        Ok(())
+        match try_create_file(&self.cfg.clash_cfg_path).map_err(Merge::Target)? {
+            CrtFile::Ok(f) => {
+                serde_yaml::to_writer(f, &dst_parsed_yaml).map_err(|e| Merge::Target(e.to_string()))
+            }
+            CrtFile::Tmp(f) => {
+                serde_yaml::to_writer(f, &dst_parsed_yaml)
+                    .map_err(|e| Merge::Target(e.to_string()))?;
+                exec("pkexec", vec!["mv", TMP_PATH, &self.cfg.clash_cfg_path])
+                    .map_err(|e| Merge::Target(e.to_string()))?;
+                Ok(())
+            }
+        }
     }
 
     pub fn update_profile(
@@ -360,33 +366,26 @@ impl ClashBackend {
         profile_name: &String,
         does_update_all: bool,
     ) -> std::io::Result<Vec<String>> {
-        let mut profile_yaml_path = self.profile_dir.join(profile_name);
+        let profile_yaml_path = self.gen_profile_path(profile_name);
         let mut net_res: Vec<(String, String)> = Vec::new();
         // if it's just the link
         if self.test_is_link(profile_name) {
             let sub_url = self
-                .cfg
-                .profiles
-                .borrow()
-                .get(profile_name)
+                .get_profile_link(profile_name)
                 .expect("have a key but no value")
                 .to_owned();
 
-            profile_yaml_path = self.gen_profile_path(profile_name);
             // Update the file to keep up-to-date
             self.download_profile(&sub_url, &profile_yaml_path)?;
 
-            net_res.push((
-                sub_url.to_string(),
-                profile_yaml_path.to_string_lossy().to_string(),
-            ))
+            net_res.push((sub_url, profile_yaml_path.to_string_lossy().to_string()))
         }
 
         // Update the resouce in the file (if there is)
         {
-            let yaml_content = std::io::read_to_string(File::open(profile_yaml_path)?)?;
-            let parsed_yaml = serde_yaml::Value::from(yaml_content.as_str());
-            drop(yaml_content);
+            let parsed_yaml: serde_yaml::Value =
+                serde_yaml::from_reader(File::open(profile_yaml_path)?)
+                    .map_err(|e| Error::new(std::io::ErrorKind::InvalidData, e))?;
             net_res.extend(
                 if !does_update_all {
                     vec!["proxy-providers"]
@@ -466,11 +465,8 @@ impl ClashBackend {
     }
     /// if that is import via link, return `Some`
     /// else return `None`
-    pub fn get_profile_link<P: AsRef<Path> + core::fmt::Display>(
-        &self,
-        profile_name: P,
-    ) -> Option<String> {
-        if let Some(s) = self.cfg.profiles.borrow().get(&profile_name.to_string()) {
+    pub fn get_profile_link<P: AsRef<str>>(&self, profile_name: P) -> Option<String> {
+        if let Some(s) = self.cfg.profiles.borrow().get(profile_name.as_ref()) {
             if !s.is_empty() {
                 return Some(s.to_owned());
             }
@@ -483,11 +479,11 @@ impl ClashBackend {
             v
         })
     }
-    pub fn test_is_link<P: AsRef<Path> + core::fmt::Display>(&self, profile_name: P) -> bool {
+    pub fn test_is_link<P: AsRef<str>>(&self, profile_name: P) -> bool {
         self.cfg
             .profiles
             .borrow()
-            .get(&profile_name.to_string())
+            .get(profile_name.as_ref())
             .is_some_and(|v| !v.is_empty())
     }
     /// Wrapped `self.profile_dir.join(profile_name)`
@@ -530,4 +526,23 @@ fn crt_symlink_file<P: AsRef<std::path::Path>>(original: P, target: P) -> std::i
     return os::windows::fs::symlink_file(original, target);
     #[cfg(target_os = "linux")]
     os::unix::fs::symlink(original, target)
+}
+enum CrtFile {
+    Ok(File),
+    Tmp(File),
+}
+const TMP_PATH: &str = "/tmp/clashctl_mihomo_config_file.tmp";
+fn try_create_file<P: AsRef<Path>>(path: P) -> Result<CrtFile, String> {
+    match File::create(path) {
+        Ok(f) => Ok(CrtFile::Ok(f)),
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                Ok(CrtFile::Tmp(
+                    File::create(TMP_PATH).map_err(|e| e.to_string())?,
+                ))
+            } else {
+                Err(format!("Unexpected Error: {e}"))
+            }
+        }
+    }
 }
