@@ -1,11 +1,17 @@
 [package]
-name = "clashctl"
-version = "0.1.0"
+name = "clashtui"
+version = "0.1.0-dev"
 edition = "2021"
 
-description = "Mihomo Control Client"
+authors = ["Johan Chane <johanchanex at gmail dot com>"]
+description = "Mihomo TUI Client"
 license = "MIT"
+repository = "https://github.com/JohanChane/clashtui"
+homepage = "https://github.com/JohanChane/clashtui"
+documentation = "https://github.com/JohanChane/clashtui"
 readme = "README.md"
+
+include = ["clashtui/*", "LICENSE", "README.md", "README_ZH.md"]
 
 [badges]
 maintenance = { status = "passively-maintained" }
