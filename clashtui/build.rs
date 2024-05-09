@@ -1,22 +1,28 @@
 use std::env;
-//use std::process::Command;
+use std::process::Command;
 
-/***
-fn get_git_version() -> String {
-    let version = env::var("CARGO_PKG_VERSION").unwrap();
-
-    let child = Command::new("git")
+fn get_version() -> String {
+    let git_describe = Command::new("git")
         .args(["describe", "--tags", "--always"])
         .output();
-    match child {
-        Ok(child) => String::from_utf8(child.stdout).expect("failed to read stdout"),
+    let mut version = match git_describe {
+        Ok(v) => {
+            String::from_utf8(v.stdout).expect("failed to read stdout").trim_end().to_string()
+        }
         Err(err) => {
             eprintln!("`git describe` err: {}", err);
-            version
+
+            let mut v = String::from("v");
+            v.push_str(env::var("CARGO_PKG_VERSION").unwrap().as_str());
+            v
         }
-    }
+    };
+
+    let build_type: bool = env::var("DEBUG").unwrap().parse().unwrap();
+    version.push_str(if build_type {"-debug"} else {""});
+
+    version
 }
-***/
 
 fn main() {
     println!("cargo:rerun-if-changed=../.git/HEAD");
@@ -25,17 +31,9 @@ fn main() {
 
     if let Ok(_) = env::var("CLASHTUI_VERSION") {
     } else {
-        // ## Use CARGO_PKG_VERSION as CLASHTUI_VERSION
         println!(
             "cargo:rustc-env=CLASHTUI_VERSION={}",
-            env::var("CARGO_PKG_VERSION").unwrap(),
+            get_version()
         );
-
-        // ## Use git tag as CLASHTUI_VERSION
-        //let version = get_git_version();
-        //let mut version = version.trim_end().to_owned();
-        ////let build_type: bool = env::var("DEBUG").unwrap().parse().unwrap();
-        ////version.push_str(if build_type { "-debug" } else { "-release" });
-        //println!("cargo:rustc-env=CLASHTUI_VERSION={}", version);
     }
 }
