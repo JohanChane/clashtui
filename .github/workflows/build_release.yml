@@ -41,16 +41,19 @@ jobs:
       #  run: cd clashtui && cargo test --release --all
         
       - name: Build
-        run: cd clashtui && cargo build --release
+        run: |
+          cd clashtui
+          cargo build --locked
+          cargo build --release --locked
 
       - name: Build Version
         run: |
-          cd clashtui
-          cargo run --release -- -v >> version.txt
+          cd clashtui && cargo run --release -- -v >> version.txt
 
       - name: Pre Upload
         run: |
           mkdir artifacts
+          mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui.debug.exe
           mv ./clashtui/target/release/clashtui.exe ./artifacts/clashtui.exe
           mv ./clashtui/version.txt ./artifacts/version.txt
 
