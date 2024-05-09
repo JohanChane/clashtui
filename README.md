@@ -128,7 +128,7 @@ clash_srv_name: "mihomo"       # systemctl {restart | stop} <clash_srv_name>
 clash_srv_is_user: false        # true: systemctl --user ...
 ```
 
-If you have cargo, you can use `cargo install clashtui` to install clashtui.
+The subsequent versions of clashtui have not been uploaded to `crates.io` because clashtui is now separated into multiple modules. If uploaded to `crates.io`, it would require uploading each dependent module, and some modules do not need to be uploaded to `crates.io`. See [ref](https://users.rust-lang.org/t/is-it-possible-to-publish-crates-with-path-specified/91497/2). So, do not use `cargo install clashtui` for installation.
 
 ### Configure `basic_clash_config.yaml`
 
