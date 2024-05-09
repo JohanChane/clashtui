@@ -99,6 +99,7 @@ macro_rules! define_enum {
 }
 
 define_enum!(
+    #[derive(Clone)]
     pub ClashSrvOp,
     [
         StartClashService,
