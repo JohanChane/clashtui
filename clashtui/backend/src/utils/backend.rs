@@ -14,9 +14,7 @@ const BASIC_FILE: &str = "basic_clash_config.yaml";
 
 pub struct ClashBackend {
     pub home_dir: PathBuf,
-    profile_dir: PathBuf,
-
-    clash_api: ClashUtil,
+    pub clash_api: ClashUtil,
     pub cfg: Config,
 }
 
@@ -27,17 +25,16 @@ impl ClashBackend {
         let mut err_track = ret.2;
         let clash_api = ret.1;
 
-        if clash_api.version().is_err() {
+        if let Err(e) = clash_api.version() {
             err_track.push(CfgError::new(
                 ErrKind::LoadClashConfig,
                 "Fail to load config from clash core. Is it Running?".to_string(),
             ));
-            log::warn!("Fail to connect to clash. Is it Running?")
+            log::warn!("Fail to connect to clash:{e}")
         }
         (
             Self {
                 home_dir: clashtui_dir.clone(),
-                profile_dir: clashtui_dir.join("profiles").to_path_buf(),
                 clash_api,
                 cfg: ret.0,
             },

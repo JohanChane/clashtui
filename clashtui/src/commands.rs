@@ -215,7 +215,7 @@ pub fn gen_complete(shell: Option<clap_complete::Shell>) {
     clap_complete::generate(
         gen,
         &mut CliCmds::command(),
-        "clashctl",
+        "clashtui",
         &mut std::io::stdout(),
     )
 }

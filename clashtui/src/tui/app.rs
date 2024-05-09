@@ -63,11 +63,6 @@ impl App {
                     .to_string(),
             );
         };
-        if flags.contains(Flag::ErrorDuringInit) {
-            self.popup_txt_msg(
-                "Some Error happened during app init, Check the log for detail".to_string(),
-            );
-        }
         err_track
             .into_iter()
             .for_each(|e| self.popup_txt_msg(e.reason));

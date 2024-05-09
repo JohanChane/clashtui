@@ -18,6 +18,7 @@ pub fn spawn(pgm: &str, args: Vec<&str>) -> Result<()> {
         .spawn()?;
     Ok(())
 }
+/// exec pgm via `pkexec`
 pub fn exec_with_sbin(pgm: &str, args: Vec<&str>) -> Result<String> {
     log::debug!("LIPC: {} {:?}", pgm, args);
     let mut execs = vec![pgm];

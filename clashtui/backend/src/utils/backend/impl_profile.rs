@@ -218,7 +218,7 @@ impl ClashBackend {
         }
 
         log::error!("testssdfs");
-        let out_yaml_path = self.profile_dir.join(template_name);
+        let out_yaml_path = self.gen_profile_path(template_name);
         let out_yaml_file = File::create(out_yaml_path).map_err(|e| e.to_string())?;
         serde_yaml::to_writer(out_yaml_file, &out_parsed_yaml).map_err(|e| e.to_string())?;
 
@@ -303,12 +303,7 @@ impl ClashBackend {
             log::error!("{emsg}");
             return Err(Error::new(std::io::ErrorKind::Other, emsg));
         };
-        let body = serde_json::json!({
-            "path": self.cfg.clash_cfg_path.as_str(),
-            "payload": ""
-        })
-        .to_string();
-        if let Err(err) = self.config_reload(body) {
+        if let Err(err) = self.config_reload(api::build_payload(&self.cfg.clash_cfg_path)) {
             let emsg = format!("Failed to Patch Profile `{profile_name}` due to {}", err);
             log::error!("{emsg}");
             return Err(Error::new(std::io::ErrorKind::Other, emsg));
@@ -491,10 +486,10 @@ impl ClashBackend {
     }
     /// Wrapped `self.profile_dir.join(profile_name)`
     pub fn gen_profile_path<P: AsRef<Path>>(&self, profile_name: P) -> PathBuf {
-        self.profile_dir.join(profile_name)
+        self.home_dir.join("profiles").join(profile_name)
     }
     /// Wrapped `self.profile_dir.join(profile_name)`
-    pub fn get_template_path_unchecked<P: AsRef<Path>>(&self, name: P) -> PathBuf {
+    pub fn gen_template_path<P: AsRef<Path>>(&self, name: P) -> PathBuf {
         self.home_dir.join("templates").join(name)
     }
     /// Make sure that's a valid yaml file
@@ -534,7 +529,7 @@ enum CrtFile {
     Ok(File),
     Tmp(File),
 }
-const TMP_PATH: &str = "/tmp/clashctl_mihomo_config_file.tmp";
+const TMP_PATH: &str = "/tmp/clashtui_mihomo_config_file.tmp";
 fn try_create_file<P: AsRef<Path>>(path: P) -> Result<CrtFile, String> {
     match File::create(path) {
         Ok(f) => Ok(CrtFile::Ok(f)),

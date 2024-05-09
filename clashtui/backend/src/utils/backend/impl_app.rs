@@ -3,15 +3,15 @@ use crate::utils::state::State;
 use std::path::Path;
 // IPC Related
 impl ClashBackend {
-    #[cfg(target_os = "windows")]
     pub fn update_state(
         &self,
         new_pf: Option<String>,
         new_mode: Option<String>,
-        new_sysp: Option<bool>,
+        #[cfg(target_os = "windows")] new_sysp: Option<bool>,
     ) -> State {
-        use crate::utils::ipc;
+        #[cfg(target_os = "windows")]
         if let Some(b) = new_sysp {
+            use crate::utils::ipc;
             let _ = if b {
                 ipc::enable_system_proxy(&self.clash_api.proxy_addr)
             } else {
@@ -19,6 +19,7 @@ impl ClashBackend {
             };
         }
         let (pf, mode, tun) = self._update_state(new_pf, new_mode);
+        #[cfg(target_os = "windows")]
         let sysp = ipc::is_system_proxy_enabled().map_or_else(
             |v| {
                 log::error!("{}", v);
@@ -30,22 +31,13 @@ impl ClashBackend {
             profile: pf,
             mode,
             tun,
+            #[cfg(target_os = "windows")]
             sysproxy: sysp,
         }
     }
 
-    #[cfg(target_os = "linux")]
-    pub fn update_state(&self, new_pf: Option<String>, new_mode: Option<String>) -> State {
-        let (pf, mode, tun) = self._update_state(new_pf, new_mode);
-        State {
-            profile: pf,
-            mode,
-            tun,
-        }
-    }
-
     pub fn fetch_recent_logs(&self, num_lines: usize) -> Vec<String> {
-        std::fs::read_to_string(self.home_dir.join("clashctl.log"))
+        std::fs::read_to_string(self.home_dir.join("clashtui.log"))
             .unwrap_or_default()
             .lines()
             .rev()

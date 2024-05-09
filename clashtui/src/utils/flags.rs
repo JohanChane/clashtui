@@ -6,7 +6,6 @@ pub use enumflags2::BitFlags;
 #[repr(u8)]
 pub enum Flag {
     FirstInit,
-    ErrorDuringInit,
     PortableMode,
 }
 #[cfg(test)]

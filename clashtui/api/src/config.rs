@@ -1,17 +1,14 @@
 use serde::{Deserialize, Serialize};
+/// config loaded from clash core
 #[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 #[serde(default)]
 pub struct ClashConfig {
-    // pub mixed_port: usize,
     pub mode: Mode,
     // pub log_level: LogLevel,
     // pub allow_lan: bool,
     // bind_address: String,
     // pub ipv6: bool,
-    // pub secret: String,
-    // tcp_concurrent: bool,
-    // pub external_controller: String,
     // pub global_client_fingerprint: String,
     pub tun: TunConfig,
 }

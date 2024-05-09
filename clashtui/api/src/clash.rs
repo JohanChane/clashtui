@@ -9,6 +9,14 @@ use std::io::Result;
 
 use minreq::Method;
 
+pub fn build_payload<P: AsRef<str>>(path: P) -> String {
+    serde_json::json!({
+        "path": path.as_ref(),
+        "payload": ""
+    })
+    .to_string()
+}
+
 fn process_err(e: minreq::Error) -> std::io::Error {
     use std::io::{Error, ErrorKind};
     match e {
@@ -312,31 +320,5 @@ mod tests {
         r.copy_to(&mut tf).unwrap();
         drop(tf);
         std::fs::remove_file("test").unwrap();
-    }
-    #[test]
-    #[cfg(target_feature = "deprecated")]
-    fn test_geo_update() {
-        let mut flag = true;
-        let sym = ClashUtil::new(
-            "http://127.0.0.1:9090".to_string(),
-            "http://127.0.0.1:7890".to_string(),
-        );
-        let exe_dir = std::env::current_dir().unwrap();
-        println!("{exe_dir:?}");
-        let path = exe_dir.join("tmp");
-        if !path.is_dir() {
-            std::fs::create_dir_all(&path).unwrap()
-        }
-        println!(
-            "result:{}",
-            match sym.check_geo_update(None, &path) {
-                Ok(r) => r,
-                Err(e) => {
-                    flag = false;
-                    format!("{e:?}")
-                }
-            }
-        );
-        assert!(flag)
     }
 }

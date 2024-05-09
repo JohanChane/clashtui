@@ -314,7 +314,7 @@ impl super::TabEvent for ProfileTab {
                         }
                         Keys::Preview => {
                             if let Some(name) = self.template_list.selected() {
-                                let path = self.util.get_template_path_unchecked(name);
+                                let path = self.util.gen_template_path(name);
                                 self.popup_list_msg(
                                     std::fs::read_to_string(path)?
                                         .lines()
@@ -328,7 +328,7 @@ impl super::TabEvent for ProfileTab {
                                 self.template_list
                                     .selected()
                                     .into_iter()
-                                    .map(|name| self.util.get_template_path_unchecked(name))
+                                    .map(|name| self.util.gen_template_path(name))
                                     .map_while(|tpl_file_path| {
                                         self.util.edit_file(&tpl_file_path).err()
                                     })
