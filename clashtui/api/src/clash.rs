@@ -5,7 +5,7 @@ const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/rel
 #[cfg(feature = "deprecated")]
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-use std::io::Result;
+type Result<T> = core::result::Result<T, String>;
 
 use minreq::Method;
 
@@ -15,34 +15,6 @@ pub fn build_payload<P: AsRef<str>>(path: P) -> String {
         "payload": ""
     })
     .to_string()
-}
-
-fn process_err(e: minreq::Error) -> std::io::Error {
-    use std::io::{Error, ErrorKind};
-    match e {
-        minreq::Error::AddressNotFound | minreq::Error::PunycodeConversionFailed => {
-            Error::new(ErrorKind::AddrNotAvailable, e)
-        }
-        minreq::Error::IoError(e) => e,
-        minreq::Error::HeadersOverflow
-        | minreq::Error::StatusLineOverflow
-        | minreq::Error::InvalidUtf8InBody(_)
-        | minreq::Error::InvalidUtf8InResponse
-        | minreq::Error::MalformedChunkLength
-        | minreq::Error::MalformedChunkEnd
-        | minreq::Error::MalformedContentLength => Error::new(ErrorKind::InvalidData, e),
-        minreq::Error::RedirectLocationMissing
-        | minreq::Error::InfiniteRedirectionLoop
-        | minreq::Error::TooManyRedirections => Error::new(ErrorKind::ConnectionAborted, e),
-        minreq::Error::HttpsFeatureNotEnabled => unreachable!("https should already be enabled"),
-        minreq::Error::PunycodeFeatureNotEnabled => panic!("{}", e),
-        minreq::Error::RustlsCreateConnection(_) => Error::new(ErrorKind::ConnectionRefused, e),
-        minreq::Error::BadProxy
-        | minreq::Error::BadProxyCreds
-        | minreq::Error::ProxyConnect
-        | minreq::Error::InvalidProxyCreds => Error::new(ErrorKind::PermissionDenied, e),
-        minreq::Error::Other(i) => Error::new(ErrorKind::Other, i),
-    }
 }
 
 pub struct Resp(minreq::ResponseLazy);
@@ -92,7 +64,7 @@ impl ClashUtil {
         req.with_timeout(TIMEOUT)
             .send()
             .and_then(|r| r.as_str().map(|s| s.to_owned()))
-            .map_err(process_err)
+            .map_err(|e| format!("API:{e:?}"))
     }
     pub fn restart(&self, payload: Option<String>) -> Result<String> {
         self.request(
@@ -114,13 +86,16 @@ impl ClashUtil {
     pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S, with_proxy: bool) -> Result<Resp> {
         let mut req = minreq::get(url);
         if with_proxy {
-            req = req.with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
+            req = req.with_proxy(
+                minreq::Proxy::new(self.proxy_addr.clone())
+                    .map_err(|e| format!("API(PROXY):{e:?}"))?,
+            )
         }
         req.with_header("user-agent", self.ua.as_deref().unwrap_or("clash.meta"))
             .with_timeout(TIMEOUT)
             .send_lazy()
             .map(Resp)
-            .map_err(process_err)
+            .map_err(|e| format!("API:{e:?}"))
     }
     pub fn config_patch(&self, payload: String) -> Result<String> {
         self.request(Method::Patch, "/configs", Some(payload))
@@ -311,7 +286,7 @@ mod tests {
     #[test]
     fn mock_clash_core_test() {
         let sym = sym();
-        let r = sym.mock_clash_core("https://www.google.com", true).unwrap();
+        let r = sym.mock_clash_core("https://www.google.com", sym.version().is_ok()).unwrap();
         let mut tf = std::fs::OpenOptions::new()
             .write(true)
             .create(true)

@@ -217,7 +217,6 @@ impl ClashBackend {
             }
         }
 
-        log::error!("testssdfs");
         let out_yaml_path = self.gen_profile_path(template_name);
         let out_yaml_file = File::create(out_yaml_path).map_err(|e| e.to_string())?;
         serde_yaml::to_writer(out_yaml_file, &out_parsed_yaml).map_err(|e| e.to_string())?;
@@ -300,12 +299,12 @@ impl ClashBackend {
                     Merge::Profile(e) => format!("Profile: {e}"),
                 }
             );
-            log::error!("{emsg}");
+            log::error!("{emsg:?}");
             return Err(Error::new(std::io::ErrorKind::Other, emsg));
         };
         if let Err(err) = self.config_reload(api::build_payload(&self.cfg.clash_cfg_path)) {
             let emsg = format!("Failed to Patch Profile `{profile_name}` due to {}", err);
-            log::error!("{emsg}");
+            log::error!("{emsg:?}");
             return Err(Error::new(std::io::ErrorKind::Other, emsg));
         };
         Ok(())
@@ -443,7 +442,9 @@ impl ClashBackend {
         }
 
         let mut output_file = File::create(path)?;
-        let response = self.dl_remote_profile(url)?;
+        let response = self
+            .dl_remote_profile(url)
+            .map_err(|s| Error::new(std::io::ErrorKind::Other, s))?;
         response.copy_to(&mut output_file)?;
         Ok(())
     }

@@ -121,7 +121,7 @@ impl ProfileTab {
     fn handle_create_template_ev(&mut self) {
         if let Some(template_name) = self.template_list.selected() {
             if let Err(err) = self.util.crt_yaml_with_template(template_name) {
-                log::error!("Create Template => {err}");
+                log::error!("Create Template => {err:?}");
                 self.popup_txt_msg(err);
             } else {
                 self.popup_txt_msg("Created".to_string());
@@ -249,7 +249,7 @@ impl super::TabEvent for ProfileTab {
                                     })
                                     .map_while(|r| r.err())
                                     .map(|err| {
-                                        log::error!("{}", err);
+                                        log::error!("{err}");
                                         err.to_string()
                                     })
                                     .collect(),

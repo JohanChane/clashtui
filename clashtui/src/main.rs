@@ -30,6 +30,7 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("{e}");
+                    log::error!("Cli:{e:?}");
                     std::process::exit(-1)
                 }
             }
@@ -37,6 +38,7 @@ fn main() {
             #[cfg(feature = "tui")]
             if let Err(e) = run_tui(backend, err_track, flags) {
                 eprintln!("{e}");
+                log::error!("Tui:{e:?}");
                 ui::setup::restore().expect("Err restore terminal interface");
                 std::process::exit(-1)
             }

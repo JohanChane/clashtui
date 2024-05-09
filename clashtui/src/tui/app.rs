@@ -31,7 +31,7 @@ impl App {
         let util = SharedBackend::new(util);
 
         let state = SharedState::new(RefCell::new(State::new(Rc::clone(&util))));
-        let _ = Theme::load(None).map_err(|e| log::error!("Loading Theme:{e}"));
+        let _ = Theme::load(None).map_err(|e| log::error!("Loading Theme:{e:?}"));
 
         let tabs: Vec<Tabs> = vec![
             Tabs::Profile(ProfileTab::new(util.clone(), state.clone())),
@@ -142,14 +142,14 @@ impl App {
                     let _ = self
                         .util
                         .open_dir(self.util.home_dir.as_path())
-                        .map_err(|e| log::error!("ODIR: {}", e));
+                        .map_err(|e| log::error!("ODIR: {e:?}"));
                     EventState::WorkDone
                 }
                 Keys::AppConfig => {
                     let _ = self
                         .util
                         .open_dir(&PathBuf::from(&self.util.cfg.clash_cfg_dir))
-                        .map_err(|e| log::error!("ODIR: {}", e));
+                        .map_err(|e| log::error!("ODIR: {e:?}"));
                     EventState::WorkDone
                 }
                 Keys::LogCat => {

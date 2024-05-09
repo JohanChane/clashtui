@@ -30,7 +30,7 @@ impl ClashBackend {
                 ErrKind::LoadClashConfig,
                 "Fail to load config from clash core. Is it Running?".to_string(),
             ));
-            log::warn!("Fail to connect to clash:{e}")
+            log::warn!("Fail to connect to clash:{e:?}")
         }
         (
             Self {
@@ -51,7 +51,7 @@ impl ClashBackend {
             let _ = self
                 .clash_api
                 .config_patch(load)
-                .map_err(|e| log::error!("Patch Errr: {}", e));
+                .map_err(|e| log::error!("Patch Errr:{e:?}"));
         }
 
         let pf = match new_pf {
@@ -63,7 +63,7 @@ impl ClashBackend {
         };
         let clash_cfg = self
             .fetch_remote()
-            .map_err(|e| log::warn!("Fetch Remote:{e}"))
+            .map_err(|e| log::warn!("Fetch Remote:{e:?}"))
             .ok();
         let (mode, tun) = match clash_cfg {
             Some(v) => (
@@ -140,7 +140,7 @@ fn load_app_config(
                     ErrKind::LoadAppConfig,
                     "Fail to load configs, using Default".to_string(),
                 ));
-                log::error!("Unable to load config file. {}", e);
+                log::error!("Unable to load config file. {e:?}");
                 Config::default()
             }
         }
