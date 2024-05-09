@@ -118,7 +118,7 @@ impl super::TabEvent for ClashSrvCtlTab {
             self.hide_msgpopup();
             match op {
                 ClashSrvOp::SwitchMode => unreachable!(),
-                _ => match self.clashtui_util.clash_srv_ctl(op) {
+                _ => match self.clashtui_util.clash_srv_ctl(op.clone()) {
                     Ok(output) => {
                         self.popup_list_msg(output.lines().map(|line| line.trim().to_string()));
                     }
@@ -127,7 +127,18 @@ impl super::TabEvent for ClashSrvCtlTab {
                     }
                 },
             }
-            self.clashtui_state.borrow_mut().refresh();
+            match op {
+                // Ops that doesn't need refresh
+                ClashSrvOp::SetPermission => {},
+
+                ClashSrvOp::StartClashService => {
+                    std::thread::sleep(std::time::Duration::from_secs(2));      // Waiting for mihomo to finish starting.
+                    self.clashtui_state.borrow_mut().refresh();
+                }
+                _ => {
+                    self.clashtui_state.borrow_mut().refresh();
+                },
+            }
         }
     }
     fn draw(&mut self, f: &mut ratatui::prelude::Frame, area: ratatui::prelude::Rect) {
