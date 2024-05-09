@@ -59,16 +59,15 @@ jobs:
 
       - name: Build Version
         run: |
-          cd clashtui
-          cargo run --release -- -v >> version.txt
+          cd clashtui && cargo run --release -- -v >> version.txt
 
       - name: Pre Upload
         run: |
           mkdir artifacts
           mv ./clashtui/target/debug/clashtui ./artifacts/clashtui-amd64.debug
-          mv ./clashtui/target/release/clashtui ./artifacts/clashtui-amd64.release
+          mv ./clashtui/target/release/clashtui ./artifacts/clashtui-amd64
           mv ./clashtui/target/aarch64-unknown-linux-gnu/debug/clashtui ./artifacts/clashtui-arm64.debug
-          mv ./clashtui/target/aarch64-unknown-linux-gnu/release/clashtui ./artifacts/clashtui-arm64.release
+          mv ./clashtui/target/aarch64-unknown-linux-gnu/release/clashtui ./artifacts/clashtui-arm64
           mv ./clashtui/version.txt ./artifacts/version.txt
 
       - name: upload artifacts
@@ -102,8 +101,8 @@ jobs:
 
       - name: Archive Release
         run:
-          gzip -c ./artifacts/clashtui-amd64.release > clashtui-linux-amd64-v${{ env.CLASHTUI_VERSION }}.gz
-          gzip -c ./artifacts/clashtui-arm64.release > clashtui-linux-arm64-v${{ env.CLASHTUI_VERSION }}.gz
+          gzip -c ./artifacts/clashtui-amd64 > clashtui-linux-amd64-v${{ env.CLASHTUI_VERSION }}.gz
+          gzip -c ./artifacts/clashtui-arm64 > clashtui-linux-arm64-v${{ env.CLASHTUI_VERSION }}.gz
 
       - name: Upload Release
         uses: softprops/action-gh-release@v1
