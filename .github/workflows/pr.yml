@@ -22,21 +22,21 @@ jobs:
           nohup ./mihomo -d Example -f Example/basic_clash_config.yaml &
 
       - name: Download Dependencies
-        run: cd clashctl && cargo fetch
+        run: cd clashtui && cargo fetch
 
       - name: Build
-        run: cd clashctl && cargo build --verbose
+        run: cd clashtui && cargo build --verbose
 
       - name: Run tests
-        run: cd clashctl && cargo test --all --verbose
+        run: cd clashtui && cargo test --all --verbose
 
       - name: Build Version
-        run: cd clashctl && cargo r -- -v
+        run: cd clashtui && cargo r -- -v
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashctl/target/debug/clashctl ./artifacts/clashctl.debug
+          mv ./clashtui/target/debug/clashtui ./artifacts/clashtui.debug
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -57,21 +57,21 @@ jobs:
           mihomo-windows-amd64.exe -d Example -f Example/basic_clash_config.yaml &
 
       - name: Download Dependencies
-        run: cd clashctl && cargo fetch
+        run: cd clashtui && cargo fetch
 
       - name: Build
-        run: cd clashctl && cargo build --verbose && cargo build --release
+        run: cd clashtui && cargo build --verbose && cargo build --release
 
       # - name: Run tests
-      #   run: cd clashctl && cargo test --all --verbose
+      #   run: cd clashtui && cargo test --all --verbose
 
       - name: Build Version
-        run: cd clashctl && cargo r -- -v
+        run: cd clashtui && cargo r -- -v
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashctl/target/debug/clashctl.exe ./artifacts/clashctl.debug.exe
+          mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui.debug.exe
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4

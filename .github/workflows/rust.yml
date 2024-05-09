@@ -27,30 +27,30 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ./clashctl/target
+            ./clashtui/target
             ~/.cargo
-          key: ci-${{ runner.os }}-${{ hashFiles('./clashctl/Cargo.lock') }}
+          key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
           restore-keys: |
-            ci-${{ runner.os }}-${{ hashFiles('./clashctl/Cargo.lock') }}
+            ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
             ci-${{ runner.os }}-
 
       - name: Download Dependencies
-        run: cd clashctl && cargo fetch
+        run: cd clashtui && cargo fetch
 
       - name: Run tests
-        run: cd clashctl && cargo test --all --verbose
+        run: cd clashtui && cargo test --all --verbose
 
       - name: Build
-        run: cd clashctl && cargo build --all-features --verbose --locked && cargo build --all-features --release --locked
+        run: cd clashtui && cargo build --all-features --verbose --locked && cargo build --all-features --release --locked
 
       - name: Build Version
-        run: cd clashctl && cargo r --all-features -- -V
+        run: cd clashtui && cargo r --all-features -- -V
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashctl/target/release/clashctl ./artifacts/clashctl.release
-          mv ./clashctl/target/debug/clashctl ./artifacts/clashctl.debug
+          mv ./clashtui/target/release/clashtui ./artifacts/clashtui.release
+          mv ./clashtui/target/debug/clashtui ./artifacts/clashtui.debug
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -76,33 +76,33 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ./clashctl/target
+            ./clashtui/target
             ~/.cargo
-          key: ci-${{ runner.os }}-${{ hashFiles('./clashctl/Cargo.lock') }}
+          key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
           restore-keys: |
-            ci-${{ runner.os }}-${{ hashFiles('./clashctl/Cargo.lock') }}
+            ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
             ci-${{ runner.os }}-
 
       - name: Download Dependencies
-        run: cd clashctl && cargo fetch
+        run: cd clashtui && cargo fetch
 
       - name: Check
-        run: cd clashctl && cargo check --all-features --verbose
+        run: cd clashtui && cargo check --all-features --verbose
 
       # - name: Run tests
-      #   run: cd clashctl && cargo test --all --verbose
+      #   run: cd clashtui && cargo test --all --verbose
         
       - name: Build
-        run: cd clashctl && cargo build --all-features --verbose && cargo build --all-features --release
+        run: cd clashtui && cargo build --all-features --verbose && cargo build --all-features --release
 
       - name: Build Version
-        run: cd clashctl && cargo r --all-features -- -V
+        run: cd clashtui && cargo r --all-features -- -V
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashctl/target/release/clashctl.exe ./artifacts/clashctl.release.exe
-          mv ./clashctl/target/debug/clashctl.exe ./artifacts/clashctl.debug.exe
+          mv ./clashtui/target/release/clashtui.exe ./artifacts/clashtui.release.exe
+          mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui.debug.exe
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
