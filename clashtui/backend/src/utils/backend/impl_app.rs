@@ -10,8 +10,9 @@ impl ClashBackend {
         #[cfg(target_os = "windows")] new_sysp: Option<bool>,
     ) -> State {
         #[cfg(target_os = "windows")]
+        use crate::utils::ipc;
+        #[cfg(target_os = "windows")]
         if let Some(b) = new_sysp {
-            use crate::utils::ipc;
             let _ = if b {
                 ipc::enable_system_proxy(&self.clash_api.proxy_addr)
             } else {
