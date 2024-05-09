@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - 'clashtui/**'
-      - '.github/**'
+      - '.github/workflows/**'
 
 env:
   CARGO_TERM_COLOR: always
