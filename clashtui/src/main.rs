@@ -63,6 +63,8 @@ pub fn run_tui(
     // create app and run it
     app.run(err_track, flags)?;
 
+    ui::setup::restore()?;
+
     app.save()?;
 
     Ok(())
@@ -71,7 +73,11 @@ pub fn run_tui(
 fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
     let config_dir = {
         use std::{env, path::PathBuf};
-        let exe_dir = env::current_dir().expect("Err loading exe_dir");
+        let exe_dir = env::current_exe()
+            .expect("Err loading exe_file_path")
+            .parent()
+            .expect("Err finding exe_dir")
+            .to_path_buf();
         let data_dir = exe_dir.join("data");
         if data_dir.exists() && data_dir.is_dir() {
             // portable mode

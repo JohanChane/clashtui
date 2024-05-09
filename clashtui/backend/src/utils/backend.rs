@@ -131,6 +131,7 @@ fn load_app_config(
                         "Some Key Configs are missing, or Default".to_string(),
                     ));
                     log::warn!("Empty Config?");
+                    log::warn!("Config File Path:{}", config_path.to_string_lossy());
                     log::debug!("{:?}", v)
                 };
                 v
