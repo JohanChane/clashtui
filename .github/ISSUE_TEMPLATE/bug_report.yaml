@@ -1,0 +1,84 @@
+name: Bug report
+description: Create a report to help us improve
+title: "[Bug]: "
+labels: ["bug"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Thank you for your willingness to fill in the error return!
+        ### Here are some precautions, be sure to read to make it easier for us to handle
+
+        #### ❗ | ISSUE determined that there is no same problem has been raised.
+        #### 🌎 | Please fill in the environmental information accurately.
+        #### ❔ | Download the debug build of your version for reproduction and provide full log content. Please delete the personal information and sensitive content that exists in the log by yourself.
+        
+        ---
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Please make sure you have read the above considerations and tick the confirmation box below.
+      options:
+        - label: I've looked for the question I'm asking in [Issue Tracker](https://github.com/JohanChane/clashtui/issues?q=is%3Aissue), and I didn't find the ISSUE for the same question.
+          required: true
+        - label: The latest ci build hasn't fix this
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ## Infos
+
+  - type: input
+    id: clashtui-ver
+    attributes:
+      label: Clashtui version
+    validations:
+      required: true
+
+  - type: dropdown
+    id: env-vm-ver
+    attributes:
+      label: OS
+      options:
+        - Windows
+        - Linux
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce-steps
+    attributes:
+      label: Steps to reproduce the behavior
+      description: |
+        What do we need to do to get the bug to appear?
+        The concise and clear reproducing steps can help us locate the problem more quickly.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual results
+    validations:
+      required: true
+
+  - type: textarea
+    id: logging
+    attributes:
+      label: logs
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra-desc
+    attributes:
+      label: Additional context

@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest an idea for this project
+title: "[Feat]: "
+labels: ["enhancement"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Thank you for your willingness to advise Clashtui!
+        ### Here are some precautions, be sure to read to make it easier for us to handle
+
+        #### ❗ | ISSUE determined that there is no same problem has been raised.
+        #### 📝 | Determining that existing PR and code do not have an implementation/similar functionality of this function。
+
+        ---
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Please make sure you have read the above considerations and tick the confirmation box below.
+      options:
+        - label: I'm sure this is a feature that has never been proposed and implemented.
+          required: true
+        - label: I've looked for the question I'm asking in [Issue Tracker](https://github.com/JohanChane/clashtui/issues?q=is%3Aissue), and I didn't find the ISSUE for the same question.
+          required: true
+
+  - type: textarea
+    id: feature-to-add
+    attributes:
+      label: Describe the solution
+      description: |
+        A clear and concise description of what the problem is, what you want to happen, and any alternative solutions or features you've considered.
+    validations:
+      required: true
