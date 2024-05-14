@@ -1,14 +1,18 @@
 proxy-anchor:
   - delay_test: &pa_dt {url: https://www.gstatic.com/generate_204, interval: 300}
   - proxy_provider: &pa_pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
+  - filter: &pa_flt
+      #filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
+      exclude-filter: "(?i)cn|china|中国|国内|港|hk|hongkong|hong kong|澳门|mo|macau"
 
 proxy-groups:
   - name: "Entry"
     type: select
     proxies:
-      - <FltLb>
+      - <FltAt>
+      #- <FltFb>
+      #- <FltLb>
       - FltAllSl
-      - <FltFb>
       - <At>
       - <Sl>
 
@@ -16,26 +20,32 @@ proxy-groups:
     type: select
     use: 
       - <pvd>
-    filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
+    <<: *pa_flt
 
   - name: "Sl"
     tpl_param:
       providers: ["pvd"]
     type: select
 
-  - name: "FltLb"
+  - name: "FltAt"
     tpl_param:
       providers: ["pvd"]
-    type: load-balance
-    strategy: consistent-hashing
-    #strategy: round-robin
-    filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
+    type: url-test
+    <<: [*pa_dt, *pa_flt]
 
-  - name: "FltFb"
-    tpl_param:
-      providers: ["pvd"]
-    type: fallback
-    filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
+  #- name: "FltFb"
+  #  tpl_param:
+  #    providers: ["pvd"]
+  #  type: fallback
+  #  <<: [*pa_dt, *pa_flt]
+  #
+  #- name: "FltLb"
+  #  tpl_param:
+  #    providers: ["pvd"]
+  #  type: load-balance
+  #  #strategy: consistent-hashing
+  #  #strategy: round-robin
+  #  <<: [*pa_dt, *pa_flt]
 
   - name: "At"
     tpl_param:
@@ -62,6 +72,10 @@ proxy-providers:
     <<: *pa_pp
 
 rules:
+  #- DOMAIN-SUFFIX,cn.bing.com,DIRECT
+  #- DOMAIN-SUFFIX,bing.com,Entry
+  #- DOMAIN,aur.archlinux.org,Entry
+
   - GEOIP,lan,DIRECT,no-resolve
   - GEOSITE,biliintl,Entry
   - GEOSITE,ehentai,Entry
