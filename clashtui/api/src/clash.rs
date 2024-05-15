@@ -1,7 +1,5 @@
 const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
-//const TIMEOUT: u8 = 3;
-const TIMEOUT: u8 = 10;     // Adapting to poor network conditions.
-                            // ToDo: Users can adjust settings based on their network quality.
+const TIMEOUT: u8 = 3;
 #[cfg(target_feature = "deprecated")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
 #[cfg(target_feature = "deprecated")]
@@ -115,10 +113,13 @@ impl ClashUtil {
         self.request(Method::Put, "/configs?force=true", Some(payload))
             .map(|_| ())
     }
-    pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S, with_proxy: bool) -> Result<Resp> {
+    pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S, with_proxy: bool, timeout: u8) -> Result<Resp> {
         let mut request = minreq::get(url)
-            .with_header("user-agent", self.clash_ua.clone())
-            .with_timeout(TIMEOUT.into());
+            .with_header("user-agent", self.clash_ua.clone());
+
+        if timeout > 0 {
+            request = request.with_timeout(timeout.into());
+        }
 
         if with_proxy {
             request = request.with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?);
@@ -408,7 +409,7 @@ mod tests {
     #[test]
     fn mock_clash_core_test() {
         let sym = sym();
-        let r = sym.mock_clash_core("https://www.google.com", true).unwrap();
+        let r = sym.mock_clash_core("https://www.google.com", true, 10).unwrap();
         let mut tf = std::fs::OpenOptions::new()
             .write(true)
             .create(true)

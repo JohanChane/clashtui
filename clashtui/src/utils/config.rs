@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ClashTuiConfig {
     pub clash_cfg_dir: String,
@@ -8,10 +8,26 @@ pub struct ClashTuiConfig {
     pub clash_core_path: String,
     pub clash_srv_name: String,
     pub clash_srv_is_user: bool,        // true: systemctl --user ...
+    pub timeout: u8,
 
     pub edit_cmd: String,
     pub open_dir_cmd: String,
 }
+impl Default for ClashTuiConfig {
+    fn default() -> Self {
+        ClashTuiConfig {
+            clash_cfg_dir: String::from("/srv/mihomo"),
+            clash_cfg_path: String::from("/srv/mihomo/config.yaml"),
+            clash_core_path: String::from("/usr/bin/mihomo"),
+            clash_srv_name: String::from("mihomo"),
+            clash_srv_is_user: false,
+            timeout: 0,
+            edit_cmd: String::from(""),
+            open_dir_cmd: String::from(""),
+        }
+    }
+}
+
 impl ClashTuiConfig {
     pub fn from_file(config_path: &str) -> Result<Self> {
         let f = File::open(config_path)?;
