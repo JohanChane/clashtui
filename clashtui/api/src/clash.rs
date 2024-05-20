@@ -1,5 +1,5 @@
 const DEFAULT_PAYLOAD: &str = "'{\"path\": \"\", \"payload\": \"\"}'";
-const TIMEOUT: u8 = 3;
+const TIMEOUT: u8 = 10;
 #[cfg(target_feature = "deprecated")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
 #[cfg(target_feature = "deprecated")]
