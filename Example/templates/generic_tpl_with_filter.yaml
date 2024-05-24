@@ -3,7 +3,7 @@ proxy-anchor:
   - proxy_provider: &pa_pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
   - filter: &pa_flt
       #filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
-      exclude-filter: "(?i)剩余|到期|勿连接|不要连接|cn|china|中国|国内|港|hk|hongkong|hong kong|澳门|mo|macau"
+      exclude-filter: "(?i)剩余|到期|勿连接|不要连接|失联|中国|国内|cn|china|香港|hk|hongkong|hong kong|澳门|mo|macau|台湾|tw|taiwan|tai wan"
 
 proxy-groups:
   - name: "Entry"
