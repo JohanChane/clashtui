@@ -26,19 +26,29 @@ jobs:
           chmod +x mihomo
           nohup ./mihomo -d Example -f Example/basic_clash_config.yaml &
 
-      - name: Cache Target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ./clashtui/target
-            ~/.cargo
-          key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
-          restore-keys: |
-            ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
-            ci-${{ runner.os }}-
+      #- name: Cache Target
+      #  uses: actions/cache@v4
+      #  with:
+      #    path: |
+      #      ./clashtui/target
+      #      ~/.cargo
+      #    key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
+      #    restore-keys: |
+      #      ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
+      #      ci-${{ runner.os }}-
+      #
+      #- name: Download Dependencies
+      #  run: cd clashtui && cargo fetch
 
-      - name: Download Dependencies
-        run: cd clashtui && cargo fetch
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          repository: ''
+          ref: 'dev'
+          #sparse-checkout: |
+          #  clashtui
+          #  Example
+          fetch-tags: true
 
       - name: Run tests
         run: cd clashtui && cargo test --all
@@ -64,9 +74,9 @@ jobs:
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashtui/target/debug/clashtui ./artifacts/clashtui-amd64.debug
+          mv ./clashtui/target/debug/clashtui ./artifacts/clashtui-amd64-debug
           mv ./clashtui/target/release/clashtui ./artifacts/clashtui-amd64
-          mv ./clashtui/target/aarch64-unknown-linux-gnu/debug/clashtui ./artifacts/clashtui-arm64.debug
+          mv ./clashtui/target/aarch64-unknown-linux-gnu/debug/clashtui ./artifacts/clashtui-arm64-debug
           mv ./clashtui/target/aarch64-unknown-linux-gnu/release/clashtui ./artifacts/clashtui-arm64
           mv ./clashtui/version.txt ./artifacts/version.txt
 
@@ -100,13 +110,14 @@ jobs:
           echo CLASHTUI_VERSION="$(cat version.txt)" >> $GITHUB_ENV
 
       - name: Archive Release
-        run:
-          gzip -c ./artifacts/clashtui-amd64 > clashtui-linux-amd64-v${{ env.CLASHTUI_VERSION }}.gz
-          gzip -c ./artifacts/clashtui-arm64 > clashtui-linux-arm64-v${{ env.CLASHTUI_VERSION }}.gz
+        run: |
+          gzip -c ./artifacts/clashtui-amd64 > clashtui-linux-amd64-${{ env.CLASHTUI_VERSION }}.gz
+          gzip -c ./artifacts/clashtui-arm64 > clashtui-linux-arm64-${{ env.CLASHTUI_VERSION }}.gz
 
       - name: Upload Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          prerelease: true
           files: |
-            clashtui-linux-amd64-v${{ env.CLASHTUI_VERSION }}.gz
-            clashtui-linux-arm64-v${{ env.CLASHTUI_VERSION }}.gz
+            clashtui-linux-amd64-${{ env.CLASHTUI_VERSION }}.gz
+            clashtui-linux-arm64-${{ env.CLASHTUI_VERSION }}.gz
