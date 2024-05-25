@@ -9,6 +9,8 @@ proxy-groups:
   - name: "Entry"
     type: select
     proxies:
+      #- FltAllAt
+      #- FltAllLb
       - <FltAt>
       #- <FltFb>
       #- <FltLb>
@@ -26,6 +28,20 @@ proxy-groups:
     tpl_param:
       providers: ["pvd"]
     type: select
+
+  #- name: "FltAllAt"
+  #  type: url-test
+  #  proxies:
+  #    - <FltAt>
+  #  <<: *pa_dt
+
+  #- name: "FltAllLb"
+  #  proxies:
+  #    - <FltAt>
+  #  type: load-balance
+  #  #strategy: consistent-hashing
+  #  #strategy: round-robin
+  #  <<: *pa_dt
 
   - name: "FltAt"
     tpl_param:
