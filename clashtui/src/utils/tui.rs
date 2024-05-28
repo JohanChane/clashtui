@@ -86,7 +86,7 @@ impl ClashTuiUtil {
         self.clash_api.restart(None)
     }
     fn dl_remote_profile(&self, url: &str) -> Result<Resp, Error> {
-        let with_proxy = self.clash_api.version().is_ok();
+        let with_proxy = self.clash_api.version().is_ok() && self.clash_api.check_connectivity().is_ok();
         let timeout = self.tui_cfg.timeout;
         self.clash_api.mock_clash_core(url, with_proxy, timeout)
     }

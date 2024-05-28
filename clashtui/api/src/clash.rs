@@ -5,8 +5,8 @@ const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/rel
 #[cfg(target_feature = "deprecated")]
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-use std::io::Result;
 use minreq::Method;
+use std::io::Result;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ProfileSectionType {
@@ -70,7 +70,12 @@ pub struct ClashUtil {
 }
 
 impl ClashUtil {
-    pub fn new(controller_api: String, secret: String, proxy_addr: String, clash_ua: String) -> Self {
+    pub fn new(
+        controller_api: String,
+        secret: String,
+        proxy_addr: String,
+        clash_ua: String,
+    ) -> Self {
         Self {
             api: controller_api,
             secret,
@@ -113,22 +118,36 @@ impl ClashUtil {
         self.request(Method::Put, "/configs?force=true", Some(payload))
             .map(|_| ())
     }
-    pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S, with_proxy: bool, timeout: u8) -> Result<Resp> {
-        let mut request = minreq::get(url)
-            .with_header("user-agent", self.clash_ua.clone());
+    pub fn mock_clash_core<S: Into<minreq::URL>>(
+        &self,
+        url: S,
+        with_proxy: bool,
+        timeout: u8,
+    ) -> Result<Resp> {
+        let mut request = minreq::get(url).with_header("user-agent", self.clash_ua.clone());
 
         if timeout > 0 {
             request = request.with_timeout(timeout.into());
         }
 
         if with_proxy {
-            request = request.with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?);
+            request = request
+                .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?);
         }
 
         request.send_lazy().map(Resp).map_err(process_err)
     }
     pub fn config_patch(&self, payload: String) -> Result<String> {
         self.request(Method::Patch, "/configs", Some(payload))
+    }
+
+    pub fn check_connectivity(&self) -> Result<()> {
+        minreq::get("https://www.gstatic.com/generate_204")
+            .with_timeout(TIMEOUT.into())
+            .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
+            .send()
+            .map(|_| ())
+            .map_err(process_err)
     }
 
     /*** update_providers_with_api
@@ -391,6 +410,12 @@ mod tests {
         println!("{}", sym.version().unwrap());
     }
     #[test]
+    #[should_panic]
+    fn connectivity_test() {
+        let sym = sym();
+        println!("{:?}", sym.check_connectivity().unwrap_err());
+    }
+    #[test]
     fn config_get_test() {
         let sym = sym();
         println!("{}", sym.config_get().unwrap());
@@ -409,7 +434,9 @@ mod tests {
     #[test]
     fn mock_clash_core_test() {
         let sym = sym();
-        let r = sym.mock_clash_core("https://www.google.com", true, 10).unwrap();
+        let r = sym
+            .mock_clash_core("https://www.google.com", true, 10)
+            .unwrap();
         let mut tf = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
