@@ -355,7 +355,8 @@ impl ClashTuiUtil {
             // Update the file to keep up-to-date
             self.download_profile(sub_url.as_str(), &profile_yaml_path)?;
 
-            result.push(format!("Updated: {}, {}", profile_name, sub_url));
+            let url_domain = Utils::extract_domain(sub_url.as_str()).unwrap_or("No domain");
+            result.push(format!("Updated: {}, {}", profile_name, url_domain));
         }
 
         let mut section_types = vec![ProfileSectionType::ProxyProvider];
