@@ -85,8 +85,7 @@ impl ClashTuiUtil {
     pub fn restart_clash(&self) -> Result<String, Error> {
         self.clash_api.restart(None)
     }
-    fn dl_remote_profile(&self, url: &str) -> Result<Resp, Error> {
-        let with_proxy = self.clash_api.version().is_ok() && self.clash_api.check_connectivity().is_ok();
+    fn dl_remote_profile(&self, url: &str, with_proxy: bool) -> Result<Resp, Error> {
         let timeout = self.tui_cfg.timeout;
         self.clash_api.mock_clash_core(url, with_proxy, timeout)
     }
@@ -97,6 +96,9 @@ impl ClashTuiUtil {
     pub fn save_to_data_file(&self) {
         let data_path = self.clashtui_dir.join(DATA_FILE);
         let _ = self.clashtui_data.borrow_mut().to_file(data_path.to_str().unwrap());
+    }
+    pub fn check_proxy(&self) -> bool {
+        self.clash_api.version().is_ok() && self.clash_api.check_connectivity().is_ok()
     }
 }
 

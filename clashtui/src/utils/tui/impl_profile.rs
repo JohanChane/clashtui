@@ -353,7 +353,7 @@ impl ClashTuiUtil {
             let sub_url = self.extract_profile_url(profile_name)?;
             profile_yaml_path = self.get_profile_cache_unchecked(profile_name);
             // Update the file to keep up-to-date
-            self.download_profile(sub_url.as_str(), &profile_yaml_path)?;
+            self.download_profile(sub_url.as_str(), &profile_yaml_path, self.check_proxy())?;
 
             let url_domain = Utils::extract_domain(sub_url.as_str()).unwrap_or("No domain");
             result.push(format!("Updated: {}, {}", profile_name, url_domain));
@@ -369,10 +369,11 @@ impl ClashTuiUtil {
             net_providers.extend(providers);
         }
 
+        let with_proxy = self.check_proxy();
         for (_, providers) in net_providers {
             for (name, url, path) in providers {
                 let url_domain = Utils::extract_domain(url.as_str()).unwrap_or("No domain");
-                match self.download_profile(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(&path)) {
+                match self.download_profile(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(&path), with_proxy) {
                     Ok(_) => result.push(format!("Updated: {}, {}", name, url_domain)),
                     Err(e) => result.push(format!("Not updated: {}, {}, {}", name, url_domain, e)),
 
@@ -383,7 +384,7 @@ impl ClashTuiUtil {
         Ok(result)
     }
 
-    fn download_profile(&self, url: &str, path: &PathBuf) -> std::io::Result<()> {
+    fn download_profile(&self, url: &str, path: &PathBuf, with_proxy: bool) -> std::io::Result<()> {
         let directory = path
             .parent()
             .ok_or_else(|| Error::new(std::io::ErrorKind::NotFound, "Invalid file path"))?;
@@ -391,7 +392,7 @@ impl ClashTuiUtil {
             create_dir_all(directory)?;
         }
 
-        let response = self.dl_remote_profile(url)?;
+        let response = self.dl_remote_profile(url, with_proxy)?;
         let mut output_file = File::create(path)?;      // will truncate the file
         response.copy_to(&mut output_file)?;
         Ok(())
