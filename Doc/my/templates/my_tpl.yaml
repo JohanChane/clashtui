@@ -93,10 +93,10 @@ rules:
   - DOMAIN,aur.archlinux.org,Entry
 
   - GEOIP,lan,DIRECT,no-resolve
-  - GEOSITE,google,Entry
   - GEOSITE,github,Entry
+  - GEOSITE,openai,Entry
   - GEOSITE,telegram,Entry
   - GEOSITE,youtube,Entry
-  - GEOSITE,geolocation-!cn,Entry
+  - GEOSITE,gfw,Entry
   - GEOIP,CN,Entry-RuleMode
   - MATCH,Entry-LastMatch
