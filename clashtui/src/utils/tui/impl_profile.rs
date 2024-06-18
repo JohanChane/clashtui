@@ -370,9 +370,10 @@ impl ClashTuiUtil {
 
         for (_, providers) in net_providers {
             for (name, url, path) in providers {
+                let url_domain = Utils::extract_domain(url.as_str()).unwrap_or("No domain");
                 match self.download_profile(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(&path)) {
-                    Ok(_) => result.push(format!("Updated: {}, {}", name, url)),
-                    Err(e) => result.push(format!("Not updated: {}, {}, {}", name, url, e)),
+                    Ok(_) => result.push(format!("Updated: {}, {}", name, url_domain)),
+                    Err(e) => result.push(format!("Not updated: {}, {}, {}", name, url_domain, e)),
 
                 }
             }
