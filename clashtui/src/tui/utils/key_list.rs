@@ -7,6 +7,7 @@ pub enum Keys {
     ProfileImport,
     ProfileDelete,
     ProfileTestConfig,
+    ProfileInfo,
     TemplateSwitch,
     Edit,
     Preview,
@@ -56,6 +57,7 @@ impl From<KeyCode> for Keys {
             KeyCode::Char('i') => Keys::ProfileImport,
             KeyCode::Char('d') => Keys::ProfileDelete,
             KeyCode::Char('s') => Keys::ProfileTestConfig,
+            KeyCode::Char('n') => Keys::ProfileInfo,
 
             // ## Global Shortcuts (As much as possible use uppercase. And Others as much as possible use lowcase to avoid conflicts with global shortcuts.)
             KeyCode::Char('q') => Keys::AppQuit,   // Exiting is a common operation, and most software also exits with "q", so let's use "q".

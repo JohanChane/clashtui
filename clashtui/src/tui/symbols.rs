@@ -17,6 +17,7 @@ d: Delete
 s: Test
 e: Edit
 v: Preview
+n: Info
 
 ## Tempalte
 Enter: Create yaml

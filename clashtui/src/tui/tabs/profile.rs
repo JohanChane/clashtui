@@ -328,6 +328,15 @@ impl super::TabEvent for ProfileTab {
                             }
                             EventState::WorkDone
                         }
+                        Keys::ProfileInfo => {
+                            if let Some(profile_name) = self.profile_list.selected() {
+                                match self.clashtui_util.gen_profile_info(&profile_name) {
+                                    Ok(info) => self.popup_list_msg(info),
+                                    Err(err) => self.popup_txt_msg(err.to_string()),
+                                }
+                            }
+                            EventState::WorkDone
+                        }
                         _ => EventState::NotConsumed,
                     };
                 }

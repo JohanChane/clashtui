@@ -594,6 +594,45 @@ impl ClashTuiUtil {
         Ok(modify_info)
     }
     ***/
+
+    // TODO: Add more info
+    pub fn gen_profile_info(&self, profile_name: &String) -> std::io::Result<Vec<String>> {
+        let profile_url = self.extract_profile_url(profile_name)?;
+        let mut info = vec!["## Providers".to_string()];
+        info.push(format!("Profile Url: {}", profile_url));
+
+        let profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
+        let net_providers = self.extract_net_providers(&profile_yaml_path, &vec![ProfileSectionType::Profile, ProfileSectionType::ProxyProvider, ProfileSectionType::RuleProvider]);
+        if let Ok(net_res) = net_providers {
+            for (st, res) in net_res {
+                let st_str = match st {
+                    ProfileSectionType::ProxyProvider => "Proxy Providers",
+                    ProfileSectionType::RuleProvider => "Rule Providers",
+                    _ => unreachable!(),
+                };
+                info.push(format!("{}:", st_str));
+
+                for (name, url, _) in res {
+                    info.push(format!("-   {}: {}",name, url));
+                }
+            }
+        }
+
+        // ## Proxy Providers
+        // Remaining traffic
+        // Expiration time
+
+        // mode
+        // log-level
+        // allow-lan
+        // external-controller
+        // enable dns?
+        // enable tun?
+        // enable ipv6?
+        // use rule dat? yes, print latest updated time, and need to udpate it?
+
+        Ok(info)
+    }
 }
 
 impl ClashTuiUtil {
