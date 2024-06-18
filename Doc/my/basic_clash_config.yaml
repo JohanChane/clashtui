@@ -1,0 +1,53 @@
+# 随意配置的, 仅供参考。
+mode: rule
+mixed-port: 7890
+allow-lan: false
+log-level: silent
+ipv6: false
+
+secret: ''
+external-controller: 127.0.0.1:9090
+external-ui: uis/metacubexd
+external-ui-name: metacubexd
+external-ui-url: https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip
+
+geo-auto-update: true
+geo-update-interval: 24
+
+profile:
+  store-selected: true
+#unified-delay: true
+
+dns:
+  enable: true
+  prefer-h3: true
+  listen: :1053
+  ipv6: false
+  enhanced-mode: fake-ip
+  fake-ip-filter:
+    - "*"
+    - "+.lan"
+    - "+.local"
+  nameserver:
+    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query
+  proxy-server-nameserver:
+    - https://doh.pub/dns-query
+  nameserver-policy:
+    "geosite:cn,private":
+      - 114.114.114.114
+      - 223.5.5.5
+      #- https://doh.pub/dns-query
+      #- https://dns.alidns.com/dns-query
+    "geosite:geolocation-!cn":
+      - 8.8.8.8
+      #- "https://dns.cloudflare.com/dns-query#dns"
+      #- "https://dns.google/dns-query#dns"
+
+tun:
+  enable: true
+  stack: system
+  dns-hijack:
+  - any:53
+  auto-route: true
+  auto-detect-interface: true

@@ -1,0 +1,102 @@
+proxy-anchor:
+  - delay_test: &pa_dt {url: https://www.gstatic.com/generate_204, interval: 300}
+  - proxy_provider: &pa_pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
+  - filter: &pa_flt
+      #filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
+      exclude-filter: "(?i)剩余|到期|勿连接|不要连接|失联|中国|国内|cn|china|香港|hk|hongkong|hong kong|澳门|mo|macau|台湾|tw|taiwan|tai wan"
+
+proxy-groups:
+  - name: "Entry"
+    type: select
+    proxies:
+      - FltAllAt
+      - FltAllLb
+      - <FltAt>
+      #- <FltFb>
+      #- <FltLb>
+      - FltAllSl
+      - <At>
+      - <Sl>
+
+  - name: "FltAllSl"
+    type: select
+    use:
+      - <pvd>
+    <<: *pa_flt
+
+  - name: "Sl"
+    tpl_param:
+      providers: ["pvd"]
+    type: select
+
+  - name: "FltAllAt"
+    type: url-test
+    proxies:
+      - <FltAt>
+    <<: *pa_dt
+
+  - name: "FltAllLb"
+    proxies:
+      - <FltAt>
+    type: load-balance
+    #strategy: consistent-hashing
+    #strategy: round-robin
+    <<: *pa_dt
+
+  - name: "FltAt"
+    tpl_param:
+      providers: ["pvd"]
+    type: url-test
+    <<: [*pa_dt, *pa_flt]
+
+  #- name: "FltFb"
+  #  tpl_param:
+  #    providers: ["pvd"]
+  #  type: fallback
+  #  <<: [*pa_dt, *pa_flt]
+  #
+  #- name: "FltLb"
+  #  tpl_param:
+  #    providers: ["pvd"]
+  #  type: load-balance
+  #  #strategy: consistent-hashing
+  #  #strategy: round-robin
+  #  <<: [*pa_dt, *pa_flt]
+
+  - name: "At"
+    tpl_param:
+      providers: ["pvd"]
+    type: url-test
+    <<: *pa_dt
+
+  - name: "Entry-RuleMode"
+    type: select
+    proxies:
+      - DIRECT
+      - Entry
+
+  - name: "Entry-LastMatch"
+    type: select
+    proxies:
+      - Entry
+      - DIRECT
+
+proxy-providers:
+  pvd:
+    tpl_param:
+    type: http
+    <<: *pa_pp
+
+rules:
+  - DOMAIN-SUFFIX,cn.bing.com,DIRECT
+  - DOMAIN-SUFFIX,bing.com,Entry
+  - DOMAIN,aur.archlinux.org,Entry
+
+  - GEOIP,lan,DIRECT,no-resolve
+  - GEOSITE,google,Entry
+  - GEOSITE,github,Entry
+  - GEOSITE,telegram,Entry
+  - GEOSITE,youtube,Entry
+  - GEOSITE,geolocation-!cn,Entry
+  - GEOIP,CN,Entry-RuleMode
+  - MATCH,Entry-LastMatch
