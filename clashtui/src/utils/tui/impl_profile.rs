@@ -652,13 +652,15 @@ impl ClashTuiUtil {
                             name, 
                             dur_str,
                             url));
-                    if let Ok(rsp) = self.dl_remote_profile(url.as_str(), with_proxy) {
-                        info.push(format!("    -   subscription-userinfo: {}",
-                                self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
-                        for key in vec!["profile-update-interval"] {
-                            info.push(format!("    -   {}: {}",
-                                    key,
-                                    rsp.get_headers().get(key).unwrap_or(&"None".to_string())));
+                    if st == ProfileSectionType::ProxyProvider {
+                        if let Ok(rsp) = self.dl_remote_profile(url.as_str(), with_proxy) {
+                            info.push(format!("    -   subscription-userinfo: {}",
+                                    self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
+                            for key in vec!["profile-update-interval"] {
+                                info.push(format!("    -   {}: {}",
+                                        key,
+                                        rsp.get_headers().get(key).unwrap_or(&"None".to_string())));
+                            }
                         }
                     }
                 }
