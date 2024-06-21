@@ -61,12 +61,22 @@ impl Resp {
         let Resp(mut inner) = self;
         std::io::copy(&mut inner, w)
     }
+
+    pub fn get_headers(&self) -> &std::collections::HashMap<String, String> {
+        &self.0.headers
+    }
+
+    pub fn to_json(self) -> Result<serde_json::Value> {
+        let Resp(inner) = self;
+        let body = serde_json::from_reader(inner)?;
+        Ok(body)
+    }
 }
 pub struct ClashUtil {
-    api: String,
+    pub api: String,
     secret: String,
     pub proxy_addr: String,
-    clash_ua: String,
+    pub clash_ua: String,
 }
 
 impl ClashUtil {

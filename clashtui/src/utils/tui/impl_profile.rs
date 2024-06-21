@@ -1,6 +1,6 @@
 use crate::utils::tui::{NetProviderMap, ProfileType};
 
-use super::ClashTuiUtil;
+use super::{ClashTuiUtil, Resp};
 use crate::utils::{is_yaml, utils as Utils};
 use api::ProfileSectionType;
 use std::{
@@ -8,6 +8,22 @@ use std::{
     io::Error,
     path::{Path, PathBuf},
 };
+use std::fmt;
+
+#[derive(Debug)]
+enum UserInfoError {
+    RegexError(regex::Error),
+    ParseError(std::num::ParseIntError),
+}
+
+impl fmt::Display for UserInfoError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            UserInfoError::RegexError(ref err) => write!(f, "Regex error: {}", err),
+            UserInfoError::ParseError(ref err) => write!(f, "Parse error: {}", err),
+        }
+    }
+}
 
 impl ClashTuiUtil {
     pub fn crt_yaml_with_template(&self, template_name: &String) -> Result<(), String> {
@@ -405,6 +421,10 @@ impl ClashTuiUtil {
             Err(err) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
         };
 
+        self.extract_net_provider_helper(&parsed_yaml, provider_types)
+    }
+
+    fn extract_net_provider_helper(&self, parsed_yaml: &serde_yaml::Value, provider_types: &Vec<ProfileSectionType>) -> std::io::Result<NetProviderMap> {
         let provider_keys: Vec<_> = provider_types.iter().filter_map(|s_type| {
             match s_type {
                 ProfileSectionType::ProxyProvider => Some("proxy-providers"),
@@ -596,14 +616,25 @@ impl ClashTuiUtil {
     }
     ***/
 
-    // TODO: Add more info
-    pub fn gen_profile_info(&self, profile_name: &String) -> std::io::Result<Vec<String>> {
-        let profile_url = self.extract_profile_url(profile_name)?;
+    pub fn gen_profile_info(&self, profile_name: &String, is_cur_profile: bool) -> std::io::Result<Vec<String>> {
+        use std::time::{SystemTime, UNIX_EPOCH, Duration};
+        use chrono::{DateTime, Utc};
+
+        // ## Providers
         let mut info = vec!["## Providers".to_string()];
+        let profile_url = self.extract_profile_url(profile_name)?;
         info.push(format!("Profile Url: {}", profile_url));
 
         let profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
-        let net_providers = self.extract_net_providers(&profile_yaml_path, &vec![ProfileSectionType::Profile, ProfileSectionType::ProxyProvider, ProfileSectionType::RuleProvider]);
+        let yaml_content = std::fs::read_to_string(&profile_yaml_path)?;
+        let parsed_yaml = match serde_yaml::from_str::<serde_yaml::Value>(&yaml_content) {
+            Ok(value) => value,
+            Err(err) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
+        };
+
+        let clash_cfg_dir = Path::new(&self.tui_cfg.clash_cfg_dir);
+        let with_proxy = self.check_proxy();
+        let net_providers = self.extract_net_provider_helper(&parsed_yaml, &vec![ProfileSectionType::Profile, ProfileSectionType::ProxyProvider, ProfileSectionType::RuleProvider]);
         if let Ok(net_res) = net_providers {
             for (st, res) in net_res {
                 let st_str = match st {
@@ -613,27 +644,138 @@ impl ClashTuiUtil {
                 };
                 info.push(format!("{}:", st_str));
 
-                for (name, url, _) in res {
-                    info.push(format!("-   {}: {}",name, url));
+                let now = std::time::SystemTime::now();
+                for (name, url, path) in res {
+                    let p = clash_cfg_dir.join(path).to_path_buf();
+                    let dur_str = Utils::gen_file_dur_str(&p, Some(now)).unwrap_or("None".to_string());
+                    info.push(format!("-   {} ({}): {}", 
+                            name, 
+                            dur_str,
+                            url));
+                    if let Ok(rsp) = self.dl_remote_profile(url.as_str(), with_proxy) {
+                        info.push(format!("    -   subscription-userinfo: {}",
+                                self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
+                        for key in vec!["profile-update-interval"] {
+                            info.push(format!("    -   {}: {}",
+                                    key,
+                                    rsp.get_headers().get(key).unwrap_or(&"None".to_string())));
+                        }
+                    }
                 }
             }
         }
 
-        // ## Proxy Providers
-        // Remaining traffic
-        // Expiration time
+        if !is_cur_profile {
+            return Ok(info);
+        }
 
-        // mode
-        // log-level
-        // allow-lan
-        // external-controller
-        // enable dns?
-        // enable tun?
-        // enable ipv6?
-        // use rule dat? yes, print latest updated time, and need to udpate it?
+        // ## GEO Database
+        info.push("## GEO Database".to_string());
+        // ### github release
+        let rule_dat_release_rsp = self.dl_remote_profile("https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases", with_proxy)?;
+        let releases = rule_dat_release_rsp.to_json()?;
+        let latest_release = releases.as_array()
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Failed to parse releases as array"))?
+                .get(0)
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "No release found"))?;
+
+        //let name = latest_release["name"].as_str().unwrap();
+        //let latest_release_time = latest_release["published_at"].as_str().unwrap();
+
+        // <name, updated_at>
+        let mut update_time_strs = std::collections::HashMap::<String, String>::new();
+        let mut update_times = std::collections::HashMap::<String, SystemTime>::new();
+        if let Some(assets) = latest_release["assets"].as_array() {
+            for asset in assets {
+                let name = asset["name"].as_str().unwrap();
+                let updated_at_str = asset["updated_at"].as_str().unwrap();
+                update_time_strs.insert(name.to_string(), updated_at_str.to_string());
+
+                let updated_at_utc = DateTime::parse_from_rfc3339(updated_at_str).unwrap().with_timezone(&Utc);
+                let updated_at_systemtime = UNIX_EPOCH + Duration::from_secs(updated_at_utc.timestamp() as u64) + Duration::from_nanos(updated_at_utc.timestamp_subsec_nanos() as u64);
+                update_times.insert(name.to_string(), updated_at_systemtime);
+            }
+        }
+
+        // ### Generate GEO database info
+        let clash_cfg = self.fetch_remote()?;
+        let mut geofiles = Vec::<(&str, &str)>::new();
+        geofiles.push(("GeoSite.dat", "geosite.dat"));      // <local_name, release_name>
+        if !clash_cfg.geodata_mode {
+            geofiles.push(("geoip.metadb", "geoip.metadb"));
+        } else {
+            geofiles.push(("geoip.dat", "geoip.dat"));
+        }
+        let now = std::time::SystemTime::now();
+        for (local_name, release_name) in geofiles {
+            let path = clash_cfg_dir.join(local_name);
+            let mtime = Utils::get_mtime(path.clone()).unwrap_or(SystemTime::UNIX_EPOCH);
+            let updated_at = update_times.get(release_name).unwrap_or(&mtime);
+            info.push(format!("{}: {{dur: {}, update: {}}}",
+                    local_name,
+                    Utils::gen_file_dur_str(&path, Some(now)).unwrap_or("None".to_string()),
+                    if updated_at > &mtime {
+                        format!("not latest {}",
+                            Utils::str_duration(updated_at.duration_since(mtime).unwrap_or_default())
+                        )
+                    } else {
+                        format!("latest {}",
+                            update_time_strs.get("geosite.dat").unwrap().clone()
+                        )
+                    }),
+                );
+        }
+
+        // ## Clash Config
+        info.push("## Clash Config".to_string());
+        info.push(format!("external-controller: {}", self.clash_api.api));
+        info.push(format!("proxy-address: {}", self.clash_api.proxy_addr));
+        info.push(format!("mode: {}", clash_cfg.mode));
+        info.push(format!("log-level: {}", clash_cfg.log_level));
+        info.push(format!("tun: {}", if clash_cfg.tun.enable {clash_cfg.tun.stack.to_string()} else {"disabled".to_string()}));
+        
+        let mut dns_enable_str = "disable";
+        if let Some(serde_yaml::Value::Mapping(dns)) = parsed_yaml.get("dns") {
+            if let Some(serde_yaml::Value::Bool(enable)) = dns.get("enable") {
+                if *enable {
+                    dns_enable_str = "enabled";
+                }
+            }
+        }
+        info.push(format!("dns: {}", dns_enable_str));
+
+        info.push(format!("mixed-port: {}", clash_cfg.mixed_port));
+        info.push(format!("allow-lan: {}", clash_cfg.allow_lan));
+        info.push(format!("bind-address: {}", clash_cfg.bind_address));
+        info.push(format!("ipv6: {}", clash_cfg.ipv6));
+        info.push(format!("global-ua: {}", self.clash_api.clash_ua));
+        info.push(format!("global-client-fingerprint: {}", if clash_cfg.global_client_fingerprint == "" {"chrome".to_string()} else {clash_cfg.global_client_fingerprint.clone()}));
 
         Ok(info)
     }
+
+    fn str_human_readable_userinfo(&self, rsp: &Resp) -> Result<String, UserInfoError> {
+        use regex::Regex;
+
+        let sub_userinfo = rsp.get_headers().get("subscription-userinfo").map(|v| v.as_str());
+        if let Some(info) = sub_userinfo {
+            let re = Regex::new(r"(\w+)=(\d+)").map_err(|e| UserInfoError::RegexError(e))?;
+            let mut res = String::new();
+            for cap in re.captures_iter(info) {
+                let key = &cap[1];
+                let value: u64 = cap[2].parse().map_err(|e| UserInfoError::ParseError(e))?;
+                if key != "expire" {
+                    res.push_str(&format!("{}: {}; ", key, Utils::bytes_to_readable(value)));
+                } else {
+                    res.push_str(&format!("{}: {}; ", key, Utils::timestamp_to_readable(value)));
+                }
+            }
+            Ok(res)
+        } else {
+            Ok("None".to_string())
+        }
+    }
+
 }
 
 impl ClashTuiUtil {

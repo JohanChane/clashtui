@@ -3,17 +3,20 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "kebab-case")]
 #[serde(default)]
 pub struct ClashConfig {
-    // pub mixed_port: usize,
+    pub mixed_port: usize,
     pub mode: Mode,
-    // pub log_level: LogLevel,
-    // pub allow_lan: bool,
-    // bind_address: String,
-    // pub ipv6: bool,
-    // pub secret: String,
-    // tcp_concurrent: bool,
-    // pub external_controller: String,
-    // pub global_client_fingerprint: String,
+    pub log_level: LogLevel,
+    pub allow_lan: bool,
+    pub bind_address: String,
+    pub ipv6: bool,
+    //pub secret: String,
+    //pub tcp_concurrent: bool,
+    //pub external_controller: String,
+    pub global_client_fingerprint: String,
+    pub global_ua: String,
     pub tun: TunConfig,
+    pub dns: String,
+    pub geodata_mode: bool,
 }
 impl std::str::FromStr for ClashConfig {
     type Err = std::fmt::Error;
@@ -49,16 +52,30 @@ impl From<Mode> for String {
         val.to_string()
     }
 }
-// #[derive(Debug, Serialize, Deserialize, Default)]
-// #[serde(rename_all = "lowercase")]
-// pub enum LogLevel {
-//     Silent,
-//     Error,
-//     Warning,
-//     #[default]
-//     Info,
-//     Debug,
-// }
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+ Silent,
+ Error,
+ Warning,
+ #[default]
+ Info,
+ Debug,
+}
+
+impl std::fmt::Display for LogLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            LogLevel::Silent => "silent",
+            LogLevel::Error => "error",
+            LogLevel::Warning => "warning",
+            LogLevel::Info => "info",
+            LogLevel::Debug => "debug",
+        };
+        write!(f, "{}", s)
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct TunConfig {

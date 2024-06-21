@@ -7,7 +7,7 @@ use crate::tui::{
 };
 use crate::utils::{self, SharedClashTuiState, SharedClashTuiUtil, ProfileType};
 use crate::{msgpopup_methods, utils::get_mtime};
-crate::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);   // PTOp: ProfileTabOperation
+crate::define_enum!(PTOp, [Update, UpdateAll, Select, Delete, GenInfo]);   // PTOp: ProfileTabOperation
 
 #[derive(PartialEq)]
 enum Fouce {
@@ -133,6 +133,20 @@ impl ProfileTab {
             } else {
                 self.popup_txt_msg("Created".to_string());
                 self.update_profile_list();
+            }
+        }
+    }
+
+    fn handle_gen_profile_info_ev(&mut self) {
+        if let Some(profile_name) = self.profile_list.selected() {
+            let is_cur_profile = profile_name == self.clashtui_state.borrow().get_profile();
+            match self.clashtui_util.gen_profile_info(profile_name, is_cur_profile) {
+                Ok(info) => {
+                    self.popup_list_msg(info);
+                },
+                Err(e) => {
+                    self.popup_txt_msg(e.to_string());
+                }
             }
         }
     }
@@ -329,13 +343,10 @@ impl super::TabEvent for ProfileTab {
                             EventState::WorkDone
                         }
                         Keys::ProfileInfo => {
-                            if let Some(profile_name) = self.profile_list.selected() {
-                                match self.clashtui_util.gen_profile_info(&profile_name) {
-                                    Ok(info) => self.popup_list_msg(info),
-                                    Err(err) => self.popup_txt_msg(err.to_string()),
-                                }
-                            }
+                            self.popup_txt_msg("Generate info...".to_string());
+                            self.op.replace(PTOp::GenInfo);
                             EventState::WorkDone
+
                         }
                         _ => EventState::NotConsumed,
                     };
@@ -400,6 +411,7 @@ impl super::TabEvent for ProfileTab {
                 PTOp::UpdateAll => self.handle_update_profile_ev(true),
                 PTOp::Select => self.handle_select_profile_ev(),
                 PTOp::Delete => self.handle_delete_profile_ev(),
+                PTOp::GenInfo => self.handle_gen_profile_info_ev(),
             }
         }
     }
