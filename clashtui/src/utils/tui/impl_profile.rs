@@ -620,11 +620,28 @@ impl ClashTuiUtil {
         use std::time::{SystemTime, UNIX_EPOCH, Duration};
         use chrono::{DateTime, Utc};
 
-        // ## Providers
-        let mut info = vec!["## Providers".to_string()];
-        let profile_url = self.extract_profile_url(profile_name)?;
-        info.push(format!("Profile Url: {}", profile_url));
+        let with_proxy = self.check_proxy();
 
+        // ## Profile
+        let mut info = vec!["## Profile".to_string()];
+        let profile_type = self.get_profile_type(profile_name)
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Profile type not found"))?;
+        if profile_type == ProfileType::Url {
+            let profile_url = self.extract_profile_url(profile_name)?;
+            info.push(format!("Url: {}", profile_url));
+
+            if let Ok(rsp) = self.dl_remote_profile(profile_url.as_str(), with_proxy) {
+                info.push(format!("-   subscription-userinfo: {}",
+                        self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
+                for key in vec!["profile-update-interval"] {
+                    info.push(format!("-   {}: {}",
+                            key,
+                            rsp.get_headers().get(key).unwrap_or(&"None".to_string())));
+                }
+            }
+        }
+
+        // ## Providers
         let profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
         let yaml_content = std::fs::read_to_string(&profile_yaml_path)?;
         let parsed_yaml = match serde_yaml::from_str::<serde_yaml::Value>(&yaml_content) {
@@ -633,38 +650,45 @@ impl ClashTuiUtil {
         };
 
         let clash_cfg_dir = Path::new(&self.tui_cfg.clash_cfg_dir);
-        let with_proxy = self.check_proxy();
         let net_providers = self.extract_net_provider_helper(&parsed_yaml, &vec![ProfileSectionType::Profile, ProfileSectionType::ProxyProvider, ProfileSectionType::RuleProvider]);
         if let Ok(net_res) = net_providers {
-            for (st, res) in net_res {
-                let st_str = match st {
-                    ProfileSectionType::ProxyProvider => "Proxy Providers",
-                    ProfileSectionType::RuleProvider => "Rule Providers",
-                    _ => unreachable!(),
-                };
-                info.push(format!("{}:", st_str));
-
-                let now = std::time::SystemTime::now();
-                for (name, url, path) in res {
+            let now = std::time::SystemTime::now();
+            // ### Proxy Providers
+            net_res.get(&ProfileSectionType::ProxyProvider).map(|pp_net_res| {
+                info.push("## Proxy Providers".to_string());
+                for (name, url, path) in pp_net_res {
                     let p = clash_cfg_dir.join(path).to_path_buf();
                     let dur_str = Utils::gen_file_dur_str(&p, Some(now)).unwrap_or("None".to_string());
                     info.push(format!("-   {} ({}): {}", 
                             name, 
                             dur_str,
                             url));
-                    if st == ProfileSectionType::ProxyProvider {
-                        if let Ok(rsp) = self.dl_remote_profile(url.as_str(), with_proxy) {
-                            info.push(format!("    -   subscription-userinfo: {}",
-                                    self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
-                            for key in vec!["profile-update-interval"] {
-                                info.push(format!("    -   {}: {}",
-                                        key,
-                                        rsp.get_headers().get(key).unwrap_or(&"None".to_string())));
-                            }
+
+                    if let Ok(rsp) = self.dl_remote_profile(url.as_str(), with_proxy) {
+                        info.push(format!("    -   subscription-userinfo: {}",
+                                self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
+                        for key in vec!["profile-update-interval"] {
+                            info.push(format!("    -   {}: {}",
+                                    key,
+                                    rsp.get_headers().get(key).unwrap_or(&"None".to_string())));
                         }
                     }
                 }
-            }
+
+            });
+
+            // ### Rule Providers
+            net_res.get(&ProfileSectionType::RuleProvider).map(|pp_net_res| {
+                info.push("## Rule Providers".to_string());
+                for (name, url, path) in pp_net_res {
+                    let p = clash_cfg_dir.join(path).to_path_buf();
+                    let dur_str = Utils::gen_file_dur_str(&p, Some(now)).unwrap_or("None".to_string());
+                    info.push(format!("-   {} ({}): {}",
+                            name,
+                            dur_str,
+                            url));
+                }
+            });
         }
 
         if !is_cur_profile {

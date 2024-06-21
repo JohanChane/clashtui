@@ -343,7 +343,7 @@ impl super::TabEvent for ProfileTab {
                             EventState::WorkDone
                         }
                         Keys::ProfileInfo => {
-                            self.popup_txt_msg("Generate info...".to_string());
+                            self.popup_txt_msg("Generating info...".to_string());
                             self.op.replace(PTOp::GenInfo);
                             EventState::WorkDone
 
