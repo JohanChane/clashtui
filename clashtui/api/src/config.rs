@@ -19,7 +19,7 @@ pub struct ClashConfig {
     pub geodata_mode: bool,
     pub unified_delay: bool,
     pub geo_auto_update: bool,
-    pub geo_update_interval: u64,
+    pub geo_update_interval: u16,
     pub find_process_mode: String,
 }
 impl std::str::FromStr for ClashConfig {
