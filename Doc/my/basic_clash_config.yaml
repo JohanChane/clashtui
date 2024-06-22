@@ -4,6 +4,8 @@ mixed-port: 7890
 allow-lan: false
 log-level: silent
 ipv6: false
+unified-delay: false
+tcp-concurrent: true    # 域名有多个IP 时，就并发尝试所有IP连接的TCP握手。有一个成功即可。
 
 secret: ''
 external-controller: 127.0.0.1:9090
@@ -11,17 +13,21 @@ external-ui: uis/metacubexd
 external-ui-name: metacubexd
 external-ui-url: https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip
 
+#geox-url:
+#  geoip: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat"
+#  geosite: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat"
+#  mmdb: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.metadb"
 geo-auto-update: true
-geo-update-interval: 24
+geo-update-interval: 7
 
 profile:
   store-selected: true
-#unified-delay: true
+  store-fake-ip: true
 
 dns:
   enable: true
   prefer-h3: true
-  listen: :1053
+  #listen: :1053       # for redirect/tproxy
   ipv6: false
   enhanced-mode: fake-ip
   fake-ip-filter:
