@@ -10,13 +10,17 @@ pub struct ClashConfig {
     pub bind_address: String,
     pub ipv6: bool,
     //pub secret: String,
-    //pub tcp_concurrent: bool,
+    pub tcp_concurrent: bool,
     //pub external_controller: String,
     pub global_client_fingerprint: String,
     pub global_ua: String,
     pub tun: TunConfig,
     pub dns: String,
     pub geodata_mode: bool,
+    pub unified_delay: bool,
+    pub geo_auto_update: bool,
+    pub geo_update_interval: u64,
+    pub find_process_mode: String,
 }
 impl std::str::FromStr for ClashConfig {
     type Err = std::fmt::Error;

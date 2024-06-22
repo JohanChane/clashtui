@@ -774,6 +774,15 @@ impl ClashTuiUtil {
         info.push(format!("allow-lan: {}", clash_cfg.allow_lan));
         info.push(format!("bind-address: {}", clash_cfg.bind_address));
         info.push(format!("ipv6: {}", clash_cfg.ipv6));
+        info.push(format!("unified-delay: {}", clash_cfg.unified_delay));
+        info.push(format!("tcp-concurrent: {}", clash_cfg.tcp_concurrent));
+        if clash_cfg.geo_auto_update {
+            info.push(format!("geo-update-interval: {}", clash_cfg.geo_update_interval));
+        } else {
+            info.push(format!("geo-auto-update: {}", clash_cfg.geo_auto_update));
+        }
+        info.push(format!("geodata-mode: {}", clash_cfg.geodata_mode));
+        info.push(format!("find-process-mode: {}", if clash_cfg.find_process_mode == "" {"strict".to_string()} else {clash_cfg.find_process_mode.clone()}));
         info.push(format!("global-ua: {}", self.clash_api.clash_ua));
         info.push(format!("global-client-fingerprint: {}", if clash_cfg.global_client_fingerprint == "" {"chrome".to_string()} else {clash_cfg.global_client_fingerprint.clone()}));
 
