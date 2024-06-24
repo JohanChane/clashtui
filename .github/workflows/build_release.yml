@@ -26,29 +26,19 @@ jobs:
           chmod +x mihomo
           nohup ./mihomo -d Example -f Example/basic_clash_config.yaml &
 
-      #- name: Cache Target
-      #  uses: actions/cache@v4
-      #  with:
-      #    path: |
-      #      ./clashtui/target
-      #      ~/.cargo
-      #    key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
-      #    restore-keys: |
-      #      ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
-      #      ci-${{ runner.os }}-
-      #
-      #- name: Download Dependencies
-      #  run: cd clashtui && cargo fetch
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Cache Target
+        uses: actions/cache@v4
         with:
-          repository: ''
-          ref: 'dev'
-          #sparse-checkout: |
-          #  clashtui
-          #  Example
-          fetch-tags: true
+          path: |
+            ./clashtui/target
+            ~/.cargo
+          key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
+          restore-keys: |
+            ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
+            ci-${{ runner.os }}-
+
+      - name: Download Dependencies
+        run: cd clashtui && cargo fetch
 
       - name: Run tests
         run: cd clashtui && cargo test --all
