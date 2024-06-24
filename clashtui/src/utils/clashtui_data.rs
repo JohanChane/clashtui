@@ -7,6 +7,7 @@ use std::error::Error;
 #[serde(default)]
 pub struct ClashTuiData {
     pub current_profile: String,
+    pub no_pp: bool,
 }
 
 impl ClashTuiData {

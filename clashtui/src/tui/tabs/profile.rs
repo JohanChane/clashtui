@@ -70,7 +70,8 @@ impl ProfileTab {
 
     fn handle_select_profile_ev(&mut self) {
         if let Some(profile_name) = self.profile_list.selected() {
-            if let Err(err) = self.clashtui_util.select_profile(profile_name) {
+            let no_pp = self.clashtui_state.borrow().get_no_pp();
+            if let Err(err) = self.clashtui_util.select_profile(profile_name, no_pp) {
                 self.popup_txt_msg(err.to_string())
             } else {
                 self.clashtui_state
@@ -87,7 +88,8 @@ impl ProfileTab {
             {
                 Ok(mut msg) => {
                     if profile_name == self.clashtui_state.borrow().get_profile() {
-                        if let Err(err) = self.clashtui_util.select_profile(profile_name) {
+                        let no_pp = self.clashtui_state.borrow().get_no_pp();
+                        if let Err(err) = self.clashtui_util.select_profile(profile_name, no_pp) {
                             log::error!("{profile_name} => {err:?}");
                             msg.push(err.to_string());
                         } else {
@@ -347,6 +349,10 @@ impl super::TabEvent for ProfileTab {
                             self.op.replace(PTOp::GenInfo);
                             EventState::WorkDone
 
+                        }
+                        Keys::ProfileNoPp => {
+                            self.clashtui_state.borrow_mut().switch_no_pp();
+                            EventState::WorkDone
                         }
                         _ => EventState::NotConsumed,
                     };

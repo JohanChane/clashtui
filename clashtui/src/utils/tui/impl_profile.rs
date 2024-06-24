@@ -285,8 +285,8 @@ impl ClashTuiUtil {
         exec("sh", vec!["-c", cmd.as_str()])
     }
 
-    pub fn select_profile(&self, profile_name: &String) -> std::io::Result<()> {
-        if let Err(err) = self.merge_profile(profile_name) {
+    pub fn select_profile(&self, profile_name: &String, no_pp: bool) -> std::io::Result<()> {
+        if let Err(err) = self.merge_profile(profile_name, no_pp) {
             log::error!(
                 "Failed to Merge Profile `{}`: {}",
                 profile_name,
@@ -310,7 +310,7 @@ impl ClashTuiUtil {
         Ok(())
     }
 
-    fn merge_profile(&self, profile_name: &String) -> std::io::Result<()> {
+    fn merge_profile(&self, profile_name: &String, no_pp: bool) -> std::io::Result<()> {
         let basic_clash_cfg_path = self.clashtui_dir.join(super::BASIC_FILE);
         let mut dst_parsed_yaml = Utils::parse_yaml(&basic_clash_cfg_path)?;
         let profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
@@ -337,6 +337,13 @@ impl ClashTuiUtil {
                         }
                     }
                 }
+            }
+        }
+
+        if no_pp {
+            if let Ok(net_res) =
+                self.extract_net_provider_helper(&dst_parsed_yaml, &vec![ProfileSectionType::ProxyProvider]) {
+                self.no_proxy_providers(&mut dst_parsed_yaml, &net_res)?;
             }
         }
 
@@ -398,6 +405,271 @@ impl ClashTuiUtil {
         }
 
         Ok(result)
+    }
+
+    pub fn gen_profile_info(&self, profile_name: &String, is_cur_profile: bool) -> std::io::Result<Vec<String>> {
+        use std::time::{SystemTime, UNIX_EPOCH, Duration};
+        use chrono::{DateTime, Utc};
+
+        let with_proxy = self.check_proxy();
+
+        // ## Profile
+        let mut info = vec!["## Profile".to_string()];
+        let profile_type = self.get_profile_type(profile_name)
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Profile type not found"))?;
+        if profile_type == ProfileType::Url {
+            let profile_url = self.extract_profile_url(profile_name)?;
+            info.push(format!("Url: {}", profile_url));
+
+            if let Ok(rsp) = self.dl_remote_profile(profile_url.as_str(), with_proxy) {
+                info.push(format!("-   subscription-userinfo: {}",
+                        self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
+                for key in vec!["profile-update-interval"] {
+                    info.push(format!("-   {}: {}",
+                            key,
+                            rsp.get_headers().get(key).unwrap_or(&"None".to_string())));
+                }
+            }
+        }
+
+        // ## Providers
+        let profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
+        let yaml_content = std::fs::read_to_string(&profile_yaml_path)?;
+        let parsed_yaml = match serde_yaml::from_str::<serde_yaml::Value>(&yaml_content) {
+            Ok(value) => value,
+            Err(err) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
+        };
+
+        let clash_cfg_dir = Path::new(&self.tui_cfg.clash_cfg_dir);
+        let net_providers = self.extract_net_provider_helper(&parsed_yaml, &vec![ProfileSectionType::Profile, ProfileSectionType::ProxyProvider, ProfileSectionType::RuleProvider]);
+        if let Ok(net_res) = net_providers {
+            let now = std::time::SystemTime::now();
+            // ### Proxy Providers
+            net_res.get(&ProfileSectionType::ProxyProvider).map(|pp_net_res| {
+                info.push("## Proxy Providers".to_string());
+                for (name, url, path) in pp_net_res {
+                    let p = clash_cfg_dir.join(path).to_path_buf();
+                    let dur_str = Utils::gen_file_dur_str(&p, Some(now)).unwrap_or("None".to_string());
+                    info.push(format!("-   {} ({}): {}", 
+                            name, 
+                            dur_str,
+                            url));
+
+                    if let Ok(rsp) = self.dl_remote_profile(url.as_str(), with_proxy) {
+                        info.push(format!("    -   subscription-userinfo: {}",
+                                self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
+                        for key in vec!["profile-update-interval"] {
+                            info.push(format!("    -   {}: {}",
+                                    key,
+                                    rsp.get_headers().get(key).unwrap_or(&"None".to_string())));
+                        }
+                    }
+                }
+
+            });
+
+            // ### Rule Providers
+            net_res.get(&ProfileSectionType::RuleProvider).map(|pp_net_res| {
+                info.push("## Rule Providers".to_string());
+                for (name, url, path) in pp_net_res {
+                    let p = clash_cfg_dir.join(path).to_path_buf();
+                    let dur_str = Utils::gen_file_dur_str(&p, Some(now)).unwrap_or("None".to_string());
+                    info.push(format!("-   {} ({}): {}",
+                            name,
+                            dur_str,
+                            url));
+                }
+            });
+        }
+
+        if !is_cur_profile {
+            return Ok(info);
+        }
+
+        // ## GEO Database
+        info.push("## GEO Database".to_string());
+        // ### github release
+        let rule_dat_release_rsp = self.dl_remote_profile("https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases", with_proxy)?;
+        let releases = rule_dat_release_rsp.to_json()?;
+        let latest_release = releases.as_array()
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Failed to parse releases as array"))?
+                .get(0)
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "No release found"))?;
+
+        //let name = latest_release["name"].as_str().unwrap();
+        //let latest_release_time = latest_release["published_at"].as_str().unwrap();
+
+        // <name, updated_at>
+        let mut update_time_strs = std::collections::HashMap::<String, String>::new();
+        let mut update_times = std::collections::HashMap::<String, SystemTime>::new();
+        if let Some(assets) = latest_release["assets"].as_array() {
+            for asset in assets {
+                let name = asset["name"].as_str().unwrap();
+                let updated_at_str = asset["updated_at"].as_str().unwrap();
+                update_time_strs.insert(name.to_string(), updated_at_str.to_string());
+
+                let updated_at_utc = DateTime::parse_from_rfc3339(updated_at_str).unwrap().with_timezone(&Utc);
+                let updated_at_systemtime = UNIX_EPOCH + Duration::from_secs(updated_at_utc.timestamp() as u64) + Duration::from_nanos(updated_at_utc.timestamp_subsec_nanos() as u64);
+                update_times.insert(name.to_string(), updated_at_systemtime);
+            }
+        }
+
+        // ### Generate GEO database info
+        let clash_cfg = self.fetch_remote()?;
+        let mut geofiles = Vec::<(&str, &str)>::new();
+        geofiles.push(("GeoSite.dat", "geosite.dat"));      // <local_name, release_name>
+        if !clash_cfg.geodata_mode {
+            geofiles.push(("geoip.metadb", "geoip.metadb"));
+        } else {
+            geofiles.push(("geoip.dat", "geoip.dat"));
+        }
+        let now = std::time::SystemTime::now();
+        for (local_name, release_name) in geofiles {
+            let path = clash_cfg_dir.join(local_name);
+            let mtime = Utils::get_mtime(path.clone()).unwrap_or(SystemTime::UNIX_EPOCH);
+            let updated_at = update_times.get(release_name).unwrap_or(&mtime);
+            info.push(format!("{}: {{dur: {}, update: {}}}",
+                    local_name,
+                    Utils::gen_file_dur_str(&path, Some(now)).unwrap_or("None".to_string()),
+                    if updated_at > &mtime {
+                        format!("not latest {}",
+                            Utils::str_duration(updated_at.duration_since(mtime).unwrap_or_default())
+                        )
+                    } else {
+                        format!("latest {}",
+                            update_time_strs.get("geosite.dat").unwrap().clone()
+                        )
+                    }),
+                );
+        }
+
+        // ## Clash Config
+        info.push("## Clash Config".to_string());
+        info.push(format!("external-controller: {}", self.clash_api.api));
+        info.push(format!("proxy-address: {}", self.clash_api.proxy_addr));
+        info.push(format!("mode: {}", clash_cfg.mode));
+        info.push(format!("log-level: {}", clash_cfg.log_level));
+        info.push(format!("tun: {}", if clash_cfg.tun.enable {clash_cfg.tun.stack.to_string()} else {"disabled".to_string()}));
+        
+        let mut dns_enable_str = "disable";
+        if let Some(serde_yaml::Value::Mapping(dns)) = parsed_yaml.get("dns") {
+            if let Some(serde_yaml::Value::Bool(enable)) = dns.get("enable") {
+                if *enable {
+                    dns_enable_str = "enabled";
+                }
+            }
+        }
+        info.push(format!("dns: {}", dns_enable_str));
+
+        info.push(format!("mixed-port: {}", clash_cfg.mixed_port));
+        info.push(format!("allow-lan: {}", clash_cfg.allow_lan));
+        info.push(format!("bind-address: {}", clash_cfg.bind_address));
+        info.push(format!("ipv6: {}", clash_cfg.ipv6));
+        info.push(format!("unified-delay: {}", clash_cfg.unified_delay));
+        info.push(format!("tcp-concurrent: {}", clash_cfg.tcp_concurrent));
+        if clash_cfg.geo_auto_update {
+            info.push(format!("geo-update-interval: {}", clash_cfg.geo_update_interval));
+        } else {
+            info.push(format!("geo-auto-update: {}", clash_cfg.geo_auto_update));
+        }
+        info.push(format!("geodata-mode: {}", clash_cfg.geodata_mode));
+        info.push(format!("find-process-mode: {}", if clash_cfg.find_process_mode == "" {"strict"} else {clash_cfg.find_process_mode.as_str()}));
+        info.push(format!("global-ua: {}", self.clash_api.clash_ua));
+        info.push(format!("global-client-fingerprint: {}", if clash_cfg.global_client_fingerprint == "" {"chrome"} else {clash_cfg.global_client_fingerprint.as_str()}));
+
+        Ok(info)
+    }
+
+}
+
+impl ClashTuiUtil {
+    pub fn get_profile_names(&self) -> std::io::Result<Vec<String>> {
+        Utils::get_file_names(&self.profile_dir).map(|mut v| {
+            v.sort();
+            v
+        })
+    }
+    pub fn get_template_names(&self) -> std::io::Result<Vec<String>> {
+        Utils::get_file_names(self.clashtui_dir.join("templates")).map(|mut v| {
+            v.sort();
+            v
+        })
+    }
+    /// Wrapped `self.profile_dir.join(profile_name)`
+    pub fn get_profile_path_unchecked<P: AsRef<Path>>(&self, profile_name: P) -> PathBuf {
+        self.profile_dir.join(profile_name)
+    }
+    /// Wrapped `self.profile_dir.join(profile_name)`
+    pub fn get_template_path_unchecked<P: AsRef<Path>>(&self, name: P) -> PathBuf {
+        self.clashtui_dir.join("templates").join(name)
+    }
+    /// Check the `profiles` and `profile_cache` path
+    pub fn get_profile_yaml_path<P>(&self, profile_name: P) -> std::io::Result<PathBuf>
+    where
+        P: AsRef<Path> + AsRef<std::ffi::OsStr>,
+    {
+        let mut path = self.get_profile_path_unchecked(&profile_name);
+        if is_yaml(&path) {
+            Some(path)
+        } else {
+            path = self.get_profile_cache_unchecked(profile_name);
+            is_yaml(&path).then_some(path)
+        }
+        .ok_or(Error::new(
+            std::io::ErrorKind::NotFound,
+            "No valid yaml file",
+        ))
+    }
+    fn get_profile_cache_unchecked<P>(&self, profile_name: P) -> PathBuf
+    where
+        P: AsRef<Path> + AsRef<std::ffi::OsStr>,
+    {
+        self.clashtui_dir
+            .join("profile_cache")
+            .join(profile_name)
+            .with_extension("yaml")
+    }
+
+    pub fn get_profile_type(&self, profile_name: &str) -> Option<ProfileType> {
+        let profile_path = self.get_profile_path_unchecked(profile_name);
+        if is_yaml(&profile_path) {
+            return Some(ProfileType::Yaml);
+        }
+
+        match self.extract_profile_url(profile_name) {
+            Ok(_) => return Some(ProfileType::Url),
+            Err(e) => {
+                log::warn!("{}", e);
+            }
+        }
+
+        None
+    }
+
+    pub fn extract_profile_url(&self, profile_name: &str) -> std::io::Result<String> {
+        use std::io::BufRead;
+        use regex::Regex;
+
+        let profile_path = self.profile_dir.join(profile_name);
+        let file = File::open(profile_path)?;
+        let reader = std::io::BufReader::new(file);
+
+        let url_regex = Regex::new(r#"(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])"#)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("Invalid regex: {}", e)))?;
+
+
+        for line in reader.lines() {
+            let line = line?;
+            let line = line.trim();
+
+            if !line.starts_with("#") {     // `#` is comment char
+                if url_regex.is_match(&line) {
+                    return Ok(line.to_string());
+                }
+            }
+        }
+
+        Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("No URL found in {}", profile_name)))
     }
 
     fn download_profile(&self, url: &str, path: &PathBuf, with_proxy: bool) -> std::io::Result<()> {
@@ -616,179 +888,6 @@ impl ClashTuiUtil {
     }
     ***/
 
-    pub fn gen_profile_info(&self, profile_name: &String, is_cur_profile: bool) -> std::io::Result<Vec<String>> {
-        use std::time::{SystemTime, UNIX_EPOCH, Duration};
-        use chrono::{DateTime, Utc};
-
-        let with_proxy = self.check_proxy();
-
-        // ## Profile
-        let mut info = vec!["## Profile".to_string()];
-        let profile_type = self.get_profile_type(profile_name)
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Profile type not found"))?;
-        if profile_type == ProfileType::Url {
-            let profile_url = self.extract_profile_url(profile_name)?;
-            info.push(format!("Url: {}", profile_url));
-
-            if let Ok(rsp) = self.dl_remote_profile(profile_url.as_str(), with_proxy) {
-                info.push(format!("-   subscription-userinfo: {}",
-                        self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
-                for key in vec!["profile-update-interval"] {
-                    info.push(format!("-   {}: {}",
-                            key,
-                            rsp.get_headers().get(key).unwrap_or(&"None".to_string())));
-                }
-            }
-        }
-
-        // ## Providers
-        let profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
-        let yaml_content = std::fs::read_to_string(&profile_yaml_path)?;
-        let parsed_yaml = match serde_yaml::from_str::<serde_yaml::Value>(&yaml_content) {
-            Ok(value) => value,
-            Err(err) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
-        };
-
-        let clash_cfg_dir = Path::new(&self.tui_cfg.clash_cfg_dir);
-        let net_providers = self.extract_net_provider_helper(&parsed_yaml, &vec![ProfileSectionType::Profile, ProfileSectionType::ProxyProvider, ProfileSectionType::RuleProvider]);
-        if let Ok(net_res) = net_providers {
-            let now = std::time::SystemTime::now();
-            // ### Proxy Providers
-            net_res.get(&ProfileSectionType::ProxyProvider).map(|pp_net_res| {
-                info.push("## Proxy Providers".to_string());
-                for (name, url, path) in pp_net_res {
-                    let p = clash_cfg_dir.join(path).to_path_buf();
-                    let dur_str = Utils::gen_file_dur_str(&p, Some(now)).unwrap_or("None".to_string());
-                    info.push(format!("-   {} ({}): {}", 
-                            name, 
-                            dur_str,
-                            url));
-
-                    if let Ok(rsp) = self.dl_remote_profile(url.as_str(), with_proxy) {
-                        info.push(format!("    -   subscription-userinfo: {}",
-                                self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
-                        for key in vec!["profile-update-interval"] {
-                            info.push(format!("    -   {}: {}",
-                                    key,
-                                    rsp.get_headers().get(key).unwrap_or(&"None".to_string())));
-                        }
-                    }
-                }
-
-            });
-
-            // ### Rule Providers
-            net_res.get(&ProfileSectionType::RuleProvider).map(|pp_net_res| {
-                info.push("## Rule Providers".to_string());
-                for (name, url, path) in pp_net_res {
-                    let p = clash_cfg_dir.join(path).to_path_buf();
-                    let dur_str = Utils::gen_file_dur_str(&p, Some(now)).unwrap_or("None".to_string());
-                    info.push(format!("-   {} ({}): {}",
-                            name,
-                            dur_str,
-                            url));
-                }
-            });
-        }
-
-        if !is_cur_profile {
-            return Ok(info);
-        }
-
-        // ## GEO Database
-        info.push("## GEO Database".to_string());
-        // ### github release
-        let rule_dat_release_rsp = self.dl_remote_profile("https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases", with_proxy)?;
-        let releases = rule_dat_release_rsp.to_json()?;
-        let latest_release = releases.as_array()
-                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Failed to parse releases as array"))?
-                .get(0)
-                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "No release found"))?;
-
-        //let name = latest_release["name"].as_str().unwrap();
-        //let latest_release_time = latest_release["published_at"].as_str().unwrap();
-
-        // <name, updated_at>
-        let mut update_time_strs = std::collections::HashMap::<String, String>::new();
-        let mut update_times = std::collections::HashMap::<String, SystemTime>::new();
-        if let Some(assets) = latest_release["assets"].as_array() {
-            for asset in assets {
-                let name = asset["name"].as_str().unwrap();
-                let updated_at_str = asset["updated_at"].as_str().unwrap();
-                update_time_strs.insert(name.to_string(), updated_at_str.to_string());
-
-                let updated_at_utc = DateTime::parse_from_rfc3339(updated_at_str).unwrap().with_timezone(&Utc);
-                let updated_at_systemtime = UNIX_EPOCH + Duration::from_secs(updated_at_utc.timestamp() as u64) + Duration::from_nanos(updated_at_utc.timestamp_subsec_nanos() as u64);
-                update_times.insert(name.to_string(), updated_at_systemtime);
-            }
-        }
-
-        // ### Generate GEO database info
-        let clash_cfg = self.fetch_remote()?;
-        let mut geofiles = Vec::<(&str, &str)>::new();
-        geofiles.push(("GeoSite.dat", "geosite.dat"));      // <local_name, release_name>
-        if !clash_cfg.geodata_mode {
-            geofiles.push(("geoip.metadb", "geoip.metadb"));
-        } else {
-            geofiles.push(("geoip.dat", "geoip.dat"));
-        }
-        let now = std::time::SystemTime::now();
-        for (local_name, release_name) in geofiles {
-            let path = clash_cfg_dir.join(local_name);
-            let mtime = Utils::get_mtime(path.clone()).unwrap_or(SystemTime::UNIX_EPOCH);
-            let updated_at = update_times.get(release_name).unwrap_or(&mtime);
-            info.push(format!("{}: {{dur: {}, update: {}}}",
-                    local_name,
-                    Utils::gen_file_dur_str(&path, Some(now)).unwrap_or("None".to_string()),
-                    if updated_at > &mtime {
-                        format!("not latest {}",
-                            Utils::str_duration(updated_at.duration_since(mtime).unwrap_or_default())
-                        )
-                    } else {
-                        format!("latest {}",
-                            update_time_strs.get("geosite.dat").unwrap().clone()
-                        )
-                    }),
-                );
-        }
-
-        // ## Clash Config
-        info.push("## Clash Config".to_string());
-        info.push(format!("external-controller: {}", self.clash_api.api));
-        info.push(format!("proxy-address: {}", self.clash_api.proxy_addr));
-        info.push(format!("mode: {}", clash_cfg.mode));
-        info.push(format!("log-level: {}", clash_cfg.log_level));
-        info.push(format!("tun: {}", if clash_cfg.tun.enable {clash_cfg.tun.stack.to_string()} else {"disabled".to_string()}));
-        
-        let mut dns_enable_str = "disable";
-        if let Some(serde_yaml::Value::Mapping(dns)) = parsed_yaml.get("dns") {
-            if let Some(serde_yaml::Value::Bool(enable)) = dns.get("enable") {
-                if *enable {
-                    dns_enable_str = "enabled";
-                }
-            }
-        }
-        info.push(format!("dns: {}", dns_enable_str));
-
-        info.push(format!("mixed-port: {}", clash_cfg.mixed_port));
-        info.push(format!("allow-lan: {}", clash_cfg.allow_lan));
-        info.push(format!("bind-address: {}", clash_cfg.bind_address));
-        info.push(format!("ipv6: {}", clash_cfg.ipv6));
-        info.push(format!("unified-delay: {}", clash_cfg.unified_delay));
-        info.push(format!("tcp-concurrent: {}", clash_cfg.tcp_concurrent));
-        if clash_cfg.geo_auto_update {
-            info.push(format!("geo-update-interval: {}", clash_cfg.geo_update_interval));
-        } else {
-            info.push(format!("geo-auto-update: {}", clash_cfg.geo_auto_update));
-        }
-        info.push(format!("geodata-mode: {}", clash_cfg.geodata_mode));
-        info.push(format!("find-process-mode: {}", if clash_cfg.find_process_mode == "" {"strict"} else {clash_cfg.find_process_mode.as_str()}));
-        info.push(format!("global-ua: {}", self.clash_api.clash_ua));
-        info.push(format!("global-client-fingerprint: {}", if clash_cfg.global_client_fingerprint == "" {"chrome"} else {clash_cfg.global_client_fingerprint.as_str()}));
-
-        Ok(info)
-    }
-
     fn str_human_readable_userinfo(&self, rsp: &Resp) -> Result<String, UserInfoError> {
         use regex::Regex;
 
@@ -811,96 +910,99 @@ impl ClashTuiUtil {
         }
     }
 
-}
+    fn no_proxy_providers(&self, parsed_yaml: &mut serde_yaml::Value, net_res: &NetProviderMap) -> std::io::Result<()> {
+        use std::collections::{HashMap, HashSet};
+        use serde_yaml::Value;
 
-impl ClashTuiUtil {
-    pub fn get_profile_names(&self) -> std::io::Result<Vec<String>> {
-        Utils::get_file_names(&self.profile_dir).map(|mut v| {
-            v.sort();
-            v
-        })
-    }
-    pub fn get_template_names(&self) -> std::io::Result<Vec<String>> {
-        Utils::get_file_names(self.clashtui_dir.join("templates")).map(|mut v| {
-            v.sort();
-            v
-        })
-    }
-    /// Wrapped `self.profile_dir.join(profile_name)`
-    pub fn get_profile_path_unchecked<P: AsRef<Path>>(&self, profile_name: P) -> PathBuf {
-        self.profile_dir.join(profile_name)
-    }
-    /// Wrapped `self.profile_dir.join(profile_name)`
-    pub fn get_template_path_unchecked<P: AsRef<Path>>(&self, name: P) -> PathBuf {
-        self.clashtui_dir.join("templates").join(name)
-    }
-    /// Check the `profiles` and `profile_cache` path
-    pub fn get_profile_yaml_path<P>(&self, profile_name: P) -> std::io::Result<PathBuf>
-    where
-        P: AsRef<Path> + AsRef<std::ffi::OsStr>,
-    {
-        let mut path = self.get_profile_path_unchecked(&profile_name);
-        if is_yaml(&path) {
-            Some(path)
-        } else {
-            path = self.get_profile_cache_unchecked(profile_name);
-            is_yaml(&path).then_some(path)
-        }
-        .ok_or(Error::new(
-            std::io::ErrorKind::NotFound,
-            "No valid yaml file",
-        ))
-    }
-    fn get_profile_cache_unchecked<P>(&self, profile_name: P) -> PathBuf
-    where
-        P: AsRef<Path> + AsRef<std::ffi::OsStr>,
-    {
-        self.clashtui_dir
-            .join("profile_cache")
-            .join(profile_name)
-            .with_extension("yaml")
-    }
-
-    pub fn get_profile_type(&self, profile_name: &str) -> Option<ProfileType> {
-        let profile_path = self.get_profile_path_unchecked(profile_name);
-        if is_yaml(&profile_path) {
-            return Some(ProfileType::Yaml);
-        }
-
-        match self.extract_profile_url(profile_name) {
-            Ok(_) => return Some(ProfileType::Url),
-            Err(e) => {
-                log::warn!("{}", e);
-            }
-        }
-
-        None
-    }
-
-    pub fn extract_profile_url(&self, profile_name: &str) -> std::io::Result<String> {
-        use std::io::BufRead;
-        use regex::Regex;
-
-        let profile_path = self.profile_dir.join(profile_name);
-        let file = File::open(profile_path)?;
-        let reader = std::io::BufReader::new(file);
-
-        let url_regex = Regex::new(r#"(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])"#)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("Invalid regex: {}", e)))?;
-
-
-        for line in reader.lines() {
-            let line = line?;
-            let line = line.trim();
-
-            if !line.starts_with("#") {     // `#` is comment char
-                if url_regex.is_match(&line) {
-                    return Ok(line.to_string());
+        // ## Load the proxy providers
+        let mut proxy_map = HashMap::<String, Vec<Value>>::new(); // <proxy_provider_name, proxies>
+        let clash_cfg_dir = Path::new(&self.tui_cfg.clash_cfg_dir);
+        if let Some(proxy_providers) = net_res.get(&ProfileSectionType::ProxyProvider) {
+            for (name, _, path) in proxy_providers {
+                let tmp_yaml_content = std::fs::read_to_string(&clash_cfg_dir.join(path))?;
+                let tmp_parsed_yaml = match serde_yaml::from_str::<serde_yaml::Value>(&tmp_yaml_content) {
+                    Ok(value) => value,
+                    Err(err) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, err)),
+                };
+                
+                if let Some(Value::Sequence(proxies)) = tmp_parsed_yaml.get("proxies") {
+                    proxy_map.insert(name.clone(), proxies.clone());
                 }
             }
         }
 
-        Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("No URL found in {}", profile_name)))
+        // ## Rename the same proxy name between the proxy_providers
+        let mut proxy_names = HashMap::<String, Vec<String>>::new();
+        let mut unique_proxy_names = HashSet::<String>::new();
+        for (pp_name, proxies) in proxy_map.iter_mut() {
+            proxy_names.insert(pp_name.to_string(), Vec::new());
+            for proxy in proxies {
+                if let Some(names) = proxy_names.get_mut(pp_name) {
+                    if let Some(Value::String(name)) = proxy.get_mut("name") {
+                        if unique_proxy_names.contains(name) {
+                            *name = format!("{}{}", pp_name, name);
+                        }
+                        names.push(name.clone());
+                        unique_proxy_names.insert(name.clone());
+                    }
+                }
+            }
+        }
+        std::mem::drop(unique_proxy_names);
+
+        // ## Repace the proxy-providers in proxy-groups
+        let proxy_groups = if let Some(serde_yaml::Value::Sequence(proxy_groups)) =
+            parsed_yaml.get_mut("proxy-groups")
+        {
+            proxy_groups
+        } else {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Failed to parse `proxy-groups`"));
+        };
+
+        for the_pg_mapping in proxy_groups {
+            if let Value::Mapping(the_pg) = the_pg_mapping {
+                let mut new_uses = Vec::<Value>::new();
+                let mut new_proxies = Vec::<Value>::new();
+
+                if let Some(Value::Sequence(providers)) = the_pg.get("use") {
+                    for p in providers {
+                        if let Some(names) = proxy_names.get(p.as_str().unwrap()) {
+                            new_proxies.extend(names.iter().map(|s| Value::String(s.clone())).collect::<Vec<_>>());
+                        } else {
+                            new_uses.push(p.clone());
+                        }
+                    }
+                }
+                if let Some(Value::Sequence(providers)) = the_pg.get("proxies") {
+                    for p in providers {
+                        new_proxies.push(p.clone());
+                    }
+                }
+
+                the_pg.insert("use".into(), Value::Sequence(new_uses));
+                the_pg.insert("proxies".into(), Value::Sequence(new_proxies));
+            }
+
+        }
+
+        if let Value::Mapping(ref mut dst_yaml) = parsed_yaml {
+            // ## drop proxy-providers
+            dst_yaml.remove("proxy-providers");
+
+            // ## Add the `proxies` to the yaml
+            let mut new_proxies: Vec<Value> = proxy_map
+                .into_iter()
+                .flat_map(|(_, p_seq)| serde_yaml::to_value(p_seq).unwrap().as_sequence().unwrap().clone())
+                .collect();
+
+            if let Some(Value::Sequence(ref mut proxies)) = dst_yaml.get_mut("proxies") {
+                proxies.append(&mut new_proxies);
+            } else {
+                dst_yaml.insert("proxies".into(), Value::Sequence(new_proxies));
+            }
+        }
+
+        Ok(())
     }
 }
 /// # Limitations

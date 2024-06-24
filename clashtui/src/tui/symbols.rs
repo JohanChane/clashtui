@@ -18,6 +18,7 @@ s: Test
 e: Edit
 v: Preview
 n: Info
+m: Switch `No proxy providers`
 
 ## Tempalte
 Enter: Create yaml

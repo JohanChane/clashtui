@@ -8,6 +8,7 @@ pub enum Keys {
     ProfileDelete,
     ProfileTestConfig,
     ProfileInfo,
+    ProfileNoPp,        // no proxy provider
     TemplateSwitch,
     Edit,
     Preview,
@@ -58,6 +59,7 @@ impl From<KeyCode> for Keys {
             KeyCode::Char('d') => Keys::ProfileDelete,
             KeyCode::Char('s') => Keys::ProfileTestConfig,
             KeyCode::Char('n') => Keys::ProfileInfo,
+            KeyCode::Char('m') => Keys::ProfileNoPp,
 
             // ## Global Shortcuts (As much as possible use uppercase. And Others as much as possible use lowcase to avoid conflicts with global shortcuts.)
             KeyCode::Char('q') => Keys::AppQuit,   // Exiting is a common operation, and most software also exits with "q", so let's use "q".
