@@ -963,16 +963,16 @@ impl ClashTuiUtil {
             if let Value::Mapping(the_pg) = the_pg_mapping {
                 let mut new_proxies = Vec::<Value>::new();
 
+                if let Some(Value::Sequence(proxies)) = the_pg.get("proxies") {
+                    for p in proxies {
+                        new_proxies.push(p.clone());
+                    }
+                }
                 if let Some(Value::Sequence(providers)) = the_pg.get("use") {
                     for p in providers {
                         if let Some(names) = proxy_names.get(p.as_str().unwrap()) {
                             new_proxies.extend(names.iter().map(|s| Value::String(s.clone())).collect::<Vec<_>>());
                         }
-                    }
-                }
-                if let Some(Value::Sequence(providers)) = the_pg.get("proxies") {
-                    for p in providers {
-                        new_proxies.push(p.clone());
                     }
                 }
 
