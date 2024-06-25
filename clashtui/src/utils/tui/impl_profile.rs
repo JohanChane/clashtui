@@ -961,15 +961,12 @@ impl ClashTuiUtil {
 
         for the_pg_mapping in proxy_groups {
             if let Value::Mapping(the_pg) = the_pg_mapping {
-                let mut new_uses = Vec::<Value>::new();
                 let mut new_proxies = Vec::<Value>::new();
 
                 if let Some(Value::Sequence(providers)) = the_pg.get("use") {
                     for p in providers {
                         if let Some(names) = proxy_names.get(p.as_str().unwrap()) {
                             new_proxies.extend(names.iter().map(|s| Value::String(s.clone())).collect::<Vec<_>>());
-                        } else {
-                            new_uses.push(p.clone());
                         }
                     }
                 }
@@ -979,8 +976,11 @@ impl ClashTuiUtil {
                     }
                 }
 
-                the_pg.insert("use".into(), Value::Sequence(new_uses));
+                if new_proxies.is_empty() {
+                    new_proxies.push(Value::String("COMPATIBLE".into()));
+                }
                 the_pg.insert("proxies".into(), Value::Sequence(new_proxies));
+                the_pg.remove("use");
             }
 
         }
@@ -990,7 +990,7 @@ impl ClashTuiUtil {
             dst_yaml.remove("proxy-providers");
 
             // ## Add the `proxies` to the yaml
-            let mut new_proxies: Vec<Value> = proxy_map
+            let mut new_proxies = proxy_map
                 .into_iter()
                 .flat_map(|(_, p_seq)| serde_yaml::to_value(p_seq).unwrap().as_sequence().unwrap().clone())
                 .collect();
