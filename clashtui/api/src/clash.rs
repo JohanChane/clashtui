@@ -9,13 +9,6 @@ const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KH
 
 type Result<T> = core::result::Result<T, String>;
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub enum ProfileSectionType {
-    Profile,
-    ProxyProvider,
-    RuleProvider,
-}
-
 pub fn build_payload<P: AsRef<str>>(path: P) -> String {
     serde_json::json!({
         "path": path.as_ref(),
