@@ -1,36 +1,42 @@
-pub(super) const HELP: &str = r#"## Profile
+pub(super) const HELP: &str = r#"## Common
+j/k/h/l OR Up/Down/Left/Right: Scroll
+Enter: Action
+Esc: Close popup
+Tab: Switch
+
+## Profile Tab
 p: Switch to profile
-enter: Select
+t: Switch to template
+
+## Profile Window
+Enter: Select
 u: Update proxy-providers only
-U: Update all network resources in profile
+a: Update all network resources in profile
 i: Import
 d: Delete
+s: Test
 e: Edit
-t: Test
-p: Preview
+v: Preview
+n: Info
+m: Switch `No proxy providers`
 
 ## Tempalte
-T: Switch to template
-enter: Create yaml
+Enter: Create yaml
 e: Edit
-p: Preview
+v: Preview
 
 ## ClashSrvCtl
-enter: Action
-
-## Scroll
-j/k/h/l OR Up/Down/Left/Right: Scroll
+Enter: Action
 
 ## Global
-I: Show informations
+q: Quit
 R: Restart clash core
+L: Show recent log
+I: Show informations
 H: Locate app home path
 G: Locate clash config dir
-L: show recent log
 1,2,...,9 OR Tab: Switch tabs
-Esc: Close popup
-Q: Quit
-?: help"#;
+?: Help"#;
 
 pub(super) const PROFILE: &str = "Profile";
 pub(super) const TEMPALTE: &str = "Template";

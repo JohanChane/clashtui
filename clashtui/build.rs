@@ -1,36 +1,49 @@
 use std::env;
 use std::process::Command;
 
-fn get_git_version() -> String {
-    let version = env::var("CARGO_PKG_VERSION").unwrap();
+fn get_version() -> String {
+    let branch_name = match Command::new("git")
+        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+        .output()
+    {
+        Ok(v) => String::from_utf8(v.stdout)
+            .expect("failed to read stdout")
+            .trim_end()
+            .to_string(),
+        Err(err) => {
+            eprintln!("`git rev-parse` err: {}", err);
+            "".to_string()
+        }
+    };
 
-    let child = Command::new("git")
-        .args(["describe", "--tags", "--always"])
-        .output();
-    match child {
-        Ok(child) => String::from_utf8(child.stdout).expect("failed to read stdout"),
+    let git_describe = match Command::new("git").args(["describe", "--always"]).output() {
+        Ok(v) => String::from_utf8(v.stdout)
+            .expect("failed to read stdout")
+            .trim_end()
+            .to_string(),
         Err(err) => {
             eprintln!("`git describe` err: {}", err);
-            version
+            "".to_string()
         }
-    }
+    };
+
+    let cargo_pkg_version = env::var("CARGO_PKG_VERSION").unwrap();
+
+    let build_type: bool = env::var("DEBUG").unwrap().parse().unwrap();
+    let build_type_str = if build_type { "-debug" } else { "" };
+
+    let version = format!("v{cargo_pkg_version}-{branch_name}-{git_describe}{build_type_str}");
+
+    version
 }
 
 fn main() {
-    if let Ok(v) = env::var("CLASHTUI_VERSION") {
-        println!(
-            "cargo:rustc-env=CLASHTUI_VERSION={}-{}",
-            env::var("CARGO_PKG_VERSION").unwrap(),
-            v.trim_end()
-        );
-    } else {
-        let version = get_git_version();
-        let mut version = version.trim_end().to_owned();
-        let build_type: bool = env::var("DEBUG").unwrap().parse().unwrap();
-        version.push_str(if build_type { "-debug" } else { "-release" });
-        println!("cargo:rustc-env=CLASHTUI_VERSION={}", version);
-    }
     println!("cargo:rerun-if-changed=../.git/HEAD");
     println!("cargo:rerun-if-changed=../.git/refs/heads/dev");
     println!("cargo:rerun-if-changed=build.rs",);
+
+    if let Ok(_) = env::var("CLASHTUI_VERSION") {
+    } else {
+        println!("cargo:rustc-env=CLASHTUI_VERSION={}", get_version());
+    }
 }

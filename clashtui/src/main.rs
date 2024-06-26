@@ -8,6 +8,14 @@ use backend::const_err::ERR_PATH_UTF_8;
 use utils::{init_config, ClashBackend, Flag, Flags};
 
 fn main() {
+    /*
+    // Prevent create root files before fixing files permissions.
+    if utils::is_clashtui_ep() {
+        utils::mock_fileop_as_sudo_user();
+    }
+    // To allow the mihomo process to read and write files created by clashtui in clash_cfg_dir, set the umask to 0o002.
+    sys::stat::umask(sys::stat::Mode::from_bits_truncate(0o002));
+     */
     if let Ok(infos) = commands::parse_args() {
         let mut flags = Flags::empty();
         let config_dir = load_app_dir(&mut flags);
@@ -103,6 +111,7 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
     }
     config_dir
 }
+
 fn setup_logging(log_path: &str) {
     use log4rs::append::file::FileAppender;
     use log4rs::config::{Appender, Config, Root};
@@ -124,7 +133,9 @@ fn setup_logging(log_path: &str) {
     #[cfg(debug_assertions)]
     let log_level = log::LevelFilter::Debug;
     let file_appender = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("[{l}] {t} - {m}{n}")))
+        .encoder(Box::new(PatternEncoder::new(
+            "{d(%H:%M:%S)} [{l}] {t} - {m}{n}",
+        ))) // Having a timestamp would be better.
         .build(log_path)
         .expect("Err opening log file");
 

@@ -55,8 +55,15 @@ impl List {
         f.render_stateful_widget(
             if let Some(vc) = self.extra.as_ref() {
                 Raw::List::from_iter(self.items.iter().zip(vc.iter()).map(|(v, e)| {
-                    Raw::ListItem::new(Ra::Line::from(v.to_owned() + "(" + e + ")"))
-                        .style(Ra::Style::default())
+                    Raw::ListItem::new(Ra::Line::from(vec![
+                        Ra::Span::styled(v.to_owned(), Ra::Style::default()),
+                        Ra::Span::styled(" ".to_owned(), Ra::Style::default()),
+                        //Ra::Span::styled(e, Ra::Style::default().fg(Ra::Color::Rgb(192, 192, 192)))
+                        Ra::Span::styled(
+                            e,
+                            Ra::Style::default().fg(Theme::get().profile_update_interval_fg),
+                        ),
+                    ]))
                 }))
             } else {
                 Raw::List::from_iter(self.items.iter().map(|i| {

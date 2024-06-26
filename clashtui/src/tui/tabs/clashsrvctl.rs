@@ -31,19 +31,10 @@ impl ClashSrvCtlTab {
     pub fn new(util: SharedBackend, state: SharedState) -> Self {
         let mut operations = List::new(CLASHSRVCTL.to_string());
         operations.set_items(vec![
-            #[cfg(target_os = "linux")]
             ClashSrvOp::SetPermission.into(),
             ClashSrvOp::StartClashService.into(),
             ClashSrvOp::StopClashService.into(),
             ClashSrvOp::SwitchMode.into(),
-            #[cfg(target_os = "windows")]
-            ClashSrvOp::SwitchSysProxy.into(),
-            #[cfg(target_os = "windows")]
-            ClashSrvOp::EnableLoopback.into(),
-            #[cfg(target_os = "windows")]
-            ClashSrvOp::InstallSrv.into(),
-            #[cfg(target_os = "windows")]
-            ClashSrvOp::UnInstallSrv.into(),
         ]);
         let mut modes = List::new("Mode".to_string());
         modes.set_items(vec![
@@ -142,7 +133,19 @@ impl super::TabEvent for ClashSrvCtlTab {
                     }
                 },
             }
-            self.state.borrow_mut().refresh();
+            match op {
+                // Ops that doesn't need refresh
+                ClashSrvOp::SetPermission => {}
+
+                ClashSrvOp::StartClashService => {
+                    todo!("Not good idea");
+                    std::thread::sleep(std::time::Duration::from_secs(2)); // Waiting for mihomo to finish starting.
+                    self.clashtui_state.borrow_mut().refresh();
+                }
+                _ => {
+                    self.clashtui_state.borrow_mut().refresh();
+                }
+            }
         }
     }
     fn draw(&mut self, f: &mut ratatui::prelude::Frame, area: ratatui::prelude::Rect) {

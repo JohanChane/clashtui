@@ -39,7 +39,7 @@ impl ClashBackend {
         // ## proxy-providers
         // e.g. {provider: [provider0, provider1, ...]}
         let mut pp_names: HashMap<String, Vec<String>> = HashMap::new(); // proxy-provider names
-        let mut new_proxy_providers = HashMap::new();
+        let mut new_proxy_providers = serde_yaml::Mapping::new();
         let pp_mapping = if let Some(serde_yaml::Value::Mapping(pp_mapping)) =
             tpl_parsed_yaml.get("proxy-providers")
         {
@@ -72,9 +72,17 @@ impl ClashBackend {
                     serde_yaml::Value::String("url".to_string()),
                     serde_yaml::Value::String(url.clone()),
                 );
+                let tpl_name_no_ext = Path::new(template_name)
+                    .file_stem()
+                    .unwrap_or_else(|| Path::new(template_name).as_os_str())
+                    .to_str()
+                    .unwrap_or(template_name);
                 new_pp.insert(
                     serde_yaml::Value::String("path".to_string()),
-                    serde_yaml::Value::String(format!("proxy-providers/tpl/{}.yaml", the_pp_name)),
+                    serde_yaml::Value::String(format!(
+                        "proxy-providers/tpl/{}/{}.yaml",
+                        tpl_name_no_ext, the_pp_name
+                    )),
                 );
                 new_proxy_providers.insert(
                     serde_yaml::Value::String(the_pp_name.clone()),
@@ -83,7 +91,7 @@ impl ClashBackend {
             }
         }
         out_parsed_yaml.to_mut()["proxy-providers"] =
-            serde_yaml::to_value(new_proxy_providers).unwrap();
+            serde_yaml::Value::Mapping(new_proxy_providers);
 
         // ## proxy-groups
         // e.g. {Auto: [Auto-provider0, Auto-provider1, ...], Select: [Select-provider0, ...]}
@@ -525,9 +533,6 @@ impl ClashBackend {
 #[allow(unused)]
 fn crt_symlink_file<P: AsRef<std::path::Path>>(original: P, target: P) -> std::io::Result<()> {
     use std::os;
-    #[cfg(target_os = "windows")]
-    return os::windows::fs::symlink_file(original, target);
-    #[cfg(target_os = "linux")]
     os::unix::fs::symlink(original, target)
 }
 enum CrtFile {

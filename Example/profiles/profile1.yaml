@@ -1,0 +1,72 @@
+pp:
+  interval: 3600
+  intehealth-check:
+    enable: true
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+delay_test:
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+proxy-groups:
+- name: Entry
+  type: select
+  proxies:
+  - Auto-provider0
+  - Select-provider0
+- name: Select-provider0
+  type: select
+  use:
+  - provider0
+- name: Auto-provider0
+  <<:
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+  type: url-test
+  use:
+  - provider0
+- name: Entry-RuleMode
+  type: select
+  proxies:
+  - DIRECT
+  - Entry
+- name: Entry-LastMatch
+  type: select
+  proxies:
+  - Entry
+  - DIRECT
+proxy-providers:
+  provider0:
+    <<:
+      interval: 3600
+      intehealth-check:
+        enable: true
+        url: https://www.gstatic.com/generate_204
+        interval: 300
+    type: http
+    url: https://cdn.jsdelivr.net/gh/anaer/Sub@main/clash.yaml
+    path: proxy-providers/tpl/provider0.yaml
+rule-anchor:
+  ip:
+    interval: 86400
+    behavior: ipcidr
+    format: yaml
+  domain:
+    type: http
+    interval: 86400
+    behavior: domain
+    format: yaml
+rule-providers:
+  private:
+    type: http
+    url: https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/private.yaml
+    path: ./rule-providers/tpl/private.yaml
+    <<:
+      type: http
+      interval: 86400
+      behavior: domain
+      format: yaml
+rules:
+- RULE-SET,private,DIRECT
+- GEOIP,lan,DIRECT,no-resolve
+- GEOSITE,biliintl,Entry
+- MATCH,Entry-LastMatch

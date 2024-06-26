@@ -15,7 +15,7 @@ pub struct ClashBackend {
 // Misc
 impl ClashBackend {
     pub fn new(clashtui_dir: &Path, is_inited: bool) -> (Self, Vec<anyhow::Error>) {
-        let ( clash_api, cfg,warning) = load_app_config(clashtui_dir, is_inited)
+        let (clash_api, cfg, warning) = load_app_config(clashtui_dir, is_inited)
             .expect("fatal error, fix them before continuing");
 
         let mut err_track = vec![];

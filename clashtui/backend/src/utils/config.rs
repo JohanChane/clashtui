@@ -170,7 +170,13 @@ pub fn load_app_config(
         Config::default()
     };
     Ok((
-        ClashUtil::new(external_controller, secret, proxy_addr, global_ua,configs.timeout),
+        ClashUtil::new(
+            external_controller,
+            secret,
+            proxy_addr,
+            global_ua,
+            configs.timeout,
+        ),
         configs,
         just_warn,
     ))

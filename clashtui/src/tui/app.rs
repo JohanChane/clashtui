@@ -1,10 +1,10 @@
 use core::cell::{OnceCell, RefCell};
+use std::io::{BufRead, Read, Write};
 use std::{path::PathBuf, rc::Rc};
 
 use crate::utils::{Flag, Flags};
 use ui::event;
 
-use crate::msgpopup_methods;
 use crate::tui::{
     tabs::{ClashSrvCtlTab, ProfileTab, TabEvent, Tabs},
     tools,
@@ -13,8 +13,22 @@ use crate::tui::{
     EventState, StatusBar, TabBar, Theme, Visibility,
 };
 use crate::utils::{ClashBackend, SharedBackend, SharedState, State};
+use crate::{msgpopup_methods, utils};
 
 use super::impl_app::MonkeyPatch;
+
+/// Mihomo (Clash.Meta) TUI Client
+///
+/// A tui tool for mihomo
+#[derive(argh::FromArgs)]
+pub struct CliEnv {
+    /// don't show UI but only update all profiles
+    #[argh(switch, short = 'u')]
+    pub update_all_profiles: bool,
+    /// print version information and exit
+    #[argh(switch, short = 'v')]
+    pub version: bool,
+}
 
 pub struct App {
     tabbar: TabBar,
@@ -154,7 +168,7 @@ impl App {
                 Keys::AppConfig => {
                     let _ = self
                         .util
-                        .open_dir(&PathBuf::from(&self.util.cfg.clash_cfg_dir))
+                        .open_dir(&self.util.cfg.clash_cfg_dir)
                         .map_err(|e| log::error!("ODIR: {e:?}"));
                     EventState::WorkDone
                 }
@@ -261,6 +275,102 @@ impl App {
                     .expect("path is not utf-8 form"),
             )
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+    #[desperated]
+    fn do_some_job_after_initapp_before_setupui(&mut self) {
+        // ## Correct the perm of files in clash_cfg_dir.
+        if !self.clashtui_util.check_perms_of_ccd_files() {
+            let ccd_str = self.clashtui_util.tui_cfg.clash_cfg_dir.as_str();
+            if !utils::is_run_as_root() {
+                print!("The permissions of the '{}' files are incorrect. clashtui need to run as root to correct. Proceed with running as root? [Y/n] ", ccd_str);
+                std::io::stdout().flush().expect("Failed to flush stdout");
+
+                let mut input = String::new();
+                let stdin = std::io::stdin();
+                stdin.lock().read_line(&mut input).unwrap();
+
+                if input.trim().to_lowercase().as_str() == "y" {
+                    utils::run_as_root();
+                }
+            } else {
+                if utils::is_clashtui_ep() {
+                    println!(
+                        "\nStart correct the permissions of files in '{}':\n",
+                        ccd_str
+                    );
+                    let dir = std::path::Path::new(ccd_str);
+                    if let Some(group_name) = utils::get_file_group_name(&dir.to_path_buf()) {
+                        utils::restore_fileop_as_root();
+                        utils::modify_file_perms_in_dir(&dir.to_path_buf(), group_name.as_str());
+                    }
+                    print!("\nEnd correct the permissions of files in '{}'. \n\nPrepare to restart clashtui. Press any key to continue. ", ccd_str);
+                    std::io::stdout().flush().expect("Failed to flush stdout");
+                    let _ = std::io::stdin().read(&mut [0u8]);
+
+                    utils::run_as_previous_user(); //
+                } else { // user manually executing `sudo clashtui`
+                     // Do nothing, as root is unaffected by permissions.
+                }
+            }
+        }
+
+        let cli_env: CliEnv = argh::from_env();
+
+        // ## CliMode
+        let mut is_cli_mode = false;
+
+        if cli_env.update_all_profiles {
+            is_cli_mode = true;
+
+            log::info!("Cron Mode!");
+
+            let current_time = std::time::SystemTime::now();
+            let datetime: chrono::DateTime<chrono::Local> = current_time.into();
+            println!("## {}", datetime.format("%Y-%m-%d %H:%M:%S"));
+            if let Ok(profile_names) = self.clashtui_util.get_profile_names() {
+                let mut ok_profiles = Vec::new();
+                for p_name in profile_names {
+                    println!("Update Profile `{p_name}`:");
+                    match self.clashtui_util.update_profile(&p_name, false) {
+                        Ok(r) => {
+                            for u in r {
+                                println!("-   {u}");
+                                ok_profiles.push(p_name.clone());
+                            }
+                        }
+                        Err(e) => {
+                            println!("-   Err: {e}");
+                        }
+                    }
+                }
+
+                let current_profile = &self.clashtui_util.clashtui_data.borrow().current_profile;
+                if ok_profiles.contains(current_profile) {
+                    let no_pp = self.clashtui_util.clashtui_data.borrow().no_pp;
+                    println!("\nSelect profile `{current_profile}`:");
+                    match self.clashtui_util.select_profile(current_profile, no_pp) {
+                        Ok(_) => println!("-   Ok"),
+                        Err(e) => println!("-   Err: {e}"),
+                    }
+                }
+            }
+
+            //self.clashtui_util.get_profile_names()
+            //    .unwrap()
+            //    .into_iter()
+            //    .inspect(|s| println!("\nProfile: {s}"))
+            //    .filter_map(|v| {
+            //        self.clashtui_util.update_profile(&v, false)
+            //            .map_err(|e| println!("- Error! {e}"))
+            //            .ok()
+            //    })
+            //    .flatten()
+            //    .for_each(|s| println!("- {s}"));
+        }
+
+        if is_cli_mode {
+            std::process::exit(0);
+        }
     }
 }
 

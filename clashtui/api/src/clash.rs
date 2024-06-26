@@ -1,3 +1,5 @@
+use minreq::Method;
+
 const DEFAULT_PAYLOAD: &str = r#"'{"path": "", "payload": ""}'"#;
 const TIMEOUT: u64 = 5;
 #[cfg(feature = "deprecated")]
@@ -7,7 +9,12 @@ const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KH
 
 type Result<T> = core::result::Result<T, String>;
 
-use minreq::Method;
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ProfileSectionType {
+    Profile,
+    ProxyProvider,
+    RuleProvider,
+}
 
 pub fn build_payload<P: AsRef<str>>(path: P) -> String {
     serde_json::json!({
@@ -31,7 +38,7 @@ pub struct ClashUtil {
     api: String,
     secret: Option<String>,
     ua: Option<String>,
-    timeout:u64,
+    timeout: u64,
     pub proxy_addr: String,
 }
 
@@ -41,14 +48,14 @@ impl ClashUtil {
         secret: Option<String>,
         proxy_addr: String,
         ua: Option<String>,
-        timeout:Option<u64>,
+        timeout: Option<u64>,
     ) -> Self {
         Self {
             api: controller_api,
             secret,
             ua,
             proxy_addr,
-            timeout: timeout.unwrap_or(TIMEOUT)
+            timeout: timeout.unwrap_or(TIMEOUT),
         }
     }
     fn request(
@@ -168,9 +175,36 @@ impl ClashUtil {
             Ok("Already Up to dated".to_string())
         }
     }
+
     /*
     pub fn flush_fakeip(&self) -> Result<String, reqwest::Error> {
         self.post("/cache/fakeip/flush", None)
+    }
+    pub fn provider(&self, is_rule: bool, name:Option<&String>, is_update: bool, is_check: bool) -> Result<String, reqwest::Error>{
+        //
+        if !is_rule{
+            let api = "/providers/proxies";
+            match name {
+                Some(v) => {
+                    if is_update{
+                        self.put(&format!("{}/{}", api, v), None)
+                    } else {
+                        if is_check{
+                            self.get(&format!("{}/{}/healthcheck", api, v), None)
+                        } else {
+                            self.get(&format!("{}/{}", api, v), None)
+                        }
+                    }
+                },
+                None => self.get(api, None),
+            }
+        } else {
+            let api = "/providers/rules";
+            match name {
+                Some(v) => self.put(&format!("{}/{}", api, v), None),
+                None => self.get(api, None)
+            }
+        }
     }
     pub fn update_geo(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
         match payload {
@@ -231,32 +265,6 @@ impl ClashUtil {
             }
         }
     }
-    pub fn provider(&self, is_rule: bool, name:Option<&String>, is_update: bool, is_check: bool) -> Result<String, reqwest::Error>{
-        //
-        if !is_rule{
-            let api = "/providers/proxies";
-            match name {
-                Some(v) => {
-                    if is_update{
-                        self.put(&format!("{}/{}", api, v), None)
-                    } else {
-                        if is_check{
-                            self.get(&format!("{}/{}/healthcheck", api, v), None)
-                        } else {
-                            self.get(&format!("{}/{}", api, v), None)
-                        }
-                    }
-                },
-                None => self.get(api, None),
-            }
-        } else {
-            let api = "/providers/rules";
-            match name {
-                Some(v) => self.put(&format!("{}/{}", api, v), None),
-                None => self.get(api, None)
-            }
-        }
-    }
     pub fn dns_resolve(&self, name:&String, _type:Option<&String>) -> Result<String, reqwest::Error>{
         match _type {
             Some(v) => self.get(&format!("/dns/query?name={}&type={}", name, v), None),
@@ -274,13 +282,19 @@ mod tests {
             None,
             "http://127.0.0.1:7890".to_string(),
             None,
-            None
+            None,
         )
     }
     #[test]
     fn version_test() {
         let sym = sym();
         println!("{}", sym.version().unwrap());
+    }
+    #[test]
+    #[should_panic]
+    fn connectivity_test() {
+        let sym = sym();
+        println!("{:?}", sym.check_connectivity().unwrap_err());
     }
     #[test]
     fn config_get_test() {

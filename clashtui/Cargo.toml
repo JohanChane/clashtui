@@ -1,6 +1,6 @@
 [package]
 name = "clashtui"
-version = "0.1.0-dev"
+version = "0.2.2"
 edition = "2021"
 
 authors = ["Johan Chane <johanchanex at gmail dot com>"]

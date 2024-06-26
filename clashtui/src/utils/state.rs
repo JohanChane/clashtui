@@ -10,11 +10,6 @@ impl State {
             st: ct.update_state(None, None, None),
             ct,
         };
-        #[cfg(target_os = "linux")]
-        Self {
-            st: ct.update_state(None, None),
-            ct,
-        }
     }
     pub fn refresh(&mut self) {
         #[cfg(target_os = "windows")]
@@ -30,35 +25,19 @@ impl State {
         &self.st.profile
     }
     pub fn set_profile(&mut self, profile: String) {
-        // With update state
-        #[cfg(target_os = "windows")]
-        {
-            self.st = self.ct.update_state(Some(profile), None, None)
-        }
-        #[cfg(target_os = "linux")]
-        {
-            self.st = self.ct.update_state(Some(profile), None)
-        }
+        self.st = self.ct.update_state(Some(profile), None, None)
     }
     pub fn set_mode(&mut self, mode: String) {
-        #[cfg(target_os = "windows")]
-        {
-            self.st = self.ct.update_state(None, Some(mode), None)
-        }
-        #[cfg(target_os = "linux")]
-        {
-            self.st = self.ct.update_state(None, Some(mode))
-        }
+        self.st = self.ct.update_state(None, Some(mode), None)
+    }
+    pub fn switch_no_pp(&mut self) {
+        let no_pp = !self.st.no_pp;
+        self.st = self.ct.update_state(None, None, Some(no_pp))
+    }
+    pub fn get_no_pp(&self) -> bool {
+        self.st.no_pp
     }
     pub fn render(&self) -> String {
         self.st.to_string()
-    }
-    #[cfg(target_os = "windows")]
-    pub fn get_sysproxy(&self) -> Option<bool> {
-        self.st.sysproxy
-    }
-    #[cfg(target_os = "windows")]
-    pub fn set_sysproxy(&mut self, sysproxy: bool) {
-        self.st = self.ct.update_state(None, None, Some(sysproxy));
     }
 }
