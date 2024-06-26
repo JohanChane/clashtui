@@ -31,6 +31,7 @@ pub struct ClashUtil {
     api: String,
     secret: Option<String>,
     ua: Option<String>,
+    timeout:u64,
     pub proxy_addr: String,
 }
 
@@ -40,12 +41,14 @@ impl ClashUtil {
         secret: Option<String>,
         proxy_addr: String,
         ua: Option<String>,
+        timeout:Option<u64>,
     ) -> Self {
         Self {
             api: controller_api,
             secret,
             ua,
             proxy_addr,
+            timeout: timeout.unwrap_or(TIMEOUT)
         }
     }
     fn request(
@@ -61,7 +64,7 @@ impl ClashUtil {
         if let Some(s) = self.secret.as_ref() {
             req = req.with_header("Authorization", format!("Bearer {s}"));
         }
-        req.with_timeout(TIMEOUT)
+        req.with_timeout(self.timeout)
             .send()
             .and_then(|r| r.as_str().map(|s| s.to_owned()))
             .map_err(|e| format!("API:{e:?}"))
@@ -92,7 +95,7 @@ impl ClashUtil {
             )
         }
         req.with_header("user-agent", self.ua.as_deref().unwrap_or("clash.meta"))
-            .with_timeout(TIMEOUT)
+            .with_timeout(self.timeout)
             .send_lazy()
             .map(Resp)
             .map_err(|e| format!("API:{e:?}"))
@@ -102,7 +105,7 @@ impl ClashUtil {
     }
     pub fn check_connectivity(&self) -> Result<()> {
         minreq::get("https://www.gstatic.com/generate_204")
-            .with_timeout(TIMEOUT)
+            .with_timeout(self.timeout)
             .with_proxy(
                 minreq::Proxy::new(self.proxy_addr.clone())
                     .map_err(|e| format!("API(PROXY):{e:?}"))?,
@@ -271,6 +274,7 @@ mod tests {
             None,
             "http://127.0.0.1:7890".to_string(),
             None,
+            None
         )
     }
     #[test]

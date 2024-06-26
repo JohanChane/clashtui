@@ -50,6 +50,7 @@ pub struct Config {
     #[cfg(target_os = "linux")]
     /// whether service is running as a user instance
     pub is_user: bool,
+    timeout: Option<u64>,
 
     pub edit_cmd: String,
     pub open_dir_cmd: String,
@@ -123,7 +124,7 @@ struct Temp {
 pub fn load_app_config(
     clashtui_dir: &std::path::Path,
     skip_init_conf: bool,
-) -> anyhow::Result<(Config, ClashUtil, Option<anyhow::Error>)> {
+) -> anyhow::Result<(ClashUtil, Config, Option<anyhow::Error>)> {
     use crate::consts::{BASIC_FILE, HOST};
     let basic_clash_config_path = clashtui_dir.join(BASIC_FILE);
     let Temp {
@@ -169,8 +170,8 @@ pub fn load_app_config(
         Config::default()
     };
     Ok((
+        ClashUtil::new(external_controller, secret, proxy_addr, global_ua,configs.timeout),
         configs,
-        ClashUtil::new(external_controller, secret, proxy_addr, global_ua),
         just_warn,
     ))
 }
