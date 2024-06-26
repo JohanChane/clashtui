@@ -1,5 +1,5 @@
 use super::ClashBackend;
-use crate::utils::{get_file_names, ipc, is_yaml, parse_yaml};
+use crate::utils::{extract_domain, get_file_names, ipc, is_yaml, parse_yaml};
 use std::{
     fs::{create_dir_all, File},
     io::Error,
@@ -429,11 +429,12 @@ impl ClashBackend {
         Ok(net_res
             .into_iter()
             .map(|(url, path)| {
+                let url_domain = extract_domain(url.as_str()).unwrap_or("No domain");
                 match self.download_profile(&url, &Path::new(&self.cfg.clash_cfg_dir).join(path)) {
-                    Ok(_) => format!("Updated: {url}"),
+                    Ok(_) => format!("Updated: {profile_name}({url_domain})"),
                     Err(err) => {
                         log::error!("Update profile:{err}");
-                        format!("Not Updated: {url}")
+                        format!("Not Updated: {profile_name}({url_domain})")
                     }
                 }
             })

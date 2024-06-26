@@ -40,3 +40,15 @@ where
         ))
     }
 }
+
+pub fn extract_domain(url: &str) -> Option<&str> {
+    if let Some(protocol_end) = url.find("://") {
+        let rest = &url[(protocol_end + 3)..];
+        if let Some(path_start) = rest.find('/') {
+            return Some(&rest[..path_start]);
+        } else {
+            return Some(rest);
+        }
+    }
+    None
+}
