@@ -450,7 +450,12 @@ impl ClashBackend {
 
         let mut output_file = File::create(path)?;
         let response = self
-            .dl_remote_profile(url)
+            .dl_remote_profile(
+                url,
+                std::env::var(crate::consts::PROXY_ENVAR)
+                    .map(|s| s.parse::<bool>().unwrap_or(false))
+                    .unwrap_or(false),
+            )
             .map_err(|s| Error::new(std::io::ErrorKind::Other, s))?;
         response.copy_to(&mut output_file)?;
         Ok(())

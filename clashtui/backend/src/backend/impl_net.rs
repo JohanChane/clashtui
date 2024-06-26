@@ -47,7 +47,7 @@ impl ClashBackend {
             }
         }
     }
-    pub(super) fn fetch_remote(&self) -> Result<ClashConfig> {
+    fn fetch_remote(&self) -> Result<ClashConfig> {
         use core::str::FromStr as _;
         self.clash_api.config_get().and_then(|cur_remote| {
             ClashConfig::from_str(cur_remote.as_str())
@@ -57,9 +57,13 @@ impl ClashBackend {
     pub fn restart_clash(&self) -> Result<String> {
         self.clash_api.restart(None)
     }
-    pub fn dl_remote_profile(&self, url: &str) -> Result<Resp> {
-        self.clash_api
-            .mock_clash_core(url, self.clash_api.version().is_ok())
+    pub fn dl_remote_profile(&self, url: &str, with_proxy: bool) -> Result<Resp> {
+        self.clash_api.mock_clash_core(
+            url,
+            with_proxy
+                && self.clash_api.version().is_ok()
+                && self.clash_api.check_connectivity().is_ok(),
+        )
     }
     pub fn config_reload(&self, body: String) -> Result<()> {
         self.clash_api.config_reload(body)
@@ -101,5 +105,4 @@ impl ClashBackend {
         };
         (pf, mode, tun)
     }
-
 }

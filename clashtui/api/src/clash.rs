@@ -1,5 +1,5 @@
 const DEFAULT_PAYLOAD: &str = r#"'{"path": "", "payload": ""}'"#;
-const TIMEOUT: u64 = 3;
+const TIMEOUT: u64 = 5;
 #[cfg(feature = "deprecated")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
 #[cfg(feature = "deprecated")]
@@ -21,7 +21,7 @@ pub struct Resp(minreq::ResponseLazy);
 impl Resp {
     pub fn copy_to<W>(self, w: &mut W) -> std::io::Result<u64>
     where
-        W: std::io::Write+?Sized,
+        W: std::io::Write + ?Sized,
     {
         let Resp(mut inner) = self;
         std::io::copy(&mut inner, w)
@@ -99,6 +99,17 @@ impl ClashUtil {
     }
     pub fn config_patch(&self, payload: String) -> Result<String> {
         self.request(Method::Patch, "/configs", Some(payload))
+    }
+    pub fn check_connectivity(&self) -> Result<()> {
+        minreq::get("https://www.gstatic.com/generate_204")
+            .with_timeout(TIMEOUT)
+            .with_proxy(
+                minreq::Proxy::new(self.proxy_addr.clone())
+                    .map_err(|e| format!("API(PROXY):{e:?}"))?,
+            )
+            .send()
+            .map(|_| ())
+            .map_err(|e| format!("API:{e:?}"))
     }
     #[cfg(target_feature = "deprecated")]
     pub fn check_geo_update(
