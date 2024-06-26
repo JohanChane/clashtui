@@ -44,24 +44,16 @@ macro_rules! msgpopup_methods {
         impl $type {
             // single-line popup
             pub fn popup_txt_msg(&mut self, msg: String) {
-                if !msg.is_empty() {
-                    self.msgpopup.push_txt_msg(msg);
-                    self.msgpopup.show();
-                }
+                self.msgpopup.push_txt_msg(msg);
+                self.msgpopup.show();
             }
             // multi-lines popup
             pub fn popup_list_msg<I>(&mut self, msg: I)
             where
                 I: IntoIterator<Item = String>,
             {
-                let mut list_msg = Vec::<String>::new();
-                for m in msg.into_iter() {
-                    list_msg.push(m);
-                }
-                if list_msg.len() > 0 {
-                    self.msgpopup.push_list_msg(list_msg);
-                    self.msgpopup.show();
-                }
+                self.msgpopup.push_list_msg(msg);
+                self.msgpopup.show();
             }
             #[allow(unused)]
             pub fn hide_msgpopup(&mut self) {

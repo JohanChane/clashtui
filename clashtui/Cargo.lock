@@ -245,7 +245,7 @@ dependencies = [
  "enumflags2",
  "log",
  "log4rs",
- "ratatui 0.27.0",
+ "ratatui",
  "ui",
 ]
 
@@ -489,15 +489,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -665,33 +656,13 @@ dependencies = [
  "bitflags",
  "cassowary",
  "compact_str",
- "itertools 0.12.1",
+ "crossterm",
+ "itertools",
  "lru",
  "paste",
  "serde",
  "stability",
  "strum",
- "unicode-segmentation",
- "unicode-truncate",
- "unicode-width",
-]
-
-[[package]]
-name = "ratatui"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d16546c5b5962abf8ce6e2881e722b4e0ae3b6f1a08a26ae3573c55853ca68d3"
-dependencies = [
- "bitflags",
- "cassowary",
- "compact_str",
- "crossterm",
- "itertools 0.13.0",
- "lru",
- "paste",
- "stability",
- "strum",
- "strum_macros",
  "unicode-segmentation",
  "unicode-truncate",
  "unicode-width",
@@ -967,7 +938,7 @@ name = "ui"
 version = "0.2.1"
 dependencies = [
  "crossterm",
- "ratatui 0.26.3",
+ "ratatui",
  "ui-derive",
 ]
 
@@ -997,7 +968,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5fbabedabe362c618c714dbefda9927b5afc8e2a8102f47f081089a9019226"
 dependencies = [
- "itertools 0.12.1",
+ "itertools",
  "unicode-width",
 ]
 

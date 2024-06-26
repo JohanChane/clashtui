@@ -1,10 +1,10 @@
 use core::cell::{OnceCell, RefCell};
-use std::io::{BufRead, Read, Write};
-use std::{path::PathBuf, rc::Rc};
+use std::rc::Rc;
 
 use crate::utils::{Flag, Flags};
 use ui::event;
 
+use crate::msgpopup_methods;
 use crate::tui::{
     tabs::{ClashSrvCtlTab, ProfileTab, TabEvent, Tabs},
     tools,
@@ -13,22 +13,8 @@ use crate::tui::{
     EventState, StatusBar, TabBar, Theme, Visibility,
 };
 use crate::utils::{ClashBackend, SharedBackend, SharedState, State};
-use crate::{msgpopup_methods, utils};
 
 use super::impl_app::MonkeyPatch;
-
-/// Mihomo (Clash.Meta) TUI Client
-///
-/// A tui tool for mihomo
-#[derive(argh::FromArgs)]
-pub struct CliEnv {
-    /// don't show UI but only update all profiles
-    #[argh(switch, short = 'u')]
-    pub update_all_profiles: bool,
-    /// print version information and exit
-    #[argh(switch, short = 'v')]
-    pub version: bool,
-}
 
 pub struct App {
     tabbar: TabBar,
@@ -168,7 +154,7 @@ impl App {
                 Keys::AppConfig => {
                     let _ = self
                         .util
-                        .open_dir(&self.util.cfg.clash_cfg_dir)
+                        .open_dir(std::path::Path::new(&self.util.cfg.clash_cfg_dir))
                         .map_err(|e| log::error!("ODIR: {e:?}"));
                     EventState::WorkDone
                 }
@@ -276,7 +262,8 @@ impl App {
             )
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     }
-    #[desperated]
+    #[deprecated]
+    #[cfg(predicate)]
     fn do_some_job_after_initapp_before_setupui(&mut self) {
         // ## Correct the perm of files in clash_cfg_dir.
         if !self.clashtui_util.check_perms_of_ccd_files() {

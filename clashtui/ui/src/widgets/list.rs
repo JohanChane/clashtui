@@ -57,12 +57,13 @@ impl List {
                 Raw::List::from_iter(self.items.iter().zip(vc.iter()).map(|(v, e)| {
                     Raw::ListItem::new(Ra::Line::from(vec![
                         Ra::Span::styled(v.to_owned(), Ra::Style::default()),
-                        Ra::Span::styled(" ".to_owned(), Ra::Style::default()),
+                        Ra::Span::styled("(".to_owned(), Ra::Style::default()),
                         //Ra::Span::styled(e, Ra::Style::default().fg(Ra::Color::Rgb(192, 192, 192)))
                         Ra::Span::styled(
                             e,
                             Ra::Style::default().fg(Theme::get().profile_update_interval_fg),
                         ),
+                        Ra::Span::styled(")".to_owned(), Ra::Style::default()),
                     ]))
                 }))
             } else {

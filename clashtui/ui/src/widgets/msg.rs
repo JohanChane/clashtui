@@ -61,7 +61,7 @@ impl MsgPopup {
         let max_item_width = text.iter().map(|i| i.width()).max().unwrap_or(0);
         let dialog_width = max(min(max_item_width + 2, f.size().width as usize - 4), 60); // min_width = 60
         let dialog_height = min(
-            if text.len() == 0 { 3 } else { text.len() + 2 },
+            if text.is_empty() { 3 } else { text.len() + 2 },
             f.size().height as usize - 6,
         );
         let area = tools::centered_lenght_rect(dialog_width as u16, dialog_height as u16, f.size());

@@ -521,20 +521,6 @@ impl ClashBackend {
         }
     }
 }
-/// # Limitations
-///
-/// Windows treats symlink creation as a [privileged action][symlink-security],
-/// therefore this function is likely to fail unless the user makes changes to
-/// their system to permit symlink creation. Users can try enabling Developer
-/// Mode, granting the `SeCreateSymbolicLinkPrivilege` privilege, or running
-/// the process as an administrator.
-///
-/// [symlink-security]: https://docs.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/create-symbolic-links
-#[allow(unused)]
-fn crt_symlink_file<P: AsRef<std::path::Path>>(original: P, target: P) -> std::io::Result<()> {
-    use std::os;
-    os::unix::fs::symlink(original, target)
-}
 enum CrtFile {
     Ok(File),
     Tmp(File),

@@ -28,7 +28,6 @@ pub struct ProfileTab {
     util: SharedBackend,
     state: SharedState,
     op: Option<PTOp>,
-    confirm_op: Option<PTOp>,
 }
 
 impl ProfileTab {
@@ -48,7 +47,6 @@ impl ProfileTab {
             util,
             state,
             op: None,
-            confirm_op: None,
         };
 
         instance.update_profile_list();
@@ -132,23 +130,6 @@ impl ProfileTab {
         }
     }
 
-    fn handle_gen_profile_info_ev(&mut self) {
-        if let Some(profile_name) = self.profile_list.selected() {
-            let is_cur_profile = profile_name == self.clashtui_state.borrow().get_profile();
-            match self
-                .clashtui_util
-                .gen_profile_info(profile_name, is_cur_profile)
-            {
-                Ok(info) => {
-                    self.popup_list_msg(info);
-                }
-                Err(e) => {
-                    self.popup_txt_msg(e.to_string());
-                }
-            }
-        }
-    }
-
     fn update_profile_list(&mut self) {
         let profile_names = self.util.get_profile_names().unwrap();
         let profile_times: Vec<Option<std::time::SystemTime>> = profile_names
@@ -166,7 +147,7 @@ impl ProfileTab {
         self.profile_list
             .set_extras(profile_times.into_iter().map(|t| {
                 t.map(|t| {
-                    utils::str_duration(
+                    display_duration(
                         now.duration_since(t)
                             .expect("Clock may have gone backwards"),
                     )
@@ -186,7 +167,7 @@ impl super::TabEvent for ProfileTab {
         if event_state.is_notconsumed() {
             event_state = match self.confirm_popup.event(ev)? {
                 EventState::Yes => {
-                    self.op = self.confirm_op.take();
+                    self.op.replace(PTOp::Delete);
                     EventState::WorkDone
                 }
                 EventState::Cancel | EventState::WorkDone => EventState::WorkDone,
@@ -252,7 +233,6 @@ impl super::TabEvent for ProfileTab {
                         Keys::ProfileDelete => {
                             self.confirm_popup
                                 .popup_msg("`y` to Delete, `Esc` to cancel".to_string());
-                            self.confirm_op.replace(PTOp::Delete);
                             EventState::WorkDone
                         }
                         Keys::Edit => {
@@ -321,15 +301,6 @@ impl super::TabEvent for ProfileTab {
                             }
                             EventState::WorkDone
                         }
-                        Keys::ProfileInfo => {
-                            self.popup_txt_msg("Generating info...".to_string());
-                            self.op.replace(PTOp::GenInfo);
-                            EventState::WorkDone
-                        }
-                        Keys::ProfileNoPp => {
-                            self.clashtui_state.borrow_mut().switch_no_pp();
-                            EventState::WorkDone
-                        }
                         _ => EventState::NotConsumed,
                     };
                 }
@@ -391,7 +362,6 @@ impl super::TabEvent for ProfileTab {
                 PTOp::UpdateAll => self.handle_update_profile_ev(true),
                 PTOp::Select => self.handle_select_profile_ev(),
                 PTOp::Delete => self.handle_delete_profile_ev(),
-                PTOp::GenInfo => self.handle_gen_profile_info_ev(),
             }
         }
     }
