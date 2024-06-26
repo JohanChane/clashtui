@@ -19,9 +19,9 @@ pub fn build_payload<P: AsRef<str>>(path: P) -> String {
 
 pub struct Resp(minreq::ResponseLazy);
 impl Resp {
-    pub fn copy_to<W: ?Sized>(self, w: &mut W) -> std::io::Result<u64>
+    pub fn copy_to<W>(self, w: &mut W) -> std::io::Result<u64>
     where
-        W: std::io::Write,
+        W: std::io::Write+?Sized,
     {
         let Resp(mut inner) = self;
         std::io::copy(&mut inner, w)
@@ -286,7 +286,9 @@ mod tests {
     #[test]
     fn mock_clash_core_test() {
         let sym = sym();
-        let r = sym.mock_clash_core("https://www.google.com", sym.version().is_ok()).unwrap();
+        let r = sym
+            .mock_clash_core("https://www.google.com", sym.version().is_ok())
+            .unwrap();
         let mut tf = std::fs::OpenOptions::new()
             .write(true)
             .create(true)

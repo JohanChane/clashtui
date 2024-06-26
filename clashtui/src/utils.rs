@@ -1,19 +1,20 @@
-#[cfg(feature = "tui")]
-use backend::utils::State as _State;
+pub use backend::ClashBackend;
 pub use backend::{
     api,
-    utils::{init_config, ClashBackend, ClashSrvOp},
+    utils::{init_config, ClashSrvOp},
 };
+mod flags;
+pub use flags::{BitFlags as Flags, Flag};
+
+pub(crate) const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
+
 #[cfg(feature = "tui")]
 pub use backend::{
     define_enum,
-    utils::{get_modify_time, CfgError},
+    utils::{get_modify_time, CfgError, State as _State},
 };
-pub(crate) const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
-mod flags;
 #[cfg(feature = "tui")]
 mod state;
-pub use flags::{BitFlags as Flags, Flag};
 #[cfg(feature = "tui")]
 pub use state::State;
 

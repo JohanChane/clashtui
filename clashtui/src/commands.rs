@@ -159,7 +159,9 @@ pub fn handle_cli(
         ArgCommand::Service(Service { command }) => match command {
             ServiceCommand::Restart(ServiceRestart { soft }) => {
                 if soft {
-                    backend.restart_clash().map_err(|s|std::io::Error::new(std::io::ErrorKind::Other, s))
+                    backend
+                        .restart_clash()
+                        .map_err(|s| std::io::Error::new(std::io::ErrorKind::Other, s))
                 } else {
                     backend.clash_srv_ctl(crate::utils::ClashSrvOp::StartClashService)
                 }

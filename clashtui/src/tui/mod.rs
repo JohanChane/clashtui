@@ -11,4 +11,5 @@ use statusbar::StatusBar;
 use tabbar::TabBar;
 
 mod app;
+mod backend;
 pub use app::App;

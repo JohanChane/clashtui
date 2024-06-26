@@ -4,6 +4,7 @@ mod commands;
 mod tui;
 mod utils;
 
+use backend::const_err::ERR_PATH_UTF_8;
 use utils::{init_config, ClashBackend, Flag, Flags};
 
 fn main() {
@@ -15,7 +16,7 @@ fn main() {
             config_dir
                 .join("clashtui.log")
                 .to_str()
-                .expect("path is not utf-8 form"),
+                .expect(ERR_PATH_UTF_8),
         );
         log::debug!("Current flags: {:?}", flags);
         let (backend, err_track) = ClashBackend::new(&config_dir, !flags.contains(Flag::FirstInit));
