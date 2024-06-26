@@ -55,7 +55,7 @@ fn main() {
 #[cfg(feature = "tui")]
 pub fn run_tui(
     backend: ClashBackend,
-    err_track: Vec<backend::utils::CfgError>,
+    err_track: Vec<anyhow::Error>,
     flags: Flags<Flag>,
 ) -> Result<(), std::io::Error> {
     let mut app = tui::App::new(backend);

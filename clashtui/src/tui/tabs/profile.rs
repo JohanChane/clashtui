@@ -1,13 +1,9 @@
 use super::profile_input::ProfileInputPopup;
 use crate::tui::{
-    symbols::{PROFILE, TEMPALTE},
-    utils::Keys,
-    widgets::{ConfirmPopup, List, MsgPopup},
-    EventState, Visibility,
+    impl_app::MonkeyPatch, symbols::{PROFILE, TEMPALTE}, utils::Keys, widgets::{ConfirmPopup, List, MsgPopup}, EventState, Visibility
 };
 use crate::utils::{get_modify_time, SharedBackend, SharedState};
 crate::utils::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);
-
 #[derive(PartialEq)]
 enum Fouce {
     Profile,
@@ -259,7 +255,7 @@ impl super::TabEvent for ProfileTab {
                         Keys::Preview => {
                             if let Some(profile_name) = self.profile_list.selected() {
                                 let mut lines: Vec<String> = vec![];
-                                if self.util.test_is_link(profile_name) {
+                                if self.util.is_upgradable(profile_name) {
                                     lines.push(
                                         self.util
                                             .get_profile_link(profile_name)

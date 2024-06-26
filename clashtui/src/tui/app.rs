@@ -1,7 +1,7 @@
 use core::cell::{OnceCell, RefCell};
 use std::{path::PathBuf, rc::Rc};
 
-use crate::utils::{CfgError, Flag, Flags};
+use crate::utils::{Flag, Flags};
 use ui::event;
 
 use crate::msgpopup_methods;
@@ -13,6 +13,8 @@ use crate::tui::{
     EventState, StatusBar, TabBar, Theme, Visibility,
 };
 use crate::utils::{ClashBackend, SharedBackend, SharedState, State};
+
+use super::impl_app::MonkeyPatch;
 
 pub struct App {
     tabbar: TabBar,
@@ -53,7 +55,11 @@ impl App {
         }
     }
 
-    pub fn run(&mut self, err_track: Vec<CfgError>, flags: Flags<Flag>) -> std::io::Result<()> {
+    pub fn run(
+        &mut self,
+        err_track: Vec<anyhow::Error>,
+        flags: Flags<Flag>,
+    ) -> std::io::Result<()> {
         const TICK_RATE: u64 = 250;
         use core::time::Duration;
         if flags.contains(Flag::FirstInit) {
@@ -65,7 +71,7 @@ impl App {
         };
         err_track
             .into_iter()
-            .for_each(|e| self.popup_txt_msg(e.reason));
+            .for_each(|e| self.popup_txt_msg(e.root_cause().to_string()));
         log::info!("App init finished");
 
         use ratatui::{backend::CrosstermBackend, Terminal};

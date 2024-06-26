@@ -9,6 +9,8 @@ mod utils;
 pub use config::init_config;
 pub use state::State;
 pub use utils::*;
+/// a fix for [`MonkeyPatch`]
+pub use ipc::spawn;
 
 #[macro_export]
 macro_rules! define_enum {

@@ -42,6 +42,7 @@ clap = { version = "4.5.4", features = [
   "color",
 ], default-features = false }
 clap_complete = "4.5.2"
+anyhow = "1.0.86"
 
 
 [workspace]

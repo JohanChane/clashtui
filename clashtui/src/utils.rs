@@ -11,7 +11,7 @@ pub(crate) const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
 #[cfg(feature = "tui")]
 pub use backend::{
     define_enum,
-    utils::{get_modify_time, CfgError, State as _State},
+    utils::{get_modify_time, State as _State},
 };
 #[cfg(feature = "tui")]
 mod state;

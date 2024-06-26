@@ -9,13 +9,17 @@ pub enum Tabs {
     Profile(ProfileTab),
     ClashSrvCtl(ClashSrvCtlTab),
 }
-impl ToString for Tabs {
-    fn to_string(&self) -> String {
-        use super::symbols;
-        match self {
-            Tabs::Profile(_) => symbols::PROFILE.to_string(),
-            Tabs::ClashSrvCtl(_) => symbols::CLASHSRVCTL.to_string(),
-        }
+impl std::fmt::Display for Tabs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use crate::tui::symbols;
+        write!(
+            f,
+            "{}",
+            match self {
+                Tabs::Profile(_) => symbols::PROFILE.to_string(),
+                Tabs::ClashSrvCtl(_) => symbols::CLASHSRVCTL.to_string(),
+            }
+        )
     }
 }
 impl std::cmp::PartialEq<std::string::String> for Tabs {
