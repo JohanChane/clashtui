@@ -449,7 +449,6 @@ impl ClashBackend {
             create_dir_all(directory)?;
         }
 
-        let mut output_file = File::create(path)?;
         let response = self
             .dl_remote_profile(
                 url,
@@ -458,6 +457,7 @@ impl ClashBackend {
                     .unwrap_or(false),
             )
             .map_err(|s| Error::new(std::io::ErrorKind::Other, s))?;
+        let mut output_file = File::create(path)?;
         response.copy_to(&mut output_file)?;
         Ok(())
     }
