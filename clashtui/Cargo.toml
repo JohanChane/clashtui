@@ -1,6 +1,6 @@
 [package]
 name = "clashtui"
-version = "0.1.0-dev"
+version = "0.2.2"
 edition = "2021"
 
 authors = ["Johan Chane <johanchanex at gmail dot com>"]
@@ -24,7 +24,7 @@ tui = ["ui", "ratatui"]
 [dependencies]
 ui = { path = "ui", optional = true }
 backend = { path = "backend" }
-ratatui = { version = "*", default-features = false, features = [
+ratatui = { version = "0.26.1", default-features = false, features = [
   "crossterm",
 ], optional = true }
 log = "0.4"
@@ -42,6 +42,7 @@ clap = { version = "4.5.4", features = [
   "color",
 ], default-features = false }
 clap_complete = "4.5.2"
+anyhow = "1.0.86"
 
 
 [workspace]
@@ -63,13 +64,13 @@ section = "utility"
 priority = "optional"
 assets = [
   [
-    'target/release/clashctl',
-    'usr/bin/clashctl',
+    'target/release/clashtui',
+    'usr/bin/clashtui',
     '755',
   ],
   [
     '../README.md',
-    'usr/share/doc/clashctl/README.md',
+    'usr/share/doc/clashtui/README.md',
     '644',
   ],
 ]

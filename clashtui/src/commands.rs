@@ -159,7 +159,9 @@ pub fn handle_cli(
         ArgCommand::Service(Service { command }) => match command {
             ServiceCommand::Restart(ServiceRestart { soft }) => {
                 if soft {
-                    backend.restart_clash()
+                    backend
+                        .restart_clash()
+                        .map_err(|s| std::io::Error::new(std::io::ErrorKind::Other, s))
                 } else {
                     backend.clash_srv_ctl(crate::utils::ClashSrvOp::StartClashService)
                 }
@@ -215,7 +217,7 @@ pub fn gen_complete(shell: Option<clap_complete::Shell>) {
     clap_complete::generate(
         gen,
         &mut CliCmds::command(),
-        "clashctl",
+        "clashtui",
         &mut std::io::stdout(),
     )
 }

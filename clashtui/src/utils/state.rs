@@ -30,7 +30,6 @@ impl State {
         &self.st.profile
     }
     pub fn set_profile(&mut self, profile: String) {
-        // With update state
         #[cfg(target_os = "windows")]
         {
             self.st = self.ct.update_state(Some(profile), None, None)
@@ -50,15 +49,11 @@ impl State {
             self.st = self.ct.update_state(None, Some(mode))
         }
     }
-    pub fn render(&self) -> String {
-        self.st.to_string()
-    }
-    #[cfg(target_os = "windows")]
-    pub fn get_sysproxy(&self) -> Option<bool> {
-        self.st.sysproxy
-    }
     #[cfg(target_os = "windows")]
     pub fn set_sysproxy(&mut self, sysproxy: bool) {
         self.st = self.ct.update_state(None, None, Some(sysproxy));
+    }
+    pub fn render(&self) -> String {
+        self.st.to_string()
     }
 }

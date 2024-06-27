@@ -1,14 +1,14 @@
-mod backend;
-mod config;
-#[cfg_attr(target_os = "windows", path="ipc_windows.rs")]
-#[cfg_attr(target_os = "linux", path="ipc_linux.rs")]
-mod ipc;
+pub(crate) mod config;
+#[cfg_attr(target_os = "windows", path = "ipc_windows.rs")]
+#[cfg_attr(target_os = "linux", path = "ipc_linux.rs")]
+pub(crate) mod ipc;
 mod state;
 #[allow(clippy::module_inception)]
 mod utils;
 
-pub use backend::ClashBackend;
-pub use config::{init_config, CfgError};
+pub use config::init_config;
+/// a fix for [`MonkeyPatch`]
+pub use ipc::spawn;
 pub use state::State;
 pub use utils::*;
 

@@ -1,5 +1,6 @@
 use super::profile_input::ProfileInputPopup;
 use crate::tui::{
+    impl_app::MonkeyPatch,
     symbols::{PROFILE, TEMPALTE},
     utils::Keys,
     widgets::{ConfirmPopup, List, MsgPopup},
@@ -7,7 +8,6 @@ use crate::tui::{
 };
 use crate::utils::{get_modify_time, SharedBackend, SharedState};
 crate::utils::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);
-
 #[derive(PartialEq)]
 enum Fouce {
     Profile,
@@ -121,7 +121,7 @@ impl ProfileTab {
     fn handle_create_template_ev(&mut self) {
         if let Some(template_name) = self.template_list.selected() {
             if let Err(err) = self.util.crt_yaml_with_template(template_name) {
-                log::error!("Create Template => {err}");
+                log::error!("Create Template => {err:?}");
                 self.popup_txt_msg(err);
             } else {
                 self.popup_txt_msg("Created".to_string());
@@ -152,7 +152,7 @@ impl ProfileTab {
                             .expect("Clock may have gone backwards"),
                     )
                 })
-                .unwrap_or("Never/Error".to_string())
+                .unwrap_or("Never/Err".to_string())
             }))
     }
 }
@@ -239,6 +239,8 @@ impl super::TabEvent for ProfileTab {
                             // Hmm, now every time I call edit, an window will pop up
                             // even if there is no error. But I think it's fine, maybe
                             // I'll solve it one day
+                            //
+                            // I fix it, because msg is empty.
                             self.popup_txt_msg(
                                 self.profile_list
                                     .selected()
@@ -249,7 +251,7 @@ impl super::TabEvent for ProfileTab {
                                     })
                                     .map_while(|r| r.err())
                                     .map(|err| {
-                                        log::error!("{}", err);
+                                        log::error!("{err}");
                                         err.to_string()
                                     })
                                     .collect(),
@@ -259,7 +261,7 @@ impl super::TabEvent for ProfileTab {
                         Keys::Preview => {
                             if let Some(profile_name) = self.profile_list.selected() {
                                 let mut lines: Vec<String> = vec![];
-                                if self.util.test_is_link(profile_name) {
+                                if self.util.is_upgradable(profile_name) {
                                     lines.push(
                                         self.util
                                             .get_profile_link(profile_name)
@@ -314,7 +316,7 @@ impl super::TabEvent for ProfileTab {
                         }
                         Keys::Preview => {
                             if let Some(name) = self.template_list.selected() {
-                                let path = self.util.get_template_path_unchecked(name);
+                                let path = self.util.gen_template_path(name);
                                 self.popup_list_msg(
                                     std::fs::read_to_string(path)?
                                         .lines()
@@ -328,7 +330,7 @@ impl super::TabEvent for ProfileTab {
                                 self.template_list
                                     .selected()
                                     .into_iter()
-                                    .map(|name| self.util.get_template_path_unchecked(name))
+                                    .map(|name| self.util.gen_template_path(name))
                                     .map_while(|tpl_file_path| {
                                         self.util.edit_file(&tpl_file_path).err()
                                     })

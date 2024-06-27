@@ -26,6 +26,8 @@ pub struct Theme {
     pub tabbar_hl_fg: Color,
 
     pub statusbar_text_fg: Color,
+
+    pub profile_update_interval_fg: Color,
 }
 
 impl Theme {
@@ -65,6 +67,8 @@ impl Default for Theme {
             tabbar_hl_fg: Color::Rgb(46, 204, 113),
 
             statusbar_text_fg: Color::Rgb(20, 122, 122),
+
+            profile_update_interval_fg: Color::Red,
         }
     }
 }

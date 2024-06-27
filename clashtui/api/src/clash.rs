@@ -1,47 +1,27 @@
+use minreq::Method;
+
 const DEFAULT_PAYLOAD: &str = r#"'{"path": "", "payload": ""}'"#;
-const TIMEOUT: u64 = 3;
+const TIMEOUT: u64 = 5;
 #[cfg(feature = "deprecated")]
 const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
 #[cfg(feature = "deprecated")]
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-use std::io::Result;
+type Result<T> = core::result::Result<T, String>;
 
-use minreq::Method;
-
-fn process_err(e: minreq::Error) -> std::io::Error {
-    use std::io::{Error, ErrorKind};
-    match e {
-        minreq::Error::AddressNotFound | minreq::Error::PunycodeConversionFailed => {
-            Error::new(ErrorKind::AddrNotAvailable, e)
-        }
-        minreq::Error::IoError(e) => e,
-        minreq::Error::HeadersOverflow
-        | minreq::Error::StatusLineOverflow
-        | minreq::Error::InvalidUtf8InBody(_)
-        | minreq::Error::InvalidUtf8InResponse
-        | minreq::Error::MalformedChunkLength
-        | minreq::Error::MalformedChunkEnd
-        | minreq::Error::MalformedContentLength => Error::new(ErrorKind::InvalidData, e),
-        minreq::Error::RedirectLocationMissing
-        | minreq::Error::InfiniteRedirectionLoop
-        | minreq::Error::TooManyRedirections => Error::new(ErrorKind::ConnectionAborted, e),
-        minreq::Error::HttpsFeatureNotEnabled => unreachable!("https should already be enabled"),
-        minreq::Error::PunycodeFeatureNotEnabled => panic!("{}", e),
-        minreq::Error::RustlsCreateConnection(_) => Error::new(ErrorKind::ConnectionRefused, e),
-        minreq::Error::BadProxy
-        | minreq::Error::BadProxyCreds
-        | minreq::Error::ProxyConnect
-        | minreq::Error::InvalidProxyCreds => Error::new(ErrorKind::PermissionDenied, e),
-        minreq::Error::Other(i) => Error::new(ErrorKind::Other, i),
-    }
+pub fn build_payload<P: AsRef<str>>(path: P) -> String {
+    serde_json::json!({
+        "path": path.as_ref(),
+        "payload": ""
+    })
+    .to_string()
 }
 
 pub struct Resp(minreq::ResponseLazy);
 impl Resp {
-    pub fn copy_to<W: ?Sized>(self, w: &mut W) -> std::io::Result<u64>
+    pub fn copy_to<W>(self, w: &mut W) -> std::io::Result<u64>
     where
-        W: std::io::Write,
+        W: std::io::Write + ?Sized,
     {
         let Resp(mut inner) = self;
         std::io::copy(&mut inner, w)
@@ -51,6 +31,7 @@ pub struct ClashUtil {
     api: String,
     secret: Option<String>,
     ua: Option<String>,
+    timeout: u64,
     pub proxy_addr: String,
 }
 
@@ -60,12 +41,14 @@ impl ClashUtil {
         secret: Option<String>,
         proxy_addr: String,
         ua: Option<String>,
+        timeout: Option<u64>,
     ) -> Self {
         Self {
             api: controller_api,
             secret,
             ua,
             proxy_addr,
+            timeout: timeout.unwrap_or(TIMEOUT),
         }
     }
     fn request(
@@ -81,10 +64,10 @@ impl ClashUtil {
         if let Some(s) = self.secret.as_ref() {
             req = req.with_header("Authorization", format!("Bearer {s}"));
         }
-        req.with_timeout(TIMEOUT)
+        req.with_timeout(self.timeout)
             .send()
             .and_then(|r| r.as_str().map(|s| s.to_owned()))
-            .map_err(process_err)
+            .map_err(|e| format!("API:{e:?}"))
     }
     pub fn restart(&self, payload: Option<String>) -> Result<String> {
         self.request(
@@ -106,16 +89,30 @@ impl ClashUtil {
     pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S, with_proxy: bool) -> Result<Resp> {
         let mut req = minreq::get(url);
         if with_proxy {
-            req = req.with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?)
+            req = req.with_proxy(
+                minreq::Proxy::new(self.proxy_addr.clone())
+                    .map_err(|e| format!("API(PROXY):{e:?}"))?,
+            )
         }
         req.with_header("user-agent", self.ua.as_deref().unwrap_or("clash.meta"))
-            .with_timeout(TIMEOUT)
+            .with_timeout(self.timeout)
             .send_lazy()
             .map(Resp)
-            .map_err(process_err)
+            .map_err(|e| format!("API:{e:?}"))
     }
     pub fn config_patch(&self, payload: String) -> Result<String> {
         self.request(Method::Patch, "/configs", Some(payload))
+    }
+    pub fn check_connectivity(&self) -> Result<()> {
+        minreq::get("https://www.gstatic.com/generate_204")
+            .with_timeout(self.timeout)
+            .with_proxy(
+                minreq::Proxy::new(self.proxy_addr.clone())
+                    .map_err(|e| format!("API(PROXY):{e:?}"))?,
+            )
+            .send()
+            .map(|_| ())
+            .map_err(|e| format!("API:{e:?}"))
     }
     #[cfg(target_feature = "deprecated")]
     pub fn check_geo_update(
@@ -171,9 +168,36 @@ impl ClashUtil {
             Ok("Already Up to dated".to_string())
         }
     }
+
     /*
     pub fn flush_fakeip(&self) -> Result<String, reqwest::Error> {
         self.post("/cache/fakeip/flush", None)
+    }
+    pub fn provider(&self, is_rule: bool, name:Option<&String>, is_update: bool, is_check: bool) -> Result<String, reqwest::Error>{
+        //
+        if !is_rule{
+            let api = "/providers/proxies";
+            match name {
+                Some(v) => {
+                    if is_update{
+                        self.put(&format!("{}/{}", api, v), None)
+                    } else {
+                        if is_check{
+                            self.get(&format!("{}/{}/healthcheck", api, v), None)
+                        } else {
+                            self.get(&format!("{}/{}", api, v), None)
+                        }
+                    }
+                },
+                None => self.get(api, None),
+            }
+        } else {
+            let api = "/providers/rules";
+            match name {
+                Some(v) => self.put(&format!("{}/{}", api, v), None),
+                None => self.get(api, None)
+            }
+        }
     }
     pub fn update_geo(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
         match payload {
@@ -234,32 +258,6 @@ impl ClashUtil {
             }
         }
     }
-    pub fn provider(&self, is_rule: bool, name:Option<&String>, is_update: bool, is_check: bool) -> Result<String, reqwest::Error>{
-        //
-        if !is_rule{
-            let api = "/providers/proxies";
-            match name {
-                Some(v) => {
-                    if is_update{
-                        self.put(&format!("{}/{}", api, v), None)
-                    } else {
-                        if is_check{
-                            self.get(&format!("{}/{}/healthcheck", api, v), None)
-                        } else {
-                            self.get(&format!("{}/{}", api, v), None)
-                        }
-                    }
-                },
-                None => self.get(api, None),
-            }
-        } else {
-            let api = "/providers/rules";
-            match name {
-                Some(v) => self.put(&format!("{}/{}", api, v), None),
-                None => self.get(api, None)
-            }
-        }
-    }
     pub fn dns_resolve(&self, name:&String, _type:Option<&String>) -> Result<String, reqwest::Error>{
         match _type {
             Some(v) => self.get(&format!("/dns/query?name={}&type={}", name, v), None),
@@ -277,12 +275,19 @@ mod tests {
             None,
             "http://127.0.0.1:7890".to_string(),
             None,
+            None,
         )
     }
     #[test]
     fn version_test() {
         let sym = sym();
         println!("{}", sym.version().unwrap());
+    }
+    #[test]
+    #[should_panic]
+    fn connectivity_test() {
+        let sym = sym();
+        println!("{:?}", sym.check_connectivity().unwrap_err());
     }
     #[test]
     fn config_get_test() {
@@ -303,7 +308,9 @@ mod tests {
     #[test]
     fn mock_clash_core_test() {
         let sym = sym();
-        let r = sym.mock_clash_core("https://www.google.com", true).unwrap();
+        let r = sym
+            .mock_clash_core("https://www.google.com", sym.version().is_ok())
+            .unwrap();
         let mut tf = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
@@ -312,31 +319,5 @@ mod tests {
         r.copy_to(&mut tf).unwrap();
         drop(tf);
         std::fs::remove_file("test").unwrap();
-    }
-    #[test]
-    #[cfg(target_feature = "deprecated")]
-    fn test_geo_update() {
-        let mut flag = true;
-        let sym = ClashUtil::new(
-            "http://127.0.0.1:9090".to_string(),
-            "http://127.0.0.1:7890".to_string(),
-        );
-        let exe_dir = std::env::current_dir().unwrap();
-        println!("{exe_dir:?}");
-        let path = exe_dir.join("tmp");
-        if !path.is_dir() {
-            std::fs::create_dir_all(&path).unwrap()
-        }
-        println!(
-            "result:{}",
-            match sym.check_geo_update(None, &path) {
-                Ok(r) => r,
-                Err(e) => {
-                    flag = false;
-                    format!("{e:?}")
-                }
-            }
-        );
-        assert!(flag)
     }
 }

@@ -9,9 +9,9 @@ impl ClashBackend {
         match op {
             ClashSrvOp::StartClashService => {
                 let arg = if self.cfg.is_user {
-                    vec!["--user", self.cfg.clash_srv_name.as_str()]
+                    vec!["--user", self.cfg.clash_srv_nam.as_str()]
                 } else {
-                    vec![self.cfg.clash_srv_name.as_str()]
+                    vec![self.cfg.clash_srv_nam.as_str()]
                 };
                 {
                     let mut args = vec!["restart"];
@@ -26,9 +26,9 @@ impl ClashBackend {
             }
             ClashSrvOp::StopClashService => {
                 let arg = if self.cfg.is_user {
-                    vec!["--user", self.cfg.clash_srv_name.as_str()]
+                    vec!["--user", self.cfg.clash_srv_nam.as_str()]
                 } else {
-                    vec![self.cfg.clash_srv_name.as_str()]
+                    vec![self.cfg.clash_srv_nam.as_str()]
                 };
                 {
                     let mut args = vec!["stop"];
@@ -45,7 +45,7 @@ impl ClashBackend {
                 "setcap",
                 vec![
                     "'cap_net_admin,cap_net_bind_service=+ep'",
-                    self.cfg.clash_core_path.as_str(),
+                    self.cfg.clash_bin_pth.as_str(),
                 ],
             ),
             _ => Err(Error::new(
@@ -70,25 +70,19 @@ impl ClashBackend {
             ClashSrvOp::StartClashService => {
                 start_process_as_admin(
                     nssm_pgm,
-                    format!("restart {}", self.cfg.clash_srv_name).as_str(),
+                    format!("restart {}", self.cfg.clash_srv_nam).as_str(),
                     true,
                 )?;
-                exec(
-                    nssm_pgm,
-                    vec!["status", self.cfg.clash_srv_name.as_str()],
-                )
+                exec(nssm_pgm, vec!["status", self.cfg.clash_srv_nam.as_str()])
             }
 
             ClashSrvOp::StopClashService => {
                 start_process_as_admin(
                     nssm_pgm,
-                    &format!("stop {}", self.cfg.clash_srv_name),
+                    &format!("stop {}", self.cfg.clash_srv_nam),
                     true,
                 )?;
-                exec(
-                    nssm_pgm,
-                    vec!["status", self.cfg.clash_srv_name.as_str()],
-                )
+                exec(nssm_pgm, vec!["status", self.cfg.clash_srv_nam.as_str()])
             }
 
             ClashSrvOp::InstallSrv => {
@@ -96,24 +90,21 @@ impl ClashBackend {
                     nssm_pgm,
                     &format!(
                         "install {} \"{}\" -d \"{}\" -f \"{}\"",
-                        self.cfg.clash_srv_name,
-                        self.cfg.clash_core_path,
+                        self.cfg.clash_srv_nam,
+                        self.cfg.clash_bin_pth,
                         self.cfg.clash_cfg_dir,
-                        self.cfg.clash_cfg_path
+                        self.cfg.clash_cfg_pth
                     ),
                     true,
                 )?;
 
-                exec(
-                    nssm_pgm,
-                    vec!["status", self.cfg.clash_srv_name.as_str()],
-                )
+                exec(nssm_pgm, vec!["status", self.cfg.clash_srv_nam.as_str()])
             }
 
             ClashSrvOp::UnInstallSrv => ipc::execute_powershell_script_as_admin(
                 &format!(
                     "{0} stop {1}; {0} remove {1}",
-                    nssm_pgm, self.cfg.clash_srv_name
+                    nssm_pgm, self.cfg.clash_srv_nam
                 ),
                 true,
             ),

@@ -7,7 +7,7 @@ pub fn exec(pgm: &str, args: Vec<&str>) -> Result<String> {
     let output = Command::new(pgm).args(args).output()?;
     string_process_output(output)
 }
-
+#[allow(unused)]
 pub fn spawn(pgm: &str, args: Vec<&str>) -> Result<()> {
     log::debug!("SPW: {} {:?}", pgm, args);
     // Just ignore the output, otherwise the ui might be broken
@@ -18,6 +18,7 @@ pub fn spawn(pgm: &str, args: Vec<&str>) -> Result<()> {
         .spawn()?;
     Ok(())
 }
+/// exec pgm via `pkexec`
 pub fn exec_with_sbin(pgm: &str, args: Vec<&str>) -> Result<String> {
     log::debug!("LIPC: {} {:?}", pgm, args);
     let mut execs = vec![pgm];

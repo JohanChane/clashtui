@@ -1,5 +1,5 @@
 use super::ClashBackend;
-use crate::utils::{ipc, is_yaml, utils as Utils};
+use crate::utils::{extract_domain, get_file_names, ipc, is_yaml, parse_yaml};
 use std::{
     fs::{create_dir_all, File},
     io::Error,
@@ -22,7 +22,7 @@ impl ClashBackend {
         let template_dir = self.home_dir.join("templates");
         let template_path = template_dir.join(template_name);
         let tpl_parsed_yaml =
-            Utils::parse_yaml(&template_path).map_err(|e| format!("parse failed: {e:?}"))?;
+            parse_yaml(&template_path).map_err(|e| format!("parse failed: {e:?}"))?;
         let mut out_parsed_yaml = Cow::Borrowed(&tpl_parsed_yaml);
 
         let proxy_url_file = File::open(self.home_dir.join("templates/template_proxy_providers"))
@@ -39,7 +39,7 @@ impl ClashBackend {
         // ## proxy-providers
         // e.g. {provider: [provider0, provider1, ...]}
         let mut pp_names: HashMap<String, Vec<String>> = HashMap::new(); // proxy-provider names
-        let mut new_proxy_providers = HashMap::new();
+        let mut new_proxy_providers = serde_yaml::Mapping::new();
         let pp_mapping = if let Some(serde_yaml::Value::Mapping(pp_mapping)) =
             tpl_parsed_yaml.get("proxy-providers")
         {
@@ -72,9 +72,17 @@ impl ClashBackend {
                     serde_yaml::Value::String("url".to_string()),
                     serde_yaml::Value::String(url.clone()),
                 );
+                let tpl_name_no_ext = Path::new(template_name)
+                    .file_stem()
+                    .unwrap_or_else(|| Path::new(template_name).as_os_str())
+                    .to_str()
+                    .unwrap_or(template_name);
                 new_pp.insert(
                     serde_yaml::Value::String("path".to_string()),
-                    serde_yaml::Value::String(format!("proxy-providers/tpl/{}.yaml", the_pp_name)),
+                    serde_yaml::Value::String(format!(
+                        "proxy-providers/tpl/{}/{}.yaml",
+                        tpl_name_no_ext, the_pp_name
+                    )),
                 );
                 new_proxy_providers.insert(
                     serde_yaml::Value::String(the_pp_name.clone()),
@@ -83,7 +91,7 @@ impl ClashBackend {
             }
         }
         out_parsed_yaml.to_mut()["proxy-providers"] =
-            serde_yaml::to_value(new_proxy_providers).unwrap();
+            serde_yaml::Value::Mapping(new_proxy_providers);
 
         // ## proxy-groups
         // e.g. {Auto: [Auto-provider0, Auto-provider1, ...], Select: [Select-provider0, ...]}
@@ -217,15 +225,25 @@ impl ClashBackend {
             }
         }
 
-        log::error!("testssdfs");
-        let out_yaml_path = self.profile_dir.join(template_name);
+        let out_yaml_path = self.gen_profile_path(template_name);
         let out_yaml_file = File::create(out_yaml_path).map_err(|e| e.to_string())?;
         serde_yaml::to_writer(out_yaml_file, &out_parsed_yaml).map_err(|e| e.to_string())?;
+        use crate::utils::config::ProfileType;
+        self.cfg.profiles.insert(
+            template_name,
+            ProfileType::Generated(
+                out_parsed_yaml
+                    .as_str()
+                    .expect("Err:pathbuf as str")
+                    .to_string(),
+            ),
+        );
 
         Ok(())
     }
 
     pub fn crt_profile(&self, profile_name: String, uri: String) -> Result<(), String> {
+        use crate::utils::config::ProfileType;
         let profile_name = profile_name.trim();
         let uri = uri.trim();
 
@@ -237,8 +255,7 @@ impl ClashBackend {
             match self
                 .cfg
                 .profiles
-                .borrow_mut()
-                .insert(profile_name.to_owned(), uri.to_owned())
+                .insert(profile_name, ProfileType::Url(uri.to_string()))
             {
                 Some(_) => Err("Already one".to_owned()),
                 None => Ok(()),
@@ -250,10 +267,7 @@ impl ClashBackend {
                 return Err("Failed to import: file exists".to_string());
             }
             std::fs::copy(uri, uri_path).map_err(|e| e.to_string())?;
-            self.cfg
-                .profiles
-                .borrow_mut()
-                .insert(profile_name.to_owned(), String::new());
+            self.cfg.profiles.insert(profile_name, ProfileType::File);
             Ok(())
         } else {
             Err("Url is invalid.".to_string())
@@ -265,10 +279,10 @@ impl ClashBackend {
     /// need to manually refresh the state
     pub fn rmf_profile(&self, profile_name: &String) -> Result<(), String> {
         use std::fs::remove_file;
-        match self.cfg.profiles.borrow_mut().remove(profile_name) {
+        match self.cfg.profiles.remove(profile_name) {
             Some(_) => {
                 if self.cfg.current_profile.borrow().to_owned() == *profile_name {
-                    *self.cfg.current_profile.borrow_mut() = "Removed".to_owned();
+                    self.cfg.update_profile("Removed");
                 };
                 remove_file(self.gen_profile_path(profile_name)).map_err(|e| e.to_string())
             }
@@ -279,7 +293,7 @@ impl ClashBackend {
     pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> std::io::Result<String> {
         let cmd = format!(
             "{} {} -d {} -f {} -t",
-            self.cfg.clash_core_path,
+            self.cfg.clash_bin_pth,
             if geodata_mode { "-m" } else { "" },
             self.cfg.clash_cfg_dir,
             path,
@@ -300,30 +314,25 @@ impl ClashBackend {
                     Merge::Profile(e) => format!("Profile: {e}"),
                 }
             );
-            log::error!("{emsg}");
+            log::error!("{emsg:?}");
             return Err(Error::new(std::io::ErrorKind::Other, emsg));
         };
-        let body = serde_json::json!({
-            "path": self.cfg.clash_cfg_path.as_str(),
-            "payload": ""
-        })
-        .to_string();
-        if let Err(err) = self.config_reload(body) {
+        if let Err(err) = self.config_reload(api::build_payload(&self.cfg.clash_cfg_pth)) {
             let emsg = format!("Failed to Patch Profile `{profile_name}` due to {}", err);
-            log::error!("{emsg}");
+            log::error!("{emsg:?}");
             return Err(Error::new(std::io::ErrorKind::Other, emsg));
         };
         Ok(())
     }
 
     fn merge_profile(&self, profile_name: &String) -> Result<(), Merge> {
-        let mut dst_parsed_yaml = Utils::parse_yaml(&self.home_dir.join(super::BASIC_FILE))
+        let mut dst_parsed_yaml = parse_yaml(&self.home_dir.join(crate::consts::BASIC_FILE))
             .map_err(|e| Merge::Config(e.to_string()))?;
         let profile_parsed_yaml = self
             .get_profile_yaml(profile_name)
             .map_err(|e| Merge::Profile(format!("{e}. Maybe need to update first.")))
             .map(|p| {
-                Utils::parse_yaml(&p).expect(
+                parse_yaml(&p).expect(
                     "get_profile_yaml mark it as valid yaml file, call parse should be safe",
                 )
             })?;
@@ -347,7 +356,7 @@ impl ClashBackend {
                     dst_mapping.insert(k.clone(), v.clone());
                 });
         }
-        match try_create_file(&self.cfg.clash_cfg_path).map_err(Merge::Target)? {
+        match try_create_file(&self.cfg.clash_cfg_pth).map_err(Merge::Target)? {
             CrtFile::Ok(f) => {
                 serde_yaml::to_writer(f, &dst_parsed_yaml).map_err(|e| Merge::Target(e.to_string()))
             }
@@ -355,7 +364,7 @@ impl ClashBackend {
                 serde_yaml::to_writer(f, &dst_parsed_yaml)
                     .map_err(|e| Merge::Target(e.to_string()))?;
                 #[cfg(target_os = "linux")]
-                ipc::exec_with_sbin("mv", vec![TMP_PATH, &self.cfg.clash_cfg_path])
+                ipc::exec_with_sbin("mv", vec![TMP_PATH, &self.cfg.clash_cfg_pth])
                     .map_err(|e| Merge::Target(e.to_string()))?;
                 #[cfg(target_os = "windows")]
                 todo!();
@@ -372,7 +381,7 @@ impl ClashBackend {
         let profile_yaml_path = self.gen_profile_path(profile_name);
         let mut net_res: Vec<(String, String)> = Vec::new();
         // if it's just the link
-        if self.test_is_link(profile_name) {
+        if self.is_upgradable(profile_name) {
             let sub_url = self
                 .get_profile_link(profile_name)
                 .expect("have a key but no value")
@@ -428,11 +437,12 @@ impl ClashBackend {
         Ok(net_res
             .into_iter()
             .map(|(url, path)| {
+                let url_domain = extract_domain(url.as_str()).unwrap_or("No domain");
                 match self.download_profile(&url, &Path::new(&self.cfg.clash_cfg_dir).join(path)) {
-                    Ok(_) => format!("Updated: {url}"),
+                    Ok(_) => format!("Updated: {profile_name}({url_domain})"),
                     Err(err) => {
                         log::error!("Update profile:{err}");
-                        format!("Not Updated: {url}")
+                        format!("Not Updated: {profile_name}({url_domain})")
                     }
                 }
             })
@@ -447,8 +457,15 @@ impl ClashBackend {
             create_dir_all(directory)?;
         }
 
+        let response = self
+            .dl_remote_profile(
+                url,
+                std::env::var(crate::consts::PROXY_ENVAR)
+                    .map(|s| s.parse::<bool>().unwrap_or(false))
+                    .unwrap_or(false),
+            )
+            .map_err(|s| Error::new(std::io::ErrorKind::Other, s))?;
         let mut output_file = File::create(path)?;
-        let response = self.dl_remote_profile(url)?;
         response.copy_to(&mut output_file)?;
         Ok(())
     }
@@ -456,45 +473,36 @@ impl ClashBackend {
 
 impl ClashBackend {
     pub fn get_profile_names(&self) -> std::io::Result<Vec<String>> {
-        let mut l: Vec<String> = self
-            .cfg
-            .profiles
-            .borrow()
-            .keys()
-            .map(|v| v.to_owned())
-            .collect();
+        let mut l: Vec<String> = self.cfg.profiles.all();
         l.sort();
         Ok(l)
     }
     /// if that is import via link, return `Some`
     /// else return `None`
     pub fn get_profile_link<P: AsRef<str>>(&self, profile_name: P) -> Option<String> {
-        if let Some(s) = self.cfg.profiles.borrow().get(profile_name.as_ref()) {
-            if !s.is_empty() {
-                return Some(s.to_owned());
-            }
-        }
-        None
+        self.cfg
+            .profiles
+            .get(profile_name.as_ref())
+            .and_then(|p| p.into_inner())
     }
     pub fn get_template_names(&self) -> std::io::Result<Vec<String>> {
-        Utils::get_file_names(self.home_dir.join("templates")).map(|mut v| {
+        get_file_names(self.home_dir.join("templates")).map(|mut v| {
             v.sort();
             v
         })
     }
-    pub fn test_is_link<P: AsRef<str>>(&self, profile_name: P) -> bool {
+    pub fn is_upgradable<P: AsRef<str>>(&self, profile_name: P) -> bool {
         self.cfg
             .profiles
-            .borrow()
             .get(profile_name.as_ref())
-            .is_some_and(|v| !v.is_empty())
+            .is_some_and(|v| !v.is_null())
     }
     /// Wrapped `self.profile_dir.join(profile_name)`
     pub fn gen_profile_path<P: AsRef<Path>>(&self, profile_name: P) -> PathBuf {
-        self.profile_dir.join(profile_name)
+        self.home_dir.join("profiles").join(profile_name)
     }
     /// Wrapped `self.profile_dir.join(profile_name)`
-    pub fn get_template_path_unchecked<P: AsRef<Path>>(&self, name: P) -> PathBuf {
+    pub fn gen_template_path<P: AsRef<Path>>(&self, name: P) -> PathBuf {
         self.home_dir.join("templates").join(name)
     }
     /// Make sure that's a valid yaml file
@@ -513,28 +521,11 @@ impl ClashBackend {
         }
     }
 }
-/// # Limitations
-///
-/// Windows treats symlink creation as a [privileged action][symlink-security],
-/// therefore this function is likely to fail unless the user makes changes to
-/// their system to permit symlink creation. Users can try enabling Developer
-/// Mode, granting the `SeCreateSymbolicLinkPrivilege` privilege, or running
-/// the process as an administrator.
-///
-/// [symlink-security]: https://docs.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/create-symbolic-links
-#[allow(unused)]
-fn crt_symlink_file<P: AsRef<std::path::Path>>(original: P, target: P) -> std::io::Result<()> {
-    use std::os;
-    #[cfg(target_os = "windows")]
-    return os::windows::fs::symlink_file(original, target);
-    #[cfg(target_os = "linux")]
-    os::unix::fs::symlink(original, target)
-}
 enum CrtFile {
     Ok(File),
     Tmp(File),
 }
-const TMP_PATH: &str = "/tmp/clashctl_mihomo_config_file.tmp";
+const TMP_PATH: &str = "/tmp/clashtui_mihomo_config_file.tmp";
 fn try_create_file<P: AsRef<Path>>(path: P) -> Result<CrtFile, String> {
     match File::create(path) {
         Ok(f) => Ok(CrtFile::Ok(f)),

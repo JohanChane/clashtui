@@ -4,18 +4,27 @@ mod commands;
 mod tui;
 mod utils;
 
+use backend::const_err::ERR_PATH_UTF_8;
 use utils::{init_config, ClashBackend, Flag, Flags};
 
 fn main() {
+    /*
+    // Prevent create root files before fixing files permissions.
+    if utils::is_clashtui_ep() {
+        utils::mock_fileop_as_sudo_user();
+    }
+    // To allow the mihomo process to read and write files created by clashtui in clash_cfg_dir, set the umask to 0o002.
+    sys::stat::umask(sys::stat::Mode::from_bits_truncate(0o002));
+     */
     if let Ok(infos) = commands::parse_args() {
         let mut flags = Flags::empty();
         let config_dir = load_app_dir(&mut flags);
 
         setup_logging(
             config_dir
-                .join("clashctl.log")
+                .join("clashtui.log")
                 .to_str()
-                .expect("path is not utf-8 form"),
+                .expect(ERR_PATH_UTF_8),
         );
         log::debug!("Current flags: {:?}", flags);
         let (backend, err_track) = ClashBackend::new(&config_dir, !flags.contains(Flag::FirstInit));
@@ -30,6 +39,7 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("{e}");
+                    log::error!("Cli:{e:?}");
                     std::process::exit(-1)
                 }
             }
@@ -37,6 +47,8 @@ fn main() {
             #[cfg(feature = "tui")]
             if let Err(e) = run_tui(backend, err_track, flags) {
                 eprintln!("{e}");
+                log::error!("Tui:{e:?}");
+                ui::setup::restore().expect("Err restore terminal interface");
                 std::process::exit(-1)
             }
             #[cfg(not(feature = "tui"))]
@@ -51,19 +63,18 @@ fn main() {
 #[cfg(feature = "tui")]
 pub fn run_tui(
     backend: ClashBackend,
-    err_track: Vec<backend::utils::CfgError>,
+    err_track: Vec<anyhow::Error>,
     flags: Flags<Flag>,
-) -> Result<(), String> {
+) -> Result<(), std::io::Error> {
     let mut app = tui::App::new(backend);
-    use ui::setup::*;
     // setup terminal
-    setup().map_err(|e| e.to_string())?;
+    ui::setup::setup()?;
     // create app and run it
-    app.run(err_track, flags).map_err(|e| e.to_string())?;
-    // restore terminal
-    restore().map_err(|e| e.to_string())?;
+    app.run(err_track, flags)?;
 
-    app.save().map_err(|e| e.to_string())?;
+    ui::setup::restore()?;
+
+    app.save()?;
 
     Ok(())
 }
@@ -71,7 +82,11 @@ pub fn run_tui(
 fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
     let config_dir = {
         use std::{env, path::PathBuf};
-        let exe_dir = env::current_exe().unwrap().parent().unwrap().to_path_buf();
+        let exe_dir = env::current_exe()
+            .expect("Err loading exe_file_path")
+            .parent()
+            .expect("Err finding exe_dir")
+            .to_path_buf();
         let data_dir = exe_dir.join("data");
         if data_dir.exists() && data_dir.is_dir() {
             // portable mode
@@ -80,56 +95,59 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
         } else {
             #[cfg(target_os = "linux")]
             let config_dir_str = env::var("XDG_CONFIG_HOME")
-                .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashctl", home)))
-                .unwrap();
+                .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)));
             #[cfg(target_os = "windows")]
-            let config_dir_str = env::var("APPDATA")
-                .map(|appdata| format!("{}/clashctl", appdata))
-                .unwrap();
-            PathBuf::from(&config_dir_str)
+            let config_dir_str = env::var("APPDATA").map(|appdata| format!("{}/clashtui", appdata));
+            PathBuf::from(&config_dir_str.expect("Err loading global config dir"))
         }
     };
 
     if !config_dir.join("config.yaml").exists() {
         flags.insert(Flag::FirstInit);
-        if let Err(err) = init_config(&config_dir) {
-            flags.insert(Flag::ErrorDuringInit);
-            log::error!("{}", err);
+        if let Err(e) = init_config(&config_dir) {
+            eprintln!("Err during init:{e}");
+            std::process::exit(-1)
         }
     }
     config_dir
 }
+
 fn setup_logging(log_path: &str) {
     use log4rs::append::file::FileAppender;
     use log4rs::config::{Appender, Config, Root};
     use log4rs::encode::pattern::PatternEncoder;
     #[cfg(debug_assertions)]
     let _ = std::fs::remove_file(log_path); // auto rm old log for debug
-    let mut flag = false;
-    if let Ok(m) = std::fs::File::open(log_path).and_then(|f| f.metadata()) {
-        if m.len() > 1024 * 1024 {
-            let _ = std::fs::remove_file(log_path);
-            flag = true
-        };
-    }
+    let flag = if std::fs::File::open(log_path)
+        .and_then(|f| f.metadata())
+        .is_ok_and(|m| m.len() > 1024 * 1024)
+    {
+        let _ = std::fs::remove_file(log_path);
+        true
+    } else {
+        false
+    };
     // No need to change. This is set to auto switch to Info level when build release
     #[allow(unused_variables)]
     let log_level = log::LevelFilter::Info;
     #[cfg(debug_assertions)]
     let log_level = log::LevelFilter::Debug;
     let file_appender = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("[{l}] {t} - {m}{n}")))
+        .encoder(Box::new(PatternEncoder::new(
+            "{d(%H:%M:%S)} [{l}] {t} - {m}{n}",
+        ))) // Having a timestamp would be better.
         .build(log_path)
-        .unwrap();
+        .expect("Err opening log file");
 
     let config = Config::builder()
         .appender(Appender::builder().build("file", Box::new(file_appender)))
         .build(Root::builder().appender("file").build(log_level))
-        .unwrap();
+        .expect("Err building log config");
 
-    log4rs::init_config(config).unwrap();
+    log4rs::init_config(config).expect("Err initing log service");
+
+    log::info!("Start Log, level: {}", log_level);
     if flag {
         log::info!("Log file too large, clear")
     }
-    log::info!("Start Log, level: {}", log_level);
 }
