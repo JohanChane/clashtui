@@ -21,7 +21,7 @@ impl State {
         {
             self.st = self.ct.update_state(None, None, None)
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
             self.st = self.ct.update_state(None, None)
         }

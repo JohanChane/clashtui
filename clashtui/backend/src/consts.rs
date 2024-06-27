@@ -8,3 +8,5 @@ pub(crate) const PROXY_ENVAR: &str = "CLASHTUI_WITH_PROXY";
 pub mod const_err {
     pub const ERR_PATH_UTF_8: &str = "path is not utf-8 form";
 }
+pub(crate) const CONFIG_FILE: &str = "config.yaml";
+pub(crate) const DATA_FILE: &str = "clashtui.conf";

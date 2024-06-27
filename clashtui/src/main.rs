@@ -74,8 +74,6 @@ pub fn run_tui(
 
     ui::setup::restore()?;
 
-    app.save()?;
-
     Ok(())
 }
 

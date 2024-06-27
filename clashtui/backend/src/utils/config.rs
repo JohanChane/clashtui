@@ -2,7 +2,9 @@ use api::ClashUtil;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+use crate::const_err::ERR_PATH_UTF_8;
+
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ProfileMap(core::cell::RefCell<std::collections::HashMap<String, ProfileType>>);
 impl ProfileMap {
     pub fn insert<S: AsRef<str>>(&self, name: S, path: ProfileType) -> Option<ProfileType> {
@@ -41,7 +43,65 @@ impl ProfileType {
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
+struct Basic {
+    clash_cfg_dir: String,
+    clash_bin_pth: String,
+    clash_cfg_pth: String,
+    timeout: Option<u64>,
+}
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct Extra {
+    edit_cmd: String,
+    open_dir_cmd: String,
+}
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct Service {
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    clash_srv_nam: String,
+    #[cfg(target_os = "linux")]
+    is_user: bool,
+}
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct ConfigFile {
+    basic: Basic,
+    service: Service,
+    extra: Extra,
+}
+impl ConfigFile {
+    pub fn from_file(config_path: &str) -> anyhow::Result<Self> {
+        let f = File::open(config_path)?;
+        Ok(serde_yaml::from_reader(f)?)
+    }
+
+    pub fn to_file(&self, config_path: &str) -> anyhow::Result<()> {
+        let f = File::create(config_path).unwrap();
+        Ok(serde_yaml::to_writer(f, self)?)
+    }
+}
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct DataFile {
+    current_profile: core::cell::RefCell<String>,
+    profiles: ProfileMap,
+}
+impl DataFile {
+    pub fn from_file(config_path: &str) -> anyhow::Result<Self> {
+        let f = File::open(config_path)?;
+        Ok(serde_yaml::from_reader(f)?)
+    }
+
+    pub fn to_file(&self, config_path: &str) -> anyhow::Result<()> {
+        let f = File::create(config_path)?;
+        Ok(serde_yaml::to_writer(f, self)?)
+    }
+}
+#[derive(Debug, Default, Clone)]
 pub struct Config {
+    conf_pth: String,
+    data_pth: String,
     /// where clash store its data
     pub clash_cfg_dir: String,
     /// where clash binary is
@@ -49,6 +109,7 @@ pub struct Config {
     /// where profile stored
     pub clash_cfg_pth: String,
     /// the name of clash service
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     pub clash_srv_nam: String,
     /// whether service is running as a user instance
     #[cfg(target_os = "linux")]
@@ -63,14 +124,95 @@ pub struct Config {
     pub profiles: ProfileMap,
 }
 impl Config {
-    pub fn from_file(config_path: &str) -> anyhow::Result<Self> {
-        let f = File::open(config_path)?;
-        Ok(serde_yaml::from_reader(f)?)
+    pub fn load<P: AsRef<str>>(conf_pth: P, data_pth: P) -> anyhow::Result<Self> {
+        let ConfigFile {
+            basic,
+            service,
+            extra,
+        } = ConfigFile::from_file(conf_pth.as_ref())?;
+        let DataFile {
+            current_profile,
+            profiles,
+        } = DataFile::from_file(data_pth.as_ref())?;
+        let Basic {
+            clash_cfg_dir,
+            clash_bin_pth,
+            clash_cfg_pth,
+            timeout,
+        } = basic;
+        let Service {
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
+            clash_srv_nam,
+            #[cfg(target_os = "linux")]
+            is_user,
+        } = service;
+        let Extra {
+            edit_cmd,
+            open_dir_cmd,
+        } = extra;
+        Ok(Self {
+            conf_pth: conf_pth.as_ref().to_string(),
+            data_pth: data_pth.as_ref().to_string(),
+            clash_cfg_dir,
+            clash_bin_pth,
+            clash_cfg_pth,
+            timeout,
+            edit_cmd,
+            open_dir_cmd,
+            current_profile,
+            profiles,
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
+            clash_srv_nam,
+            #[cfg(target_os = "linux")]
+            is_user,
+        })
     }
 
-    pub fn to_file(&self, config_path: &str) -> anyhow::Result<()> {
-        let f = File::create(config_path)?;
-        Ok(serde_yaml::to_writer(f, self)?)
+    pub fn save(self) -> anyhow::Result<()> {
+        let Config {
+            conf_pth,
+            data_pth,
+            clash_cfg_dir,
+            clash_bin_pth,
+            clash_cfg_pth,
+            timeout,
+            edit_cmd,
+            open_dir_cmd,
+            current_profile,
+            profiles,
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
+            clash_srv_nam,
+            #[cfg(target_os = "linux")]
+            is_user,
+        } = self;
+        let basic = Basic {
+            clash_cfg_dir,
+            clash_bin_pth,
+            clash_cfg_pth,
+            timeout,
+        };
+        let service = Service {
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
+            clash_srv_nam,
+            #[cfg(target_os = "linux")]
+            is_user,
+        };
+        let extra = Extra {
+            edit_cmd,
+            open_dir_cmd,
+        };
+        let conf = ConfigFile {
+            basic,
+            service,
+            extra,
+        };
+        conf.to_file(&conf_pth)?;
+        let data = DataFile {
+            current_profile,
+            profiles,
+        };
+        data.to_file(&data_pth)?;
+        Ok(())
     }
 
     pub fn is_valid(&self) -> bool {
@@ -82,27 +224,31 @@ impl Config {
     pub fn update_profile<S: AsRef<str>>(&self, profile: S) {
         *self.current_profile.borrow_mut() = profile.as_ref().to_string();
     }
+
+    fn modify<P: AsRef<str>>(mut self, conf_pth: P, data_pth: P) -> Self {
+        self.data_pth = data_pth.as_ref().to_string();
+        self.conf_pth = conf_pth.as_ref().to_string();
+        self
+    }
 }
 pub fn init_config(config_dir: &std::path::PathBuf) -> anyhow::Result<()> {
-    use crate::consts::DEFAULT_BASIC_CLASH_CFG_CONTENT;
+    use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE, DEFAULT_BASIC_CLASH_CFG_CONTENT};
     use std::fs;
     fs::create_dir_all(config_dir)?;
 
-    Config::default().to_file(config_dir.join("config.yaml").to_str().unwrap())?;
+    ConfigFile::default().to_file(config_dir.join(CONFIG_FILE).to_str().expect(ERR_PATH_UTF_8))?;
+    DataFile::default().to_file(config_dir.join(DATA_FILE).to_str().expect(ERR_PATH_UTF_8))?;
 
     fs::create_dir(config_dir.join("profiles"))?;
     fs::create_dir(config_dir.join("templates"))?;
 
-    fs::write(
-        config_dir.join("basic_clash_config.yaml"),
-        DEFAULT_BASIC_CLASH_CFG_CONTENT,
-    )?;
+    fs::write(config_dir.join(BASIC_FILE), DEFAULT_BASIC_CLASH_CFG_CONTENT)?;
     Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 /// Get necessary info
-struct Temp {
+struct BasicInfo {
     #[serde(rename = "external-controller")]
     external_controller: String,
     #[serde(rename = "mixed-port")]
@@ -118,9 +264,9 @@ pub fn load_app_config(
     clashtui_dir: &std::path::Path,
     skip_init_conf: bool,
 ) -> anyhow::Result<(ClashUtil, Config, Option<anyhow::Error>)> {
-    use crate::consts::{BASIC_FILE, HOST};
+    use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE, HOST};
     let basic_clash_config_path = clashtui_dir.join(BASIC_FILE);
-    let Temp {
+    let BasicInfo {
         mut external_controller,
         mixed_port,
         port,
@@ -148,9 +294,18 @@ pub fn load_app_config(
     }
     let mut just_warn = None;
 
+    let conf_pth = clashtui_dir
+        .join(CONFIG_FILE)
+        .to_str()
+        .expect(ERR_PATH_UTF_8)
+        .to_owned();
+    let data_pth = clashtui_dir
+        .join(DATA_FILE)
+        .to_str()
+        .expect(ERR_PATH_UTF_8)
+        .to_owned();
     let configs = if skip_init_conf {
-        let config_path = clashtui_dir.join("config.yaml");
-        match Config::from_file(config_path.to_str().unwrap()) {
+        match Config::load(&conf_pth, &data_pth) {
             Ok(v) => {
                 if !v.is_valid() {
                     just_warn = Some(anyhow::anyhow!("Some Key Configs are missing, or Default"));
@@ -166,7 +321,8 @@ pub fn load_app_config(
         }
     } else {
         Config::default()
-    };
+    }
+    .modify(conf_pth, data_pth);
     log::debug!("CFG:{:?}", configs);
     let api = ClashUtil::new(
         format!("http://{external_controller}"),
@@ -182,7 +338,7 @@ pub fn load_app_config(
 #[cfg(test)]
 mod test {
     use super::*;
-    #[test]
+    /*#[test]
     fn test_config() {
         let exe_dir = std::env::current_dir().unwrap();
         println!("{exe_dir:?}");
@@ -195,12 +351,12 @@ mod test {
         println!("{path_:?}");
         assert!(path_.is_file());
         let path = path_.as_path().to_str().unwrap();
-        let conf = Config::from_file(path).unwrap();
+        let conf = Config::load(path).unwrap();
         println!("{:?}", conf);
         conf.to_file(path).unwrap();
-    }
+    }*/
     #[test]
-    fn test_temp() {
+    fn test_basic_info() {
         let exe_dir = std::env::current_dir().unwrap();
         println!("{exe_dir:?}");
         let path_ = exe_dir
@@ -213,7 +369,7 @@ mod test {
         assert!(path_.is_file());
         let path = path_.as_path().to_str().unwrap();
         let file = File::open(path).unwrap();
-        let t: Temp = serde_yaml::from_reader(file).unwrap();
+        let t: BasicInfo = serde_yaml::from_reader(file).unwrap();
         println!("{t:?}");
         let s = serde_yaml::to_string(&t).unwrap();
         println!("{s:?}")

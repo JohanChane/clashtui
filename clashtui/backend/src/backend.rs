@@ -38,3 +38,9 @@ impl ClashBackend {
         )
     }
 }
+impl Drop for ClashBackend {
+    fn drop(&mut self) {
+        let cfg = self.cfg.clone();
+        cfg.save().expect("Err when saving config");
+    }
+}
