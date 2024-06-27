@@ -236,11 +236,6 @@ impl super::TabEvent for ProfileTab {
                             EventState::WorkDone
                         }
                         Keys::Edit => {
-                            // Hmm, now every time I call edit, an window will pop up
-                            // even if there is no error. But I think it's fine, maybe
-                            // I'll solve it one day
-                            //
-                            // I fix it, because msg is empty.
                             self.popup_txt_msg(
                                 self.profile_list
                                     .selected()

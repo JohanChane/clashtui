@@ -257,14 +257,13 @@ impl ClashBackend {
                 .profiles
                 .insert(profile_name, ProfileType::Url(uri.to_string()))
             {
-                Some(_) => Err("Already one".to_owned()),
+                Some(_) => Err(format!("Name `{profile_name}` already in use")),
                 None => Ok(()),
             }
         } else if Path::new(uri).is_file() {
             let uri_path = self.gen_profile_path(profile_name);
             if uri_path.exists() {
-                log::debug!("{uri_path:?}");
-                return Err("Failed to import: file exists".to_string());
+                return Err(format!("Failed to import: file `{profile_name}` exists"));
             }
             std::fs::copy(uri, uri_path).map_err(|e| e.to_string())?;
             self.cfg.profiles.insert(profile_name, ProfileType::File);
@@ -281,7 +280,7 @@ impl ClashBackend {
         use std::fs::remove_file;
         match self.cfg.profiles.remove(profile_name) {
             Some(_) => {
-                if self.cfg.current_profile.borrow().to_owned() == *profile_name {
+                if self.cfg.current_profile.borrow().eq(profile_name) {
                     self.cfg.update_profile("Removed");
                 };
                 remove_file(self.gen_profile_path(profile_name)).map_err(|e| e.to_string())

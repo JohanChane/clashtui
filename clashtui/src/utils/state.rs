@@ -53,6 +53,10 @@ impl State {
     pub fn set_sysproxy(&mut self, sysproxy: bool) {
         self.st = self.ct.update_state(None, None, Some(sysproxy));
     }
+    #[cfg(target_os = "windows")]
+    pub fn get_sysproxy(&self) -> Option<bool> {
+        self.st.sysproxy
+    }
     pub fn render(&self) -> String {
         self.st.to_string()
     }
