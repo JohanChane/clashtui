@@ -1,22 +1,25 @@
 use serde::{Deserialize, Serialize};
 /// config loaded from clash core
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-#[serde(default)]
 pub struct ClashConfig {
+    // Core infos
     pub mode: Mode,
-    // pub log_level: LogLevel,
-    // pub allow_lan: bool,
-    // bind_address: String,
-    // pub ipv6: bool,
-    // pub global_client_fingerprint: String,
     pub tun: TunConfig,
-    pub dns: String,
-    pub geodata_mode: bool,
-    pub unified_delay: bool,
-    pub geo_auto_update: bool,
-    pub geo_update_interval: u16,
-    pub find_process_mode: String,
+    // Extend infos
+    pub log_level: Option<LogLevel>,
+    pub bind_address: Option<String>,
+    pub allow_lan: Option<bool>,
+    pub ipv6: Option<bool>,
+    pub global_client_fingerprint: Option<String>,
+    pub tcp_concurrent: Option<bool>,
+    pub global_ua: Option<String>,
+    pub dns: Option<String>,
+    pub geodata_mode: Option<bool>,
+    pub unified_delay: Option<bool>,
+    pub geo_auto_update: Option<bool>,
+    pub geo_update_interval: Option<u16>,
+    pub find_process_mode: Option<String>,
 }
 impl std::str::FromStr for ClashConfig {
     type Err = std::fmt::Error;
@@ -53,13 +56,12 @@ impl From<Mode> for String {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LogLevel {
     Silent,
     Error,
     Warning,
-    #[default]
     Info,
     Debug,
 }
@@ -77,15 +79,14 @@ impl std::fmt::Display for LogLevel {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Deserialize)]
 pub struct TunConfig {
     pub enable: bool,
     pub stack: TunStack,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 pub enum TunStack {
-    #[default]
     #[serde(alias = "Mixed")]
     Mixed,
     #[serde(alias = "gVisor")]

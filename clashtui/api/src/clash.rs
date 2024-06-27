@@ -2,10 +2,6 @@ use minreq::Method;
 
 const DEFAULT_PAYLOAD: &str = r#"'{"path": "", "payload": ""}'"#;
 const TIMEOUT: u64 = 5;
-#[cfg(feature = "deprecated")]
-const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases/latest";
-#[cfg(feature = "deprecated")]
-const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 type Result<T> = core::result::Result<T, String>;
 
@@ -27,6 +23,7 @@ impl Resp {
         std::io::copy(&mut inner, w)
     }
 }
+#[derive(Debug)]
 pub struct ClashUtil {
     api: String,
     secret: Option<String>,
@@ -114,157 +111,6 @@ impl ClashUtil {
             .map(|_| ())
             .map_err(|e| format!("API:{e:?}"))
     }
-    #[cfg(target_feature = "deprecated")]
-    pub fn check_geo_update(
-        &self,
-        old_id: Option<&String>,
-        path: &std::path::Path,
-    ) -> Result<String> {
-        let info = self
-            .client
-            .get_or_init(Client::new)
-            .get(GEO_URI)
-            .header(reqwest::header::USER_AGENT, USER_AGENT)
-            .send()
-            .map_err(process_err)?
-            .text()
-            .map_err(process_err)?;
-        let info: crate::geo::GithubApi =
-            serde_json::from_str(info.as_str()).map_err(Error::from)?;
-        if info.check(old_id) {
-            let (assets, publist_at) = info.into();
-            let result: Vec<Error> = assets
-                .into_iter()
-                // .inspect(|e| println!("{e:?}"))
-                .map(|info| info.into())
-                // ignore sha check for now, though no future plan to add
-                .filter(|(name, _)| !name.ends_with("sha256sum"))
-                .filter_map(|(name, url)| {
-                    let path = path.join(name);
-                    self.client
-                        .get_or_init(Client::new)
-                        .get(url)
-                        .send()
-                        .map_err(process_err)
-                        .and_then(|dow| {
-                            std::fs::File::options()
-                                .create(true)
-                                .write(true)
-                                .open(path)
-                                .and_then(|mut file| {
-                                    file.write_all(dow.text().map_err(process_err)?.as_bytes())
-                                })
-                        })
-                        .err()
-                })
-                // .inspect(|e| println!("{e:?}"))
-                .collect();
-            if result.is_empty() {
-                Ok(publist_at)
-            } else {
-                Err(Error::new(ErrorKind::Other, format!("{result:?}")))
-            }
-        } else {
-            Ok("Already Up to dated".to_string())
-        }
-    }
-
-    /*
-    pub fn flush_fakeip(&self) -> Result<String, reqwest::Error> {
-        self.post("/cache/fakeip/flush", None)
-    }
-    pub fn provider(&self, is_rule: bool, name:Option<&String>, is_update: bool, is_check: bool) -> Result<String, reqwest::Error>{
-        //
-        if !is_rule{
-            let api = "/providers/proxies";
-            match name {
-                Some(v) => {
-                    if is_update{
-                        self.put(&format!("{}/{}", api, v), None)
-                    } else {
-                        if is_check{
-                            self.get(&format!("{}/{}/healthcheck", api, v), None)
-                        } else {
-                            self.get(&format!("{}/{}", api, v), None)
-                        }
-                    }
-                },
-                None => self.get(api, None),
-            }
-        } else {
-            let api = "/providers/rules";
-            match name {
-                Some(v) => self.put(&format!("{}/{}", api, v), None),
-                None => self.get(api, None)
-            }
-        }
-    }
-    pub fn update_geo(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
-        match payload {
-            Some(load) => self.post("/configs/geo", Some(load)),
-            None => self.post("/configs/geo", Some(&self.default_payload))
-        }
-    }
-    pub fn log(&self) -> Result<String, reqwest::Error>{
-        self.get("/logs", None)
-    }
-    pub fn traffic(&self) -> Result<String, reqwest::Error>{
-        self.get(&"/traffic", None)
-    }
-    pub fn memory(&self) -> Result<String, reqwest::Error>{
-        self.get(&"/memory", None)
-    }
-    pub fn upgrade(&self, payload:Option<&String>) -> Result<String, reqwest::Error>{
-        match payload {
-            Some(load) => self.post("/upgrade", Some(load)),
-            None => self.post("/upgrade", Some(&self.default_payload))
-        }
-    }
-    pub fn upgrade_ui(&self) -> Result<String, reqwest::Error>{
-        self.post("/upgrade/ui", None)
-    }
-    pub fn proxies(&self, name:Option<&String>, test_delay: bool) -> Result<String, reqwest::Error>{
-        let api = match name {
-            Some(v) => if test_delay {
-                format!("/proxies/{}/delay", v)
-            } else {
-                format!("/proxies/{}", v)
-            },
-            None => "/proxies/".to_string()
-        };
-        self.get(&api, None)
-    }
-    pub fn set_proxy(&self, name:&String) -> Result<String, reqwest::Error> {
-        self.put(&format!("/proxies/{}", name), None)
-    }
-    pub fn rules(&self) -> Result<String, reqwest::Error>{
-        self.get("/rules", None)
-    }
-    pub fn connection(&self, is_close: bool, id:Option<usize>) -> Result<String, reqwest::Error>{
-        if !is_close {
-            self.get("/connections", None)
-        } else {
-            match
-                match id {
-                    Some(v) => self.client.delete(format!("/connections/{}", v)).send(),
-                    None => self.client.delete("/connections").send(),
-                }
-                {
-                Ok(r) => r.text(),
-                Err(e) => {
-                    log::error!("[ClashUtil] {} exec {} failed! {}", "patch", "/configs", e.status().unwrap());
-                    Err(e)
-                }
-            }
-        }
-    }
-    pub fn dns_resolve(&self, name:&String, _type:Option<&String>) -> Result<String, reqwest::Error>{
-        match _type {
-            Some(v) => self.get(&format!("/dns/query?name={}&type={}", name, v), None),
-            None => self.get(&format!("/dns/query?name={}", name), None),
-        }
-    }
-    */
 }
 #[cfg(test)]
 mod tests {

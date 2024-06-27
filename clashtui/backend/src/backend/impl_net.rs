@@ -47,7 +47,7 @@ impl ClashBackend {
             }
         }
     }
-    fn fetch_remote(&self) -> Result<ClashConfig> {
+    pub fn fetch_remote(&self) -> Result<ClashConfig> {
         use core::str::FromStr as _;
         self.clash_api.config_get().and_then(|cur_remote| {
             ClashConfig::from_str(cur_remote.as_str())
@@ -92,6 +92,7 @@ impl ClashBackend {
             .fetch_remote()
             .map_err(|e| log::warn!("Fetch Remote:{e:?}"))
             .ok();
+        log::debug!("Fetch Remote:{clash_cfg:?}");
         let (mode, tun) = match clash_cfg {
             Some(v) => (
                 Some(v.mode),

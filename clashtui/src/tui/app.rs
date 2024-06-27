@@ -41,7 +41,7 @@ impl App {
         ]; // Init the tabs
         let tabbar = TabBar::new(tabs.iter().map(|v| v.to_string()).collect());
         let statusbar = StatusBar::new(Rc::clone(&state));
-        let info_popup = InfoPopUp::with_items(&util.clash_version());
+        let info_popup = InfoPopUp::new();
 
         Self {
             tabbar,
@@ -145,6 +145,9 @@ impl App {
                     EventState::WorkDone
                 }
                 Keys::AppInfo => {
+                    use super::utils::Infos;
+                    self.info_popup
+                        .set_items(Infos::MihomoVer, &self.util.clash_version());
                     self.info_popup.show();
                     EventState::WorkDone
                 }

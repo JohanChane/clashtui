@@ -1,18 +1,17 @@
+use super::list_popup::PopUp;
 use crate::tui::{EventState, Visibility};
 use ratatui::prelude as Ra;
 use std::collections::HashMap;
 use ui::event::Event;
 
-use super::list_popup::PopUp;
-
-pub struct InfoPopUp {
-    inner: PopUp,
-    items: HashMap<Infos, String>,
-}
-#[derive(Clone, PartialEq, Eq, Hash)]
-enum Infos {
+#[derive(Clone, PartialEq, Eq, Hash, Copy)]
+pub enum Infos {
     TuiVer,
     MihomoVer,
+    MihomoLoglevel,
+    MihomoIpv6,
+    MihomoAllowLan,
+    MihomoGlobalUa,
 }
 impl core::fmt::Display for Infos {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -20,30 +19,35 @@ impl core::fmt::Display for Infos {
             f,
             "{}",
             match self {
-                Infos::TuiVer => "ClashTui:".to_string(),
-                Infos::MihomoVer => "Mihomo:".to_string(),
+                Infos::TuiVer => "ClashTui:",
+                Infos::MihomoVer => "Mihomo:",
+                Infos::MihomoLoglevel => todo!(),
+                Infos::MihomoIpv6 => todo!(),
+                Infos::MihomoAllowLan => todo!(),
+                Infos::MihomoGlobalUa => todo!(),
             }
         )
     }
 }
+
+pub struct InfoPopUp {
+    pub inner: PopUp,
+    pub items: HashMap<Infos, String>,
+}
 impl InfoPopUp {
     #[allow(unused)]
-    pub fn set_items(&mut self, mihomover: Option<&String>) {
-        if let Some(v) = mihomover {
-            self.items.insert(Infos::MihomoVer, v.clone());
-        } else {
-            return;
-        }
-        self.inner
-            .set_items(self.items.iter().map(|(k, v)| format!("{k}:{v}")))
+    pub fn set_items(&mut self, item: Infos, cont: &str) {
+        self.items.insert(item, cont.to_string());
+        let mut strs: Vec<String> = self.items.iter().map(|(k, v)| format!("{k}:{v}")).collect();
+        strs.sort(); // make sure A->Z
+        self.inner.set_items(strs.iter())
     }
-    pub fn with_items(mihomover: &str) -> Self {
+    pub fn new() -> Self {
         let mut items = HashMap::new();
         items.insert(Infos::TuiVer, crate::utils::VERSION.to_string());
-        items.insert(Infos::MihomoVer, mihomover.to_owned());
         let mut inner = PopUp::new("Info".to_string());
         inner.set_items(items.iter().map(|(k, v)| format!("{k}:{v}")));
-        Self { items, inner }
+        Self { inner, items }
     }
 }
 

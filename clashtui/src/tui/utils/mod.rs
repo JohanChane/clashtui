@@ -4,5 +4,5 @@ mod key_list;
 mod list_popup;
 
 pub use self::help_popup::HelpPopUp;
-pub use self::info_popup::InfoPopUp;
+pub use self::info_popup::{InfoPopUp,Infos};
 pub use self::key_list::Keys;
