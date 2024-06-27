@@ -24,7 +24,7 @@ tui = ["ui", "ratatui"]
 [dependencies]
 ui = { path = "ui", optional = true }
 backend = { path = "backend" }
-ratatui = { version = "0.26.1", default-features = false, features = [
+ratatui = { version = "*", default-features = false, features = [
   "crossterm",
 ], optional = true }
 log = "0.4"
