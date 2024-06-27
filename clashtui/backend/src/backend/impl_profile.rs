@@ -300,7 +300,7 @@ impl ClashBackend {
         );
         #[cfg(target_os = "windows")]
         return ipc::exec("cmd", vec!["/C", cmd.as_str()]);
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         ipc::exec("sh", vec!["-c", cmd.as_str()])
     }
 

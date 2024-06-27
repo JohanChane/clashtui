@@ -23,6 +23,7 @@ pub struct PackedArgCommand(ArgCommand);
 #[cfg_attr(debug_assertions, derive(Debug))]
 enum ArgCommand {
     Profile(Profile),
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     Service(Service),
     Mode(Mode),
 }
@@ -156,6 +157,7 @@ pub fn handle_cli(
                 todo!()
             }
         },
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
         ArgCommand::Service(Service { command }) => match command {
             ServiceCommand::Restart(ServiceRestart { soft }) => {
                 if soft {
@@ -170,7 +172,7 @@ pub fn handle_cli(
                 backend.clash_srv_ctl(crate::utils::ClashSrvOp::StopClashService)
             }
         },
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         ArgCommand::Mode(Mode { command }) => match command {
             ModeCommand::Rule => Ok(backend
                 .update_state(None, Some(api::Mode::Rule.into()))

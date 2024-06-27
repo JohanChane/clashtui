@@ -33,7 +33,9 @@ impl ClashSrvCtlTab {
         operations.set_items(vec![
             #[cfg(target_os = "linux")]
             ClashSrvOp::SetPermission.into(),
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
             ClashSrvOp::StartClashService.into(),
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
             ClashSrvOp::StopClashService.into(),
             ClashSrvOp::SwitchMode.into(),
             #[cfg(target_os = "windows")]
@@ -106,6 +108,8 @@ impl super::TabEvent for ClashSrvCtlTab {
             // override `Enter`
             event_state = if &Keys::Select == key {
                 let op = ClashSrvOp::from(self.main_list.selected().unwrap().as_str());
+                #[allow(irrefutable_let_patterns)]
+                // currently, only [`SwitchMode`] is impl on macos
                 if let ClashSrvOp::SwitchMode = op {
                     self.mode_selector.show();
                 } else {
@@ -133,6 +137,7 @@ impl super::TabEvent for ClashSrvCtlTab {
                     self.state.borrow_mut().set_sysproxy(cur);
                     self.hide_msgpopup();
                 }
+                #[allow(unreachable_patterns)] // currently, only [`SwitchMode`] is impl on macos
                 _ => match self.util.clash_srv_ctl(op) {
                     Ok(output) => {
                         self.popup_list_msg(output.lines().map(|line| line.trim().to_string()));
@@ -142,7 +147,7 @@ impl super::TabEvent for ClashSrvCtlTab {
                     }
                 },
             }
-                    self.state.borrow_mut().refresh();
+            self.state.borrow_mut().refresh();
         }
     }
     fn draw(&mut self, f: &mut ratatui::prelude::Frame, area: ratatui::prelude::Rect) {

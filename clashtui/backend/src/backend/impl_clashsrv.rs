@@ -1,4 +1,5 @@
 use super::ClashBackend;
+#[allow(unused_imports)] // currently, only [`SwitchMode`] is impl on macos
 use crate::utils::ipc::{self, exec};
 use crate::utils::ClashSrvOp;
 use std::io::Error;
@@ -48,6 +49,15 @@ impl ClashBackend {
                     self.cfg.clash_bin_pth.as_str(),
                 ],
             ),
+            _ => Err(Error::new(
+                std::io::ErrorKind::NotFound,
+                "No Support Action",
+            )),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
+        match op {
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
                 "No Support Action",

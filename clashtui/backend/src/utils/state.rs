@@ -23,7 +23,7 @@ impl core::fmt::Display for State {
                 .as_ref()
                 .map_or("Unknown".to_string(), |v| format!("{}", v)),
         );
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         let status_str = write!(
             f,
             "Profile: {}    Mode: {}    Tun: {}    Help: ?",

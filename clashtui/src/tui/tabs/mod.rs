@@ -1,3 +1,4 @@
+#![allow(refining_impl_trait)]
 mod clashsrvctl;
 mod profile;
 mod profile_input;

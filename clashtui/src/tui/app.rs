@@ -63,11 +63,15 @@ impl App {
         const TICK_RATE: u64 = 250;
         use core::time::Duration;
         if flags.contains(Flag::FirstInit) {
-            self.popup_txt_msg("Welcome to ClashTui(forked)!".to_string());
-            self.popup_txt_msg(
-                "Please go to Config Tab to set configs so that program can work properly"
-                    .to_string(),
-            );
+            self.popup_txt_msg("Welcome to ClashTui!".to_string());
+            self.popup_txt_msg(format!(
+                "Please go to {} to set configs so that program can work properly",
+                self.util
+                    .home_dir
+                    .join("config.yaml")
+                    .to_str()
+                    .expect(backend::const_err::ERR_PATH_UTF_8)
+            ));
         };
         err_track
             .into_iter()

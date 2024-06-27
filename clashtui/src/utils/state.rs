@@ -10,7 +10,7 @@ impl State {
             st: ct.update_state(None, None, None),
             ct,
         };
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         Self {
             st: ct.update_state(None, None),
             ct,
@@ -34,7 +34,7 @@ impl State {
         {
             self.st = self.ct.update_state(Some(profile), None, None)
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
             self.st = self.ct.update_state(Some(profile), None)
         }
@@ -44,7 +44,7 @@ impl State {
         {
             self.st = self.ct.update_state(None, Some(mode), None)
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
             self.st = self.ct.update_state(None, Some(mode))
         }

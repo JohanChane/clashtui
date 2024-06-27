@@ -1,6 +1,7 @@
 pub(crate) mod config;
 #[cfg_attr(target_os = "windows", path = "ipc_windows.rs")]
 #[cfg_attr(target_os = "linux", path = "ipc_linux.rs")]
+#[cfg_attr(target_os = "macos", path = "ipc_macos.rs")]
 pub(crate) mod ipc;
 mod state;
 #[allow(clippy::module_inception)]
@@ -48,6 +49,13 @@ define_enum!(
         StartClashService,
         StopClashService,
         SetPermission,
+        SwitchMode
+    ]
+);
+#[cfg(target_os = "macos")]
+define_enum!(
+    pub ClashSrvOp,
+    [
         SwitchMode
     ]
 );

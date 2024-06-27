@@ -42,8 +42,7 @@ fn main() {
     println!("cargo:rerun-if-changed=../.git/refs/heads/dev");
     println!("cargo:rerun-if-changed=build.rs",);
 
-    if env::var("CLASHTUI_VERSION").is_ok() {
-    } else {
+    if env::var("CLASHTUI_VERSION").is_err() {
         println!("cargo:rustc-env=CLASHTUI_VERSION={}", get_version());
     }
 }

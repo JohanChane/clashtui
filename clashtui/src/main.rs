@@ -98,6 +98,8 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
                 .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)));
             #[cfg(target_os = "windows")]
             let config_dir_str = env::var("APPDATA").map(|appdata| format!("{}/clashtui", appdata));
+            #[cfg(target_os = "macos")]
+            let config_dir_str = env::var("HOME").map(|home| format!("{}/.config/clashtui", home));
             PathBuf::from(&config_dir_str.expect("Err loading global config dir"))
         }
     };

@@ -34,12 +34,12 @@ fn spawn_open(cmd: &str, path: &Path) -> std::io::Result<()> {
         let opendir_cmd_with_path = cmd.replace("%s", path.to_str().unwrap_or(""));
         #[cfg(target_os = "windows")]
         return spawn("cmd", vec!["/C", opendir_cmd_with_path.as_str()]);
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         spawn("sh", vec!["-c", opendir_cmd_with_path.as_str()])
     } else {
         #[cfg(target_os = "windows")]
         return spawn("cmd", vec!["/C", "start", path.to_str().unwrap_or("")]);
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         spawn("xdg-open", vec![path.to_str().unwrap_or("")])
     }
 }
