@@ -134,7 +134,7 @@ pub fn handle_cli(
                         .inspect(|s| println!("\nProfile: {s}"))
                         .filter_map(|v| {
                             backend
-                                .update_profile(&v, false)
+                                .update_profile(&v, false,None)
                                 .map_err(|e| println!("- Error! {e}"))
                                 .ok()
                         })

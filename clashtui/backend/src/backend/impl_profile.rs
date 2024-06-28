@@ -372,17 +372,23 @@ impl ClashBackend {
         }
     }
 
-    pub fn trim_proxy_providers(&self) -> anyhow::Result<()>{
+    pub fn trim_proxy_providers(&self) -> anyhow::Result<()> {
         let current_config = std::fs::File::open(&self.cfg.clash_cfg_pth)?;
-        let mut parsed_yaml:serde_yaml::Value = serde_yaml::from_reader(current_config)?;
-        let net_res = extract_net_provider_helper(&parsed_yaml, &vec![ProfileSectionType::ProxyProvider])?;
-        Ok(no_proxy_providers(&self.cfg.clash_cfg_dir, &mut parsed_yaml, &net_res)?)
+        let mut parsed_yaml: serde_yaml::Value = serde_yaml::from_reader(current_config)?;
+        let net_res =
+            extract_net_provider_helper(&parsed_yaml, &vec![ProfileSectionType::ProxyProvider])?;
+        Ok(no_proxy_providers(
+            &self.cfg.clash_cfg_dir,
+            &mut parsed_yaml,
+            &net_res,
+        )?)
     }
 
     pub fn update_profile(
         &self,
         profile_name: &String,
         does_update_all: bool,
+        with_proxy: Option<bool>,
     ) -> std::io::Result<Vec<String>> {
         let profile_yaml_path = self.gen_profile_path(profile_name);
         let mut net_res: Vec<(String, String)> = Vec::new();
@@ -394,7 +400,7 @@ impl ClashBackend {
                 .to_owned();
 
             // Update the file to keep up-to-date
-            self.download_profile(&sub_url, &profile_yaml_path)?;
+            self.download_profile(&sub_url, &profile_yaml_path, with_proxy)?;
 
             net_res.push((sub_url, profile_yaml_path.to_string_lossy().to_string()))
         }
@@ -444,7 +450,11 @@ impl ClashBackend {
             .into_iter()
             .map(|(url, path)| {
                 let url_domain = extract_domain(url.as_str()).unwrap_or("No domain");
-                match self.download_profile(&url, &Path::new(&self.cfg.clash_cfg_dir).join(path)) {
+                match self.download_profile(
+                    &url,
+                    &Path::new(&self.cfg.clash_cfg_dir).join(path),
+                    with_proxy,
+                ) {
                     Ok(_) => format!("Updated: {profile_name}({url_domain})"),
                     Err(err) => {
                         log::error!("Update profile:{err}");
@@ -455,7 +465,12 @@ impl ClashBackend {
             .collect::<Vec<String>>())
     }
 
-    fn download_profile(&self, url: &str, path: &PathBuf) -> std::io::Result<()> {
+    fn download_profile(
+        &self,
+        url: &str,
+        path: &PathBuf,
+        with_proxy: Option<bool>,
+    ) -> std::io::Result<()> {
         let directory = path
             .parent()
             .ok_or_else(|| Error::new(std::io::ErrorKind::NotFound, "Invalid file path"))?;
@@ -464,12 +479,7 @@ impl ClashBackend {
         }
 
         let response = self
-            .dl_remote_profile(
-                url,
-                std::env::var(crate::consts::PROXY_ENVAR)
-                    .map(|s| s.parse::<bool>().unwrap_or(false))
-                    .unwrap_or(false),
-            )
+            .dl_remote_profile(url, with_proxy.is_some_and(|b| b))
             .map_err(|s| Error::new(std::io::ErrorKind::Other, s))?;
         let mut output_file = File::create(path)?;
         response.copy_to(&mut output_file)?;
@@ -567,7 +577,7 @@ fn extract_net_provider_helper(
             .and_then(|m| m.as_mapping())
             .into_iter()
             .flat_map(|m| m.into_iter())
-            .filter_map(|(name, cont)| cont.as_mapping().and_then(|m| Some((name, m))))
+            .filter_map(|(name, cont)| cont.as_mapping().map(|m| (name, m)))
             .filter_map(|(name, cont)| {
                 if let (Some(name), Some(url), Some(path)) = (
                     name.as_str(),

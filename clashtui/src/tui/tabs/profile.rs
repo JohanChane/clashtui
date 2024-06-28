@@ -9,7 +9,19 @@ use crate::tui::{
 use crate::utils::{get_modify_time, SharedBackend, SharedState};
 crate::utils::define_enum!(
     PTOp,
-    [Update, UpdateAll, Select, PreDelete, Delete, PreTrim, Trim]
+    [
+        PreUpdate,
+        Update,
+        UpdateProxy,
+        PreUpdateAll,
+        UpdateAll,
+        UpdateAllProxy,
+        Select,
+        PreDelete,
+        Delete,
+        PreTrim,
+        Trim
+    ]
 );
 #[derive(PartialEq)]
 enum Fouce {
@@ -80,9 +92,12 @@ impl ProfileTab {
             }
         };
     }
-    fn handle_update_profile_ev(&mut self, does_update_all: bool) {
+    fn handle_update_profile_ev(&mut self, does_update_all: bool, with_proxy: bool) {
         if let Some(profile_name) = self.profile_list.selected() {
-            match self.util.update_profile(profile_name, does_update_all) {
+            match self
+                .util
+                .update_profile(profile_name, does_update_all, Some(with_proxy))
+            {
                 Ok(mut msg) => {
                     if profile_name == self.state.borrow().get_profile() {
                         if let Err(err) = self.util.select_profile(profile_name) {
@@ -179,11 +194,21 @@ impl super::TabEvent for ProfileTab {
                     match self.op.take() {
                         Some(PTOp::PreDelete) => self.op.replace(PTOp::Delete),
                         Some(PTOp::PreTrim) => self.op.replace(PTOp::Trim),
+                        Some(PTOp::PreUpdate) => self.op.replace(PTOp::UpdateProxy),
+                        Some(PTOp::PreUpdateAll) => self.op.replace(PTOp::UpdateAllProxy),
                         Some(_) | None => None,
                     };
                     EventState::WorkDone
                 }
-                EventState::Cancel | EventState::WorkDone => EventState::WorkDone,
+                EventState::Cancel => {
+                    match self.op.take() {
+                        Some(PTOp::PreUpdate) => self.op.replace(PTOp::Update),
+                        Some(PTOp::PreUpdateAll) => self.op.replace(PTOp::UpdateAll),
+                        Some(_) | None => None,
+                    };
+                    EventState::WorkDone
+                }
+                EventState::WorkDone => EventState::WorkDone,
                 _ => EventState::NotConsumed,
             };
         }
@@ -231,12 +256,14 @@ impl super::TabEvent for ProfileTab {
                         }
                         Keys::ProfileUpdate => {
                             self.popup_txt_msg("Updating...".to_string());
-                            self.op.replace(PTOp::Update);
+                            self.op.replace(PTOp::PreUpdate);
+                            self.confirm_popup.popup_msg("Update with proxy?".to_owned());
                             EventState::WorkDone
                         }
                         Keys::ProfileUpdateAll => {
                             self.popup_txt_msg("Updating...".to_string());
-                            self.op.replace(PTOp::UpdateAll);
+                            self.op.replace(PTOp::PreUpdateAll);
+                            self.confirm_popup.popup_msg("Update with proxy?".to_owned());
                             EventState::WorkDone
                         }
                         Keys::ProfileImport => {
@@ -246,6 +273,7 @@ impl super::TabEvent for ProfileTab {
                         Keys::ProfileDelete => {
                             self.confirm_popup
                                 .popup_msg("`y` to Delete, `Esc` to cancel".to_string());
+                            self.op.replace(PTOp::PreDelete);
                             EventState::WorkDone
                         }
                         Keys::Edit => {
@@ -366,14 +394,13 @@ impl super::TabEvent for ProfileTab {
         if let Some(op) = self.op.take() {
             self.hide_msgpopup();
             match op {
-                PTOp::Update => self.handle_update_profile_ev(false),
-                PTOp::UpdateAll => self.handle_update_profile_ev(true),
+                PTOp::Update => self.handle_update_profile_ev(false, false),
+                PTOp::UpdateProxy => self.handle_update_profile_ev(false, true),
+                PTOp::UpdateAllProxy => self.handle_update_profile_ev(true, true),
+                PTOp::UpdateAll => self.handle_update_profile_ev(true, false),
                 PTOp::Select => self.handle_select_profile_ev(),
                 PTOp::Delete => self.handle_delete_profile_ev(),
-                PTOp::PreDelete => {
-                    self.op.replace(op);
-                }
-                PTOp::PreTrim => {
+                PTOp::PreUpdate | PTOp::PreUpdateAll | PTOp::PreDelete | PTOp::PreTrim => {
                     self.op.replace(op);
                 }
                 PTOp::Trim => {
