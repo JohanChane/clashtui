@@ -30,24 +30,29 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
 
 ## Supported Platforms
 
-- Linux
-- Windows. Please refer to [Windows README](https://github.com/JohanChane/clashtui/blob/win/README.md)
+- Linux(x86_64, arm64(CI in fixing))
+- Windows
+- MacOS(In test, You need to build from source by youself)
 
 ## Target Audience
 
 - Those with a certain understanding of Clash configurations.
 - Fans of TUI software.
 
-## Install Mihomo Service (Enable Tun Mode)
+## Installing Mihomo Service (With Tun Mode Avaliable)
+
+ > It's advised to test the mihomo service with a functional mihomo configuration to verify its success. 
+ >
+ > Check for any missing [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) files.
+
+### Linux
 
 For example: [ArchLinux](https://aur.archlinux.org/packages/mihomo).
 
-```sh
-# ## Install mihomo
-paru -S mihomo
-
-# ## Add mihomo hook
-# cat /etc/pacman.d/hooks/mihomo.hook (If there is no system similar to hook, use ClashSrvCtl Tab's SetPermission or use mihomo@root service)
+#### Set Up Trigger:
+ > This will `setcap` for `mihomo` automatically every time you update via `pacman`
+ - `vi /etc/pacman.d/hooks/mihomo.hook` 
+```systemd
 [Trigger]
 Operation = Install
 Operation = Upgrade
@@ -57,36 +62,48 @@ Target = usr/bin/mihomo
 [Action]
 When = PostTransaction
 Exec = /usr/bin/setcap 'cap_net_admin,cap_net_bind_service=+ep' /usr/bin/mihomo
+```
+ - And then `paru -S mihomo`
+#### Set Up Systemd User Service: 
+ - Create service: `systemctl --user edit mihomo`
+```systemd
+[Unit]
+Description=mihomo Daemon, Another Clash Kernel.
+After=network.target NetworkManager.service systemd-networkd.service iwd.service
 
-# ## Edit mihomo service unit
-# systemctl edit mihomo
 [Service]
-# Remove original ExecStart
-ExecStart=
-ExecStart=/usr/bin/mihomo -d /srv/mihomo -f /srv/mihomo/config.yaml
+Type=simple
+LimitNPROC=4096
+LimitNOFILE=1000000
+# %h mean HOME
+WorkingDirectory=%h/.local/proxy
+Restart=always
+ExecStartPre=/usr/bin/sleep 1s
+ExecStart=%h/.local/proxy/mihomo -d %h/.local/proxy/config
+ExecReload=/bin/kill -HUP $MAINPID
+ 
+[Install]
+WantedBy=default.target
+```
+ - To enable at boot: `systemctl --user enable mihomo`
+ - To start the service: `systemctl --user start mihomo`
 
-# ## Create /srv/mihomo
+#### Set Up Systemd System Service
+ > For those want to use system-wide service, please refer to [this](https://wiki.metacubex.one/startup/service/#systemd) 
+  - Create /srv/mihomo
+  ```bash
 mkdir /srv/mihomo
 cd /srv/mihomo
 chown -R mihomo:mihomo /srv/mihomo
 usermod -a -G mihomo <user>
 groups <user>       # Check if already added to mihomo group
 
-# Optional. After version 0.2.0, clashtui will automatically fix file permissions.
 chmod g+w /srv/mihomo               # clashtui needs permission to create files.
 chmod g+s /srv/mihomo               # Make the group of files created by clashtui mihomo. This is to give clashtui group read and write permissions to files in this directory.
 chmod g+w /srv/mihomo/config.yaml   # clashtui needs write permission.
-
-# ## Set mihomo service unit
-systemctl enable mihomo  # Start on boot
-systemctl restart mihomo  # Start service
 ```
-
-It is recommended to test the mihomo service with a valid configuration to ensure its success. Check if [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) file is missing.
-
-`mihomo.service` of `mihomo` package:
-
-```
+ - Create service: `systemctl --user edit mihomo`
+```systemd
 [Unit]
 Description=Mihomo daemon
 After=network.target NetworkManager.service systemd-networkd.service iwd.service
@@ -101,35 +118,82 @@ CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
 Restart=always
 RestartSec=5
-ExecStart=/usr/bin/mihomo -d /etc/mihomo
+ExecStart=/usr/bin/mihomo -d /srv/mihomo
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+### Windows
+
+[Install scoop](https://github.com/ScoopInstaller/Install) (optional):
+
+```powershell
+irm get.scoop.sh -outfile 'install.ps1'
+.\install.ps1 -ScoopDir 'D:\Scoop' -ScoopGlobalDir 'D:\ScoopGlobal' -NoProxy    
+# I chose to install it in the D drive.
+```
+
+For instance:
+
+- Use `scoop install mihomo` to install mihomo. Alternatively, download a suitable [mihomo](https://github.com/MetaCubeX/mihomo/releases) for your system and place it in `D:/PortableProgramFiles/mihomo/mihomo.exe`.
+- Create directories `D:/MyAppData/mihomo` and a file `D:/MyAppData/mihomo/config.yaml`.
+- Perform actions after installing clashtui.
+
+If mihomo client (e.g. metacubexd) can access but requires a proxy for certain websites:
+- For mihomo installed via Scoop: Allow `D:\Scoop\apps\mihomo\1.17.0\mihomo.exe` instead of the current path. After updating mihomo, repeat this process.
+- For manually downloaded mihomo installations: Allow `D:/PortableProgramFiles/mihomo/mihomo.exe`.
+
 ## Install ClashTui
 
-For example: ArchLinux
+### Linux
 
-```sh
-# ## Install clashtui
-# There is a latest [PKGBUILD](./PkgManagers/PKGBUILD).
-paru -S clashtui.      # For other Linux distributions, manually download and place clashtui in PATH.
+For example: ArchLinux `paru -S clashtui.`      
+> For other Linux distributions, manually download and place clashtui in PATH.
 
-# ## Configure clashtui
-clashtui                # Running this will generate some default files in ~/.config/clashtui.
-
-# nvim ~/.config/clashtui/config.yaml
-# The following parameters correspond to the command <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
-clash_core_path: "/usr/bin/mihomo"
-clash_cfg_dir: "/srv/mihomo"
-clash_cfg_path: "/srv/mihomo/config.yaml"
-clash_srv_name: "mihomo"       # systemctl {restart | stop} <clash_srv_name>
-clash_srv_is_user: false        # true: systemctl --user ...
-timeout: 0                      # the timeout duration for downloading via clash_ua. `0` means no timeout. The unit is `seconds`.
+Clashtui's config file:
+```yaml
+basic:
+# You can find the path by `Get-Command mihomo`
+  clash_bin_path: /usr/bin/mihomo
+  clash_config_dir: /srv/mihomo
+  clash_config_path: /srv/mihomo/config.yaml
+  timeout: null # default to be 5, '0' DOES NOT mean no timeout
+service: 
+  clash_srv_nam: mihomo 
+  is_user: false
+extra:
+  edit_cmd: ''
+  open_dir_cmd: ''
 ```
 
 The subsequent versions of clashtui have not been uploaded to `crates.io` because clashtui is now separated into multiple modules. If uploaded to `crates.io`, it would require uploading each dependent module, and some modules do not need to be uploaded to `crates.io`. See [ref](https://users.rust-lang.org/t/is-it-possible-to-publish-crates-with-path-specified/91497/2). So, do not use `cargo install clashtui` for installation.
+
+### Windows
+
+ - Manually [download](https://github.com/Jackhr-arch/clashtui/releases) and install clashtui
+ - Install via Scoop 
+ `scoop bucket add extras; scoop install clashtui; scoop install nssm`.
+
+Please modify `%APPDATA%/clashtui/config.yaml`:
+
+```yaml
+basic:
+# You can find the path by `Get-Command mihomo`
+  clash_bin_path: D:/Scoop/shims/mihomo.exe
+  clash_config_dir: D:/MyAppData/mihomo
+  clash_config_path: D:/MyAppData/mihomo/config.yaml
+  timeout: null
+service: # is_user is not used on Windows
+  clash_srv_nam: mihomo 
+extra:
+  edit_cmd: ''
+  open_dir_cmd: ''
+```
+
+ > After editing, add `nssm` and `clashtui`(Optional) to PATH
+
+Run clashtui. In `ClashSrvCtl`, select `InstallSrv`. The program will install the `mihomo` core service based on the configured settings. This service starts automatically at boot. After that, press `R` to start the core service without rebooting.
 
 ### Configure `basic_clash_config.yaml`
 
@@ -160,14 +224,14 @@ If it is the first time installing clashtui:
 ### Scheduled Updates with cronie
 
 ```sh
-clashtui -u         # Updates all profiles in command-line mode. If the profile has proxy-providers, they will also be updated.
+clashtui profile update -a         # Updates all profiles in command-line mode. If the profile has proxy-providers, they will also be updated.
 ```
 
 Thus, you can use cronie to schedule updates:
 
 ```sh
 # crontab -e
-0 10,14,16,22 * * * /usr/bin/env clashtui -u >> ~/cron.out 2>&1
+0 10,14,16,22 * * * /usr/bin/env clashtui profile update -a >> ~/cron.out 2>&1
 ```
 
 For cronie usage, see [ref](https://wiki.archlinuxcn.org/wiki/Cron).
@@ -190,6 +254,10 @@ For cronie usage, see [ref](https://wiki.archlinuxcn.org/wiki/Cron).
 - Press `Enter` to generate configuration to `Profile`. Press `p` to switch back to `Profile`, then `Enter` to select the configuration.
 
 The latest templates can be found [here](./Example/templates).
+
+### For Command line user
+clashtui now also provide command line interface, simply type `clashtui -h` to find out
+> shell auto-compeltion can be generated by clashtui itself. use `clashtui --generate-shell-completion --shell [zsh/bash/powershell]` to do so.
 
 ### Advanced Usage
 

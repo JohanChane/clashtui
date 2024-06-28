@@ -44,8 +44,11 @@ impl ProfileType {
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 struct Basic {
+    #[serde(rename="clash_config_dir")]
     clash_cfg_dir: String,
+    #[serde(rename="clash_bin_path")]
     clash_bin_pth: String,
+    #[serde(rename="clash_config_path")]
     clash_cfg_pth: String,
     timeout: Option<u64>,
 }
@@ -338,7 +341,7 @@ pub fn load_app_config(
 #[cfg(test)]
 mod test {
     use super::*;
-    /*#[test]
+    #[test]
     fn test_config() {
         let exe_dir = std::env::current_dir().unwrap();
         println!("{exe_dir:?}");
@@ -351,10 +354,10 @@ mod test {
         println!("{path_:?}");
         assert!(path_.is_file());
         let path = path_.as_path().to_str().unwrap();
-        let conf = Config::load(path).unwrap();
+        let conf = ConfigFile::from_file(path).unwrap();
         println!("{:?}", conf);
         conf.to_file(path).unwrap();
-    }*/
+    }
     #[test]
     fn test_basic_info() {
         let exe_dir = std::env::current_dir().unwrap();
