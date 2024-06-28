@@ -69,6 +69,12 @@ struct ProfileUpdate {
     /// the profile name
     #[arg(short, long)]
     name: Option<String>,
+    /// convert proxy-provider to proxies
+    #[arg(long)]
+    no_proxy_provider: bool,
+    /// update profile with proxy
+    #[arg(long)]
+    with_proxy:bool
 }
 /// select profile
 #[derive(clap::Args)]
@@ -125,7 +131,12 @@ pub fn handle_cli(
     let PackedArgCommand(command) = command;
     match command {
         ArgCommand::Profile(Profile { command }) => match command {
-            ProfileCommand::Update(ProfileUpdate { all, name }) => {
+            ProfileCommand::Update(ProfileUpdate {
+                all,
+                name,
+                no_proxy_provider,
+                with_proxy,
+            }) => {
                 if all {
                     backend
                         .get_profile_names()
@@ -134,7 +145,7 @@ pub fn handle_cli(
                         .inspect(|s| println!("\nProfile: {s}"))
                         .filter_map(|v| {
                             backend
-                                .update_profile(&v, false,None)
+                                .update_profile(&v, false, Some(with_proxy))
                                 .map_err(|e| println!("- Error! {e}"))
                                 .ok()
                         })
@@ -143,8 +154,14 @@ pub fn handle_cli(
                     if let Err(e) = backend.select_profile(&backend.cfg.current_profile.borrow()) {
                         eprintln!("Select Profile: {e}")
                     };
+                    if no_proxy_provider {
+                        if let Err(e) = backend.trim_proxy_providers() {
+                            eprint!("Convert proxy providers: {e}")
+                        }
+                    }
                     Ok("Done".to_string())
                 } else if let Some(_name) = name {
+                    println!("Update Profile:{_name}");
                     todo!()
                 } else {
                     Err(std::io::Error::new(
