@@ -7,7 +7,10 @@ use crate::tui::{
     EventState, Visibility,
 };
 use crate::utils::{get_modify_time, SharedBackend, SharedState};
-crate::utils::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);
+crate::utils::define_enum!(
+    PTOp,
+    [Update, UpdateAll, Select, PreDelete, Delete, PreTrim, Trim]
+);
 #[derive(PartialEq)]
 enum Fouce {
     Profile,
@@ -70,7 +73,10 @@ impl ProfileTab {
             if let Err(err) = self.util.select_profile(profile_name) {
                 self.popup_txt_msg(err.to_string())
             } else {
-                self.state.borrow_mut().set_profile(profile_name.clone())
+                self.state.borrow_mut().set_profile(profile_name.clone());
+                self.confirm_popup
+                    .popup_msg("Extra proxy provider?".to_owned());
+                self.op.replace(PTOp::PreTrim);
             }
         };
     }
@@ -84,6 +90,9 @@ impl ProfileTab {
                             msg.push(err.to_string());
                         } else {
                             msg.push("Update and selected".to_string());
+                            self.confirm_popup
+                                .popup_msg("Extra proxy provider?".to_owned());
+                            self.op.replace(PTOp::PreTrim);
                         }
                     } else {
                         msg.push("Update success".to_string());
@@ -167,7 +176,11 @@ impl super::TabEvent for ProfileTab {
         if event_state.is_notconsumed() {
             event_state = match self.confirm_popup.event(ev)? {
                 EventState::Yes => {
-                    self.op.replace(PTOp::Delete);
+                    match self.op.take() {
+                        Some(PTOp::PreDelete) => self.op.replace(PTOp::Delete),
+                        Some(PTOp::PreTrim) => self.op.replace(PTOp::Trim),
+                        Some(_) | None => None,
+                    };
                     EventState::WorkDone
                 }
                 EventState::Cancel | EventState::WorkDone => EventState::WorkDone,
@@ -357,6 +370,17 @@ impl super::TabEvent for ProfileTab {
                 PTOp::UpdateAll => self.handle_update_profile_ev(true),
                 PTOp::Select => self.handle_select_profile_ev(),
                 PTOp::Delete => self.handle_delete_profile_ev(),
+                PTOp::PreDelete => {
+                    self.op.replace(op);
+                }
+                PTOp::PreTrim => {
+                    self.op.replace(op);
+                }
+                PTOp::Trim => {
+                    if let Err(e) = self.util.trim_proxy_providers() {
+                        log::error!("Trim:{e:?}")
+                    }
+                }
             }
         }
     }

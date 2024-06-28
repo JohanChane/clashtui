@@ -372,6 +372,13 @@ impl ClashBackend {
         }
     }
 
+    pub fn trim_proxy_providers(&self) -> anyhow::Result<()>{
+        let current_config = std::fs::File::open(&self.cfg.clash_cfg_pth)?;
+        let mut parsed_yaml:serde_yaml::Value = serde_yaml::from_reader(current_config)?;
+        let net_res = extract_net_provider_helper(&parsed_yaml, &vec![ProfileSectionType::ProxyProvider])?;
+        Ok(no_proxy_providers(&self.cfg.clash_cfg_dir, &mut parsed_yaml, &net_res)?)
+    }
+
     pub fn update_profile(
         &self,
         profile_name: &String,
@@ -538,4 +545,151 @@ fn try_create_file<P: AsRef<Path>>(path: P) -> Result<CrtFile, String> {
             }
         }
     }
+}
+type NetProviderMap = std::collections::HashMap<ProfileSectionType, Vec<(String, String, String)>>;
+#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+enum ProfileSectionType {
+    ProxyProvider,
+    RuleProvider,
+}
+fn extract_net_provider_helper(
+    parsed_yaml: &serde_yaml::Value,
+    provider_types: &Vec<ProfileSectionType>,
+) -> std::io::Result<NetProviderMap> {
+    let mut net_providers = NetProviderMap::new();
+    for provider_type in provider_types {
+        let provider_str = match provider_type {
+            ProfileSectionType::ProxyProvider => "proxy-providers",
+            ProfileSectionType::RuleProvider => "rule-providers",
+        };
+        let providers: Vec<(String, String, String)> = parsed_yaml
+            .get(provider_str)
+            .and_then(|m| m.as_mapping())
+            .into_iter()
+            .flat_map(|m| m.into_iter())
+            .filter_map(|(name, cont)| cont.as_mapping().and_then(|m| Some((name, m))))
+            .filter_map(|(name, cont)| {
+                if let (Some(name), Some(url), Some(path)) = (
+                    name.as_str(),
+                    cont.get("url").and_then(|s| s.as_str()),
+                    cont.get("path").and_then(|s| s.as_str()),
+                ) {
+                    Some((name.to_owned(), url.to_owned(), path.to_owned()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        net_providers.insert(*provider_type, providers);
+    }
+    Ok(net_providers)
+}
+
+fn no_proxy_providers<P: AsRef<Path>>(
+    clash_home_dir: P,
+    parsed_yaml: &mut serde_yaml::Value,
+    net_res: &NetProviderMap,
+) -> std::io::Result<()> {
+    use serde_yaml::Value;
+    use std::collections::{HashMap, HashSet};
+
+    // ## Load the proxy providers
+    let mut proxy_map = HashMap::<String, Vec<Value>>::new(); // <proxy_provider_name, proxies>
+    if let Some(proxy_providers) = net_res.get(&ProfileSectionType::ProxyProvider) {
+        for (name, _, path) in proxy_providers {
+            let tmp_yaml_fp = std::fs::File::open(clash_home_dir.as_ref().join(path))?;
+            let tmp_parsed_yaml: serde_yaml::Value = serde_yaml::from_reader(&tmp_yaml_fp)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+            if let Some(Value::Sequence(proxies)) = tmp_parsed_yaml.get("proxies") {
+                proxy_map.insert(name.clone(), proxies.clone());
+            }
+        }
+    }
+
+    // ## Rename the same proxy name between the proxy_providers
+    let mut proxy_names = HashMap::<String, Vec<String>>::new();
+    let mut unique_proxy_names = HashSet::<String>::new();
+    for (pp_name, proxies) in proxy_map.iter_mut() {
+        proxy_names.insert(pp_name.to_string(), Vec::new());
+        for proxy in proxies {
+            if let Some(names) = proxy_names.get_mut(pp_name) {
+                if let Some(Value::String(name)) = proxy.get_mut("name") {
+                    if unique_proxy_names.contains(name) {
+                        *name = format!("{}{}", pp_name, name);
+                    }
+                    names.push(name.clone());
+                    unique_proxy_names.insert(name.clone());
+                }
+            }
+        }
+    }
+    std::mem::drop(unique_proxy_names);
+
+    // ## Repace the proxy-providers in proxy-groups
+    let proxy_groups = if let Some(serde_yaml::Value::Sequence(proxy_groups)) =
+        parsed_yaml.get_mut("proxy-groups")
+    {
+        proxy_groups
+    } else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Failed to parse `proxy-groups`",
+        ));
+    };
+
+    for the_pg_mapping in proxy_groups {
+        if let Value::Mapping(the_pg) = the_pg_mapping {
+            let mut new_proxies = Vec::<Value>::new();
+
+            if let Some(Value::Sequence(proxies)) = the_pg.get("proxies") {
+                for p in proxies {
+                    new_proxies.push(p.clone());
+                }
+            }
+            if let Some(Value::Sequence(providers)) = the_pg.get("use") {
+                for p in providers {
+                    if let Some(names) = proxy_names.get(p.as_str().unwrap()) {
+                        new_proxies.extend(
+                            names
+                                .iter()
+                                .map(|s| Value::String(s.clone()))
+                                .collect::<Vec<_>>(),
+                        );
+                    }
+                }
+            }
+
+            if new_proxies.is_empty() {
+                new_proxies.push(Value::String("COMPATIBLE".into()));
+            }
+            the_pg.insert("proxies".into(), Value::Sequence(new_proxies));
+            the_pg.remove("use");
+        }
+    }
+
+    if let Value::Mapping(ref mut dst_yaml) = parsed_yaml {
+        // ## drop proxy-providers
+        dst_yaml.remove("proxy-providers");
+
+        // ## Add the `proxies` to the yaml
+        let mut new_proxies = proxy_map
+            .into_iter()
+            .flat_map(|(_, p_seq)| {
+                serde_yaml::to_value(p_seq)
+                    .unwrap()
+                    .as_sequence()
+                    .unwrap()
+                    .clone()
+            })
+            .collect();
+
+        if let Some(Value::Sequence(ref mut proxies)) = dst_yaml.get_mut("proxies") {
+            proxies.append(&mut new_proxies);
+        } else {
+            dst_yaml.insert("proxies".into(), Value::Sequence(new_proxies));
+        }
+    }
+
+    Ok(())
 }
