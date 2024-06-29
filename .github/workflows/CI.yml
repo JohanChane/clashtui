@@ -190,6 +190,13 @@ jobs:
           merge-multiple: true
           path: ./artifacts
 
+      - name: UPX compress
+        run: |
+          curl -OL https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz
+          tar -xf upx-4.2.4-amd64_linux.tar.xz
+          cp ./upx-4.2.4-amd64_linux/upx .
+          ./upx ./artifacts/*
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
