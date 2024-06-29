@@ -1,5 +1,5 @@
 use super::ClashBackend;
-use crate::utils::{extract_domain, get_file_names, ipc, is_yaml, parse_yaml};
+use crate::{consts::TMP_PATH, utils::{extract_domain, get_file_names, ipc, is_yaml, parse_yaml}};
 use std::{
     fs::{create_dir_all, File},
     io::Error,
@@ -547,7 +547,7 @@ fn try_create_file<P: AsRef<Path>>(path: P) -> Result<CrtFile, String> {
         Err(e) => {
             if e.kind() == std::io::ErrorKind::PermissionDenied {
                 Ok(CrtFile::Tmp(
-                    File::create(crate::consts::TMP_PATH).map_err(|e| e.to_string())?,
+                    File::create(TMP_PATH).map_err(|e| e.to_string())?,
                 ))
             } else {
                 Err(format!("Unexpected Error: {e}"))
