@@ -9,3 +9,5 @@ pub mod const_err {
 }
 pub(crate) const CONFIG_FILE: &str = "config.yaml";
 pub(crate) const DATA_FILE: &str = "clashtui.conf";
+pub(crate) const TMP_PATH: &str = "/tmp/clashtui_mihomo_config_file.tmp";
+pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"));

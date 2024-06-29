@@ -541,14 +541,13 @@ enum CrtFile {
     Ok(File),
     Tmp(File),
 }
-const TMP_PATH: &str = "/tmp/clashtui_mihomo_config_file.tmp";
 fn try_create_file<P: AsRef<Path>>(path: P) -> Result<CrtFile, String> {
     match File::create(path) {
         Ok(f) => Ok(CrtFile::Ok(f)),
         Err(e) => {
             if e.kind() == std::io::ErrorKind::PermissionDenied {
                 Ok(CrtFile::Tmp(
-                    File::create(TMP_PATH).map_err(|e| e.to_string())?,
+                    File::create(crate::consts::TMP_PATH).map_err(|e| e.to_string())?,
                 ))
             } else {
                 Err(format!("Unexpected Error: {e}"))

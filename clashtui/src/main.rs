@@ -5,7 +5,7 @@ mod tui;
 mod utils;
 
 use backend::const_err::ERR_PATH_UTF_8;
-use utils::{init_config, ClashBackend, Flag, Flags};
+use utils::{consts, init_config, ClashBackend, Flag, Flags};
 
 fn main() {
     /*
@@ -22,7 +22,7 @@ fn main() {
 
         setup_logging(
             config_dir
-                .join("clashtui.log")
+                .join(consts::LOG_NAME)
                 .to_str()
                 .expect(ERR_PATH_UTF_8),
         );
@@ -32,6 +32,9 @@ fn main() {
             if !err_track.is_empty() {
                 println!("Some err happened, you may have to fix them before this program can work as expected");
                 err_track.into_iter().for_each(|e| println!("{e}"));
+            }
+            if is_root::is_root() {
+                println!("{}", consts::ROOT_WARNING)
             }
             match commands::handle_cli(command, backend) {
                 Ok(v) => {

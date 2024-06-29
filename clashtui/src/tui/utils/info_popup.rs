@@ -44,7 +44,7 @@ impl InfoPopUp {
     }
     pub fn new() -> Self {
         let mut items = HashMap::new();
-        items.insert(Infos::TuiVer, crate::utils::VERSION.to_string());
+        items.insert(Infos::TuiVer, crate::utils::consts::VERSION.to_string());
         let mut inner = PopUp::new("Info".to_string());
         inner.set_items(items.iter().map(|(k, v)| format!("{k}:{v}")));
         Self { inner, items }

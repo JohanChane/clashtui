@@ -9,7 +9,7 @@ pub trait MonkeyPatch {
 // IPC Related
 impl MonkeyPatch for ClashBackend {
     fn fetch_recent_logs(&self, num_lines: usize) -> Vec<String> {
-        std::fs::read_to_string(self.home_dir.join("clashtui.log"))
+        std::fs::read_to_string(self.home_dir.join(crate::utils::consts::LOG_NAME))
             .unwrap_or_default()
             .lines()
             .rev()

@@ -1,5 +1,5 @@
 mod statusbar;
-mod symbols;
+pub(crate) mod symbols;
 mod tabbar;
 mod tabs;
 mod utils;

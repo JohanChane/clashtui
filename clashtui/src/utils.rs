@@ -5,8 +5,8 @@ pub use backend::{
 };
 mod flags;
 pub use flags::{BitFlags as Flags, Flag};
+pub(crate) mod consts;
 
-pub(crate) const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
 
 #[cfg(feature = "tui")]
 pub use backend::{

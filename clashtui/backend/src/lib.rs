@@ -3,7 +3,7 @@ mod backend;
 mod consts;
 pub mod utils;
 pub use backend::ClashBackend;
-pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"));
+pub use consts::VERSION;
 /// re-export
 pub mod api {
     pub use api::Mode;

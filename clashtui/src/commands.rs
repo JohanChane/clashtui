@@ -1,4 +1,4 @@
-use crate::utils::VERSION;
+use crate::utils::consts::VERSION;
 /// Mihomo (Clash.Meta) Control Client
 ///
 /// A tool for mihomo

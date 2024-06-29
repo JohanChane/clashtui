@@ -60,8 +60,8 @@ impl App {
         err_track: Vec<anyhow::Error>,
         flags: Flags<Flag>,
     ) -> std::io::Result<()> {
-        const TICK_RATE: u64 = 250;
         use core::time::Duration;
+        const TICK_RATE: Duration = Duration::from_millis(250);
         if flags.contains(Flag::FirstInit) {
             self.popup_txt_msg("Welcome to ClashTui!".to_string());
             self.popup_txt_msg(format!(
@@ -73,6 +73,9 @@ impl App {
                     .expect(backend::const_err::ERR_PATH_UTF_8)
             ));
         };
+        if is_root::is_root(){
+            self.popup_txt_msg(crate::utils::consts::ROOT_WARNING.to_string())
+        }
         err_track
             .into_iter()
             .for_each(|e| self.popup_txt_msg(e.root_cause().to_string()));
@@ -80,13 +83,12 @@ impl App {
 
         use ratatui::{backend::CrosstermBackend, Terminal};
         let mut terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
-        let tick_rate = Duration::from_millis(TICK_RATE);
         while !self.should_quit {
             terminal.draw(|f| self.draw(f))?;
 
             self.late_event();
 
-            if event::poll(tick_rate)? {
+            if event::poll(TICK_RATE)? {
                 if let Err(e) = self.event(&event::read()?) {
                     self.popup_txt_msg(e.to_string())
                 };
