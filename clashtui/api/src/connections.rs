@@ -8,6 +8,14 @@ pub struct ConnInfo {
     pub connections: Option<Vec<Conn>>,
 }
 
+impl TryFrom<String> for ConnInfo {
+    type Error = String;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        serde_json::from_str(&value).map_err(|e| format!("{e:?}"))
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Conn {
     pub id: String,

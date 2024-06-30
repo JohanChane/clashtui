@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 mod impl_clashsrv;
 mod impl_net;
+mod impl_conn;
 mod impl_profile;
 
 use crate::utils::config::{load_app_config, Config};
