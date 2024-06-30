@@ -111,6 +111,26 @@ impl ClashUtil {
             .map(|_| ())
             .map_err(|e| format!("API:{e:?}"))
     }
+    /// If `is_query` is true, `id` will be ignored, infos returned as `String`,
+    /// else if `id` is some, will try to terminate that connection,
+    /// otherwise try to terminate all connections.
+    /// <br>
+    /// NOTE:
+    /// Empty str is returned if connection is terminated successfully
+    pub fn connections(&self, is_query: bool, id: Option<String>) -> Result<String> {
+        if is_query {
+            self.request(Method::Get, "/connections", None)
+        } else {
+            self.request(
+                Method::Delete,
+                &format!(
+                    "/connections{}",
+                    id.map(|c| format!("/{c}")).unwrap_or_default()
+                ),
+                None,
+            )
+        }
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -123,6 +143,27 @@ mod tests {
             None,
             None,
         )
+    }
+    #[test]
+    #[ignore = "no env on ci"]
+    fn terminate_connection() {
+        let sym = sym();
+        let table = sym.connections(true, None).expect("Get connections failed");
+        println!("Raw => {table}");
+        let table: crate::connections::ConnInfo = serde_json::from_str(&table).expect("DeSer ERR");
+        println!("BEFORE => {table:?}");
+        let ret = sym
+            .connections(false, Some(table.connections.unwrap()[0].id.clone()))
+            .unwrap();
+        println!("RESULT => {ret}");
+        let table = sym.connections(true, None).expect("Get connections failed");
+        let table: crate::connections::ConnInfo = serde_json::from_str(&table).expect("DeSer ERR");
+        println!("AFTER => {table:?}");
+        let ret = sym.connections(false, None).unwrap();
+        println!("RESULT => {ret}");
+        let table = sym.connections(true, None).expect("Get connections failed");
+        let table: crate::connections::ConnInfo = serde_json::from_str(&table).expect("DeSer ERR");
+        println!("AFTER => {table:?}");
     }
     #[test]
     fn version_test() {
