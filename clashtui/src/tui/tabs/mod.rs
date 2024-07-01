@@ -1,14 +1,17 @@
 #![allow(refining_impl_trait)]
 mod clashsrvctl;
+mod connctl;
 mod profile;
 mod profile_input;
 
 pub use clashsrvctl::ClashSrvCtlTab;
+pub use connctl::ConnctlTab;
 pub use profile::ProfileTab;
 
 pub enum Tabs {
     Profile(ProfileTab),
     ClashSrvCtl(ClashSrvCtlTab),
+    ConnCtl(ConnctlTab),
 }
 impl std::fmt::Display for Tabs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -19,6 +22,7 @@ impl std::fmt::Display for Tabs {
             match self {
                 Tabs::Profile(_) => symbols::PROFILE.to_string(),
                 Tabs::ClashSrvCtl(_) => symbols::CLASHSRVCTL.to_string(),
+                Tabs::ConnCtl(_) => "Connections Control".to_string(),
             }
         )
     }

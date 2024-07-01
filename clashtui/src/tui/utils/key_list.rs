@@ -1,5 +1,5 @@
 use ui::event::{KeyCode, KeyEvent};
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone, Copy)]
 pub enum Keys {
     ProfileSwitch,
     ProfileUpdate,
@@ -10,6 +10,7 @@ pub enum Keys {
     ProfileInfo,
     ProfileNoPp, // no proxy provider
     TemplateSwitch,
+    ConnRefresh,
     Edit,
     Preview,
 
@@ -20,6 +21,7 @@ pub enum Keys {
     Select,
     Esc,
     Tab,
+    Search,
 
     SoftRestart,
     LogCat,
@@ -43,6 +45,7 @@ impl From<KeyCode> for Keys {
             KeyCode::Enter => Keys::Select,
             KeyCode::Esc => Keys::Esc,
             KeyCode::Tab => Keys::Tab,
+            KeyCode::Char('/') => Keys::Search,
 
             // ## Profile Tab shortcuts
             KeyCode::Char('p') => Keys::ProfileSwitch, // Not Global shortcuts
@@ -60,6 +63,9 @@ impl From<KeyCode> for Keys {
             KeyCode::Char('s') => Keys::ProfileTestConfig,
             KeyCode::Char('n') => Keys::ProfileInfo,
             KeyCode::Char('m') => Keys::ProfileNoPp,
+
+            // ## Profile Tab shortcuts
+            KeyCode::Char('r') => Keys::ConnRefresh,
 
             // ## Global Shortcuts (As much as possible use uppercase. And Others as much as possible use lowcase to avoid conflicts with global shortcuts.)
             KeyCode::Char('q') => Keys::AppQuit, // Exiting is a common operation, and most software also exits with "q", so let's use "q".

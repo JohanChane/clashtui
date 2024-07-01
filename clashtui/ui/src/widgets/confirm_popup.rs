@@ -57,8 +57,34 @@ impl ConfirmPopup {
         self.0.draw(f, _area);
     }
 
-    pub fn popup_msg(&mut self, confirm_str: String) {
+    pub fn popup_confirm(&mut self, confirm_str: String) {
         self.0.push_txt_msg(confirm_str);
+        self.should_confirm(true);
         self.0.show();
+    }
+}
+
+impl ConfirmPopup {
+    pub fn show(&mut self) {
+        self.0.show()
+    }
+    pub fn hide(&mut self) {
+        self.0.hide()
+    }
+    pub fn push_txt_msg(&mut self, msg: String) {
+        if self.0.is_visible() && self.1 {
+            panic!("Overriding one confirm msg")
+        }
+        self.0.push_txt_msg(msg);
+        self.should_confirm(false);
+        self.0.show()
+    }
+    pub fn push_list_msg(&mut self, msg: impl IntoIterator<Item = String>) {
+        if self.0.is_visible() && self.1 {
+            panic!("Overriding one confirm msg")
+        }
+        self.0.push_list_msg(msg);
+        self.should_confirm(false);
+        self.0.show()
     }
 }

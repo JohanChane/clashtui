@@ -15,6 +15,7 @@ use crate::tui::{
 use crate::utils::{ClashBackend, SharedBackend, SharedState, State};
 
 use super::impl_app::MonkeyPatch;
+use super::tabs::ConnctlTab;
 
 pub struct App {
     tabbar: TabBar,
@@ -38,6 +39,7 @@ impl App {
         let tabs: Vec<Tabs> = vec![
             Tabs::Profile(ProfileTab::new(util.clone(), state.clone())),
             Tabs::ClashSrvCtl(ClashSrvCtlTab::new(util.clone(), state.clone())),
+            Tabs::ConnCtl(ConnctlTab::new(util.clone())),
         ]; // Init the tabs
         let tabbar = TabBar::new(tabs.iter().map(|v| v.to_string()).collect());
         let statusbar = StatusBar::new(Rc::clone(&state));
@@ -73,7 +75,7 @@ impl App {
                     .expect(backend::const_err::ERR_PATH_UTF_8)
             ));
         };
-        if is_root::is_root(){
+        if is_root::is_root() {
             self.popup_txt_msg(crate::utils::consts::ROOT_WARNING.to_string())
         }
         err_track
@@ -112,6 +114,7 @@ impl App {
         let mut iter = self.tabs.iter_mut().map(|v| match v {
             Tabs::Profile(tab) => tab.popup_event(ev),
             Tabs::ClashSrvCtl(tab) => tab.popup_event(ev),
+            Tabs::ConnCtl(tab) => tab.popup_event(ev),
         });
         while event_state.is_notconsumed() {
             match iter.next() {
@@ -194,6 +197,7 @@ impl App {
                 let mut iter = self.tabs.iter_mut().map(|v| match v {
                     Tabs::Profile(tab) => tab.event(ev),
                     Tabs::ClashSrvCtl(tab) => Ok(tab.event(ev)?),
+                    Tabs::ConnCtl(tab) => Ok(tab.event(ev)?),
                 });
                 while event_state.is_notconsumed() {
                     match iter.next() {
@@ -210,6 +214,7 @@ impl App {
         self.tabs.iter_mut().for_each(|v| match v {
             Tabs::Profile(tab) => tab.late_event(),
             Tabs::ClashSrvCtl(tab) => tab.late_event(),
+            Tabs::ConnCtl(tab) => tab.late_event(),
         })
     }
 
@@ -233,6 +238,7 @@ impl App {
         self.tabs.iter_mut().for_each(|v| match v {
             Tabs::Profile(tab) => tab.draw(f, tab_chunk),
             Tabs::ClashSrvCtl(tab) => tab.draw(f, tab_chunk),
+            Tabs::ConnCtl(tab) => tab.draw(f, tab_chunk),
         });
 
         self.statusbar.draw(f, chunks[2]);
@@ -256,6 +262,7 @@ impl App {
             .for_each(|(b, v)| match v {
                 Tabs::Profile(tab) => tab.set_visible(b),
                 Tabs::ClashSrvCtl(tab) => tab.set_visible(b),
+                Tabs::ConnCtl(tab) => tab.set_visible(b),
             });
     }
 }

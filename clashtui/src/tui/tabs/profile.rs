@@ -87,7 +87,7 @@ impl ProfileTab {
             } else {
                 self.state.borrow_mut().set_profile(profile_name.clone());
                 self.confirm_popup
-                    .popup_msg("Extra proxy provider?".to_owned());
+                    .popup_confirm("Extra proxy provider?".to_owned());
                 self.op.replace(PTOp::PreTrim);
             }
         };
@@ -106,7 +106,7 @@ impl ProfileTab {
                         } else {
                             msg.push("Update and selected".to_string());
                             self.confirm_popup
-                                .popup_msg("Extra proxy provider?".to_owned());
+                                .popup_confirm("Extra proxy provider?".to_owned());
                             self.op.replace(PTOp::PreTrim);
                         }
                     } else {
@@ -257,13 +257,13 @@ impl super::TabEvent for ProfileTab {
                         Keys::ProfileUpdate => {
                             self.popup_txt_msg("Updating...".to_string());
                             self.op.replace(PTOp::PreUpdate);
-                            self.confirm_popup.popup_msg("Update with proxy?".to_owned());
+                            self.confirm_popup.popup_confirm("Update with proxy?".to_owned());
                             EventState::WorkDone
                         }
                         Keys::ProfileUpdateAll => {
                             self.popup_txt_msg("Updating...".to_string());
                             self.op.replace(PTOp::PreUpdateAll);
-                            self.confirm_popup.popup_msg("Update with proxy?".to_owned());
+                            self.confirm_popup.popup_confirm("Update with proxy?".to_owned());
                             EventState::WorkDone
                         }
                         Keys::ProfileImport => {
@@ -272,7 +272,7 @@ impl super::TabEvent for ProfileTab {
                         }
                         Keys::ProfileDelete => {
                             self.confirm_popup
-                                .popup_msg("`y` to Delete, `Esc` to cancel".to_string());
+                                .popup_confirm("`y` to Delete, `Esc` to cancel".to_string());
                             self.op.replace(PTOp::PreDelete);
                             EventState::WorkDone
                         }

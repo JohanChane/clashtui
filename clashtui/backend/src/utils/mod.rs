@@ -40,6 +40,13 @@ macro_rules! define_enum {
             }
         }
     };
+    ($(#[$attr:meta])*
+    $vis:vis $name: ident,
+    [$($variant:ident,)*]) => {
+        define_enum!($(#[$attr:meta])*
+        $vis:vis $name: ident,
+        [$($variant:ident),*])
+    };
 }
 
 #[cfg(target_os = "linux")]

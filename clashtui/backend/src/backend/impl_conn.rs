@@ -1,7 +1,7 @@
 use super::ClashBackend;
 
 impl ClashBackend {
-    #[cfg(test)]
+    #[cfg(debug_assertions)]
     pub fn get_connections(&self) -> Result<(Option<Vec<Vec<String>>>, (u64, u64)), String> {
         use crate::utils::bytes_to_readable;
         Ok((
@@ -12,14 +12,15 @@ impl ClashBackend {
                     "DIRECT".to_string(),
                     "2024-06-30T09:20:17.386789854Z".to_string(),
                     bytes_to_readable(854),
-                    bytes_to_readable(7652)
+                    bytes_to_readable(7652),
+                    "59f12afb-719a-4d0c-a4b8-1ec78f604e9c".to_string()
                 ];
                 3
             ]),
             (10000, 0),
         ))
     }
-    #[cfg(not(test))]
+    #[cfg(not(debug_assertions))]
     pub fn get_connections(&self) -> Result<(Option<Vec<Vec<String>>>, (u64, u64)), String> {
         use crate::utils::bytes_to_readable;
         use api::{Conn, ConnInfo, ConnMetaData};
@@ -40,7 +41,7 @@ impl ClashBackend {
                     .flat_map(|t| t.into_iter())
                     .map(|c| {
                         let Conn {
-                            id: _,
+                            id,
                             metadata,
                             upload,
                             download,
@@ -66,6 +67,7 @@ impl ClashBackend {
                             start,
                             bytes_to_readable(upload),
                             bytes_to_readable(download),
+                            id,
                         ]
                     })
                     .collect(),
