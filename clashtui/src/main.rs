@@ -69,6 +69,12 @@ pub fn run_tui(
     err_track: Vec<anyhow::Error>,
     flags: Flags<Flag>,
 ) -> Result<(), std::io::Error> {
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic| {
+        ui::setup::restore().unwrap();
+        original_hook(panic);
+    }));
+
     let mut app = tui::App::new(backend);
     // setup terminal
     ui::setup::setup()?;
