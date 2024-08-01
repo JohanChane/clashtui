@@ -105,6 +105,7 @@ define_enum!(
         StartClashService,
         StopClashService,
         SetPermission,
-        SwitchMode
+        SwitchMode,
+        CloseConnections
     ]
 );

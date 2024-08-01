@@ -160,6 +160,10 @@ impl ClashUtil {
             .map_err(process_err)
     }
 
+    pub fn close_connnections(&self) -> Result<String> {
+        self.request(Method::Delete, "/connections", None)
+    }
+
     /*** update_providers_with_api
     pub fn update_providers(&self, provider_type: ProfileSectionType) -> Result<Vec<(String, Result<String>)>> {
         self.extract_net_providers(provider_type).and_then(|names| self.update_providers_helper(names, provider_type))

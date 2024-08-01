@@ -55,6 +55,9 @@ impl ClashTuiUtil {
                     ipc::exec_with_sbin("pkexec", cmd)
                 }
             }
+            ClashSrvOp::CloseConnections => {
+                self.clash_api.close_connnections()
+            }
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
                 "No Support Action",
