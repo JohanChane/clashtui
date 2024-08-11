@@ -87,7 +87,9 @@ fn run_app(
     terminal.clear()?;  // Clear terminal residual text before draw.
     let tick_rate = Duration::from_millis(tick_rate);
     use ui::event;
-    app.popup_list_msg(warning_list_msg.to_owned());   // Set msg popup before draw
+    if ! warning_list_msg.is_empty() {
+        app.popup_list_msg(warning_list_msg.to_owned());   // Set msg popup before draw
+    }
     while !app.should_quit {
         terminal.draw(|f| app.draw(f))?;
 
