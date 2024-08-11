@@ -9,6 +9,93 @@ use minreq::Method;
 use std::io::Result;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub enum UrlType {
+    Generic,
+    GitHub,
+    Gitee,
+    Unknown
+}
+
+impl UrlType {
+    fn from_str(s: &str) -> Self {
+        match s {
+            "github" => UrlType::GitHub,
+            "gitee" => UrlType::Gitee,
+            _ => UrlType::Unknown,
+        }
+    }
+}
+
+// {type: github|gitee, url, with_proxy}
+pub struct UrlItem {
+    pub typ: UrlType,
+    pub url: String,
+    pub token: Option<String>,
+    pub with_proxy: bool
+}
+
+impl UrlItem {
+    pub fn new(typ: UrlType, url: String, token: Option<String>, with_proxy: bool) -> Self {
+        Self {
+            typ: typ,
+            url: url,
+            token: token,
+            with_proxy: with_proxy
+        }
+    }
+
+    pub fn from_yaml(url_value: &serde_yaml::Value) -> Self {
+        let typ = url_value.get("type")
+            .and_then(serde_yaml::Value::as_str)
+            .map(UrlType::from_str)
+            .unwrap_or(UrlType::Unknown);
+
+        let url = url_value.get("url")
+            .and_then(serde_yaml::Value::as_str)
+            .unwrap_or("")
+            .to_string();
+
+        let token = url_value.get("token")
+            .and_then(serde_yaml::Value::as_str)
+            .map(String::from);
+
+        let with_proxy = url_value.get("with_proxy")
+            .and_then(serde_yaml::Value::as_bool)
+            .unwrap_or(true);
+
+        UrlItem::new(typ, url, token, with_proxy)
+    }
+
+    pub fn gen_url(&self) -> Option<String> {
+        if self.token.is_none() {
+            return Some(self.url.clone());
+        }
+
+        // url format: 'https://x-access-token:token@url_without_protocol'
+        // e.g. 'https://x-access-token:<token>@raw.githubusercontent.com/<User>/<Repo>/<Branch>/config.yaml'
+        if self.typ == UrlType::GitHub {
+            let token_part = if let Some(token) = &self.token {
+                format!("x-access-token:{}", token)
+            } else {
+                String::new()
+            };
+
+            let url_without_protocol = self.url.trim_start_matches("https://");
+
+            let url_with_auth = if !token_part.is_empty() {
+                format!("{}@{}", token_part, url_without_protocol)
+            } else {
+                url_without_protocol.to_string()
+            };
+
+            return Some(format!("https://{}", url_with_auth));
+        }
+
+        None
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ProfileSectionType {
     Profile,
     ProxyProvider,
@@ -128,22 +215,71 @@ impl ClashUtil {
         self.request(Method::Put, "/configs?force=true", Some(payload))
             .map(|_| ())
     }
-    pub fn mock_clash_core<S: Into<minreq::URL>>(
+
+    // TODO: get blob path
+    // Some REST API use sha in blob path. e.g.
+    // 'https://gitee.com/api/v5/swagger#/getV5ReposOwnerRepoGitBlobsSha',
+    // 'https://docs.gitcode.com/docs/openapi/repos/'
+    pub fn get_blob_path(
         &self,
-        url: S,
-        with_proxy: bool,
+        url_item: &UrlItem,
         timeout: u8,
-    ) -> Result<Resp> {
-        let mut request = minreq::get(url).with_header("user-agent", self.clash_ua.clone());
+    ) -> Result<String> {
+        let mut request = self.make_req(url_item, timeout);
+        // TODO: with header
+
+        let rsp = self.mock_clash_core(url_item, timeout)?;
+        let file_info = rsp.to_json()?;
+        let sha = file_info.get("sha").ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "No sha found"))?;
+        // https://api.gitcode.com/api/v5/repos/{owner}/{repo}/contents/{path}
+        // https://api.gitcode.com/api/v5/repos/{owner}/{repo}/git/blobs/{sha}
+        Ok(format!("https://api.gitcode.com/api/v5/repos/{}/{}/git/blobs/{}", "User", "Branch", sha))
+    }
+
+    pub fn make_req(
+        &self,
+        url_item: &UrlItem,
+        timeout: u8,
+    ) -> Result<minreq::Request> {
+        let mut request = minreq::get(url_item.url.as_str());
+
+        if url_item.typ == UrlType::GitHub {
+        } else if url_item.typ == UrlType::Gitee {
+        }
+        match url_item.typ {
+            UrlType::GitHub => {
+                if url_item.token.is_some() {
+                    request = request.with_header("Authorization", format!("token {}", url_item.token.as_ref().unwrap()));
+                }
+            }
+            UrlType::Gitee => {
+                if url_item.token.is_some() {
+                    request = request.with_header("Authorization", format!("Bearer {}", url_item.token.as_ref().unwrap()));
+                    request = request.with_header("Accept", "application/vnd.github.v3.raw");
+                }
+            }
+            _ => {}
+        }
 
         if timeout > 0 {
             request = request.with_timeout(timeout.into());
         }
 
-        if with_proxy {
+        if url_item.with_proxy {
             request = request
                 .with_proxy(minreq::Proxy::new(self.proxy_addr.clone()).map_err(process_err)?);
         }
+
+        Ok(request)
+    }
+
+    pub fn mock_clash_core(
+        &self,
+        url_item: &UrlItem,
+        timeout: u8,
+    ) -> Result<Resp> {
+        let mut request = self.make_req(url_item, timeout)?;
+        request = request.with_header("user-agent", self.clash_ua.clone());
 
         request.send_lazy().map(Resp).map_err(process_err)
     }
@@ -409,7 +545,7 @@ impl ClashUtil {
 }
 #[cfg(test)]
 mod tests {
-    use super::{ClashUtil, ProfileSectionType};
+    use super::{ClashUtil, ProfileSectionType, UrlItem, UrlType};
     fn sym() -> ClashUtil {
         ClashUtil::new(
             "http://127.0.0.1:9090".to_string(),
@@ -448,8 +584,9 @@ mod tests {
     #[test]
     fn mock_clash_core_test() {
         let sym = sym();
+        let url_item = UrlItem::new(UrlType::Generic, "https://www.google.com".to_string(), None, true);
         let r = sym
-            .mock_clash_core("https://www.google.com", true, 10)
+            .mock_clash_core(&url_item, 10)
             .unwrap();
         let mut tf = std::fs::OpenOptions::new()
             .write(true)

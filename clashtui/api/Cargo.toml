@@ -9,6 +9,7 @@ edition = "2021"
 serde = { version = "^1", features = ["derive"] }
 minreq = { version = "^2", features = ["proxy", "https"] }
 serde_json = "^1"
+serde_yaml = "^0"
 serde-this-or-that = { version = "^0", optional = true }
 chrono = "^0"
 

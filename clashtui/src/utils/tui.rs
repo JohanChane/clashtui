@@ -4,7 +4,8 @@ use std::{
     io::Error,
     path::{Path, PathBuf},
 };
-use api::ProfileSectionType;
+use strum_macros::Display;
+use api::{ProfileSectionType, UrlItem};
 
 mod impl_app;
 mod impl_clashsrv;
@@ -18,12 +19,30 @@ use super::{
 use api::{ClashConfig, ClashUtil, Resp};
 
 // format: {section_key: [(name, url, path)]}
-pub type NetProviderMap = std::collections::HashMap<ProfileSectionType, Vec<(String, String, String)>>;
+pub type NetProviderMap = std::collections::HashMap<ProfileSectionType, Vec<(String, UrlItem, String)>>;
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Display)]
 pub enum ProfileType {
-    Url,
-    Yaml,
+    ClashPf,            // clash profile yaml file
+    SubUrl,             // Only a SubUrl
+    CtPf,               // ClashTui profile no sub url
+    CtPfWithSubUrl      // ClashTui profile with sub url
+}
+
+pub struct ProfileItem {
+    pub typ: ProfileType,
+    pub name: String,                   // profile name
+    pub url_item: Option<UrlItem>,      // ProfileType: Url
+}
+
+impl ProfileItem {
+    pub fn from_url(typ: ProfileType, name: String) -> Self {
+        Self {
+            typ: typ,
+            name: name,
+            url_item: None
+        }
+    }
 }
 
 const BASIC_FILE: &str = "basic_clash_config.yaml";
@@ -85,9 +104,9 @@ impl ClashTuiUtil {
     pub fn restart_clash(&self) -> Result<String, Error> {
         self.clash_api.restart(None)
     }
-    fn dl_remote_profile(&self, url: &str, with_proxy: bool) -> Result<Resp, Error> {
+    fn dl_remote_profile(&self, url_item: &UrlItem) -> Result<Resp, Error> {
         let timeout = self.tui_cfg.timeout;
-        self.clash_api.mock_clash_core(url, with_proxy, timeout)
+        self.clash_api.mock_clash_core(url_item, timeout)
     }
     fn config_reload(&self, body: String) -> Result<(), Error> {
         self.clash_api.config_reload(body)

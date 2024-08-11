@@ -1,8 +1,8 @@
 use crate::utils::tui::{NetProviderMap, ProfileType};
 
-use super::{ClashTuiUtil, Resp};
+use super::{ClashTuiUtil, Resp, ProfileItem};
 use crate::utils::{is_yaml, utils as Utils};
-use api::ProfileSectionType;
+use api::{UrlType, UrlItem, ProfileSectionType};
 use std::{
     fs::{create_dir_all, File},
     io::Error,
@@ -229,6 +229,10 @@ impl ClashTuiUtil {
             }
         }
 
+        // ## add `clashtui` section
+        out_parsed_yaml.to_mut()["clashtui"] = serde_yaml::Value::Null;
+
+        // ## write to file
         let out_yaml_path = self.profile_dir.join(template_name);
         let out_yaml_file = File::create(out_yaml_path).map_err(|e| e.to_string())?;
         serde_yaml::to_writer(out_yaml_file, &out_parsed_yaml).map_err(|e| e.to_string())?;
@@ -267,7 +271,7 @@ impl ClashTuiUtil {
 
     pub fn rmf_profile(&self, profile_name: &String) -> Result<(), String> {
         use std::fs::remove_file;
-        if self.get_profile_type(profile_name).is_some_and(|t| t == ProfileType::Url) {
+        if self.get_profile_type(profile_name).is_some_and(|t| Self::is_profile_with_suburl(&t)) {
             let _ = remove_file(self.get_profile_cache_unchecked(profile_name));  // Not important
         }
         remove_file(self.get_profile_path_unchecked(profile_name)).map_err(|e| e.to_string())
@@ -368,18 +372,23 @@ impl ClashTuiUtil {
         profile_name: &String,
         does_update_all: bool,
     ) -> std::io::Result<Vec<String>> {
-        let mut profile_yaml_path = self.profile_dir.join(profile_name);
-        let mut result = Vec::new();
-        if self.get_profile_type(profile_name)
-            .is_some_and(|t| t == ProfileType::Url)
-        {
-            let sub_url = self.extract_profile_url(profile_name)?;
-            profile_yaml_path = self.get_profile_cache_unchecked(profile_name);
-            // Update the file to keep up-to-date
-            self.download_profile(sub_url.as_str(), &profile_yaml_path, self.check_proxy())?;
+        let profile_yaml_path;
 
+        let mut result = Vec::new();
+        let profile_item = self.gen_profile_item(profile_name)?;
+        if Self::is_profile_with_suburl(&profile_item.typ) {
+            profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
+
+            // Update the file to keep up-to-date
+            self.download_profile(&profile_item)?;
+
+            let sub_url = profile_item.url_item.ok_or(Error::new(
+                std::io::ErrorKind::Other,
+                "No sub-url found".to_string(),))?.url;
             let url_domain = Utils::extract_domain(sub_url.as_str()).unwrap_or("No domain");
             result.push(format!("Updated: {}, {}", profile_name, url_domain));
+        } else {
+            profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
         }
 
         let mut section_types = vec![ProfileSectionType::ProxyProvider];
@@ -395,8 +404,12 @@ impl ClashTuiUtil {
         let with_proxy = self.check_proxy();
         for (_, providers) in net_providers {
             for (name, url, path) in providers {
-                let url_domain = Utils::extract_domain(url.as_str()).unwrap_or("No domain");
-                match self.download_profile(&url, &Path::new(&self.tui_cfg.clash_cfg_dir).join(&path), with_proxy) {
+                let url_domain = Utils::extract_domain(url.url.as_str()).unwrap_or("No domain");
+                let url_item = UrlItem::new(UrlType::Generic, url.url.clone(), None, with_proxy);
+                match self.download_url_content(
+                    &Path::new(&self.tui_cfg.clash_cfg_dir).join(&path),
+                    &url_item
+                ) {
                     Ok(_) => result.push(format!("Updated: {}, {}", name, url_domain)),
                     Err(e) => result.push(format!("Not updated: {}, {}, {}", name, url_domain, e)),
 
@@ -417,11 +430,13 @@ impl ClashTuiUtil {
         let mut info = vec!["## Profile".to_string()];
         let profile_type = self.get_profile_type(profile_name)
             .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Profile type not found"))?;
-        if profile_type == ProfileType::Url {
+        info.push(format!("ProfileType: {}", profile_type));
+        if profile_type == ProfileType::SubUrl {
             let profile_url = self.extract_profile_url(profile_name)?;
             info.push(format!("Url: {}", profile_url));
 
-            if let Ok(rsp) = self.dl_remote_profile(profile_url.as_str(), with_proxy) {
+            let url_item = UrlItem::new(UrlType::Generic, profile_url, None, with_proxy);
+            if let Ok(rsp) = self.dl_remote_profile(&url_item) {
                 info.push(format!("-   subscription-userinfo: {}",
                         self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
                 for key in vec!["profile-update-interval"] {
@@ -453,9 +468,10 @@ impl ClashTuiUtil {
                     info.push(format!("-   {} ({}): {}", 
                             name, 
                             dur_str,
-                            url));
+                            url.url));
 
-                    if let Ok(rsp) = self.dl_remote_profile(url.as_str(), with_proxy) {
+                    let url_item = UrlItem::new(UrlType::Generic, url.url.clone(), None, with_proxy);
+                    if let Ok(rsp) = self.dl_remote_profile(&url_item) {
                         info.push(format!("    -   subscription-userinfo: {}",
                                 self.str_human_readable_userinfo(&rsp).unwrap_or_else(|e| e.to_string())));
                         for key in vec!["profile-update-interval"] {
@@ -477,7 +493,7 @@ impl ClashTuiUtil {
                     info.push(format!("-   {} ({}): {}",
                             name,
                             dur_str,
-                            url));
+                            url.url));
                 }
             });
         }
@@ -489,7 +505,13 @@ impl ClashTuiUtil {
         // ## GEO Database
         info.push("## GEO Database".to_string());
         // ### github release
-        let rule_dat_release_rsp = self.dl_remote_profile("https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases", with_proxy)?;
+        let dat_url_item = UrlItem {
+            typ: UrlType::Generic,
+            url: "https://api.github.com/repos/MetaCubeX/meta-rules-dat/releases".to_string(),
+            token: None,
+            with_proxy: with_proxy,
+        };
+        let rule_dat_release_rsp = self.dl_remote_profile(&dat_url_item)?;
         let releases = rule_dat_release_rsp.to_json()?;
         let latest_release = releases.as_array()
                 .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::Other, "Failed to parse releases as array"))?
@@ -609,16 +631,23 @@ impl ClashTuiUtil {
         P: AsRef<Path> + AsRef<std::ffi::OsStr>,
     {
         let mut path = self.get_profile_path_unchecked(&profile_name);
-        if is_yaml(&path) {
-            Some(path)
-        } else {
+
+        let profile_name_path: &Path = profile_name.as_ref();
+        let profile_name_str = profile_name_path.to_str().ok_or(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "invalid profile name",
+        ))?;
+        let profile_type = self.get_profile_type(profile_name_str)
+            .ok_or(Error::new(
+                std::io::ErrorKind::NotFound,
+                "profile type is invalid",
+            ))?;
+        if Self::is_profile_with_suburl(&profile_type) {
             path = self.get_profile_cache_unchecked(profile_name);
-            is_yaml(&path).then_some(path)
+            Ok(path)
+        } else {
+            Ok(path)
         }
-        .ok_or(Error::new(
-            std::io::ErrorKind::NotFound,
-            "No valid yaml file",
-        ))
     }
     fn get_profile_cache_unchecked<P>(&self, profile_name: P) -> PathBuf
     where
@@ -631,26 +660,48 @@ impl ClashTuiUtil {
     }
 
     pub fn get_profile_type(&self, profile_name: &str) -> Option<ProfileType> {
-        let profile_path = self.get_profile_path_unchecked(profile_name);
-        if is_yaml(&profile_path) {
-            return Some(ProfileType::Yaml);
-        }
+        let profile_path = self.get_profile_path_unchecked(&profile_name);
 
-        match self.extract_profile_url(profile_name) {
-            Ok(_) => return Some(ProfileType::Url),
-            Err(e) => {
-                log::warn!("{}", e);
+        if is_yaml(&profile_path) {
+            if let Ok(parsed_yaml) = Utils::parse_yaml(profile_path.as_path()) {
+                if let serde_yaml::Value::Mapping(map) = parsed_yaml {
+                    if let Some(clashtui) = map.get("clashtui").and_then(|v| v.as_mapping()) {
+                        if let Some(_) = clashtui.get("profile_url").and_then(|v| v.as_mapping()) {
+                            return Some(ProfileType::CtPfWithSubUrl);
+                        }
+                        return Some(ProfileType::CtPf);
+                    } else {
+                        return Some(ProfileType::ClashPf)
+                    }
+                }
             }
+        } else {
+            return self.extract_profile_url(profile_name)
+                .ok().and(Some(ProfileType::SubUrl));
         }
 
         None
+    }
+
+    pub fn is_clashtui_profile(profile_type: &ProfileType) -> bool {
+        match profile_type {
+            ProfileType::ClashPf => false,
+            _ => true
+        }
+    }
+
+    pub fn is_profile_with_suburl(profile_type: &ProfileType) -> bool {
+        match profile_type {
+            ProfileType::SubUrl | ProfileType::CtPfWithSubUrl => true,
+            ProfileType::ClashPf | ProfileType::CtPf => false,
+        }
     }
 
     pub fn extract_profile_url(&self, profile_name: &str) -> std::io::Result<String> {
         use std::io::BufRead;
         use regex::Regex;
 
-        let profile_path = self.profile_dir.join(profile_name);
+        let profile_path = self.get_profile_path_unchecked(&profile_name);
         let file = File::open(profile_path)?;
         let reader = std::io::BufReader::new(file);
 
@@ -669,10 +720,45 @@ impl ClashTuiUtil {
             }
         }
 
-        Err(std::io::Error::new(std::io::ErrorKind::NotFound, format!("No URL found in {}", profile_name)))
+        Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("No URL found in {}", profile_name)
+            )
+        )
     }
 
-    fn download_profile(&self, url: &str, path: &PathBuf, with_proxy: bool) -> std::io::Result<()> {
+    pub fn gen_profile_item(&self, profile_name: &str) -> std::io::Result<ProfileItem> {
+
+
+        let profile_path = self.get_profile_path_unchecked(profile_name);
+
+        // ## ProfileType
+        let profile_type = self.get_profile_type(profile_name).ok_or(std::io::Error::new(std::io::ErrorKind::InvalidData, "Unknown profile type"))?;
+
+        // ## Generate the profile_item
+        let mut profile_item = ProfileItem::from_url(profile_type, profile_name.to_string());
+        if profile_type == ProfileType::ClashPf {
+            return Ok(profile_item);
+        }
+
+        if profile_type == ProfileType::SubUrl {
+            let profile_url = Some(self.extract_profile_url(profile_name)?);
+            let url_item = UrlItem::new(UrlType::Generic, profile_url.unwrap(), None, self.check_proxy());
+            profile_item.url_item = Some(url_item);
+        } else if profile_type == ProfileType::CtPfWithSubUrl {
+            let profile_parsed_yaml = Utils::parse_yaml(profile_path.as_path())?;
+            if let Some(profile) = profile_parsed_yaml.get("clashtui")
+                    .and_then(|v| v.get("profile_url")) {
+                let url_item = UrlItem::from_yaml(profile);
+                profile_item.url_item = Some(url_item);
+            }
+        } else if profile_type == ProfileType::CtPf {
+        }
+
+        Ok(profile_item)
+    }
+
+    fn download_url_content(&self, path: &PathBuf, url_item: &UrlItem) -> std::io::Result<()> {
         let directory = path
             .parent()
             .ok_or_else(|| Error::new(std::io::ErrorKind::NotFound, "Invalid file path"))?;
@@ -680,9 +766,26 @@ impl ClashTuiUtil {
             create_dir_all(directory)?;
         }
 
-        let response = self.dl_remote_profile(url, with_proxy)?;
+        let response = self.dl_remote_profile(url_item)?;
         let mut output_file = File::create(path)?;      // will truncate the file
         response.copy_to(&mut output_file)?;
+        Ok(())
+    }
+
+    fn download_profile(&self, profile_item: &ProfileItem) -> std::io::Result<()> {
+        let path = self.get_profile_cache_unchecked(profile_item.name.clone());
+
+        let directory = path
+            .parent()
+            .ok_or_else(|| Error::new(std::io::ErrorKind::NotFound, "Invalid file path"))?;
+        if !directory.exists() {
+            create_dir_all(directory)?;
+        }
+
+        if let Some(ref url_item) = profile_item.url_item {
+            self.download_url_content(&path, url_item)?;
+        }
+
         Ok(())
     }
 
@@ -719,7 +822,7 @@ impl ClashTuiUtil {
                 continue;
             };
 
-            let mut providers: Vec<(String, String, String)> = Vec::new();
+            let mut providers: Vec<(String, UrlItem, String)> = Vec::new();
             for (provider_key, provider_val) in the_section_val {
                 let provider = if let Some(val) = provider_val.as_mapping() {
                     val
@@ -732,8 +835,16 @@ impl ClashTuiUtil {
                     provider.get(&serde_yaml::Value::String("url".to_string())),
                     provider.get(&serde_yaml::Value::String("path".to_string())),
                 ) {
-                    if let (serde_yaml::Value::String(name), serde_yaml::Value::String(url), serde_yaml::Value::String(path)) = (name, url, path) {
-                        providers.push((name.clone(), url.clone(), path.clone()));
+                    let url_item = if url.as_mapping().is_some() {
+                        UrlItem::from_yaml(url)
+                    } else {
+                        UrlItem::new(UrlType::Generic, url.as_str().unwrap().to_string(), None, true)
+                    };
+
+                    if let (serde_yaml::Value::String(name), serde_yaml::Value::String(path)) = (name, path) {
+                        providers.push((name.clone(), url_item, path.clone()));
+                    } else if let (serde_yaml::Value::String(name), serde_yaml::Value::String(path)) = (name, path) {
+                        providers.push((name.clone(), url_item, path.clone()));
                     }
                 }
             }
@@ -1041,7 +1152,7 @@ mod tests {
         let profile_name = "profile1.yaml";
         let mut profile_yaml_path = sym.profile_dir.join(profile_name);
         if sym.get_profile_type(profile_name)
-            .is_some_and(|t| t == ProfileType::Url)
+            .is_some_and(|t| ClashTuiUtil::is_profile_with_suburl(&t))
         {
             profile_yaml_path = sym.get_profile_cache_unchecked(profile_name);
         }

@@ -1,10 +1,10 @@
 use super::profile_input::ProfileInputPopup;
-use crate::tui::{
+use crate::{tui::{
     symbols::{PROFILE, TEMPALTE},
     utils::Keys,
     widgets::{ConfirmPopup, List, MsgPopup},
     EventState, Visibility,
-};
+}, utils::ClashTuiUtil};
 use crate::utils::{self, SharedClashTuiState, SharedClashTuiUtil, ProfileType};
 use crate::{msgpopup_methods, utils::get_mtime};
 crate::define_enum!(PTOp, [Update, UpdateAll, Select, Delete, GenInfo]);   // PTOp: ProfileTabOperation
@@ -306,9 +306,8 @@ impl super::TabEvent for ProfileTab {
                                         .collect();
 
                                 if self.clashtui_util.get_profile_type(profile_name)
-                                    .is_some_and(|t| t == ProfileType::Url)
+                                    .is_some_and(|t| ClashTuiUtil::is_profile_with_suburl(&t))
                                 {
-                                    log::debug!("get_profile_type: is url");
                                     lines.push(String::new());
                                     profile_path =
                                         self.clashtui_util.get_profile_yaml_path(profile_name).ok();
