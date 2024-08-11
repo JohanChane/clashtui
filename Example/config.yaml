@@ -1,8 +1,11 @@
-clash_cfg_dir: ~/.local/proxy/mihomo
-clash_cfg_path: ~/.local/proxy/mihomo/config.yaml
-clash_core_path: /usr/bin/mihomo
-clash_srv_name: mihomo
-clash_srv_is_user: false
-timeout: 0
-edit_cmd: alacritty -e nvim %s
-open_dir_cmd: alacritty -e ranger %s
+basic:
+  clash_config_dir: /srv/mihomo
+  clash_bin_path: /usr/bin/mihomo
+  clash_config_path: /srv/mihomo/config.yaml
+  timeout: null
+service:
+  clash_srv_name: mihomo
+  is_user: false
+extra:
+  edit_cmd: ''
+  open_dir_cmd: ''

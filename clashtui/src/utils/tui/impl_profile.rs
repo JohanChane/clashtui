@@ -281,7 +281,7 @@ impl ClashTuiUtil {
         use crate::utils::ipc::exec;
         let cmd = format!(
             "{} {} -d {} -f {} -t",
-            self.tui_cfg.clash_core_path,
+            self.tui_cfg.clash_bin_path,
             if geodata_mode { "-m" } else { "" },
             self.tui_cfg.clash_cfg_dir,
             path,

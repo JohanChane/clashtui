@@ -223,7 +223,7 @@ impl ClashUtil {
     pub fn get_blob_path(
         &self,
         url_item: &UrlItem,
-        timeout: u8,
+        timeout: Option<u64>,
     ) -> Result<String> {
         let mut request = self.make_req(url_item, timeout);
         // TODO: with header
@@ -239,7 +239,7 @@ impl ClashUtil {
     pub fn make_req(
         &self,
         url_item: &UrlItem,
-        timeout: u8,
+        timeout: Option<u64>,
     ) -> Result<minreq::Request> {
         let mut request = minreq::get(url_item.url.as_str());
 
@@ -261,8 +261,8 @@ impl ClashUtil {
             _ => {}
         }
 
-        if timeout > 0 {
-            request = request.with_timeout(timeout.into());
+        if timeout.is_some() {
+            request = request.with_timeout(timeout.unwrap());
         }
 
         if url_item.with_proxy {
@@ -276,7 +276,7 @@ impl ClashUtil {
     pub fn mock_clash_core(
         &self,
         url_item: &UrlItem,
-        timeout: u8,
+        timeout: Option<u64>,
     ) -> Result<Resp> {
         let mut request = self.make_req(url_item, timeout)?;
         request = request.with_header("user-agent", self.clash_ua.clone());
@@ -586,7 +586,7 @@ mod tests {
         let sym = sym();
         let url_item = UrlItem::new(UrlType::Generic, "https://www.google.com".to_string(), None, true);
         let r = sym
-            .mock_clash_core(&url_item, 10)
+            .mock_clash_core(&url_item, Some(10))
             .unwrap();
         let mut tf = std::fs::OpenOptions::new()
             .write(true)

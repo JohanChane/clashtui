@@ -12,14 +12,14 @@ impl ClashTuiUtil {
         match op {
             ClashSrvOp::StartClashService => {
                 let mut args = vec!["restart", self.tui_cfg.clash_srv_name.as_str()];
-                if self.tui_cfg.clash_srv_is_user {
+                if self.tui_cfg.is_user {
                     args.push("--user")
                 }
                 let output1 = exec("systemctl", args)?; // Although the command execution is successful,
                                                         // the operation may not necessarily be successful.
                                                         // So we need to show the command's output to the user.
                 args = vec!["status", self.tui_cfg.clash_srv_name.as_str()];
-                if self.tui_cfg.clash_srv_is_user {
+                if self.tui_cfg.is_user {
                     args.push("--user")
                 }
                 let output2 = exec("systemctl", args)?;
@@ -28,12 +28,12 @@ impl ClashTuiUtil {
             }
             ClashSrvOp::StopClashService => {
                 let mut args = vec!["stop", self.tui_cfg.clash_srv_name.as_str()];
-                if self.tui_cfg.clash_srv_is_user {
+                if self.tui_cfg.is_user {
                     args.push("--user")
                 }
                 let output1 = exec("systemctl", args)?;
                 args = vec!["status", self.tui_cfg.clash_srv_name.as_str()];
-                if self.tui_cfg.clash_srv_is_user {
+                if self.tui_cfg.is_user {
                     args.push("--user")
                 }
                 let output2 = exec("systemctl", args)?;
@@ -44,7 +44,7 @@ impl ClashTuiUtil {
                 let pgm = "setcap";
                 let args = vec![
                     "cap_net_admin,cap_net_bind_service=+ep",
-                    self.tui_cfg.clash_core_path.as_str(),
+                    self.tui_cfg.clash_bin_path.as_str(),
                 ];
                 if toolkit::is_run_as_root() {
                     ipc::exec_with_sbin(pgm, args)

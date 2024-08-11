@@ -12,7 +12,7 @@ mod impl_clashsrv;
 mod impl_profile;
 
 use super::{
-    config::{CfgError, ClashTuiConfig, ErrKind},
+    config::{CfgError, CtCfg, ErrKind},
     parse_yaml,
     ClashTuiData,
 };
@@ -53,7 +53,7 @@ pub struct ClashTuiUtil {
     profile_dir: PathBuf,
 
     clash_api: ClashUtil,
-    pub tui_cfg: ClashTuiConfig,
+    pub tui_cfg: CtCfg,
     pub clashtui_data: RefCell<ClashTuiData>,
 }
 
@@ -124,7 +124,7 @@ impl ClashTuiUtil {
 fn load_app_config(
     clashtui_dir: &PathBuf,
     skip_init_conf: bool,
-) -> (ClashTuiConfig, ClashUtil, Vec<CfgError>) {
+) -> (CtCfg, ClashUtil, Vec<CfgError>) {
     let mut err_collect = Vec::new();
     let basic_clash_config_path = Path::new(clashtui_dir).join(BASIC_FILE);
     let basic_clash_config_value: serde_yaml::Value =
@@ -173,9 +173,9 @@ fn load_app_config(
 
     let configs = if skip_init_conf {
         let config_path = clashtui_dir.join("config.yaml");
-        match ClashTuiConfig::from_file(config_path.to_str().unwrap()) {
+        match CtCfg::load(config_path.to_str().unwrap()) {
             Ok(v) => {
-                if !v.check() {
+                if !v.is_valid() {
                     err_collect.push(CfgError::new(
                         ErrKind::LoadAppConfig,
                         "Some Key Configs are missing, or Default".to_string(),
@@ -191,11 +191,11 @@ fn load_app_config(
                     "Fail to load configs, using Default".to_string(),
                 ));
                 log::error!("Unable to load config file. {}", e);
-                ClashTuiConfig::default()
+                CtCfg::default()
             }
         }
     } else {
-        ClashTuiConfig::default()
+        CtCfg::default()
     };
     (
         configs,
