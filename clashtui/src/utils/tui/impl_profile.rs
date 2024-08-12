@@ -450,6 +450,14 @@ impl ClashTuiUtil {
                             rsp.get_headers().get(key).unwrap_or(&"None".to_string())));
                 }
             }
+        } else if profile_type == ProfileType::CtPfWithSubUrl {
+            let profile_item = self.gen_profile_item(profile_name)?;
+            if profile_item.url_item.is_some() {
+                let profile_url_with_token = profile_item.url_item.unwrap().gen_url();
+                if let Some(url) = profile_url_with_token {
+                    info.push(format!("UrlWithToken: {}", url));
+                }
+            }
         }
 
         // ## Providers
