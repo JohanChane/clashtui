@@ -23,6 +23,7 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
         * [Customizing Configuration Templates](#customizing-configuration-templates)
 * [ClashTui File Structure](#clashtui-file-structure)
 * [See more](#see-more)
+* [Trying new things](#trying-new-things)
 * [Project Disclaimer](#project-disclaimer)
 
 <!-- vim-markdown-toc -->
@@ -260,6 +261,11 @@ proxy-groups:
 ## See more
 
 [Doc](./Doc)
+
+## Trying new things
+
+- [dev](https://github.com/JohanChane/clashtui/tree/dev)
+- [clashcli](https://github.com/JohanChane/clashtui/tree/aio)
 
 ## Project Disclaimer
 

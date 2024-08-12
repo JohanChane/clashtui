@@ -23,6 +23,7 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
         * [自定义配置模板](#自定义配置模板)
 * [clashtui 的文件结构](#clashtui-的文件结构)
 * [See more](#see-more)
+* [尝试新东西](#尝试新东西)
 * [项目免责声明](#项目免责声明)
 
 <!-- vim-markdown-toc -->
@@ -260,6 +261,11 @@ proxy-groups:
 ## See more
 
 [Doc](./Doc)
+
+## 尝试新东西
+
+-   [dev](https://github.com/JohanChane/clashtui/tree/dev)
+-   [clashcli](https://github.com/JohanChane/clashtui/tree/aio)
 
 ## 项目免责声明
 
