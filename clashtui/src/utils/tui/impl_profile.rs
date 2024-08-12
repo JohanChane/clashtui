@@ -683,6 +683,7 @@ impl ClashTuiUtil {
         } else {
             return self.extract_profile_url(profile_name)
                 .ok().and(Some(ProfileType::SubUrl));
+
         }
 
         None
@@ -710,7 +711,8 @@ impl ClashTuiUtil {
         let file = File::open(profile_path)?;
         let reader = std::io::BufReader::new(file);
 
-        let url_regex = Regex::new(r#"(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])"#)
+        //let url_regex = Regex::new(r#"(http|ftp|https):\/\/([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])"#)       // no token format
+        let url_regex = Regex::new(r#"(http|ftp|https):\/\/(?:[\w_-]+(?::[\w_-]*)?@)?([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:\/~+#-]*[\w@?^=%&\/~+#-])"#)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, format!("Invalid regex: {}", e)))?;
 
 

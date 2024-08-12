@@ -71,11 +71,13 @@ impl UrlItem {
             return Some(self.url.clone());
         }
 
-        // url format: 'https://x-access-token:token@url_without_protocol'
-        // e.g. 'https://x-access-token:<token>@raw.githubusercontent.com/<User>/<Repo>/<Branch>/config.yaml'
+        // url format:
+        // - 'https://token@url_without_protocol'
+        // - 'https://x-access-token:token@url_without_protocol'
+        // e.g. 'https://<token>@raw.githubusercontent.com/<User>/<Repo>/<Branch>/config.yaml'
         if self.typ == UrlType::GitHub {
             let token_part = if let Some(token) = &self.token {
-                format!("x-access-token:{}", token)
+                format!("{}", token)
             } else {
                 String::new()
             };
