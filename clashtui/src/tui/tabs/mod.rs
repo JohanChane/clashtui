@@ -46,6 +46,8 @@ macro_rules! msgpopup_methods {
                 if ! msg.is_empty() {
                     self.msgpopup.push_txt_msg(msg);
                     self.msgpopup.show();
+                } else {
+                    log::debug!("from tui: txt msg is empty!");
                 }
             }
             // multi-lines popup
@@ -60,6 +62,8 @@ macro_rules! msgpopup_methods {
                 if list_msg.len() > 0 {
                     self.msgpopup.push_list_msg(list_msg);
                     self.msgpopup.show();
+                } else {
+                    log::debug!("from tui: list msg is empty!");
                 }
             }
             #[allow(unused)]
