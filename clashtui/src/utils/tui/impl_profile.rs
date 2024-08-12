@@ -375,7 +375,13 @@ impl ClashTuiUtil {
         let profile_yaml_path;
 
         let mut result = Vec::new();
-        let profile_item = self.gen_profile_item(profile_name)?;
+        let mut profile_item = self.gen_profile_item(profile_name)?;
+        let with_proxy = self.check_proxy();
+        if ! with_proxy {       // mihomo is stop.
+            if let Some(ref mut url_item) = profile_item.url_item {
+                url_item.with_proxy = false;
+            }
+        }
         if Self::is_profile_with_suburl(&profile_item.typ) {
             profile_yaml_path = self.get_profile_yaml_path(profile_name)?;
 
@@ -401,7 +407,6 @@ impl ClashTuiUtil {
             net_providers.extend(providers);
         }
 
-        let with_proxy = self.check_proxy();
         for (_, providers) in net_providers {
             for (name, url, path) in providers {
                 let url_domain = Utils::extract_domain(url.url.as_str()).unwrap_or("No domain");
