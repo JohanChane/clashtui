@@ -97,6 +97,7 @@ rules:
   - GEOSITE,openai,Entry
   - GEOSITE,telegram,Entry
   - GEOSITE,youtube,Entry
+  - GEOSITE,reddit,Entry
   - GEOSITE,gfw,Entry
   - GEOIP,CN,Entry-RuleMode
   - MATCH,Entry-LastMatch

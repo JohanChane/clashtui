@@ -1,0 +1,139 @@
+proxy-anchor:
+  - delay_test: &pa_dt {url: https://www.gstatic.com/generate_204, interval: 300}
+  - proxy_provider: &pa_pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
+  - filter: &pa_flt
+      #filter: "(?i)美|us|unitedstates|united states|日本|jp|japan|韩|kr|korea|southkorea|south korea|新|sg|singapore"
+      exclude-filter: "(?i)剩余|到期|勿连接|不要连接|失联|中国|国内|cn|china|香港|hk|hongkong|hong kong|澳门|mo|macau|台湾|tw|taiwan|tai wan"
+  - filter_gpt: &pa_flt_gpt
+      # proxy-group 在用 proixes 的情况下, filter 无效。
+      #exclude-filter: "(?i)美|us|unitedstates|canada|mexico|巴西|brazil|阿根廷|argentina|英国|uk|united kingdom|德国|germany|法国|france|意大利|italy|西班牙|spain|荷兰|netherlands|瑞士|switzerland|瑞典|sweden|挪威|norway|丹麦|denmark|芬兰|finland|比利时|belgium|奥地利|austria|爱尔兰|ireland|葡萄牙|portugal|希腊|greece|波兰|poland|捷克|czech republic|匈牙利|hungary|斯洛伐克|slovakia|克罗地亚|croatia|罗马尼亚|romania|保加利亚|bulgaria|斯洛文尼亚|slovenia|拉脱维亚|latvia|立陶宛|lithuania|爱沙尼亚|estonia|冰岛|iceland"
+      exclude-filter: "^(?!.*(?i)(美|us|unitedstates|canada|mexico|巴西|brazil|阿根廷|argentina|英国|uk|united kingdom|德国|germany|法国|france|意大利|italy|西班牙|spain|荷兰|netherlands|瑞士|switzerland|瑞典|sweden|挪威|norway|丹麦|denmark|芬兰|finland|比利时|belgium|奥地利|austria|爱尔兰|ireland|葡萄牙|portugal|希腊|greece|波兰|poland|捷克|czech republic|匈牙利|hungary|斯洛伐克|slovakia|克罗地亚|croatia|罗马尼亚|romania|保加利亚|bulgaria|斯洛文尼亚|slovenia|拉脱维亚|latvia|立陶宛|lithuania|爱沙尼亚|estonia|冰岛|iceland)).*$"
+
+proxy-groups:
+  - name: "Entry"
+    type: select
+    proxies:
+      - <At>
+      #- FltAllAt
+      #- FltAllLb
+      - <FltAt>
+      #- <FltFb>
+      #- <FltLb>
+      #- FltAllSl
+      - <Sl>
+      - 看视频和下载不要选这个
+
+  - name: "Entry-Gpt"
+    type: select
+    proxies:
+      - <FltAt-Gpt>
+      - <Sl-Gpt>
+
+  #- name: "FltAllSl"
+  #  type: select
+  #  use:
+  #    - <pvd>
+  #  <<: *pa_flt
+
+  - name: "Sl-Gpt"
+    tpl_param:
+      providers: ["pvd"]
+    type: select
+    filter: "美|us|unitedstates"
+    <<: *pa_flt_gpt
+
+  - name: "Sl"
+    tpl_param:
+      providers: ["pvd"]
+    type: select
+
+  #- name: "FltAllAt"
+  #  type: url-test
+  #  proxies:
+  #    - <FltAt>
+  #  <<: *pa_dt
+
+  #- name: "FltAllLb"
+  #  proxies:
+  #    - <FltAt>
+  #  type: load-balance
+  #  #strategy: consistent-hashing
+  #  #strategy: round-robin
+  #  <<: *pa_dt
+
+  - name: "FltAt-Gpt"
+    tpl_param:
+      providers: ["pvd"]
+    type: url-test
+    filter: "(?i)美|us|unitedstates"
+    <<: [*pa_dt, *pa_flt_gpt]
+
+  - name: "FltAt"
+    tpl_param:
+      providers: ["pvd"]
+    type: url-test
+    <<: [*pa_dt, *pa_flt]
+
+  #- name: "FltFb"
+  #  tpl_param:
+  #    providers: ["pvd"]
+  #  type: fallback
+  #  <<: [*pa_dt, *pa_flt]
+  #
+  #- name: "FltLb"
+  #  tpl_param:
+  #    providers: ["pvd"]
+  #  type: load-balance
+  #  #strategy: consistent-hashing
+  #  #strategy: round-robin
+  #  <<: [*pa_dt, *pa_flt]
+
+  - name: "At"
+    tpl_param:
+      providers: ["pvd"]
+    type: url-test
+    <<: *pa_dt
+
+  - name: "看视频和下载不要选这个"
+    type: select
+    use:
+      - bak
+    <<: *pa_flt
+
+  - name: "Entry-RuleMode"
+    type: select
+    proxies:
+      - DIRECT
+      - Entry
+
+  - name: "Entry-LastMatch"
+    type: select
+    proxies:
+      - Entry
+      - DIRECT
+
+proxy-providers:
+  pvd:
+    tpl_param:
+    type: http
+    <<: *pa_pp
+  bak:
+    type: http
+    url: <your subscribe url>
+    path: proxy-providers/tpl/my_tpl/bak.yaml
+    <<: *pa_pp
+
+rules:
+  - DOMAIN-SUFFIX,cn.bing.com,DIRECT
+  - DOMAIN-SUFFIX,bing.com,Entry
+  - DOMAIN,aur.archlinux.org,Entry
+
+  - GEOIP,lan,DIRECT,no-resolve
+  - GEOSITE,github,Entry
+  - GEOSITE,openai,Entry-Gpt
+  - GEOSITE,telegram,Entry
+  - GEOSITE,youtube,Entry
+  - GEOSITE,reddit,Entry
+  - GEOSITE,gfw,Entry
+  - GEOIP,CN,Entry-RuleMode
+  - MATCH,Entry-LastMatch
