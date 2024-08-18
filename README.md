@@ -1,8 +1,8 @@
 # ClashTui
 
-![Demo](./Assets/clashtui_demo.gif)
+![Demo](./Doc/Assets/clashtui_demo.gif)
 
-Language: [English](./README.md) | [中文](./README_ZH.md)
+Language: [English](./README.md) | [中文](./Doc/README_ZH.md)
 
 <details>
 <summary>Table of Contents</summary>
