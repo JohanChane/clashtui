@@ -3,8 +3,8 @@ mod impl_clashsrv;
 mod impl_net;
 mod impl_profile;
 
-use crate::utils::config::{load_app_config, Config};
-use api::ClashUtil;
+use crate::api::ClashUtil;
+use crate::backend::utils::config::{load_app_config, Config};
 
 pub struct ClashBackend {
     pub home_dir: PathBuf,

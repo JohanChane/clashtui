@@ -1,8 +1,8 @@
-use api::ClashUtil;
+use crate::api::ClashUtil;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 
-use crate::const_err::ERR_PATH_UTF_8;
+use crate::backend::const_err::ERR_PATH_UTF_8;
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct ProfileMap(core::cell::RefCell<std::collections::HashMap<String, ProfileType>>);
@@ -44,11 +44,11 @@ impl ProfileType {
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 struct Basic {
-    #[serde(rename="clash_config_dir")]
+    #[serde(rename = "clash_config_dir")]
     clash_cfg_dir: String,
-    #[serde(rename="clash_bin_path")]
+    #[serde(rename = "clash_bin_path")]
     clash_bin_pth: String,
-    #[serde(rename="clash_config_path")]
+    #[serde(rename = "clash_config_path")]
     clash_cfg_pth: String,
     timeout: Option<u64>,
 }
@@ -235,7 +235,9 @@ impl Config {
     }
 }
 pub fn init_config(config_dir: &std::path::PathBuf) -> anyhow::Result<()> {
-    use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE, DEFAULT_BASIC_CLASH_CFG_CONTENT};
+    use crate::backend::consts::{
+        BASIC_FILE, CONFIG_FILE, DATA_FILE, DEFAULT_BASIC_CLASH_CFG_CONTENT,
+    };
     use std::fs;
     fs::create_dir_all(config_dir)?;
 
@@ -267,7 +269,7 @@ pub fn load_app_config(
     clashtui_dir: &std::path::Path,
     skip_init_conf: bool,
 ) -> anyhow::Result<(ClashUtil, Config, Option<anyhow::Error>)> {
-    use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE, HOST};
+    use crate::backend::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE, HOST};
     let basic_clash_config_path = clashtui_dir.join(BASIC_FILE);
     let BasicInfo {
         mut external_controller,

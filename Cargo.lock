@@ -91,16 +91,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3d1d046238990b9cf5bcde22a3fb3584ee5cf65fb2765f454ed428c7a0063da"
 
 [[package]]
-name = "api"
-version = "0.1.1"
-dependencies = [
- "minreq",
- "serde",
- "serde-this-or-that",
- "serde_json",
-]
-
-[[package]]
 name = "arc-swap"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -113,19 +103,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c4b4d0bd25bd0b74681c0ad21497610ce1b7c91b1022cd21c80c6fbdd9476b0"
 
 [[package]]
-name = "backend"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "api",
- "encoding",
- "enumflags2",
- "log",
- "serde",
- "serde_yaml",
-]
-
-[[package]]
 name = "base64"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -136,9 +113,6 @@ name = "bitflags"
 version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b048fb63fd8b5923fc5aa7b340d8e156aec7ec02f0c78fa8a6ddc2613f6f71de"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "bumpalo"
@@ -239,15 +213,19 @@ name = "clashtui"
 version = "0.2.2"
 dependencies = [
  "anyhow",
- "backend",
  "clap",
  "clap_complete",
+ "crossterm",
+ "encoding",
  "enumflags2",
  "is-root",
  "log",
  "log4rs",
+ "minreq",
  "ratatui",
- "ui",
+ "serde",
+ "serde_json",
+ "serde_yaml",
 ]
 
 [[package]]
@@ -266,7 +244,6 @@ dependencies = [
  "cfg-if",
  "itoa",
  "ryu",
- "serde",
  "static_assertions",
 ]
 
@@ -680,7 +657,6 @@ dependencies = [
  "itertools 0.13.0",
  "lru",
  "paste",
- "serde",
  "stability",
  "strum",
  "strum_macros",
@@ -770,15 +746,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7253ab4de971e72fb7be983802300c30b5a7f0c2e56fab8abfc6a214307c0094"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde-this-or-that"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "634c5a3cb041e56cc2964386151c67d520f845445789da3bd46bfb1c94f5e3bb"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -952,23 +919,6 @@ checksum = "f0ec81c46e9eb50deaa257be2f148adf052d1fb7701cfd55ccfab2525280b70b"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "ui"
-version = "0.2.1"
-dependencies = [
- "crossterm",
- "ratatui",
- "ui-derive",
-]
-
-[[package]]
-name = "ui-derive"
-version = "0.1.1"
-dependencies = [
- "quote",
- "syn 2.0.68",
 ]
 
 [[package]]

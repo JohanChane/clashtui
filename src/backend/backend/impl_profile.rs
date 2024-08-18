@@ -1,5 +1,8 @@
 use super::ClashBackend;
-use crate::{consts::TMP_PATH, utils::{extract_domain, get_file_names, ipc, is_yaml, parse_yaml}};
+use crate::{
+    backend::consts::TMP_PATH,
+    backend::utils::{extract_domain, get_file_names, ipc, is_yaml, parse_yaml},
+};
 use std::{
     fs::{create_dir_all, File},
     io::Error,
@@ -228,7 +231,7 @@ impl ClashBackend {
         let out_yaml_path = self.gen_profile_path(template_name);
         let out_yaml_file = File::create(out_yaml_path).map_err(|e| e.to_string())?;
         serde_yaml::to_writer(out_yaml_file, &out_parsed_yaml).map_err(|e| e.to_string())?;
-        use crate::utils::config::ProfileType;
+        use crate::backend::utils::config::ProfileType;
         self.cfg.profiles.insert(
             template_name,
             ProfileType::Generated(
@@ -243,7 +246,7 @@ impl ClashBackend {
     }
 
     pub fn crt_profile(&self, profile_name: String, uri: String) -> Result<(), String> {
-        use crate::utils::config::ProfileType;
+        use crate::backend::utils::config::ProfileType;
         let profile_name = profile_name.trim();
         let uri = uri.trim();
 
@@ -316,7 +319,7 @@ impl ClashBackend {
             log::error!("{emsg:?}");
             return Err(Error::new(std::io::ErrorKind::Other, emsg));
         };
-        if let Err(err) = self.config_reload(api::build_payload(&self.cfg.clash_cfg_pth)) {
+        if let Err(err) = self.config_reload(crate::api::build_payload(&self.cfg.clash_cfg_pth)) {
             let emsg = format!("Failed to Patch Profile `{profile_name}` due to {}", err);
             log::error!("{emsg:?}");
             return Err(Error::new(std::io::ErrorKind::Other, emsg));
@@ -325,8 +328,9 @@ impl ClashBackend {
     }
 
     fn merge_profile(&self, profile_name: &String) -> Result<(), Merge> {
-        let mut dst_parsed_yaml = parse_yaml(&self.home_dir.join(crate::consts::BASIC_FILE))
-            .map_err(|e| Merge::Config(e.to_string()))?;
+        let mut dst_parsed_yaml =
+            parse_yaml(&self.home_dir.join(crate::backend::consts::BASIC_FILE))
+                .map_err(|e| Merge::Config(e.to_string()))?;
         let profile_parsed_yaml = self
             .get_profile_yaml(profile_name)
             .map_err(|e| Merge::Profile(format!("{e}. Maybe need to update first.")))

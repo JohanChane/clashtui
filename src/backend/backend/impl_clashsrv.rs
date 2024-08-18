@@ -1,6 +1,6 @@
 use super::ClashBackend;
 #[allow(unused_imports)] // currently, only [`SwitchMode`] is impl on macos
-use crate::utils::ipc::{self, exec};
+use crate::backend::utils::ipc::{self, exec};
 use crate::utils::ClashSrvOp;
 use std::io::Error;
 

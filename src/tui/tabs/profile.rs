@@ -257,13 +257,15 @@ impl super::TabEvent for ProfileTab {
                         Keys::ProfileUpdate => {
                             self.popup_txt_msg("Updating...".to_string());
                             self.op.replace(PTOp::PreUpdate);
-                            self.confirm_popup.popup_msg("Update with proxy?".to_owned());
+                            self.confirm_popup
+                                .popup_msg("Update with proxy?".to_owned());
                             EventState::WorkDone
                         }
                         Keys::ProfileUpdateAll => {
                             self.popup_txt_msg("Updating...".to_string());
                             self.op.replace(PTOp::PreUpdateAll);
-                            self.confirm_popup.popup_msg("Update with proxy?".to_owned());
+                            self.confirm_popup
+                                .popup_msg("Update with proxy?".to_owned());
                             EventState::WorkDone
                         }
                         Keys::ProfileImport => {

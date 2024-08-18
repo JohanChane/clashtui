@@ -6,6 +6,6 @@ pub use backend::ClashBackend;
 pub use consts::VERSION;
 /// re-export
 pub mod api {
-    pub use api::Mode;
+    pub use crate::api::Mode;
 }
 pub use consts::const_err;

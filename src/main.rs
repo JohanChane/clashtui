@@ -1,7 +1,11 @@
 #![warn(clippy::all)]
+mod api;
+mod backend;
 mod commands;
 #[cfg(feature = "tui")]
 mod tui;
+#[cfg(feature = "tui")]
+mod ui;
 mod utils;
 
 use backend::const_err::ERR_PATH_UTF_8;

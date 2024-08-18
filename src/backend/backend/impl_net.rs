@@ -1,6 +1,6 @@
 use super::ClashBackend;
-use crate::utils::State;
-use api::{ClashConfig, Resp};
+use crate::api::{ClashConfig, Resp};
+use crate::backend::utils::State;
 
 type Result<T> = core::result::Result<T, String>;
 
@@ -72,7 +72,11 @@ impl ClashBackend {
         &self,
         new_pf: Option<String>,
         new_mode: Option<String>,
-    ) -> (String, Option<api::Mode>, Option<api::TunStack>) {
+    ) -> (
+        String,
+        Option<crate::api::Mode>,
+        Option<crate::api::TunStack>,
+    ) {
         if let Some(v) = new_mode {
             let load = format!(r#"{{"mode": "{}"}}"#, v);
             let _ = self

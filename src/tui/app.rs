@@ -73,7 +73,7 @@ impl App {
                     .expect(backend::const_err::ERR_PATH_UTF_8)
             ));
         };
-        if is_root::is_root(){
+        if is_root::is_root() {
             self.popup_txt_msg(crate::utils::consts::ROOT_WARNING.to_string())
         }
         err_track

@@ -1,4 +1,4 @@
-use api::{Mode, TunStack};
+use crate::api::{Mode, TunStack};
 
 pub struct State {
     pub profile: String,

@@ -74,7 +74,7 @@ struct ProfileUpdate {
     no_proxy_provider: bool,
     /// update profile with proxy
     #[arg(long)]
-    with_proxy:bool
+    with_proxy: bool,
 }
 /// select profile
 #[derive(clap::Args)]
