@@ -1,13 +1,16 @@
 use super::profile_input::ProfileInputPopup;
-use crate::tui::{
-    impl_app::MonkeyPatch,
-    symbols::{PROFILE, TEMPALTE},
-    utils::Keys,
-    widgets::{ConfirmPopup, List, MsgPopup},
-    EventState, Visibility,
-};
 use crate::utils::{get_modify_time, SharedBackend, SharedState};
-crate::utils::define_enum!(
+use crate::{
+    tui::{
+        impl_app::MonkeyPatch,
+        symbols::{PROFILE, TEMPALTE},
+        utils::Keys,
+        widgets::{ConfirmPopup, List, MsgPopup},
+        EventState, Visibility,
+    },
+    ui,
+};
+crate::define_enum!(
     PTOp,
     [
         PreUpdate,
@@ -29,7 +32,6 @@ enum Fouce {
     Template,
 }
 
-#[derive(Visibility)]
 pub struct ProfileTab {
     is_visible: bool,
     fouce: Fouce,
@@ -43,6 +45,23 @@ pub struct ProfileTab {
     util: SharedBackend,
     state: SharedState,
     op: Option<PTOp>,
+}
+impl Visibility for ProfileTab {
+    fn is_visible(&self) -> bool {
+        self.is_visible
+    }
+
+    fn show(&mut self) {
+        self.is_visible = true;
+    }
+
+    fn hide(&mut self) {
+        self.is_visible = false;
+    }
+
+    fn set_visible(&mut self, b: bool) {
+        self.is_visible = b;
+    }
 }
 
 impl ProfileTab {

@@ -8,10 +8,7 @@ pub use flags::{BitFlags as Flags, Flag};
 pub(crate) mod consts;
 
 #[cfg(feature = "tui")]
-pub use backend::{
-    define_enum,
-    utils::{get_modify_time, State as _State},
-};
+pub use crate::backend::utils::{get_modify_time, State as _State};
 #[cfg(feature = "tui")]
 mod state;
 #[cfg(feature = "tui")]

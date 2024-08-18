@@ -1,4 +1,4 @@
-use backend::ClashBackend;
+use crate::backend::ClashBackend;
 use std::path::Path;
 /// A little trick, work for now
 pub trait MonkeyPatch {
@@ -29,7 +29,7 @@ impl MonkeyPatch for ClashBackend {
 ///
 /// Auto detect `cmd` is_empty and use system default app to open `path`
 fn spawn_open(cmd: &str, path: &Path) -> std::io::Result<()> {
-    use backend::utils::spawn;
+    use crate::backend::utils::spawn;
     if !cmd.is_empty() {
         let opendir_cmd_with_path = cmd.replace("%s", path.to_str().unwrap_or(""));
         #[cfg(target_os = "windows")]

@@ -1,15 +1,31 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::{EventState, Infailable, Theme, Visibility};
+use crate::ui::{EventState, Infailable, Theme, Visibility};
 /// Collect input and cache as [String]
-#[derive(Visibility)]
 pub struct InputPopup {
     title: String,
     is_visible: bool,
     input: String,
     cursor_position: usize,
     input_data: String,
+}
+impl Visibility for InputPopup {
+    fn is_visible(&self) -> bool {
+        self.is_visible
+    }
+
+    fn show(&mut self) {
+        self.is_visible = true;
+    }
+
+    fn hide(&mut self) {
+        self.is_visible = false;
+    }
+
+    fn set_visible(&mut self, b: bool) {
+        self.is_visible = b;
+    }
 }
 
 impl InputPopup {

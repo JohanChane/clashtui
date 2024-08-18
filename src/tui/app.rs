@@ -1,8 +1,8 @@
 use core::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 
+use crate::ui::event;
 use crate::utils::{Flag, Flags};
-use ui::event;
 
 use crate::msgpopup_methods;
 use crate::tui::{
@@ -70,7 +70,7 @@ impl App {
                     .home_dir
                     .join("config.yaml")
                     .to_str()
-                    .expect(backend::const_err::ERR_PATH_UTF_8)
+                    .expect(crate::backend::const_err::ERR_PATH_UTF_8)
             ));
         };
         if is_root::is_root() {
@@ -98,7 +98,7 @@ impl App {
         Ok(())
     }
 
-    fn popup_event(&mut self, ev: &event::Event) -> Result<EventState, ui::Infailable> {
+    fn popup_event(&mut self, ev: &event::Event) -> Result<EventState, crate::ui::Infailable> {
         // ## Self Popups
         let mut event_state = self
             .help_popup

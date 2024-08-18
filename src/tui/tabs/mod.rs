@@ -6,6 +6,8 @@ mod profile_input;
 pub use clashsrvctl::ClashSrvCtlTab;
 pub use profile::ProfileTab;
 
+use crate::ui;
+
 pub enum Tabs {
     Profile(ProfileTab),
     ClashSrvCtl(ClashSrvCtlTab),

@@ -1,12 +1,11 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 
-use crate::{utils::Theme, EventState, Infailable, Visibility};
+use crate::ui::{utils::Theme, EventState, Infailable, Visibility};
 
 /// Interactive list, mainly used as basic interface
 ///
 /// Using arrow keys or j\k(vim-like) to navigate.
-#[derive(Visibility)]
 pub struct List {
     title: String,
     is_visible: bool,
@@ -14,6 +13,23 @@ pub struct List {
     extra: Option<Vec<String>>,
     list_state: Raw::ListState,
     scrollbar: Raw::ScrollbarState,
+}
+impl Visibility for List {
+    fn is_visible(&self) -> bool {
+        self.is_visible
+    }
+
+    fn show(&mut self) {
+        self.is_visible = true;
+    }
+
+    fn hide(&mut self) {
+        self.is_visible = false;
+    }
+
+    fn set_visible(&mut self, b: bool) {
+        self.is_visible = b;
+    }
 }
 
 impl List {

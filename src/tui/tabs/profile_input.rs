@@ -1,7 +1,10 @@
 use ratatui::{prelude as Ra, widgets as Raw};
 use ui::event::{Event, KeyEventKind};
 
-use crate::tui::{utils::Keys, widgets::InputPopup, EventState, Visibility};
+use crate::{
+    tui::{utils::Keys, widgets::InputPopup, EventState, Visibility},
+    ui,
+};
 
 #[derive(PartialEq)]
 enum Fouce {

@@ -1,4 +1,4 @@
-use ui::event::{KeyCode, KeyEvent};
+use crate::ui::event::{KeyCode, KeyEvent};
 #[derive(PartialEq)]
 pub enum Keys {
     ProfileSwitch,

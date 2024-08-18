@@ -1,4 +1,5 @@
 use crate::tui::{tools, EventState, Visibility};
+use crate::ui;
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 use ui::event::{Event, KeyEventKind};

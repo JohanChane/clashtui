@@ -1,7 +1,7 @@
 use super::list_popup::PopUp;
 use crate::tui::{symbols::HELP, EventState, Visibility};
+use crate::ui::event::Event;
 use ratatui::prelude as Ra;
-use ui::event::Event;
 
 pub struct HelpPopUp {
     inner: PopUp,
@@ -13,7 +13,7 @@ impl HelpPopUp {
         inner.set_items(HELP.lines().map(|line| line.trim().to_string()));
         Self { inner }
     }
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, crate::ui::Infailable> {
         self.inner.event(ev)
     }
     pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {

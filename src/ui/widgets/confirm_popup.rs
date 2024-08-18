@@ -1,7 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::prelude as Ra;
 
-use crate::{EventState, Infailable};
+use crate::ui::{EventState, Infailable};
 
 use super::MsgPopup;
 /// Modified [MsgPopup]

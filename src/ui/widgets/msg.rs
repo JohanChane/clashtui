@@ -2,7 +2,7 @@ use crossterm::event::{Event, KeyCode, KeyEventKind};
 use ratatui::{prelude as Ra, widgets as Raw};
 use std::cmp::{max, min};
 
-use crate::{utils::tools, EventState, Infailable, Theme};
+use crate::ui::{utils::tools, EventState, Infailable, Theme};
 
 /// Pop a Message Window
 ///

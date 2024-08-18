@@ -1,5 +1,6 @@
-use crate::msgpopup_methods;
+use crate::backend::api::Mode;
 use crate::utils::ClashSrvOp;
+use crate::{msgpopup_methods, ui};
 use crate::{
     tui::{
         symbols::CLASHSRVCTL,
@@ -10,9 +11,7 @@ use crate::{
     },
     utils::{SharedBackend, SharedState},
 };
-use backend::api::Mode;
 
-#[derive(Visibility)]
 pub struct ClashSrvCtlTab {
     is_visible: bool,
 
@@ -26,7 +25,23 @@ pub struct ClashSrvCtlTab {
 
     op: Option<ClashSrvOp>,
 }
+impl Visibility for ClashSrvCtlTab {
+    fn is_visible(&self) -> bool {
+        self.is_visible
+    }
 
+    fn show(&mut self) {
+        self.is_visible = true;
+    }
+
+    fn hide(&mut self) {
+        self.is_visible = false;
+    }
+
+    fn set_visible(&mut self, b: bool) {
+        self.is_visible = b;
+    }
+}
 impl ClashSrvCtlTab {
     pub fn new(util: SharedBackend, state: SharedState) -> Self {
         let mut operations = List::new(CLASHSRVCTL.to_string());

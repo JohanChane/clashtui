@@ -1,8 +1,8 @@
 use super::list_popup::PopUp;
 use crate::tui::{EventState, Visibility};
+use crate::ui::event::Event;
 use ratatui::prelude as Ra;
 use std::collections::HashMap;
-use ui::event::Event;
 
 #[derive(Clone, PartialEq, Eq, Hash, Copy)]
 pub enum Infos {
@@ -52,7 +52,7 @@ impl InfoPopUp {
 }
 
 impl InfoPopUp {
-    pub fn event(&mut self, ev: &Event) -> Result<EventState, ui::Infailable> {
+    pub fn event(&mut self, ev: &Event) -> Result<EventState, crate::ui::Infailable> {
         self.inner.event(ev)
     }
     pub fn draw(&mut self, f: &mut Ra::Frame, area: Ra::Rect) {
