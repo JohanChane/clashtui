@@ -28,30 +28,33 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ./clashtui/target
+            ./target
             ~/.cargo
-          key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
+          key: ci-${{ runner.os }}-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
-            ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
+            ci-${{ runner.os }}-${{ hashFiles('./Cargo.lock') }}
             ci-${{ runner.os }}-
 
       - name: Download Dependencies
-        run: cd clashtui && cargo fetch
+        run: cargo fetch
 
       - name: Run tests
-        run: cd clashtui && cargo test --all --verbose
+        if: false
+        run: cargo test --all --verbose
 
       - name: Build
-        run: cd clashtui && cargo build --all-features --verbose --locked && cargo build --all-features --release --locked
+        run: |
+           cargo build --all-features --verbose --locked 
+           cargo build --all-features --release --locked
 
       - name: Build Version
-        run: cd clashtui && cargo r --all-features -- -V
+        run: cargo r --all-features -- -V
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashtui/target/release/clashtui ./artifacts/clashtui.release
-          mv ./clashtui/target/debug/clashtui ./artifacts/clashtui.debug
+          mv ./target/release/clashcli ./artifacts/clashcli.release
+          mv ./target/debug/clashcli ./artifacts/clashcli.debug
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -84,16 +87,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ./clashtui/target
+            ./target
             ~/.cargo
-          key: ci-${{ runner.os }}-arm64-${{ hashFiles('./clashtui/Cargo.lock') }}
+          key: ci-${{ runner.os }}-arm64-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
-            ci-${{ runner.os }}-arm64-${{ hashFiles('./clashtui/Cargo.lock') }}
+            ci-${{ runner.os }}-arm64-${{ hashFiles('./Cargo.lock') }}
             ci-${{ runner.os }}-arm64-
 
       - name: Download Dependencies
         run: |
-          cd clashtui 
           rustup target add aarch64-unknown-linux-gnu
           cargo install cross
           cargo fetch 
@@ -101,11 +103,10 @@ jobs:
       - name: Run tests
         if: false
         # ignore as it's same as linux
-        run: cd clashtui && cargo test --all --verbose
+        run: cargo test --all --verbose
 
       - name: Build
         run: |
-          cd clashtui 
           cross build --target=aarch64-unknown-linux-gnu --all-features --verbose --locked 
           cross build --target=aarch64-unknown-linux-gnu --all-features --release --locked
 
@@ -115,8 +116,8 @@ jobs:
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashtui/target/aarch64-unknown-linux-gnu/release/clashtui ./artifacts/clashtui.arm64.release
-          mv ./clashtui/target/aarch64-unknown-linux-gnu/debug/clashtui ./artifacts/clashtui.arm64.debug
+          mv ./target/aarch64-unknown-linux-gnu/release/clashcli ./artifacts/clashcli.arm64.release
+          mv ./target/aarch64-unknown-linux-gnu/debug/clashcli ./artifacts/clashcli.arm64.debug
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -143,33 +144,35 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            ./clashtui/target
+            ./target
             ~/.cargo
-          key: ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
+          key: ci-${{ runner.os }}-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
-            ci-${{ runner.os }}-${{ hashFiles('./clashtui/Cargo.lock') }}
+            ci-${{ runner.os }}-${{ hashFiles('./Cargo.lock') }}
             ci-${{ runner.os }}-
 
       - name: Download Dependencies
-        run: cd clashtui && cargo fetch
+        run: cargo fetch
 
       - name: Check
-        run: cd clashtui && cargo check --all-features --verbose
+        run: cargo check --all-features --verbose
 
       # - name: Run tests
-      #   run: cd clashtui && cargo test --all --verbose
+      #   run: cargo test --all --verbose
         
       - name: Build
-        run: cd clashtui && cargo build --all-features --verbose && cargo build --all-features --release
+        run: |
+          cargo build --all-features --verbose 
+          cargo build --all-features --release
 
       - name: Build Version
-        run: cd clashtui && cargo r --all-features -- -V
+        run: cargo r --all-features -- -V
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashtui/target/release/clashtui.exe ./artifacts/clashtui.release.exe
-          mv ./clashtui/target/debug/clashtui.exe ./artifacts/clashtui.debug.exe
+          mv ./target/release/clashcli.exe ./artifacts/clashcli.release.exe
+          mv ./target/debug/clashcli.exe ./artifacts/clashcli.debug.exe
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
