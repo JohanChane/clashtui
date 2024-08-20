@@ -1,5 +1,5 @@
 use encoding::{all::GBK, DecoderTrap, Encoding};
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Output};
 
 use std::io::Result;
 

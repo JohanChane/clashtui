@@ -6,6 +6,6 @@
 version: 2
 updates:
   - package-ecosystem: "cargo" # See documentation for possible values
-    directory: "/clashtui" # Location of package manifests
+    directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"

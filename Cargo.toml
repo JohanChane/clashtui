@@ -34,6 +34,10 @@ template = []
 name = "clashcli"
 required-features = ["bin-cli"]
 
+[[bin]]
+name = "clashtui"
+required-features = ["bin-tui"]
+
 [dependencies]
 ratatui = { version = "^0.28.0", default-features = false, features = [
   "crossterm",
