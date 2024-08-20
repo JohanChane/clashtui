@@ -133,6 +133,18 @@ impl ClashBackend {
             )),
         }
     }
+    #[cfg(windows)]
+    pub fn enable_system_proxy(&self) -> std::io::Result<String>{
+        ipc::enable_system_proxy(&self.api.proxy_addr)
+    }
+    #[cfg(windows)]
+    pub fn disable_system_proxy(&self) -> std::io::Result<String>{
+        ipc::disable_system_proxy()
+    }
+    #[cfg(windows)]
+    pub fn is_system_proxy_enabled(&self) -> std::io::Result<bool>{
+        ipc::is_system_proxy_enabled()
+    }
 }
 
 #[cfg(target_os = "linux")]

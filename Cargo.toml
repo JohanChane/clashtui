@@ -28,6 +28,7 @@ bin-cli = [
   "encoding",
 ]
 bin-tui = ["ratatui", "crossterm"]
+template = []
 
 [[bin]]
 name = "clashcli"

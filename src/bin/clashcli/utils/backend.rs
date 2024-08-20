@@ -72,13 +72,11 @@ impl Backend {
         #[cfg(target_os = "windows")] new_sysp: Option<bool>,
     ) -> anyhow::Result<State> {
         #[cfg(target_os = "windows")]
-        use crate::utils::ipc;
-        #[cfg(target_os = "windows")]
         if let Some(b) = new_sysp {
             let _ = if b {
-                ipc::enable_system_proxy(&self.clash_api.proxy_addr)
+                self.inner.enable_system_proxy()
             } else {
-                ipc::disable_system_proxy()
+                self.inner.disable_system_proxy()
             };
         }
         if let Some(mode) = new_mode {
@@ -92,7 +90,7 @@ impl Backend {
             };
         }
         #[cfg(target_os = "windows")]
-        let sysp = ipc::is_system_proxy_enabled().map_or_else(
+        let sysp = self.inner.is_system_proxy_enabled().map_or_else(
             |v| {
                 log::error!("{}", v);
                 None
