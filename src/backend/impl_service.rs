@@ -3,6 +3,27 @@ use super::ipc::{self, exec};
 use super::ClashBackend;
 use std::io::Error;
 
+crate::define_enum!(
+    #[derive(Clone, Copy)]
+    pub enum ServiceOp
+    {
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
+        StartClashService,
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
+        StopClashService,
+        #[cfg(target_os = "linux")]
+        SetPermission,
+        #[cfg(target_os = "windows")]
+        SwitchSysProxy,
+        #[cfg(target_os = "windows")]
+        EnableLoopback,
+        #[cfg(target_os = "windows")]
+        InstallSrv,
+        #[cfg(target_os = "windows")]
+        UnInstallSrv
+    }
+);
+
 impl ClashBackend {
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ServiceOp) -> Result<String, Error> {
@@ -159,24 +180,3 @@ impl ClashBackend {
         ipc::is_system_proxy_enabled()
     }
 }
-
-crate::define_enum!(
-    #[derive(Clone, Copy)]
-    pub enum ServiceOp,
-    {
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
-        StartClashService,
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
-        StopClashService,
-        #[cfg(target_os = "linux")]
-        SetPermission,
-        #[cfg(target_os = "windows")]
-        SwitchSysProxy,
-        #[cfg(target_os = "windows")]
-        EnableLoopback,
-        #[cfg(target_os = "windows")]
-        InstallSrv,
-        #[cfg(target_os = "windows")]
-        UnInstallSrv
-    }
-);

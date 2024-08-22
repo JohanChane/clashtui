@@ -1,27 +1,80 @@
 #[macro_export]
+/// build a new enum
+/// with [`std::fmt::Display`], [`From<&str>`], [`Into<String>`]
+/// 
+/// this also provide `const_array`, `const_len`
+/// to get a const array of every item in this enum
+/// 
+/// ### WARNING
+/// current, only `#[cfg(predicate)]` is tested,
+/// other thing like `#[default]` will fail.
+///
+/// ```rust
+/// use clashtui::define_enum;
+/// define_enum!{
+///     #[derive(Clone, Copy, PartialEq)]
+///     pub enum Test
+///     {
+///         Test1,
+///         // this mean true
+///         #[cfg(all())]
+///         Test2,
+///         // this mean false
+///         #[cfg(any())]
+///         #[cfg(any())]
+///         Test3,
+///     }
+/// }
+///
+/// assert!(Test::Test1.to_string() == String::from("Test1"));
+/// assert!(Into::<String>::into(Test::Test1) == String::from("Test1"));
+///
+/// assert!(Test::const_array() == [Test::Test1, Test::Test2]);
+/// assert!(Test::const_len() == 2);
+/// ```
 macro_rules! define_enum {
     ($(#[$attr:meta])*
-    $vis:vis enum $name: ident,
-    {$($(#[$item_attr:meta])? $variant:ident $(,)?)*}) => {
+    $vis:vis enum $name: ident
+    {$($(#[$item_attr:meta])* $variant:ident $(,)?)*}) => {
         $(#[$attr])*
         $vis enum $name {
-            $($(#[$item_attr])? $variant),*
+            $($(#[$item_attr])* $variant),*
         }
 
         impl From<&str> for $name {
             fn from(value: &str) -> Self {
                 match value {
-                    $($(#[$item_attr])? stringify!($variant) => $name::$variant,)*
+                    $($(#[$item_attr])* stringify!($variant) => $name::$variant,)*
                     _ => panic!("Invalid value for conversion"),
                 }
             }
         }
 
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}",
+                    match self {
+                        $($(#[$item_attr])* $name::$variant => stringify!($variant)),*
+                    }
+                )
+            }
+        }
+
         impl From<$name> for String {
             fn from(value: $name) -> Self {
-                match value {
-                    $($(#[$item_attr])? $name::$variant => String::from(stringify!($variant)),)*
-                }
+                value.to_string()
+            }
+        }
+
+        impl $name {
+            #[doc = concat!("give a const array of [`", stringify!($name), "`],
+            with its length [`", stringify!($name), "::const_len`]")]
+            pub const fn const_array() -> [$name; $name::const_len()] {
+                [$($(#[$item_attr])* $name::$variant),*]
+            }
+            #[doc = concat!("give the length of [`", stringify!($name), "::const_array`]")]
+            pub const fn const_len() -> usize {
+                <[$name]>::len(&[$($(#[$item_attr])* $name::$variant),*])
             }
         }
     };

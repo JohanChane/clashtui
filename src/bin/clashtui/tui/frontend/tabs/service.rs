@@ -28,28 +28,7 @@ pub(in crate::tui::frontend) struct ServiceTab {
     backend_content: Option<Call>,
 }
 
-#[cfg(target_os = "linux")]
-const INNER_COUNT: usize = 3;
-#[cfg(target_os = "windows")]
-const INNER_COUNT: usize = 6;
-#[cfg(target_os = "macos")]
-const INNER_COUNT: usize = 0;
-const INNER: [ServiceOp; INNER_COUNT] = [
-    #[cfg(target_os = "linux")]
-    ServiceOp::SetPermission,
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
-    ServiceOp::StartClashService,
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
-    ServiceOp::StopClashService,
-    #[cfg(target_os = "windows")]
-    ServiceOp::SwitchSysProxy,
-    #[cfg(target_os = "windows")]
-    ServiceOp::EnableLoopback,
-    #[cfg(target_os = "windows")]
-    ServiceOp::InstallSrv,
-    #[cfg(target_os = "windows")]
-    ServiceOp::UnInstallSrv,
-];
+const INNER: [ServiceOp; ServiceOp::const_len()] = ServiceOp::const_array();
 
 const MODE: [Mode; 3] = [Mode::Rule, Mode::Direct, Mode::Global];
 
