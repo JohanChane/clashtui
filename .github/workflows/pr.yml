@@ -25,13 +25,13 @@ jobs:
         run: cargo fetch
 
       - name: Build
-        run: cargo build --verbose
+        run: cargo build --bin clashtui --verbose
 
       - name: Run tests
         run: cargo test --all --verbose
 
       - name: Build Version
-        run: cargo r -- -V
+        run: cargo r --bin clashtui -- -V
 
       - name: Pre Upload
         run: |
@@ -61,13 +61,13 @@ jobs:
 
       - name: Build
         run: |
-          cargo build --verbose 
+          cargo build --bin clashtui --verbose 
 
       # - name: Run tests
       #   run: cargo test --all --verbose
 
       - name: Build Version
-        run: cargo r -- -V
+        run: cargo r --bin clashtui -- -V
 
       - name: Pre Upload
         run: |

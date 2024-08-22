@@ -44,17 +44,17 @@ jobs:
 
       - name: Build
         run: |
-           cargo build --all-features --verbose --locked 
-           cargo build --all-features --release --locked
+           cargo build --bin clashtui --all-features --verbose --locked 
+           cargo build --bin clashtui --all-features --release --locked
 
       - name: Build Version
-        run: cargo r --all-features -- -V
+        run: cargo run --bin clashtui --all-features -- -V
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./target/release/clashcli ./artifacts/clashcli.release
-          mv ./target/debug/clashcli ./artifacts/clashcli.debug
+          mv ./target/release/clashtui ./artifacts/clashtui.release
+          mv ./target/debug/clashtui ./artifacts/clashtui.debug
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -107,8 +107,8 @@ jobs:
 
       - name: Build
         run: |
-          cross build --target=aarch64-unknown-linux-gnu --all-features --verbose --locked 
-          cross build --target=aarch64-unknown-linux-gnu --all-features --release --locked
+          cross build --bin clashtui --target=aarch64-unknown-linux-gnu --all-features --verbose --locked 
+          cross build --bin clashtui --target=aarch64-unknown-linux-gnu --all-features --release --locked
 
       - name: Build Version
         run: echo "Refer to build-linux"
@@ -116,8 +116,8 @@ jobs:
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./target/aarch64-unknown-linux-gnu/release/clashcli ./artifacts/clashcli.arm64.release
-          mv ./target/aarch64-unknown-linux-gnu/debug/clashcli ./artifacts/clashcli.arm64.debug
+          mv ./target/aarch64-unknown-linux-gnu/release/clashtui ./artifacts/clashtui.arm64.release
+          mv ./target/aarch64-unknown-linux-gnu/debug/clashtui ./artifacts/clashtui.arm64.debug
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
@@ -162,17 +162,17 @@ jobs:
         
       - name: Build
         run: |
-          cargo build --all-features --verbose 
-          cargo build --all-features --release
+          cargo build --bin clashtui --all-features --verbose 
+          cargo build --bin clashtui --all-features --release
 
       - name: Build Version
-        run: cargo r --all-features -- -V
+        run: cargo run --bin clashtui --all-features -- -V
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./target/release/clashcli.exe ./artifacts/clashcli.release.exe
-          mv ./target/debug/clashcli.exe ./artifacts/clashcli.debug.exe
+          mv ./target/release/clashtui.exe ./artifacts/clashtui.release.exe
+          mv ./target/debug/clashtui.exe ./artifacts/clashtui.debug.exe
 
       - name: upload artifacts
         uses: actions/upload-artifact@v4
