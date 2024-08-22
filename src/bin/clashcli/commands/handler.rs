@@ -1,4 +1,4 @@
-use clashtui::{backend::ClashSrvOp, webapi::Mode as cMode};
+use clashtui::{backend::ServiceOp, webapi::Mode as cMode};
 
 use crate::utils::Backend;
 
@@ -47,10 +47,10 @@ pub fn handle_cli(command: PackedArgs, backend: Backend) -> anyhow::Result<Strin
                 if soft {
                     backend.restart_clash().map_err(|e| anyhow::anyhow!(e))
                 } else {
-                    Ok(backend.clash_srv_ctl(ClashSrvOp::StartClashService)?)
+                    Ok(backend.clash_srv_ctl(ServiceOp::StartClashService)?)
                 }
             }
-            ServiceCommand::Stop => Ok(backend.clash_srv_ctl(ClashSrvOp::StopClashService)?),
+            ServiceCommand::Stop => Ok(backend.clash_srv_ctl(ServiceOp::StopClashService)?),
         },
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         ArgCommand::Mode(Mode { command }) => match command {

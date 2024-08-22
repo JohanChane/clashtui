@@ -1,26 +1,85 @@
+use super::consts::err as consts_err;
 use super::{
     config::{BuildConfig, ConfigFile, DataFile},
     state::State,
 };
+use crate::tui::Call;
 use clashtui::{
-    backend::{config::LibConfig, ClashBackend, ClashSrvOp},
+    backend::{config::LibConfig, ClashBackend, ServiceOp},
     profile::{map::ProfileManager, LocalProfile, Profile},
     webapi::{ClashConfig, ClashUtil},
 };
 use std::path::PathBuf;
+use tokio::sync::mpsc::{Receiver, Sender};
+
+pub enum CallBack {
+    Error(String),
+    State(String),
+    ServiceCTL(String),
+}
 
 /// a wrapper for [`ClashBackend`]
-/// 
+///
 /// impl some other functions
-pub struct Backend {
+pub struct BackEnd {
     inner: ClashBackend,
     profile_path: PathBuf,
     _template_path: PathBuf,
     /// just clone and merge, DO NEVER sync_to_disk/sync_from_disk
     base_profile: LocalProfile,
 }
+impl BackEnd {
+    /// async runtime entry
+    /// 
+    /// use [`tokio::sync::mpsc`] to exchange data and command
+    pub async fn run(self, tx: Sender<CallBack>, mut rx: Receiver<Call>) -> anyhow::Result<()> {
+        use crate::tui::tabs;
+        loop {
+            // this blocks until recv
+            let op = rx.recv().await.expect(consts_err::APP_TX);
+            match op {
+                Call::Service(op) => match op {
+                    tabs::service::BackendOp::SwitchMode(mode) => {
+                        match self.update_state(None, Some(mode.to_string())) {
+                            Ok(v) => tx.send(CallBack::State(v.to_string())),
+                            Err(e) => {
+                                // ensure there is a refresh
+                                tx.send(CallBack::State(State::unknown(
+                                    self.get_current_profile().name,
+                                )))
+                                .await
+                                .expect(consts_err::APP_RX);
+                                tx.send(CallBack::Error(e.to_string()))
+                            }
+                        }
+                    }
+                    tabs::service::BackendOp::ServiceCTL(op) => match self.clash_srv_ctl(op) {
+                        Ok(v) => tx.send(CallBack::ServiceCTL(v)),
+                        Err(e) => tx.send(CallBack::Error(e.to_string())),
+                    },
+                }
+                .await
+                .expect(consts_err::APP_RX),
 
-impl Backend {
+                Call::Stop => return Ok(()),
+                // register some real-time work here
+                //
+                // DO NECER return [`CallBack::Error`], 
+                // otherwise tui might be 'blocked' by error message
+                Call::Tick => match self.update_state(None, None) {
+                    Ok(v) => tx.send(CallBack::State(v.to_string())),
+                    Err(e) => {
+                        tx.send(CallBack::State(State::unknown(
+                            self.get_current_profile().name,
+                        )))
+                        //write this direct to log, write only once
+                    }
+                }
+                .await
+                .expect(consts_err::APP_RX),
+            }
+        }
+    }
     pub fn get_all_profiles(&self) -> Vec<Profile> {
         self.inner.get_all_profiles()
     }
@@ -58,8 +117,8 @@ impl Backend {
     }
 }
 
-impl Backend {
-    pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> std::io::Result<String> {
+impl BackEnd {
+    pub fn clash_srv_ctl(&self, op: ServiceOp) -> std::io::Result<String> {
         self.inner.clash_srv_ctl(op)
     }
     pub fn restart_clash(&self) -> Result<String, String> {
@@ -69,16 +128,7 @@ impl Backend {
         &self,
         new_pf: Option<String>,
         new_mode: Option<String>,
-        #[cfg(target_os = "windows")] new_sysp: Option<bool>,
     ) -> anyhow::Result<State> {
-        #[cfg(target_os = "windows")]
-        if let Some(b) = new_sysp {
-            let _ = if b {
-                self.inner.enable_system_proxy()
-            } else {
-                self.inner.disable_system_proxy()
-            };
-        }
         if let Some(mode) = new_mode {
             self.inner.update_mode(mode)?;
         }
@@ -108,7 +158,7 @@ impl Backend {
     }
 }
 
-impl TryFrom<BuildConfig> for Backend {
+impl TryFrom<BuildConfig> for BackEnd {
     type Error = anyhow::Error;
     fn try_from(value: BuildConfig) -> Result<Self, Self::Error> {
         let BuildConfig {

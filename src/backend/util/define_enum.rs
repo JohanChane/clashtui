@@ -1,18 +1,17 @@
-
 #[macro_export]
 macro_rules! define_enum {
     ($(#[$attr:meta])*
-    $vis:vis $name: ident,
-    [$($variant:ident),*]) => {
+    $vis:vis enum $name: ident,
+    {$($(#[$item_attr:meta])? $variant:ident $(,)?)*}) => {
         $(#[$attr])*
         $vis enum $name {
-            $($variant),*
+            $($(#[$item_attr])? $variant),*
         }
 
         impl From<&str> for $name {
             fn from(value: &str) -> Self {
                 match value {
-                    $(stringify!($variant) => $name::$variant,)*
+                    $($(#[$item_attr])? stringify!($variant) => $name::$variant,)*
                     _ => panic!("Invalid value for conversion"),
                 }
             }
@@ -21,10 +20,9 @@ macro_rules! define_enum {
         impl From<$name> for String {
             fn from(value: $name) -> Self {
                 match value {
-                    $($name::$variant => String::from(stringify!($variant)),)*
+                    $($(#[$item_attr])? $name::$variant => String::from(stringify!($variant)),)*
                 }
             }
         }
     };
 }
-

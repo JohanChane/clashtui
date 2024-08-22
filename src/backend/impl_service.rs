@@ -5,9 +5,9 @@ use std::io::Error;
 
 impl ClashBackend {
     #[cfg(target_os = "linux")]
-    pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
+    pub fn clash_srv_ctl(&self, op: ServiceOp) -> Result<String, Error> {
         match op {
-            ClashSrvOp::StartClashService => {
+            ServiceOp::StartClashService => {
                 let arg = if self.cfg.service.is_user {
                     vec!["--user", self.cfg.service.clash_srv_nam.as_str()]
                 } else {
@@ -24,7 +24,7 @@ impl ClashBackend {
                     exec("systemctl", args)
                 }
             }
-            ClashSrvOp::StopClashService => {
+            ServiceOp::StopClashService => {
                 let arg = if self.cfg.service.is_user {
                     vec!["--user", self.cfg.service.clash_srv_nam.as_str()]
                 } else {
@@ -41,13 +41,14 @@ impl ClashBackend {
                     exec("systemctl", args)
                 }
             }
-            ClashSrvOp::SetPermission => ipc::exec_with_sbin(
+            ServiceOp::SetPermission => ipc::exec_with_sbin(
                 "setcap",
                 vec![
                     "'cap_net_admin,cap_net_bind_service=+ep'",
                     self.cfg.basic.clash_bin_pth.as_str(),
                 ],
             ),
+            #[allow(unreachable_patterns)]
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
                 "No Support Action",
@@ -55,8 +56,9 @@ impl ClashBackend {
         }
     }
     #[cfg(target_os = "macos")]
-    pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
+    pub fn clash_srv_ctl(&self, op: ServiceOp) -> Result<String, Error> {
         match op {
+            #[allow(unreachable_patterns)]
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
                 "No Support Action",
@@ -64,12 +66,14 @@ impl ClashBackend {
         }
     }
     #[cfg(target_os = "windows")]
-    pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> Result<String, Error> {
+    pub fn clash_srv_ctl(&self, op: ServiceOp) -> Result<String, Error> {
         let nssm_pgm = "nssm";
+        use std::thread::current;
+
         use ipc::start_process_as_admin;
 
         match op {
-            ClashSrvOp::StartClashService => {
+            ServiceOp::StartClashService => {
                 start_process_as_admin(
                     nssm_pgm,
                     format!("restart {}", self.cfg.service.clash_srv_nam).as_str(),
@@ -81,7 +85,7 @@ impl ClashBackend {
                 )
             }
 
-            ClashSrvOp::StopClashService => {
+            ServiceOp::StopClashService => {
                 start_process_as_admin(
                     nssm_pgm,
                     &format!("stop {}", self.cfg.service.clash_srv_nam),
@@ -93,7 +97,7 @@ impl ClashBackend {
                 )
             }
 
-            ClashSrvOp::InstallSrv => {
+            ServiceOp::InstallSrv => {
                 start_process_as_admin(
                     nssm_pgm,
                     &format!(
@@ -112,7 +116,7 @@ impl ClashBackend {
                 )
             }
 
-            ClashSrvOp::UnInstallSrv => ipc::execute_powershell_script_as_admin(
+            ServiceOp::UnInstallSrv => ipc::execute_powershell_script_as_admin(
                 &format!(
                     "{0} stop {1}; {0} remove {1}",
                     nssm_pgm, self.cfg.service.clash_srv_nam
@@ -120,13 +124,23 @@ impl ClashBackend {
                 true,
             ),
 
-            ClashSrvOp::EnableLoopback => {
+            ServiceOp::EnableLoopback => {
                 let exe_dir = std::env::current_exe()?
                     .parent()
                     .expect("Exec at / ?")
                     .to_path_buf();
                 start_process_as_admin(exe_dir.join("EnableLoopback").to_str().unwrap(), "", false)
             }
+
+            ServiceOp::SwitchSysProxy => {
+                let current = self.is_system_proxy_enabled()?;
+                if current {
+                    self.disable_system_proxy()
+                } else {
+                    self.enable_system_proxy()
+                }
+            }
+            #[allow(unreachable_patterns)]
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
                 "No Support Action",
@@ -134,46 +148,36 @@ impl ClashBackend {
         }
     }
     #[cfg(windows)]
-    pub fn enable_system_proxy(&self) -> std::io::Result<String>{
+    pub fn enable_system_proxy(&self) -> std::io::Result<String> {
         ipc::enable_system_proxy(&self.api.proxy_addr)
     }
     #[cfg(windows)]
-    pub fn disable_system_proxy(&self) -> std::io::Result<String>{
+    pub fn disable_system_proxy(&self) -> std::io::Result<String> {
         ipc::disable_system_proxy()
     }
     #[cfg(windows)]
-    pub fn is_system_proxy_enabled(&self) -> std::io::Result<bool>{
+    pub fn is_system_proxy_enabled(&self) -> std::io::Result<bool> {
         ipc::is_system_proxy_enabled()
     }
 }
 
-#[cfg(target_os = "linux")]
 crate::define_enum!(
-    pub ClashSrvOp,
-    [
+    #[derive(Clone, Copy)]
+    pub enum ServiceOp,
+    {
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
         StartClashService,
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
         StopClashService,
+        #[cfg(target_os = "linux")]
         SetPermission,
-        SwitchMode
-    ]
-);
-#[cfg(target_os = "macos")]
-crate::define_enum!(
-    pub ClashSrvOp,
-    [
-        SwitchMode
-    ]
-);
-#[cfg(target_os = "windows")]
-crate::define_enum!(
-    pub ClashSrvOp,
-    [
-        StartClashService,
-        StopClashService,
+        #[cfg(target_os = "windows")]
         SwitchSysProxy,
+        #[cfg(target_os = "windows")]
         EnableLoopback,
+        #[cfg(target_os = "windows")]
         InstallSrv,
-        UnInstallSrv,
-        SwitchMode
-    ]
+        #[cfg(target_os = "windows")]
+        UnInstallSrv
+    }
 );

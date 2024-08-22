@@ -5,7 +5,7 @@ mod impl_webapi;
 mod ipc;
 mod util;
 
-pub use impl_service::ClashSrvOp;
+pub use impl_service::ServiceOp;
 
 use crate::backend::config::LibConfig;
 use crate::profile::map::ProfileManager;

@@ -9,4 +9,3 @@ pub(crate) const LOG_FILE: &str = "clashtui.log";
 pub(crate) const _TMP_FILE: &str = "/tmp/clashtui_mihomo_config_file.tmp";
 
 pub(crate) const LOCALHOST: &str = "127.0.0.1";
-

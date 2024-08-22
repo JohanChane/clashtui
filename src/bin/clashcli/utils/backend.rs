@@ -3,14 +3,14 @@ use super::{
     state::State,
 };
 use clashtui::{
-    backend::{config::LibConfig, ClashBackend, ClashSrvOp},
+    backend::{config::LibConfig, ClashBackend, ServiceOp},
     profile::{map::ProfileManager, LocalProfile, Profile},
     webapi::{ClashConfig, ClashUtil},
 };
 use std::path::PathBuf;
 
 /// a wrapper for [`ClashBackend`]
-/// 
+///
 /// impl some other functions
 pub struct Backend {
     inner: ClashBackend,
@@ -59,7 +59,7 @@ impl Backend {
 }
 
 impl Backend {
-    pub fn clash_srv_ctl(&self, op: ClashSrvOp) -> std::io::Result<String> {
+    pub fn clash_srv_ctl(&self, op: ServiceOp) -> std::io::Result<String> {
         self.inner.clash_srv_ctl(op)
     }
     pub fn restart_clash(&self) -> Result<String, String> {

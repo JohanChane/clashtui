@@ -1,8 +1,9 @@
 #![warn(clippy::all)]
 mod commands;
+mod tui;
 mod utils;
 
-use utils::{consts, init_config, load_config, Backend, Flag, Flags};
+use utils::{consts, init_config, load_config, BackEnd, Flag, Flags};
 
 fn main() {
     if is_root::is_root() {
@@ -47,7 +48,7 @@ fn main() {
             }
         };
         // build backend
-        let backend = Backend::try_from(buildconfig).expect("failed to build Backend");
+        let backend = BackEnd::try_from(buildconfig).expect("failed to build Backend");
         // handle args
         if let Some(command) = infos {
             match commands::handle_cli(command, backend) {
@@ -55,20 +56,48 @@ fn main() {
                     println!("{v}")
                 }
                 Err(e) => {
-                    eprintln!("clashcli encounter some error");
+                    eprintln!("clashtui encounter some error");
                     eprintln!("{e}");
                     log::error!("Cli:{e:?}");
                     std::process::exit(-1)
                 }
             }
         } else {
-            eprintln!("No arg, use clashcli -h to get some help");
-            std::process::exit(-1)
+            println!("Entering TUI...");
+            if let Err(e) = start_tui(backend) {
+                eprintln!("clashtui encounter some error");
+                eprintln!("{e}");
+                log::error!("Tui:{e:?}");
+                std::process::exit(-1)
+            }
         }
     } else {
         eprint!("generate completion success");
     }
     std::process::exit(0)
+}
+// run a single thread, since there is no high-cpu-usage task
+#[tokio::main(flavor = "current_thread")]
+async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
+    use tui::setup;
+    tui::Theme::load(None)?;
+    let app = tui::FrontEnd::new();
+    setup::setup()?;
+    // make terminal restore after panic
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic| {
+        let _ = setup::restore();
+        original_hook(panic);
+    }));
+    let (backend_tx, app_rx) = tokio::sync::mpsc::channel(5);
+    let (app_tx, backend_rx) = tokio::sync::mpsc::channel(5);
+    let backend = tokio::spawn(backend.run(backend_tx, backend_rx));
+    let app = tokio::spawn(app.run(app_tx, app_rx));
+    let (b, a) = tokio::try_join!(app, backend)?;
+    b?;
+    a?;
+    setup::restore()?;
+    Ok(())
 }
 
 fn load_home_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
