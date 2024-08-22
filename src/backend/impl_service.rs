@@ -67,39 +67,38 @@ impl ClashBackend {
     }
     #[cfg(target_os = "windows")]
     pub fn clash_srv_ctl(&self, op: ServiceOp) -> Result<String, Error> {
-        let nssm_pgm = "nssm";
-        use std::thread::current;
+        const NSSM_PGM: &str = "nssm";
 
         use ipc::start_process_as_admin;
 
         match op {
             ServiceOp::StartClashService => {
                 start_process_as_admin(
-                    nssm_pgm,
+                    NSSM_PGM,
                     format!("restart {}", self.cfg.service.clash_srv_nam).as_str(),
                     true,
                 )?;
                 exec(
-                    nssm_pgm,
+                    NSSM_PGM,
                     vec!["status", self.cfg.service.clash_srv_nam.as_str()],
                 )
             }
 
             ServiceOp::StopClashService => {
                 start_process_as_admin(
-                    nssm_pgm,
+                    NSSM_PGM,
                     &format!("stop {}", self.cfg.service.clash_srv_nam),
                     true,
                 )?;
                 exec(
-                    nssm_pgm,
+                    NSSM_PGM,
                     vec!["status", self.cfg.service.clash_srv_nam.as_str()],
                 )
             }
 
             ServiceOp::InstallSrv => {
                 start_process_as_admin(
-                    nssm_pgm,
+                    NSSM_PGM,
                     &format!(
                         "install {} \"{}\" -d \"{}\" -f \"{}\"",
                         self.cfg.service.clash_srv_nam,
@@ -111,7 +110,7 @@ impl ClashBackend {
                 )?;
 
                 exec(
-                    nssm_pgm,
+                    NSSM_PGM,
                     vec!["status", self.cfg.service.clash_srv_nam.as_str()],
                 )
             }
@@ -119,7 +118,7 @@ impl ClashBackend {
             ServiceOp::UnInstallSrv => ipc::execute_powershell_script_as_admin(
                 &format!(
                     "{0} stop {1}; {0} remove {1}",
-                    nssm_pgm, self.cfg.service.clash_srv_nam
+                    NSSM_PGM, self.cfg.service.clash_srv_nam
                 ),
                 true,
             ),

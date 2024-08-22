@@ -15,6 +15,8 @@ impl State {
             profile,
             mode: None,
             tun: None,
+            #[cfg(target_os = "windows")]
+            sysproxy: None,
         }
     }
     pub fn unknown(profile: String) -> String {

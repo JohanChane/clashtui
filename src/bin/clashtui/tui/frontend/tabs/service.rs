@@ -31,7 +31,7 @@ pub(in crate::tui::frontend) struct ServiceTab {
 #[cfg(target_os = "linux")]
 const INNER_COUNT: usize = 3;
 #[cfg(target_os = "windows")]
-const INNER_COUNT: usize = 7;
+const INNER_COUNT: usize = 6;
 #[cfg(target_os = "macos")]
 const INNER_COUNT: usize = 0;
 const INNER: [ServiceOp; INNER_COUNT] = [

@@ -67,13 +67,13 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
         #[cfg(target_os = "windows")]
         ArgCommand::Mode(Mode { command }) => match command {
             ModeCommand::Rule => Ok(backend
-                .update_state(None, Some(cMode::Rule.into()), None)?
+                .update_state(None, Some(cMode::Rule.into()))?
                 .to_string()),
             ModeCommand::Direct => Ok(backend
-                .update_state(None, Some(cMode::Direct.into()), None)?
+                .update_state(None, Some(cMode::Direct.into()))?
                 .to_string()),
             ModeCommand::Global => Ok(backend
-                .update_state(None, Some(cMode::Global.into()), None)?
+                .update_state(None, Some(cMode::Global.into()))?
                 .to_string()),
         },
     }
