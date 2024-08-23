@@ -1,6 +1,10 @@
 #[derive(PartialEq, Eq)]
 pub enum EventState {
     Yes,
+    /// In fact [EventState::Yes], but means another choice
+    Choice2,
+    /// In fact [EventState::Yes], but means the other choice
+    Choice3,
     Cancel,
     NotConsumed,
     WorkDone,

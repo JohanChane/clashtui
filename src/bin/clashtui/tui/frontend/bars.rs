@@ -2,9 +2,8 @@ use super::*;
 
 impl FrontEnd {
     pub(super) fn render_tabbar(&self, f: &mut Frame, area: Rect) {
-        let active_tab: Vec<String> = self.tabs.iter().map(|tab| tab.to_string()).collect();
-        assert!(active_tab.len() == 1, "more than tab is active");
-        let this = Raw::Tabs::new(active_tab)
+        let tab_titles: Vec<String> = self.tabs.iter().map(|tab| tab.to_string()).collect();
+        let this = Raw::Tabs::new(tab_titles)
             .block(Raw::Block::default().borders(Raw::Borders::ALL))
             .highlight_style(Ra::Style::default().fg(Theme::get().tabbar_hl_fg))
             .select(self.tab_index);

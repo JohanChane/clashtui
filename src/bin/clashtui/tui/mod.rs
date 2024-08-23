@@ -5,6 +5,7 @@ mod widget;
 
 pub use frontend::{tabs, FrontEnd};
 pub use theme::Theme;
+pub use widget::PopMsg;
 
 use misc::EventState;
 
@@ -16,17 +17,33 @@ trait Drawable {
 /// Wrap the caller,
 /// the inner ops are defined in their own files.
 pub enum Call {
+    Profile(tabs::profile::BackendOp),
     Service(tabs::service::BackendOp),
+    /// read file by lines, from `total_len-start-length` to `total_len-start`
+    Logs(usize, usize),
+    /// ask to refresh
     Tick,
+    /// ask to shutdown
     Stop,
 }
 
-enum PopMsg {
-    Ask(Vec<String>),
-    Processing(Vec<String>),
-    Notice(Vec<String>),
+impl std::fmt::Display for Call {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Call::Profile(_) => "Profile",
+                Call::Service(_) => "Service",
+                Call::Logs(..) => "Logs",
+                Call::Tick => "Tick",
+                Call::Stop => "Stop",
+            }
+        )
+    }
 }
 
+/// turn terminal from/into Raw mode
 pub mod setup {
     use crossterm::{
         cursor,

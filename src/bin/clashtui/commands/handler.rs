@@ -20,7 +20,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                         .inspect(|s| println!("\nProfile: {}", s.name))
                         .filter_map(|v| {
                             backend
-                                .update_profile(&v, false, Some(with_proxy))
+                                .update_profile(&v, Some(with_proxy))
                                 .map_err(|e| println!("- Error! {e}"))
                                 .ok()
                         })

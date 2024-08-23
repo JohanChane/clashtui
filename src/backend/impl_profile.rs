@@ -30,8 +30,13 @@ impl ClashBackend {
         path: P,
     ) -> anyhow::Result<LocalProfile> {
         let Profile { name, dtype } = pf;
-        let fp = File::open(path.as_ref())?;
-        let content = serde_yaml::from_reader(fp)?;
+        let content = if !path.as_ref().is_file() {
+            // this means the local content does not exist
+            None
+        } else {
+            let fp = File::open(path.as_ref())?;
+            serde_yaml::from_reader(fp)?
+        };
         Ok(LocalProfile {
             name: name.clone(),
             dtype: dtype.clone(),
@@ -43,7 +48,6 @@ impl ClashBackend {
     pub fn update_profile(
         &self,
         profile: &LocalProfile,
-        _update_all: bool,
         with_proxy: Option<bool>,
     ) -> anyhow::Result<Vec<String>> {
         if profile.dtype.is_upgradable() {
@@ -81,7 +85,7 @@ impl ClashBackend {
             anyhow::bail!("Not upgradable");
         }
     }
-
+    /// current, if `with_proxy` is set to [None], it will be treated as false
     fn download_blob<U: Into<minreq::URL>, P: AsRef<Path>>(
         &self,
         url: U,
@@ -89,7 +93,7 @@ impl ClashBackend {
         with_proxy: Option<bool>,
     ) -> anyhow::Result<()> {
         assert!(
-            !path.as_ref().is_absolute(),
+            path.as_ref().is_absolute(),
             "trying to call `download_blob` without absolute path"
         );
         let directory = path

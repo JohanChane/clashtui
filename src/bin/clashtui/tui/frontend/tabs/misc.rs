@@ -1,3 +1,4 @@
+/// this do only one thing -- build [`Tabs`]
 macro_rules! build_tabs {
     ($(#[$attr:meta])*
     $vis:vis enum $name: ident
@@ -55,6 +56,12 @@ use super::*;
 impl From<ServiceTab> for TabContainer {
     fn from(value: ServiceTab) -> Self {
         Self(Tabs::Service(value))
+    }
+}
+
+impl From<ProfileTab> for TabContainer {
+    fn from(value: ProfileTab) -> Self {
+        Self(Tabs::Profile(value))
     }
 }
 

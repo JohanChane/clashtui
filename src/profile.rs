@@ -58,7 +58,15 @@ impl LocalProfile {
             content,
         })
     }
-
+    /// Returns the atime of this [`LocalProfile`].
+    /// 
+    /// Errors are ignored and return will be replaced with [None]
+    pub fn atime(&self) -> Option<core::time::Duration> {
+        let now = std::time::SystemTime::now();
+        crate::backend::util::get_modify_time(&self.path)
+            .ok()
+            .and_then(|file| now.duration_since(file).ok())
+    }
     /// merge `base` into [`LocalProfile::content`],
     /// using [`FILTER`]
     ///

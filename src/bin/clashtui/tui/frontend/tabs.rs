@@ -4,28 +4,33 @@ pub mod service;
 mod misc;
 
 use crate::{
-    tui::{frontend::consts::TAB_TITLE_SERVICE, Call, Drawable, EventState, PopMsg},
+    tui::{frontend::consts, Call, Drawable, EventState, PopMsg},
     utils::CallBack,
 };
 use crossterm::event::KeyEvent;
 use ratatui::prelude as Ra;
-use service::ServiceTab;
 use Ra::{Frame, Rect};
 
+use profile::ProfileTab;
+use service::ServiceTab;
+
+/// A trait that every tab should impl
 pub(super) trait TabCont {
     fn get_backend_call(&mut self) -> Option<Call>;
-    /// return [`PopMsg`], guide the [`ConfirmPopup`] to ask
+    /// return [`PopMsg`], guide the [`super::ConfirmPopup`] to ask
     fn get_popup_content(&mut self) -> Option<PopMsg>;
     fn apply_backend_call(&mut self, op: CallBack);
+    /// return [`EventState::WorkDone`] only when the msg popup should close
     fn apply_popup_result(&mut self, evst: EventState) -> EventState;
 }
 
 build_tabs!(
     enum Tabs {
-        // Profile,
+        Profile(ProfileTab),
         Service(ServiceTab),
     }
 );
+/// a wrapper for [`Tabs`]
 pub(super) struct TabContainer(Tabs);
 
 impl std::fmt::Display for TabContainer {
@@ -34,8 +39,8 @@ impl std::fmt::Display for TabContainer {
             f,
             "{}",
             match self.0 {
-                // Tabs::Profile => todo!(),
-                Tabs::Service(_) => TAB_TITLE_SERVICE.to_string(),
+                Tabs::Profile(_) => consts::TAB_TITLE_PROFILE,
+                Tabs::Service(_) => consts::TAB_TITLE_SERVICE,
             }
         )
     }

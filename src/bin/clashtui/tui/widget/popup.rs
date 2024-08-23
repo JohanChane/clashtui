@@ -3,16 +3,18 @@ use ratatui::prelude as Ra;
 use ratatui::widgets as Raw;
 
 use super::tools;
-use crate::tui::PopMsg;
+use super::PopMsg;
 use crate::tui::{Drawable, EventState, Theme};
 
-/// Pop a Message Window
+/// Pop a Message Window,
+/// use arrow keys or `j\k\h\l`(vim-like) to navigate.
 ///
-/// Using arrow keys or `j\k\h\l`(vim-like) to navigate.
+/// Can handle up to `4` choices.
 ///
-/// If press `Esc/n`, return [`EventState::Cancel`].
-///
-/// If press `y`, return [`EventState::Yes`].
+/// - If press `Esc/n`, return [`EventState::Cancel`].
+/// - If press `y`, return [`EventState::Yes`].
+/// - If press `o`, return [`EventState::Choice2`].
+/// - If press `t`, return [`EventState::Choice3`].
 #[derive(Default)]
 pub struct ConfirmPopup {
     msg: Option<PopMsg>,
@@ -21,19 +23,34 @@ pub struct ConfirmPopup {
 }
 
 impl Drawable for ConfirmPopup {
+    /// No need to [Raw::clear], or plan aera
     fn render(&mut self, f: &mut ratatui::Frame, _: ratatui::layout::Rect, _: bool) {
+        let prompt = if let Some(PopMsg::Ask(_, ch2, ch3)) = self.msg.as_ref() {
+            if let Some(ch2) = ch2 {
+                if let Some(ch3) = ch3 {
+                    format!("Press y for Yes, n for No, o for {ch2}, t for {ch3}")
+                } else {
+                    format!("Press y for Yes, n for No, o for {ch2}")
+                }
+            } else {
+                format!("Press y for Yes, n for No")
+            }
+        } else {
+            format!("Press Esc to close")
+        };
         let text: Vec<Ra::Line> = if let Some(msg) = &self.msg {
             match msg {
-                PopMsg::Ask(msg) | PopMsg::Processing(msg) | PopMsg::Notice(msg) => msg
-                    .iter()
-                    .map(|s| {
-                        Ra::Line::from(Ra::Span::styled(
-                            s,
-                            Ra::Style::default().fg(Theme::get().popup_text_fg),
-                        ))
-                    })
-                    .collect(),
+                PopMsg::Ask(msg, ..) | PopMsg::Prompt(msg) => msg,
             }
+            .iter()
+            .chain([&prompt])
+            .map(|s| {
+                Ra::Line::from(Ra::Span::styled(
+                    s,
+                    Ra::Style::default().fg(Theme::get().popup_text_fg),
+                ))
+            })
+            .collect()
         } else {
             return;
         };
@@ -78,6 +95,8 @@ impl Drawable for ConfirmPopup {
             KeyCode::Right | KeyCode::Char('l') => self.scroll_right(),
             KeyCode::Char('n') | KeyCode::Esc => return EventState::Cancel,
             KeyCode::Char('y') => return EventState::Yes,
+            KeyCode::Char('o') => return EventState::Choice2,
+            KeyCode::Char('t') => return EventState::Choice3,
             _ => return EventState::NotConsumed,
         }
         EventState::WorkDone

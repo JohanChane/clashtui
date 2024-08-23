@@ -182,9 +182,9 @@ impl List {
         &self.items
     }
 
-    pub fn select(&mut self, name: &str) {
-        if let Some(index) = self.items.iter().position(|item| item == name) {
-            self.list_state.select(Some(index));
-        }
-    }
+    // pub fn select(&mut self, name: &str) {
+    //     if let Some(index) = self.items.iter().position(|item| item == name) {
+    //         self.list_state.select(Some(index));
+    //     }
+    // }
 }

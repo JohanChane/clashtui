@@ -30,12 +30,11 @@ impl Backend {
     pub fn update_profile(
         &self,
         profile: &Profile,
-        update_all: bool,
         with_proxy: Option<bool>,
     ) -> anyhow::Result<Vec<String>> {
         let path = self.profile_path.join(&profile.name);
         let profile = self.inner.load_local_profile(profile, path)?;
-        self.inner.update_profile(&profile, update_all, with_proxy)
+        self.inner.update_profile(&profile, with_proxy)
     }
 
     pub fn select_profile(&self, profile: Profile) -> anyhow::Result<()> {

@@ -16,7 +16,8 @@ fn main() {
         // setup home dir
         let home_dir = load_home_dir(&mut flags);
 
-        setup_logging(home_dir.join(consts::LOG_FILE));
+        let log_file = home_dir.join(consts::LOG_FILE);
+        setup_logging(&log_file);
         // pre-setup flags are done here
         let flags = flags;
         log::debug!("Current flags: {:?}", flags);
@@ -39,16 +40,17 @@ fn main() {
                     // accept 'y' only
                     if let Err(e) = init_config(&home_dir) {
                         eprint!("init config failed: {e}");
+                        std::process::exit(-1);
                     };
                 } else {
                     println!("Abort");
-                    std::process::exit(0);
                 }
-                load_config(home_dir).unwrap()
+                println!("Config Inited, please modify them to have clashtui work properly");
+                std::process::exit(0);
             }
         };
         // build backend
-        let backend = BackEnd::try_from(buildconfig).expect("failed to build Backend");
+        let backend = BackEnd::build(buildconfig, log_file).expect("failed to build Backend");
         // handle args
         if let Some(command) = infos {
             match commands::handle_cli(command, backend) {
@@ -94,9 +96,9 @@ async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     let backend = tokio::spawn(backend.run(backend_tx, backend_rx));
     let app = tokio::spawn(app.run(app_tx, app_rx));
     let (b, a) = tokio::try_join!(app, backend)?;
+    setup::restore()?;
     b?;
     a?;
-    setup::restore()?;
     Ok(())
 }
 
@@ -127,17 +129,17 @@ fn load_home_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
     config_dir
 }
 
-fn setup_logging<P: AsRef<std::path::Path>>(log_path: P) {
+fn setup_logging<P: AsRef<std::path::Path>>(log_file: P) {
     use log4rs::append::file::FileAppender;
     use log4rs::config::{Appender, Config, Root};
     use log4rs::encode::pattern::PatternEncoder;
     #[cfg(debug_assertions)]
-    let _ = std::fs::remove_file(&log_path); // auto rm old log for debug
-    let flag = if std::fs::File::open(&log_path)
+    let _ = std::fs::remove_file(&log_file); // auto rm old log for debug
+    let flag = if std::fs::File::open(&log_file)
         .and_then(|f| f.metadata())
         .is_ok_and(|m| m.len() > 1024 * 1024)
     {
-        let _ = std::fs::remove_file(&log_path);
+        let _ = std::fs::remove_file(&log_file);
         true
     } else {
         false
@@ -151,7 +153,7 @@ fn setup_logging<P: AsRef<std::path::Path>>(log_path: P) {
         .encoder(Box::new(PatternEncoder::new(
             "{d(%H:%M:%S)} [{l}] {t} - {m}{n}",
         ))) // Having a timestamp would be better.
-        .build(log_path)
+        .build(log_file)
         .expect("Err opening log file");
 
     let config = Config::builder()

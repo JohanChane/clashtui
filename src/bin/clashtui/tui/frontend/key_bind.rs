@@ -16,8 +16,8 @@ pub enum Keys {
 
     Down,
     Up,
-    // Left,
-    // Right,
+    Left,
+    Right,
     Select,
     Esc,
     Tab,
@@ -41,13 +41,15 @@ impl From<KeyCode> for Keys {
             // ## Common shortcuts
             KeyCode::Down | KeyCode::Char('j') => Keys::Down,
             KeyCode::Up | KeyCode::Char('k') => Keys::Up,
+            KeyCode::Left => Keys::Left,
+            KeyCode::Right => Keys::Right,
             KeyCode::Enter => Keys::Select,
             KeyCode::Esc => Keys::Esc,
             KeyCode::Tab => Keys::Tab,
 
             // ## Profile Tab shortcuts
-            KeyCode::Char('p') => Keys::ProfileSwitch, // Not Global shortcuts
-            KeyCode::Char('t') => Keys::TemplateSwitch, // Not Global shortcuts
+            KeyCode::Char('t') => Keys::ProfileSwitch, // Not Global shortcuts
+            KeyCode::Char('p') => Keys::TemplateSwitch, // Not Global shortcuts
 
             // ## For operating file in Profile and Template Windows
             KeyCode::Char('e') => Keys::Edit,

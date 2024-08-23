@@ -4,7 +4,7 @@ mod consts;
 mod key_bind;
 pub mod tabs;
 
-use super::widget::ConfirmPopup;
+use super::widget::{ConfirmPopup, ListPopup};
 use super::{Call, Drawable, EventState, Theme};
 use crate::utils::{consts::err as consts_err, CallBack};
 use key_bind::Keys;
@@ -19,32 +19,41 @@ use Ra::{Frame, Rect};
 pub struct FrontEnd {
     tabs: Vec<TabContainer>,
     tab_index: usize,
-    // help_popup: OnceCell<Box<HelpPopUp>>,
-    // info_popup: Box<InfoPopUp>,
-    there_is_pop: bool,
-    global_popup: ConfirmPopup,
+    there_is_list_pop: bool,
+    list_popup: std::cell::OnceCell<Box<ListPopup>>,
+    there_is_msg_pop: bool,
+    msg_popup: ConfirmPopup,
     should_quit: bool,
     state: Option<String>,
+    backend_content: Option<Call>,
 }
 
 impl FrontEnd {
     pub fn new() -> Self {
         let service_tab = tabs::service::ServiceTab::new();
-        let tabs = vec![service_tab.into()];
+        let profile_tab = tabs::profile::ProfileTab::new();
+        let tabs = vec![profile_tab.into(), service_tab.into()];
         Self {
             tabs,
             tab_index: 0,
-            // help_popup: Default::default(),
-            there_is_pop: false,
-            global_popup: ConfirmPopup::new(),
+            there_is_list_pop: false,
+            list_popup: Default::default(),
+            there_is_msg_pop: false,
+            msg_popup: ConfirmPopup::new(),
             should_quit: false,
             state: None,
+            backend_content: None,
         }
     }
     pub async fn run(mut self, tx: Sender<Call>, mut rx: Receiver<CallBack>) -> anyhow::Result<()> {
         use core::time::Duration;
         use futures::StreamExt as _;
-        const TICK_RATE: Duration = Duration::from_millis(250);
+        // 5fps for ui debug
+        #[cfg(debug_assertions)]
+        const TICK_RATE: Duration = Duration::from_millis(200);
+        // 50fps
+        #[cfg(not(debug_assertions))]
+        const TICK_RATE: Duration = Duration::from_millis(20);
         let mut terminal = Ra::Terminal::new(Ra::CrosstermBackend::new(std::io::stdout()))?;
         // this is an async solution.
         // NOTE:
@@ -55,15 +64,18 @@ impl FrontEnd {
         while !self.should_quit {
             self.tick(&tx, &mut rx).await;
             terminal.draw(|f| self.render(f, Default::default(), true))?;
+            let ev;
             tokio::select! {
-                Some(ev) = stream.next() => {
-                    if let event::Event::Key(key) = ev?{
-                        self.handle_key_event(&key);
-                    }
-                },
+                // avoid tokio cancel the handler
+                e = stream.next() => {ev = e},
                 // make sure tui refresh
-                () = tokio::time::sleep(TICK_RATE) => {}
+                () = tokio::time::sleep(TICK_RATE) => {ev = None}
             };
+            if let Some(ev) = ev {
+                if let event::Event::Key(key) = ev? {
+                    self.handle_key_event(&key);
+                }
+            }
         }
         tx.send(Call::Stop).await.expect(consts_err::BACKEND_TX);
         log::info!("App Exit");
@@ -72,11 +84,17 @@ impl FrontEnd {
     async fn tick(&mut self, tx: &Sender<Call>, rx: &mut Receiver<CallBack>) {
         // the backend thread is activated by this call
         tx.send(Call::Tick).await.expect(consts_err::BACKEND_TX);
+        // handle tab msg
         let msg = self.tabs[self.tab_index].get_popup_content();
         if let Some(msg) = msg {
-            self.global_popup.show_msg(msg);
-            self.there_is_pop = true;
+            self.msg_popup.show_msg(msg);
+            self.there_is_msg_pop = true;
         }
+        // handle app ops
+        if let Some(op) = self.backend_content.take() {
+            tx.send(op).await.expect(consts_err::BACKEND_RX);
+        }
+        // handle tab ops
         let op = self.tabs[self.tab_index].get_backend_call();
         if let Some(op) = op {
             tx.send(op).await.expect(consts_err::BACKEND_RX);
@@ -85,19 +103,35 @@ impl FrontEnd {
         match op {
             Ok(op) => match op {
                 CallBack::Error(error) => {
-                    self.global_popup.clear();
-                    self.global_popup.show_msg(super::PopMsg::Notice(vec![
+                    self.msg_popup.clear();
+                    self.msg_popup.show_msg(super::PopMsg::Prompt(vec![
                         "Error Happened".to_owned(),
                         error,
                     ]));
-                    self.there_is_pop = true;
+                    self.there_is_msg_pop = true;
+                }
+                CallBack::Logs(logs) => {
+                    if let Some(lp) = self.list_popup.get_mut() {
+                        lp
+                    } else {
+                        let _ = self.list_popup.set(Box::new(ListPopup::new()));
+                        self.list_popup.get_mut().unwrap()
+                    }
+                    .set("Log",logs);
+                    self.there_is_list_pop = true;
                 }
                 // `SwitchMode` goes here
                 // Just update StateBar
                 CallBack::State(state) => {
                     self.state.replace(state);
                 }
-                CallBack::ServiceCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
+                // assume ProfileTab is the first tab
+                CallBack::ProfileInit(..) => self.tabs[0].apply_backend_call(op),
+                #[cfg(feature = "template")]
+                CallBack::TemplateInit(_) => self.tabs[0].apply_backend_call(op),
+                CallBack::ProfileCTL(_) | CallBack::ServiceCTL(_) => {
+                    self.tabs[self.tab_index].apply_backend_call(op)
+                }
             },
             Err(e) => match e {
                 tokio::sync::mpsc::error::TryRecvError::Empty => (),
@@ -128,8 +162,14 @@ impl Drawable for FrontEnd {
             .get_mut(self.tab_index)
             .unwrap()
             .render(f, chunks[1], true);
-        if self.there_is_pop {
-            self.global_popup.render(f, chunks[1], true)
+        if self.there_is_list_pop {
+            self.list_popup
+                .get_mut()
+                .unwrap()
+                .render(f, chunks[1], true)
+        }
+        if self.there_is_msg_pop {
+            self.msg_popup.render(f, chunks[1], true)
         }
     }
 
@@ -137,11 +177,20 @@ impl Drawable for FrontEnd {
         let mut evst;
         let tab = self.tabs.get_mut(self.tab_index).unwrap();
         // handle popups first
-        // handle them only in app to avoid complexity
-        if self.there_is_pop {
-            evst = self.global_popup.handle_key_event(ev);
+        // handle them only in app to avoid complexity.
+        //
+        // if there is a popup, other part will be blocked.
+        if self.there_is_msg_pop {
+            evst = self.msg_popup.handle_key_event(ev);
             if let EventState::WorkDone = tab.apply_popup_result(evst) {
-                self.there_is_pop = false;
+                self.there_is_msg_pop = false;
+            }
+            return EventState::WorkDone;
+        }
+        if self.there_is_list_pop {
+            evst = self.list_popup.get_mut().unwrap().handle_key_event(ev);
+            if let EventState::Cancel = evst {
+                self.there_is_list_pop = false;
             }
             return EventState::WorkDone;
         }
@@ -183,6 +232,7 @@ impl Drawable for FrontEnd {
             }
             // ## the other app function
             match ev.code.into() {
+                Keys::LogCat => self.backend_content = Some(Call::Logs(0, 20)),
                 Keys::AppHelp => todo!(),
                 Keys::AppInfo => todo!(),
                 Keys::AppQuit => {

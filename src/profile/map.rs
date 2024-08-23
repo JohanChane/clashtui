@@ -65,11 +65,11 @@ pub enum ProfileType {
     Generated(String),
 }
 impl ProfileType {
-    pub fn is_null(&self) -> bool {
+    pub fn is_file(&self) -> bool {
         matches!(self, ProfileType::File)
     }
     pub fn is_upgradable(&self) -> bool {
-        !self.is_null()
+        !self.is_file()
     }
     pub fn into_inner(self) -> Option<String> {
         match self {

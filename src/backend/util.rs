@@ -28,7 +28,7 @@ mod define_enum;
 //         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
 // }
 
-pub fn _get_modify_time<P>(file_path: P) -> std::io::Result<std::time::SystemTime>
+pub fn get_modify_time<P>(file_path: P) -> std::io::Result<std::time::SystemTime>
 where
     P: AsRef<std::path::Path>,
 {

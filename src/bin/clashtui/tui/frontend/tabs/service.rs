@@ -36,7 +36,7 @@ impl ServiceTab {
     /// Creates a new [`ServiceTab`].
     pub fn new() -> Self {
         let mut operations = List::new(TAB_TITLE_SERVICE.to_string());
-        let mut inner_items = vec!["Switch Mode".to_owned()];
+        let mut inner_items = vec!["SwitchMode".to_owned()];
         inner_items.extend(INNER.into_iter().map(|v| v.into()));
         operations.set_items(inner_items);
 
@@ -72,16 +72,19 @@ impl TabCont for ServiceTab {
     fn apply_backend_call(&mut self, op: CallBack) {
         if let CallBack::ServiceCTL(result) = op {
             self.popup_content
-                .replace(PopMsg::Notice(vec!["Success".to_string(), result]));
+                .replace(PopMsg::Prompt(vec!["Success".to_string(), result]));
         } else {
             unreachable!("{} get unexpected op", TAB_TITLE_SERVICE)
         }
     }
-    /// this tab just display info but don't ask
+    // this tab just display info but don't ask
     fn apply_popup_result(&mut self, evst: EventState) -> EventState {
         match evst {
             EventState::Yes | EventState::Cancel => EventState::WorkDone,
-            _ => evst,
+            EventState::Choice2
+            | EventState::Choice3
+            | EventState::NotConsumed
+            | EventState::WorkDone => EventState::NotConsumed,
         }
     }
 }
@@ -107,13 +110,16 @@ impl Drawable for ServiceTab {
                         let mode = MODE[mode_index];
                         let pak = Call::Service(BackendOp::SwitchMode(mode));
                         self.backend_content.replace(pak);
-                        let msg = PopMsg::Processing(vec!["Working".to_owned()]);
+                        let msg = PopMsg::Prompt(vec!["Working".to_owned()]);
                         self.popup_content.replace(msg);
                     };
                     self.select_mode = false;
                 }
                 EventState::Cancel => self.select_mode = false,
-                EventState::NotConsumed | EventState::WorkDone => (),
+                EventState::NotConsumed
+                | EventState::WorkDone
+                | EventState::Choice2
+                | EventState::Choice3 => (),
             }
         } else {
             // ## handle inner
@@ -130,7 +136,11 @@ impl Drawable for ServiceTab {
                         }
                     };
                 }
-                EventState::Cancel | EventState::NotConsumed | EventState::WorkDone => (),
+                EventState::Cancel
+                | EventState::NotConsumed
+                | EventState::WorkDone
+                | EventState::Choice2
+                | EventState::Choice3 => (),
             }
         }
         event_state.unify()

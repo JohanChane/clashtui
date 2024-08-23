@@ -1,9 +1,11 @@
 pub mod config;
 mod impl_profile;
 mod impl_service;
+#[cfg(feature = "template")]
+mod impl_template;
 mod impl_webapi;
 mod ipc;
-mod util;
+pub(crate) mod util;
 
 pub use impl_service::ServiceOp;
 
