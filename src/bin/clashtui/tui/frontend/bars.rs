@@ -2,7 +2,16 @@ use super::*;
 
 impl FrontEnd {
     pub(super) fn render_tabbar(&self, f: &mut Frame, area: Rect) {
-        let tab_titles: Vec<String> = self.tabs.iter().map(|tab| tab.to_string()).collect();
+        let tab_titles: Vec<Ra::text::Line> = self
+            .tabs
+            .iter()
+            .map(|tab| {
+                Ra::text::Line::from(Ra::Span::styled(
+                    tab.to_string(),
+                    Ra::Style::default().fg(Theme::get().tabbar_text_fg),
+                ))
+            })
+            .collect();
         let this = Raw::Tabs::new(tab_titles)
             .block(Raw::Block::default().borders(Raw::Borders::ALL))
             .highlight_style(Ra::Style::default().fg(Theme::get().tabbar_hl_fg))
