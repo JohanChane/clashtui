@@ -41,11 +41,12 @@ fn main() {
                     if let Err(e) = init_config(&home_dir) {
                         eprint!("init config failed: {e}");
                         std::process::exit(-1);
+                    } else {
+                        println!("Config Inited, please modify them to have clashtui work properly");
                     };
                 } else {
                     println!("Abort");
                 }
-                println!("Config Inited, please modify them to have clashtui work properly");
                 std::process::exit(0);
             }
         };

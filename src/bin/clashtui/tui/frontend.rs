@@ -48,11 +48,7 @@ impl FrontEnd {
     pub async fn run(mut self, tx: Sender<Call>, mut rx: Receiver<CallBack>) -> anyhow::Result<()> {
         use core::time::Duration;
         use futures::StreamExt as _;
-        // 5fps for ui debug
-        #[cfg(debug_assertions)]
-        const TICK_RATE: Duration = Duration::from_millis(200);
         // 50fps
-        #[cfg(not(debug_assertions))]
         const TICK_RATE: Duration = Duration::from_millis(20);
         let mut terminal = Ra::Terminal::new(Ra::CrosstermBackend::new(std::io::stdout()))?;
         // this is an async solution.

@@ -108,11 +108,15 @@ pub struct BasicInfo {
     pub external_controller: String,
     #[serde(rename = "mixed-port")]
     pub mixed_port: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub port: Option<u32>,
     #[serde(rename = "socks-port")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub socks_port: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub secret: Option<String>,
     #[serde(rename = "global-ua")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub global_ua: Option<String>,
 }
 impl Default for BasicInfo {
