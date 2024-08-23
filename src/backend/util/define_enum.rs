@@ -1,10 +1,10 @@
 #[macro_export]
 /// build a new enum
 /// with [`std::fmt::Display`], [`From<&str>`], [`Into<String>`]
-/// 
+///
 /// this also provide `const_array`, `const_len`
 /// to get a const array of every item in this enum
-/// 
+///
 /// ### WARNING
 /// current, only `#[cfg(predicate)]` is tested,
 /// other thing like `#[default]` will fail.
@@ -74,7 +74,12 @@ macro_rules! define_enum {
             }
             #[doc = concat!("give the length of [`", stringify!($name), "::const_array`]")]
             pub const fn const_len() -> usize {
-                <[$name]>::len(&[$($(#[$item_attr])* $name::$variant),*])
+                macro_rules! replace_expr {
+                    ($_t:tt, $e:expr) => {
+                        $e
+                    };
+                }
+                <[()]>::len(&[$($(#[$item_attr])* replace_expr!($variant, ())),*])
             }
         }
     };

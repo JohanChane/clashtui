@@ -51,8 +51,8 @@ impl ProfileTab {
                     ))
                 }
             }
-            Keys::ProfileUpdateAll => todo!(),
-            Keys::ProfileInfo => todo!(),
+            // Keys::ProfileUpdateAll => todo!(),
+            // Keys::ProfileInfo => todo!(),
             Keys::ProfileTestConfig => todo!(),
             Keys::Preview => todo!(),
             Keys::Edit => todo!(),

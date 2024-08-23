@@ -1,91 +1,180 @@
 use crossterm::event::KeyCode;
-
-#[derive(PartialEq)]
-pub enum Keys {
-    ProfileSwitch,
-    ProfileUpdate,
-    ProfileUpdateAll,
-    ProfileImport,
-    ProfileDelete,
-    ProfileTestConfig,
-    ProfileInfo,
-    // ProfileNoPp, // no proxy provider
-    TemplateSwitch,
-    Edit,
-    Preview,
-
-    Down,
-    Up,
-    Left,
-    Right,
-    Select,
-    Esc,
-    Tab,
-
-    SoftRestart,
-    LogCat,
-    AppQuit,
-    AppConfig,
-    ClashConfig,
-    AppHelp,
-    AppInfo,
-
-    Reserved,
-}
-
-impl From<KeyCode> for Keys {
-    fn from(value: KeyCode) -> Self {
-        match value {
-            // Convention: Global Shortcuts As much as possible use uppercase. And Others as much as possible use lowcase to avoid conflicts with global shortcuts. ToDo: User can config shortcuts.
-
-            // ## Common shortcuts
-            KeyCode::Down | KeyCode::Char('j') => Keys::Down,
-            KeyCode::Up | KeyCode::Char('k') => Keys::Up,
-            KeyCode::Left => Keys::Left,
-            KeyCode::Right => Keys::Right,
-            KeyCode::Enter => Keys::Select,
-            KeyCode::Esc => Keys::Esc,
-            KeyCode::Tab => Keys::Tab,
-
-            // ## Profile Tab shortcuts
-            KeyCode::Char('t') => Keys::ProfileSwitch, // Not Global shortcuts
-            KeyCode::Char('p') => Keys::TemplateSwitch, // Not Global shortcuts
-
-            // ## For operating file in Profile and Template Windows
-            KeyCode::Char('e') => Keys::Edit,
-            KeyCode::Char('v') => Keys::Preview,
-
-            // ## Profile windows shortcuts
-            KeyCode::Char('u') => Keys::ProfileUpdate,
-            KeyCode::Char('a') => Keys::ProfileUpdateAll,
-            KeyCode::Char('i') => Keys::ProfileImport,
-            KeyCode::Char('d') => Keys::ProfileDelete,
-            KeyCode::Char('s') => Keys::ProfileTestConfig,
-            KeyCode::Char('n') => Keys::ProfileInfo,
-            // KeyCode::Char('m') => Keys::ProfileNoPp,
-
-            // ## Global Shortcuts (As much as possible use uppercase. And Others as much as possible use lowcase to avoid conflicts with global shortcuts.)
-            KeyCode::Char('q') => Keys::AppQuit, // Exiting is a common operation, and most software also exits with "q", so let's use "q".
-            KeyCode::Char('R') => Keys::SoftRestart,
-            KeyCode::Char('L') => Keys::LogCat,
-            KeyCode::Char('?') => Keys::AppHelp,
-            KeyCode::Char('I') => Keys::AppInfo,
-            KeyCode::Char('H') => Keys::AppConfig,
-            KeyCode::Char('G') => Keys::ClashConfig,
-
-            _ => Keys::Reserved,
+/// build [Keys]
+///
+/// can auto expand `document` into help content,
+/// access them by [Keys::const_doc]
+///
+/// ### Note
+/// for keys that are not bind to a char (e.g. [Keys::Select] which is bind to [KeyCode::Enter]),
+/// **must use `[""]`** to help expand it.
+/// 
+/// ### Example
+/// this doc may not display correctly as it uses `#` for a key word.
+/// ```rust
+/// use crossterm::event::KeyCode;
+/// use clashtui::tui::frontend::key_bind::define_keys;
+///
+/// define_keys!{
+///     #[derive(PartialEq)]
+///     pub enum Test{
+///         # Aera1
+///         /// means func1
+///         Func1(KeyCode::Char('a')),
+///         #Aera2,
+///         /// part1,
+///         /// part2
+///         Func2(KeyCode::Char('b')),
+///         /// doc on Esc
+///         Func3(KeyCode::Esc["Esc"]),
+///         ///     more space
+///         Func4(KeyCode::Char('c')),
+///         #       Aera3,
+///         /// true
+///         #[cfg(all())]
+///         Func5(KeyCode::Enter["Enter"]),
+///         /// false
+///         #[cfg(any())]
+///         Func5(KeyCode::Space["Space"]),
+///         # Aera4
+///         # Aera5
+///         ##[cfg(any())]
+///         # Aera6
+///     }
+/// }
+/// assert!(Test::Func1 == KeyCode::Char('a').into());
+/// assert!(Test::Func3 == KeyCode::Esc.into());
+/// assert_eq!(Test::const_doc(), [
+///     "# Aera1",
+///     "a: means func1",
+///     "# Aera2",
+///     "b: part1, part2",
+///     "Esc: doc on Esc",
+///     "c:     more space",
+///     "# Aera3",
+///     "Enter: true",
+///     "# Aera4",
+///     "# Aera5",
+/// ]);
+/// ```
+macro_rules! define_keys {
+    ($(#[$attr:meta])*
+    $vis:vis enum $name: ident
+    {$(
+        $(##[cfg($prompt_cfg_attr:meta)])*
+        # $prompt:ident $(,)?
+        $(
+            $(#[doc = $doc:expr])*
+            $(#[cfg($cfg_attr:meta)])*
+            $variant:ident (KeyCode::$ch_type:ident $(($ch:expr))? $([$chs:expr])?) $(,)?
+        )*
+    )*}
+    ) => {
+        $(#[$attr])*
+        $vis enum $name {
+        $(
+            $(#[cfg($prompt_cfg_attr)])*
+        $(
+            $(#[doc = $doc])*
+            $(#[cfg($cfg_attr)])*
+            $variant,
+        )*)*
+            Reserved,
         }
+
+        impl From<KeyCode> for $name {
+            fn from(value: KeyCode) -> Self {
+                match value{
+                $(
+                    $(#[cfg($prompt_cfg_attr)])*
+                $(
+                    $(#[cfg($cfg_attr)])* 
+                    KeyCode::$ch_type$(($ch))? => $name::$variant,
+                )*)*
+                    _ => $name::Reserved,
+                }
+            }
+        }
+
+        impl $name {
+            #[doc = concat!("give a const array of [`", stringify!($name), "`]'s doc,
+            with its length [`", stringify!($name), "::const_len`]")]
+            #[doc = "this is used for build help content"]
+            pub const fn const_doc() -> [&'static str; $name::doc_len()]{
+                [$(
+                    $(#[cfg($prompt_cfg_attr)])* 
+                    concat!("# ",stringify!($prompt)), 
+                    $(
+                        $(#[cfg($cfg_attr)])* 
+                        (concat!($($ch)? $($chs)?, ":" $(, $doc)*)),
+                    )*
+                )*]
+            }
+            #[doc = concat!("give the length of [`", stringify!($name), "::const_doc`]")]
+            pub const fn doc_len() -> usize{
+                macro_rules! replace_expr {
+                    ($_t:tt, $e:expr) => {
+                        $e
+                    };
+                }
+                <[()]>::len(&[$(
+                    $(#[cfg($prompt_cfg_attr)])*
+                    replace_expr!($prompt, ()),
+                    $(
+                        $(#[cfg($cfg_attr)])* 
+                        replace_expr!($variant, ()),
+                    )*
+                )*])
+            }
+        }
+    };
+}
+// this macro mean the shortcut are **unchangeable**
+define_keys! {
+#[derive(PartialEq)]
+    pub enum Keys {
+        # Common
+        /// Action
+        Select(KeyCode::Enter["Enter"]),
+        // Down(KeyCode::Down["Down"]),
+        // Up(KeyCode::Up["Up"]),
+        // Left(KeyCode::Left["Left"]),
+        // Right(KeyCode::Right["Right"]),
+        // Esc(KeyCode::Esc["Esc"]),
+        // Tab(KeyCode::Tab["Tab"]),
+        # Profile
+        /// Switch to template sub tab
+        #[cfg(feature = "template")]
+        ProfileSwitch(KeyCode::Char('t')),
+        /// Update profile
+        ProfileUpdate(KeyCode::Char('u')),
+        // ProfileUpdateAll(KeyCode::Char('a')),
+        /// Import new profile
+        ProfileImport(KeyCode::Char('i')),
+        /// Delete this profile
+        ProfileDelete(KeyCode::Char('d')),
+        /// Test this profile
+        ProfileTestConfig(KeyCode::Char('s')),
+        // ProfileInfo(KeyCode::Char('n')),
+        # #[cfg(feature = "template")]
+        # Template
+        /// Switch to profile sub tab
+        TemplateSwitch(KeyCode::Char('p')),
+        # Global
+        /// Edit this
+        Edit(KeyCode::Char('e')),
+        /// Preview content in program
+        Preview(KeyCode::Char('v')),
+        /// Restart clash core
+        SoftRestart(KeyCode::Char('R')),
+        /// Show recent log
+        LogCat(KeyCode::Char('L')),
+        // AppConfig(KeyCode::Char('H')),
+        // ClashConfig(KeyCode::Char('G')),
+        /// Get help
+        AppHelp(KeyCode::Char('?')),
+        /// Show informations about program and mihomo
+        AppInfo(KeyCode::Char('I')),
+        /// Quit program
+        AppQuit(KeyCode::Char('q')),
     }
 }
-
-// impl core::cmp::PartialEq<KeyCode> for Keys {
-//     fn eq(&self, other: &KeyCode) -> bool {
-//         <KeyCode as Into<Keys>>::into(*other) == *self
-//     }
-// }
-
-// impl core::cmp::PartialEq<KeyEvent> for Keys {
-//     fn eq(&self, other: &KeyEvent) -> bool {
-//         <KeyCode as Into<Keys>>::into(other.code) == *self
-//     }
-// }

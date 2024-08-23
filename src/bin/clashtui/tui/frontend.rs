@@ -20,7 +20,7 @@ pub struct FrontEnd {
     tabs: Vec<TabContainer>,
     tab_index: usize,
     there_is_list_pop: bool,
-    list_popup: std::cell::OnceCell<Box<ListPopup>>,
+    list_popup: Option<Box<ListPopup>>,
     there_is_msg_pop: bool,
     msg_popup: ConfirmPopup,
     should_quit: bool,
@@ -111,13 +111,7 @@ impl FrontEnd {
                     self.there_is_msg_pop = true;
                 }
                 CallBack::Logs(logs) => {
-                    if let Some(lp) = self.list_popup.get_mut() {
-                        lp
-                    } else {
-                        let _ = self.list_popup.set(Box::new(ListPopup::new()));
-                        self.list_popup.get_mut().unwrap()
-                    }
-                    .set("Log",logs);
+                    self.get_list_popup().set("Log", logs);
                     self.there_is_list_pop = true;
                 }
                 // `SwitchMode` goes here
@@ -141,6 +135,12 @@ impl FrontEnd {
             },
         }
     }
+    fn get_list_popup(&mut self) -> &mut Box<ListPopup> {
+        if let None = self.list_popup.as_ref() {
+            self.list_popup = Some(Box::new(ListPopup::new()));
+        }
+        self.list_popup.as_mut().unwrap()
+    }
 }
 
 impl Drawable for FrontEnd {
@@ -163,10 +163,7 @@ impl Drawable for FrontEnd {
             .unwrap()
             .render(f, chunks[1], true);
         if self.there_is_list_pop {
-            self.list_popup
-                .get_mut()
-                .unwrap()
-                .render(f, chunks[1], true)
+            self.get_list_popup().render(f, chunks[1], true)
         }
         if self.there_is_msg_pop {
             self.msg_popup.render(f, chunks[1], true)
@@ -188,7 +185,7 @@ impl Drawable for FrontEnd {
             return EventState::WorkDone;
         }
         if self.there_is_list_pop {
-            evst = self.list_popup.get_mut().unwrap().handle_key_event(ev);
+            evst = self.get_list_popup().handle_key_event(ev);
             if let EventState::Cancel = evst {
                 self.there_is_list_pop = false;
             }
@@ -233,7 +230,16 @@ impl Drawable for FrontEnd {
             // ## the other app function
             match ev.code.into() {
                 Keys::LogCat => self.backend_content = Some(Call::Logs(0, 20)),
-                Keys::AppHelp => todo!(),
+                Keys::AppHelp => {
+                    self.get_list_popup().set(
+                        "Help",
+                        Keys::const_doc()
+                            .into_iter()
+                            .map(|s| s.to_owned())
+                            .collect(),
+                    );
+                    self.there_is_list_pop = true;
+                }
                 Keys::AppInfo => todo!(),
                 Keys::AppQuit => {
                     self.should_quit = true;
