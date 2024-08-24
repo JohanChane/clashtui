@@ -7,7 +7,7 @@ use crossterm::event::KeyCode;
 /// ### Note
 /// for keys that are not bind to a char (e.g. [Keys::Select] which is bind to [KeyCode::Enter]),
 /// **must use `[""]`** to help expand it.
-/// 
+///
 /// ### Example
 /// this doc may not display correctly as it uses `#` for a key word.
 /// ```rust
@@ -87,7 +87,7 @@ macro_rules! define_keys {
                 $(
                     $(#[cfg($prompt_cfg_attr)])*
                 $(
-                    $(#[cfg($cfg_attr)])* 
+                    $(#[cfg($cfg_attr)])*
                     KeyCode::$ch_type$(($ch))? => $name::$variant,
                 )*)*
                     _ => $name::Reserved,
@@ -101,10 +101,10 @@ macro_rules! define_keys {
             #[doc = "this is used for build help content"]
             pub const fn const_doc() -> [&'static str; $name::doc_len()]{
                 [$(
-                    $(#[cfg($prompt_cfg_attr)])* 
-                    concat!("# ",stringify!($prompt)), 
+                    $(#[cfg($prompt_cfg_attr)])*
+                    concat!("# ",stringify!($prompt)),
                     $(
-                        $(#[cfg($cfg_attr)])* 
+                        $(#[cfg($cfg_attr)])*
                         (concat!($($ch)? $($chs)?, ":" $(, $doc)*)),
                     )*
                 )*]
@@ -120,7 +120,7 @@ macro_rules! define_keys {
                     $(#[cfg($prompt_cfg_attr)])*
                     replace_expr!($prompt, ()),
                     $(
-                        $(#[cfg($cfg_attr)])* 
+                        $(#[cfg($cfg_attr)])*
                         replace_expr!($variant, ()),
                     )*
                 )*])

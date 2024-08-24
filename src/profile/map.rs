@@ -56,7 +56,7 @@ impl ProfileManager {
     pub fn get_current(&self) -> Option<Profile> {
         self.get(self.current.borrow().as_str())
     }
-    pub fn set_current(&self, pf: Profile){
+    pub fn set_current(&self, pf: Profile) {
         assert!(self.get(&pf.name).is_some());
         *self.current.borrow_mut() = pf.name;
     }

@@ -59,7 +59,7 @@ impl LocalProfile {
         })
     }
     /// Returns the atime of this [`LocalProfile`].
-    /// 
+    ///
     /// Errors are ignored and return will be replaced with [None]
     pub fn atime(&self) -> Option<core::time::Duration> {
         let now = std::time::SystemTime::now();

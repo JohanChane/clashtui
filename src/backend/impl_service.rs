@@ -5,8 +5,7 @@ use std::io::Error;
 
 crate::define_enum!(
     #[derive(Clone, Copy)]
-    pub enum ServiceOp
-    {
+    pub enum ServiceOp {
         #[cfg(any(target_os = "linux", target_os = "windows"))]
         StartClashService,
         #[cfg(any(target_os = "linux", target_os = "windows"))]
@@ -20,7 +19,7 @@ crate::define_enum!(
         #[cfg(target_os = "windows")]
         InstallSrv,
         #[cfg(target_os = "windows")]
-        UnInstallSrv
+        UnInstallSrv,
     }
 );
 

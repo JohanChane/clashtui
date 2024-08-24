@@ -12,6 +12,7 @@ impl ProfileTab {
                 if let Some(name) = name {
                     let pak = Call::Profile(BackendOp::Profile(ProfileOp::Select(name)));
                     self.backend_content.replace(pak);
+                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
                 }
             }
             Keys::ProfileImport => {

@@ -57,7 +57,11 @@ impl BackEnd {
     /// async runtime entry
     ///
     /// use [`tokio::sync::mpsc`] to exchange data and command
-    pub async fn run(self, tx: Sender<CallBack>, mut rx: Receiver<Call>) -> anyhow::Result<DataFile> {
+    pub async fn run(
+        self,
+        tx: Sender<CallBack>,
+        mut rx: Receiver<Call>,
+    ) -> anyhow::Result<DataFile> {
         use crate::tui::tabs;
         let mut errs = vec![];
         loop {
@@ -137,17 +141,12 @@ impl BackEnd {
                 Call::Service(op) => {
                     match op {
                         tabs::service::BackendOp::SwitchMode(mode) => {
+                            // tick will refresh state
                             match self.update_state(None, Some(mode.to_string())) {
-                                Ok(v) => CallBack::State(v.to_string()),
-                                Err(e) => {
-                                    // ensure there is a refresh
-                                    tx.send(CallBack::State(State::unknown(
-                                        self.get_current_profile().name,
-                                    )))
-                                    .await
-                                    .map_err(|_| anyhow::anyhow!("{}", consts_err::APP_RX))?;
-                                    CallBack::Error(e.to_string())
+                                Ok(_) => {
+                                    CallBack::ServiceCTL(format!("Mode is switched to {}", mode))
                                 }
+                                Err(e) => CallBack::Error(e.to_string()),
                             }
                         }
                         tabs::service::BackendOp::ServiceCTL(op) => match self.clash_srv_ctl(op) {
@@ -205,7 +204,7 @@ impl BackEnd {
             }
         }
     }
-    fn save(&self) -> DataFile{
+    fn save(&self) -> DataFile {
         let (current_profile, profiles) = self.inner.pm.clone_inner();
         let data = DataFile {
             profiles,
