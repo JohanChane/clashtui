@@ -57,7 +57,7 @@ impl BackEnd {
     /// async runtime entry
     ///
     /// use [`tokio::sync::mpsc`] to exchange data and command
-    pub async fn run(self, tx: Sender<CallBack>, mut rx: Receiver<Call>) -> anyhow::Result<()> {
+    pub async fn run(self, tx: Sender<CallBack>, mut rx: Receiver<Call>) -> anyhow::Result<DataFile> {
         use crate::tui::tabs;
         let mut errs = vec![];
         loop {
@@ -164,7 +164,7 @@ impl BackEnd {
                 // thousand of [Call::Tick],
                 //
                 // another match might help
-                Call::Stop => return Ok(()),
+                Call::Stop => return Ok(self.save()),
                 // register some real-time work here
                 //
                 // DO NEVER return [`CallBack::Error`],
@@ -186,7 +186,7 @@ impl BackEnd {
             if let Err(_) = tx.send(cb).await {
                 return match rx.recv().await {
                     // normal shutdown
-                    Some(Call::Stop) => Ok(()),
+                    Some(Call::Stop) => Ok(self.save()),
                     // try match other op in channel if there is
                     //
                     // I use panic in hope to catch those at develop time
@@ -197,13 +197,21 @@ impl BackEnd {
                             Call::Tick | Call::Stop => {}
                             _ => panic!("leftover value in backend rx {op}"),
                         });
-                        Ok(())
+                        Ok(self.save())
                     }
                     Some(op) => panic!("a leftover value in backend rx {op}"),
                     None => Err(anyhow::anyhow!("{}", consts_err::APP_RX)),
                 };
             }
         }
+    }
+    fn save(&self) -> DataFile{
+        let (current_profile, profiles) = self.inner.pm.clone_inner();
+        let data = DataFile {
+            profiles,
+            current_profile,
+        };
+        data
     }
 }
 impl BackEnd {

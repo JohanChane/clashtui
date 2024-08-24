@@ -5,6 +5,8 @@ mod utils;
 
 use utils::{consts, init_config, load_config, BackEnd, Flag, Flags};
 
+static HOME_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
 fn main() {
     if is_root::is_root() {
         println!("{}", consts::ROOT_WARNING)
@@ -14,14 +16,14 @@ fn main() {
         // store pre-setup flags
         let mut flags = Flags::empty();
         // setup home dir
-        let home_dir = load_home_dir(&mut flags);
+        let _ = HOME_DIR.set(load_home_dir(&mut flags));
 
-        let log_file = home_dir.join(consts::LOG_FILE);
+        let log_file = HOME_DIR.get().unwrap().join(consts::LOG_FILE);
         setup_logging(&log_file);
         // pre-setup flags are done here
         let flags = flags;
         log::debug!("Current flags: {:?}", flags);
-        let buildconfig = match load_config(&home_dir) {
+        let buildconfig = match load_config(&HOME_DIR.get().unwrap()) {
             Ok(v) => v,
             Err(e) => {
                 use std::io::{Read, Write};
@@ -29,7 +31,7 @@ fn main() {
                 println!("program will try to init default config");
                 println!(
                     "WARNING! THIS WILL DELETE ALL FILE UNDER {}",
-                    home_dir.to_string_lossy()
+                    HOME_DIR.get().unwrap().to_string_lossy()
                 );
                 // we don't really do so, as it can be dangerous
                 print!("Are you sure to continue[y/n]?");
@@ -38,11 +40,13 @@ fn main() {
                 let rep = std::io::stdin().read(&mut buf);
                 if rep.is_ok_and(|l| l != 0) && buf[0] == b'y' {
                     // accept 'y' only
-                    if let Err(e) = init_config(&home_dir) {
+                    if let Err(e) = init_config(&HOME_DIR.get().unwrap()) {
                         eprint!("init config failed: {e}");
                         std::process::exit(-1);
                     } else {
-                        println!("Config Inited, please modify them to have clashtui work properly");
+                        println!(
+                            "Config Inited, please modify them to have clashtui work properly"
+                        );
                     };
                 } else {
                     println!("Abort");
@@ -96,10 +100,10 @@ async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     let (app_tx, backend_rx) = tokio::sync::mpsc::channel(5);
     let backend = tokio::spawn(backend.run(backend_tx, backend_rx));
     let app = tokio::spawn(app.run(app_tx, app_rx));
-    let (b, a) = tokio::try_join!(app, backend)?;
+    let (a, b) = tokio::try_join!(app, backend)?;
     setup::restore()?;
-    b?;
     a?;
+    b?.to_file(HOME_DIR.get().unwrap().join(consts::DATA_FILE))?;
     Ok(())
 }
 

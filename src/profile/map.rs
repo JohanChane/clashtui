@@ -15,6 +15,12 @@ impl ProfileManager {
             all: all.into(),
         }
     }
+    pub fn clone_inner(&self) -> (String, ProfileDataBase) {
+        (
+            self.current.clone().into_inner(),
+            self.all.clone().into_inner(),
+        )
+    }
     pub fn insert<S: AsRef<str>>(&self, name: S, dtype: ProfileType) -> Option<Profile> {
         self.all
             .borrow_mut()
