@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::fs::File;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use clashtui::{
     backend::config::{Basic, Service},
@@ -14,6 +14,7 @@ pub struct ConfigFile {
     pub basic: Basic,
     pub service: Service,
     pub timeout: Option<u64>,
+    pub edit_cmd: String,
 }
 impl ConfigFile {
     pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
@@ -46,11 +47,11 @@ impl DataFile {
 }
 
 pub fn init_config<P: AsRef<Path>>(config_dir: P) -> Result<()> {
-    use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE};
+    use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE, PROFILE_PATH, TEMPLATE_PATH};
     use std::fs;
 
-    let template_dir = config_dir.as_ref().join("templates");
-    let profile_dir = config_dir.as_ref().join("profiles");
+    let template_dir = config_dir.as_ref().join(TEMPLATE_PATH);
+    let profile_dir = config_dir.as_ref().join(PROFILE_PATH);
     let basic_path = config_dir.as_ref().join(BASIC_FILE);
     let config_path = config_dir.as_ref().join(CONFIG_FILE);
     let data_path = config_dir.as_ref().join(DATA_FILE);
@@ -71,8 +72,6 @@ pub fn init_config<P: AsRef<Path>>(config_dir: P) -> Result<()> {
 pub fn load_config<P: AsRef<Path>>(config_dir: P) -> Result<BuildConfig> {
     use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE};
 
-    let template_dir = config_dir.as_ref().join("templates");
-    let profile_dir = config_dir.as_ref().join("profiles");
     let basic_path = config_dir.as_ref().join(BASIC_FILE);
     let config_path = config_dir.as_ref().join(CONFIG_FILE);
     let data_path = config_dir.as_ref().join(DATA_FILE);
@@ -87,8 +86,6 @@ pub fn load_config<P: AsRef<Path>>(config_dir: P) -> Result<BuildConfig> {
         basic: base,
         base_raw: raw,
         data,
-        profile_dir,
-        template_dir,
     })
 }
 
@@ -97,8 +94,6 @@ pub struct BuildConfig {
     pub basic: BasicInfo,
     pub base_raw: serde_yaml::Mapping,
     pub data: DataFile,
-    pub profile_dir: PathBuf,
-    pub template_dir: PathBuf,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

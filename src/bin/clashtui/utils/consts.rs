@@ -7,6 +7,8 @@ pub(crate) const DATA_FILE: &str = "clashtui.db";
 pub(crate) const BASIC_FILE: &str = "basic_clash_config.yaml";
 pub(crate) const LOG_FILE: &str = "clashtui.log";
 pub(crate) const _TMP_FILE: &str = "/tmp/clashtui_mihomo_config_file.tmp";
+pub(crate) const PROFILE_PATH: &str = "profiles";
+pub(crate) const TEMPLATE_PATH: &str = "templates";
 
 pub(crate) const LOCALHOST: &str = "127.0.0.1";
 

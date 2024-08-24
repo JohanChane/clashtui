@@ -69,7 +69,13 @@ impl ProfileTab {
                     self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
                 }
             }
-            Keys::Edit => todo!(),
+            Keys::Edit => {
+                if let Some(name) = name {
+                    self.backend_content =
+                        Some(Call::Profile(BackendOp::Profile(ProfileOp::Edit(name))));
+                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                }
+            }
             _ => return EventState::NotConsumed,
         };
         EventState::WorkDone

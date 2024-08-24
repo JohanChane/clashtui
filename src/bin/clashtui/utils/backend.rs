@@ -1,3 +1,8 @@
+mod impl_profile;
+mod impl_service;
+#[cfg(feature = "template")]
+mod impl_template;
+
 use super::consts::err as consts_err;
 use super::{
     config::{BuildConfig, ConfigFile, DataFile},
@@ -9,7 +14,6 @@ use clashtui::{
     profile::{map::ProfileManager, LocalProfile, Profile},
     webapi::{ClashConfig, ClashUtil},
 };
-use std::path::PathBuf;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 pub enum CallBack {
@@ -17,6 +21,7 @@ pub enum CallBack {
     State(String),
     Logs(Vec<String>),
     Infos(Vec<String>),
+    Edit,
     Preview(Vec<String>),
     ServiceCTL(String),
     ProfileCTL(Vec<String>),
@@ -34,6 +39,7 @@ impl std::fmt::Display for CallBack {
                 CallBack::State(_) => "State",
                 CallBack::Logs(_) => "Logs",
                 CallBack::Infos(_) => "Infos",
+                CallBack::Edit => "Edit",
                 CallBack::Preview(_) => "Preview",
                 CallBack::ServiceCTL(_) => "ServiceCTL",
                 CallBack::ProfileCTL(_) => "ProfileCTL",
@@ -50,10 +56,7 @@ impl std::fmt::Display for CallBack {
 /// impl some other functions
 pub struct BackEnd {
     inner: ClashBackend,
-    log_file: PathBuf,
-    profile_path: PathBuf,
-    #[cfg(feature = "template")]
-    template_path: PathBuf,
+    edit_cmd: String,
     /// just clone and merge, DO NEVER sync_to_disk/sync_from_disk
     base_profile: LocalProfile,
 }
@@ -76,115 +79,9 @@ impl BackEnd {
                 .ok_or(anyhow::anyhow!("{}", consts_err::APP_TX))?;
             let cb = match op {
                 Call::Profile(op) => match op {
-                    tabs::profile::BackendOp::Profile(op) => match op {
-                        tabs::profile::ProfileOp::GetALL => CallBack::ProfileInit(
-                            self.get_all_profiles()
-                                .into_iter()
-                                .map(|p| p.name)
-                                .collect(),
-                            self.get_all_profiles()
-                                .into_iter()
-                                .map(|p| self.load_local_profile(&p).ok())
-                                .map(|lp| lp.and_then(|lp| lp.atime()))
-                                .collect(),
-                        ),
-                        tabs::profile::ProfileOp::Add(name, url) => {
-                            self.create_profile(&name, url);
-                            match self.update_profile(
-                                &self
-                                    .get_profile(name)
-                                    .expect("Cannot find selected profile"),
-                                None,
-                            ) {
-                                Ok(v) => CallBack::ProfileCTL(v),
-                                Err(e) => CallBack::Error(e.to_string()),
-                            }
-                        }
-                        tabs::profile::ProfileOp::Remove(name) => {
-                            if let Err(e) = self.remove_profile(
-                                self.get_profile(name)
-                                    .expect("Cannot find selected profile"),
-                            ) {
-                                CallBack::Error(e.to_string())
-                            } else {
-                                CallBack::ProfileCTL(vec!["Profile is now removed".to_owned()])
-                            }
-                        }
-                        tabs::profile::ProfileOp::Update(name, with_proxy) => {
-                            match self.update_profile(
-                                &self
-                                    .get_profile(name)
-                                    .expect("Cannot find selected profile"),
-                                with_proxy,
-                            ) {
-                                Ok(v) => CallBack::ProfileCTL(v),
-                                Err(e) => CallBack::Error(e.to_string()),
-                            }
-                        }
-                        tabs::profile::ProfileOp::Select(name) => {
-                            if let Err(e) = self.select_profile(
-                                self.get_profile(name)
-                                    .expect("Cannot find selected profile"),
-                            ) {
-                                CallBack::Error(e.to_string())
-                            } else {
-                                CallBack::ProfileCTL(vec!["Profile is now loaded".to_owned()])
-                            }
-                        }
-                        tabs::profile::ProfileOp::Test(name, geodata_mode) => {
-                            let pf = self
-                                .get_profile(name)
-                                .expect("Cannot find selected profile");
-                            match self.load_local_profile(&pf).and_then(|pf| {
-                                self.inner
-                                    .test_profile_config(&pf.path.to_string_lossy(), geodata_mode)
-                                    .map_err(|e| e.into())
-                            }) {
-                                Ok(v) => CallBack::ProfileCTL(vec![v]),
-                                Err(e) => CallBack::Error(e.to_string()),
-                            }
-                        }
-                        tabs::profile::ProfileOp::Preview(name) => {
-                            let mut lines: Vec<String> = vec![];
-                            let pf = self
-                                .get_profile(name)
-                                .expect("Cannot find selected profile");
-                            lines.push(
-                                pf.dtype
-                                    .get_domain()
-                                    .unwrap_or("Imported local file".to_owned()),
-                            );
-                            lines.push(Default::default());
-                            match self.load_local_profile(&pf).and_then(|pf| {
-                                match pf.content.as_ref() {
-                                    Some(content) => serde_yaml::to_string(content)
-                                        .map_err(|e| e.into())
-                                        .map(|content| {
-                                            lines.extend(content.lines().map(|s| s.to_owned()));
-                                        }),
-                                    None => {
-                                        lines.push(
-                                            "yaml file is empty. Please update it.".to_owned(),
-                                        );
-                                        Ok(())
-                                    }
-                                }
-                            }) {
-                                Ok(_) => CallBack::Preview(lines),
-                                Err(e) => CallBack::Error(e.to_string()),
-                            }
-                        }
-                        tabs::profile::ProfileOp::Edit(name) => todo!(),
-                    },
+                    tabs::profile::BackendOp::Profile(op) => self.handle_profile_op(op),
                     #[cfg(feature = "template")]
-                    tabs::profile::BackendOp::Template(op) => match op {
-                        tabs::profile::TemplateOp::GetALL => {
-                            CallBack::TemplateInit(self.get_all_templates())
-                        }
-                        tabs::profile::TemplateOp::Add(_) => todo!(),
-                        tabs::profile::TemplateOp::Remove(_) => todo!(),
-                        tabs::profile::TemplateOp::Generate(_) => todo!(),
-                    },
+                    tabs::profile::BackendOp::Template(op) => self.handle_template_op(op),
                 },
                 Call::Service(op) => {
                     match op {
@@ -281,12 +178,14 @@ impl BackEnd {
         data
     }
 }
+
 impl BackEnd {
     /// read file by lines, from `total_len-start-length` to `total_len-start`
     pub fn logcat(&self, start: usize, length: usize) -> anyhow::Result<Vec<String>> {
+        use crate::{utils::consts::LOG_FILE, HOME_DIR};
         use std::io::BufRead as _;
         use std::io::Seek as _;
-        let mut fp = std::fs::File::open(&self.log_file)?;
+        let mut fp = std::fs::File::open(HOME_DIR.get().unwrap().join(LOG_FILE))?;
         let size = {
             let fp = fp.try_clone()?;
             std::io::BufReader::new(fp).lines().count()
@@ -303,120 +202,18 @@ impl BackEnd {
 }
 
 impl BackEnd {
-    fn create_profile<S: AsRef<str>, S2: AsRef<str>>(&self, name: S, url: S2) {
-        self.inner.pm.insert(
-            name,
-            clashtui::profile::ProfileType::Url(url.as_ref().to_owned()),
-        );
-    }
-    fn remove_profile(&self, pf: Profile) -> anyhow::Result<()> {
-        let LocalProfile { path, .. } = self.load_local_profile(&pf)?;
-        Ok(std::fs::remove_file(path)?)
-    }
-    pub fn get_profile<S: AsRef<str>>(&self, name: S) -> Option<Profile> {
-        self.inner.get_profile(name)
-    }
-    pub fn get_all_profiles(&self) -> Vec<Profile> {
-        self.inner.get_all_profiles()
-    }
-    pub fn get_current_profile(&self) -> Profile {
-        self.inner.get_current_profile().unwrap_or_default()
-    }
-    fn load_local_profile(&self, pf: &Profile) -> anyhow::Result<LocalProfile> {
-        let path = self.profile_path.join(&pf.name);
-        self.inner.load_local_profile(pf, path)
-    }
-    // TODO: plan to treat None as auto
-    pub fn update_profile(
-        &self,
-        profile: &Profile,
-        with_proxy: Option<bool>,
-    ) -> anyhow::Result<Vec<String>> {
-        let profile = self.load_local_profile(profile)?;
-        self.inner.update_profile(&profile, with_proxy)
-    }
-
-    pub fn select_profile(&self, profile: Profile) -> anyhow::Result<()> {
-        // load selected profile
-        let lprofile = self.load_local_profile(&profile)?;
-        // merge that into basic profile
-        let mut new_profile = self.base_profile.clone();
-        new_profile.merge(&lprofile)?;
-        // set path to clash config file path and sync to disk
-        new_profile.path = self.inner.cfg.basic.clash_cfg_pth.clone().into();
-        new_profile.sync_to_disk()?;
-        // after, change current profile
-        self.inner.set_current_profile(profile);
-        // ask clash to reload config
-        self.inner
-            .api
-            .config_reload(&self.inner.cfg.basic.clash_cfg_pth)?;
-        Ok(())
-    }
-}
-
-#[cfg(feature = "template")]
-impl BackEnd {
-    pub fn get_all_templates(&self) -> Vec<String> {
-        self.inner.get_all_templates()
-    }
-}
-
-impl BackEnd {
-    pub fn clash_srv_ctl(&self, op: ServiceOp) -> std::io::Result<String> {
-        self.inner.clash_srv_ctl(op)
-    }
-    pub fn restart_clash(&self) -> Result<String, String> {
-        self.inner.api.restart(None).map_err(|e| e.to_string())
-    }
-    pub fn update_state(
-        &self,
-        new_pf: Option<String>,
-        new_mode: Option<String>,
-    ) -> anyhow::Result<State> {
-        if let Some(mode) = new_mode {
-            self.inner.update_mode(mode)?;
-        }
-        if let Some(pf) = new_pf.as_ref() {
-            if let Some(pf) = self.inner.get_profile(pf) {
-                self.select_profile(pf)?;
-            } else {
-                anyhow::bail!("Not a recorded profile");
-            };
-        }
-        #[cfg(target_os = "windows")]
-        let sysp = self.inner.is_system_proxy_enabled().map_or_else(
-            |v| {
-                log::error!("{}", v);
-                None
-            },
-            Some,
-        );
-        let ClashConfig { mode, tun, .. } = self.inner.api.config_get()?;
-        Ok(State {
-            profile: new_pf.unwrap_or(self.get_current_profile().name),
-            mode: Some(mode),
-            tun: if tun.enable { Some(tun.stack) } else { None },
-            #[cfg(target_os = "windows")]
-            sysproxy: sysp,
-        })
-    }
-}
-
-impl BackEnd {
-    pub fn build(value: BuildConfig, log_file: PathBuf) -> Result<Self, anyhow::Error> {
+    pub fn build(value: BuildConfig) -> Result<Self, anyhow::Error> {
         let BuildConfig {
             cfg,
             basic: info,
             data,
-            profile_dir: profile_path,
-            template_dir: _template_path,
             base_raw,
         } = value;
         let ConfigFile {
             basic,
             service,
             timeout,
+            edit_cmd,
         } = cfg;
         let cfg = LibConfig { basic, service };
         let (external_controller, proxy_addr, secret, global_ua) = info.build()?;
@@ -432,10 +229,7 @@ impl BackEnd {
         };
         Ok(Self {
             inner: ClashBackend { api, cfg, pm },
-            profile_path,
-            log_file,
-            #[cfg(feature = "template")]
-            template_path: _template_path,
+            edit_cmd,
             base_profile,
         })
     }

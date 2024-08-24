@@ -55,7 +55,7 @@ fn main() {
             }
         };
         // build backend
-        let backend = BackEnd::build(buildconfig, log_file).expect("failed to build Backend");
+        let backend = BackEnd::build(buildconfig).expect("failed to build Backend");
         // handle args
         if let Some(command) = infos {
             match commands::handle_cli(command, backend) {

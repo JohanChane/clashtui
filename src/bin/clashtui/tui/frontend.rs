@@ -121,7 +121,13 @@ impl FrontEnd {
                         self.there_is_msg_pop = false;
                         self.get_list_popup().set("Preview", content);
                         self.there_is_list_pop = true;
-                    },
+                    }
+                    CallBack::Edit => {
+                        self.msg_popup.clear();
+                        self.msg_popup
+                            .show_msg(super::PopMsg::Prompt(vec!["OK".to_owned()]));
+                        self.there_is_msg_pop = true;
+                    }
                     // `SwitchMode` goes here
                     // Just update StateBar
                     CallBack::State(state) => {

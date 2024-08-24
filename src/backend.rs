@@ -4,7 +4,7 @@ mod impl_service;
 #[cfg(feature = "template")]
 mod impl_template;
 mod impl_webapi;
-mod ipc;
+pub mod ipc;
 pub(crate) mod util;
 
 pub use impl_service::ServiceOp;
