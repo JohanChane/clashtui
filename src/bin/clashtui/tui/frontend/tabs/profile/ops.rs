@@ -18,6 +18,11 @@ pub enum ProfileOp {
     ///
     /// Currently, `Auto` is treated as `No` in the BackEnd
     Update(String, Option<bool>),
+    /// test the profile content
+    ///
+    /// > I don't really know what `geodata_mode` can do,
+    /// but I'll keep it
+    Test(String, bool),
 }
 #[cfg(feature = "template")]
 pub enum TemplateOp {

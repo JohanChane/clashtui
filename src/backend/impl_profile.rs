@@ -110,4 +110,19 @@ impl ClashBackend {
         std::io::copy(&mut response, &mut output_file)?;
         Ok(())
     }
+
+    pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> std::io::Result<String> {
+        use super::ipc;
+        let cmd = format!(
+            "{} {} -d {} -f {} -t",
+            self.cfg.basic.clash_bin_pth,
+            if geodata_mode { "-m" } else { "" },
+            self.cfg.basic.clash_cfg_dir,
+            path,
+        );
+        #[cfg(target_os = "windows")]
+        return ipc::exec("cmd", vec!["/C", cmd.as_str()]);
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        ipc::exec("sh", vec!["-c", cmd.as_str()])
+    }
 }

@@ -11,7 +11,7 @@ impl ProfileTab {
             Keys::Select => {
                 if let Some(name) = name {
                     let pak = Call::Profile(BackendOp::Profile(ProfileOp::Select(name)));
-                    self.backend_content.replace(pak);
+                    self.backend_content = Some(pak);
                     self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
                 }
             }
@@ -54,7 +54,14 @@ impl ProfileTab {
             }
             // Keys::ProfileUpdateAll => todo!(),
             // Keys::ProfileInfo => todo!(),
-            Keys::ProfileTestConfig => todo!(),
+            Keys::ProfileTestConfig => {
+                if let Some(name) = name {
+                    self.backend_content = Some(Call::Profile(BackendOp::Profile(
+                        ProfileOp::Test(name, false),
+                    )));
+                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                }
+            }
             Keys::Preview => todo!(),
             Keys::Edit => todo!(),
             _ => return EventState::NotConsumed,

@@ -127,6 +127,19 @@ impl BackEnd {
                                 CallBack::ProfileCTL(vec!["Profile is now loaded".to_owned()])
                             }
                         }
+                        tabs::profile::ProfileOp::Test(name, geodata_mode) => {
+                            let pf = self
+                                .get_profile(name)
+                                .expect("Cannot find selected profile");
+                            match self.load_local_profile(&pf).and_then(|pf| {
+                                self.inner
+                                    .test_profile_config(&pf.path.to_string_lossy(), geodata_mode)
+                                    .map_err(|e| e.into())
+                            }) {
+                                Ok(v) => CallBack::ProfileCTL(vec![v]),
+                                Err(e) => CallBack::Error(e.to_string()),
+                            }
+                        }
                     },
                     #[cfg(feature = "template")]
                     tabs::profile::BackendOp::Template(op) => match op {
@@ -245,7 +258,7 @@ impl BackEnd {
         let LocalProfile { path, .. } = self.load_local_profile(&pf)?;
         Ok(std::fs::remove_file(path)?)
     }
-    fn get_profile<S: AsRef<str>>(&self, name: S) -> Option<Profile> {
+    pub fn get_profile<S: AsRef<str>>(&self, name: S) -> Option<Profile> {
         self.inner.get_profile(name)
     }
     pub fn get_all_profiles(&self) -> Vec<Profile> {
