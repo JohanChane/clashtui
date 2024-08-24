@@ -341,7 +341,7 @@ impl BackEnd {
         Ok(State {
             profile: new_pf.unwrap_or(self.get_current_profile().name),
             mode: Some(mode),
-            tun: Some(tun.stack),
+            tun: if tun.enable { Some(tun.stack) } else { None },
             #[cfg(target_os = "windows")]
             sysproxy: sysp,
         })
