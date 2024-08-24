@@ -31,10 +31,6 @@ bin-tui = ["ratatui", "crossterm", "tokio", "bin-cli"]
 template = []
 
 [[bin]]
-name = "clashcli"
-required-features = ["bin-cli"]
-
-[[bin]]
 name = "clashtui"
 required-features = ["bin-tui"]
 
