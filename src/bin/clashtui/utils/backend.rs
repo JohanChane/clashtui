@@ -15,8 +15,9 @@ use tokio::sync::mpsc::{Receiver, Sender};
 pub enum CallBack {
     Error(String),
     State(String),
-    Infos(Vec<String>),
     Logs(Vec<String>),
+    Infos(Vec<String>),
+    Preview(Vec<String>),
     ServiceCTL(String),
     ProfileCTL(Vec<String>),
     ProfileInit(Vec<String>, Vec<Option<core::time::Duration>>),
@@ -33,6 +34,7 @@ impl std::fmt::Display for CallBack {
                 CallBack::State(_) => "State",
                 CallBack::Logs(_) => "Logs",
                 CallBack::Infos(_) => "Infos",
+                CallBack::Preview(_) => "Preview",
                 CallBack::ServiceCTL(_) => "ServiceCTL",
                 CallBack::ProfileCTL(_) => "ProfileCTL",
                 CallBack::ProfileInit(..) => "ProfileInit",
@@ -142,6 +144,37 @@ impl BackEnd {
                                 Err(e) => CallBack::Error(e.to_string()),
                             }
                         }
+                        tabs::profile::ProfileOp::Preview(name) => {
+                            let mut lines: Vec<String> = vec![];
+                            let pf = self
+                                .get_profile(name)
+                                .expect("Cannot find selected profile");
+                            lines.push(
+                                pf.dtype
+                                    .get_domain()
+                                    .unwrap_or("Imported local file".to_owned()),
+                            );
+                            lines.push(Default::default());
+                            match self.load_local_profile(&pf).and_then(|pf| {
+                                match pf.content.as_ref() {
+                                    Some(content) => serde_yaml::to_string(content)
+                                        .map_err(|e| e.into())
+                                        .map(|content| {
+                                            lines.extend(content.lines().map(|s| s.to_owned()));
+                                        }),
+                                    None => {
+                                        lines.push(
+                                            "yaml file is empty. Please update it.".to_owned(),
+                                        );
+                                        Ok(())
+                                    }
+                                }
+                            }) {
+                                Ok(_) => CallBack::Preview(lines),
+                                Err(e) => CallBack::Error(e.to_string()),
+                            }
+                        }
+                        tabs::profile::ProfileOp::Edit(name) => todo!(),
                     },
                     #[cfg(feature = "template")]
                     tabs::profile::BackendOp::Template(op) => match op {

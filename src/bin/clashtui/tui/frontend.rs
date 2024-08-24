@@ -116,6 +116,12 @@ impl FrontEnd {
                         self.get_list_popup().set("Infos", infos);
                         self.there_is_list_pop = true;
                     }
+                    CallBack::Preview(content) => {
+                        self.msg_popup.clear();
+                        self.there_is_msg_pop = false;
+                        self.get_list_popup().set("Preview", content);
+                        self.there_is_list_pop = true;
+                    },
                     // `SwitchMode` goes here
                     // Just update StateBar
                     CallBack::State(state) => {

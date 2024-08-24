@@ -78,6 +78,19 @@ impl ProfileType {
     pub fn is_upgradable(&self) -> bool {
         !self.is_file()
     }
+    /// if [ProfileType::is_upgradable], return [Some]
+    pub fn get_domain(&self) -> Option<String> {
+        match self {
+            ProfileType::File => None,
+            ProfileType::Url(url) => {
+                crate::backend::util::extract_domain(url).map(|s| s.to_owned())
+            }
+            #[cfg(feature = "template")]
+            ProfileType::Generated(name) => {
+                Some(format!("From template {name}"))
+            }
+        }
+    }
     pub fn into_inner(self) -> Option<String> {
         match self {
             ProfileType::File => None,

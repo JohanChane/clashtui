@@ -23,6 +23,14 @@ pub enum ProfileOp {
     /// > I don't really know what `geodata_mode` can do,
     /// but I'll keep it
     Test(String, bool),
+    /// ask for preview
+    /// 
+    /// though this is asked by tab, but it will be handled at frontend
+    Preview(String),
+    /// ask for edit
+    /// 
+    /// though this is asked by tab, but it will be handled at frontend
+    Edit(String),
 }
 #[cfg(feature = "template")]
 pub enum TemplateOp {
