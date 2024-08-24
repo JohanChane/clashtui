@@ -95,40 +95,43 @@ impl FrontEnd {
         if let Some(op) = op {
             tx.send(op).await.expect(consts_err::BACKEND_RX);
         }
-        let op = rx.try_recv();
-        match op {
-            Ok(op) => match op {
-                CallBack::Error(error) => {
-                    self.msg_popup.clear();
-                    self.msg_popup.show_msg(super::PopMsg::Prompt(vec![
-                        "Error Happened".to_owned(),
-                        error,
-                    ]));
-                    self.there_is_msg_pop = true;
-                }
-                CallBack::Logs(logs) => {
-                    self.get_list_popup().set("Log", logs);
-                    self.there_is_list_pop = true;
-                }
-                // `SwitchMode` goes here
-                // Just update StateBar
-                CallBack::State(state) => {
-                    self.state.replace(state);
-                }
-                // assume ProfileTab is the first tab
-                CallBack::ProfileInit(..) => self.tabs[0].apply_backend_call(op),
-                #[cfg(feature = "template")]
-                CallBack::TemplateInit(_) => self.tabs[0].apply_backend_call(op),
-                CallBack::ProfileCTL(_) | CallBack::ServiceCTL(_) => {
-                    self.tabs[self.tab_index].apply_backend_call(op)
-                }
-            },
-            Err(e) => match e {
-                tokio::sync::mpsc::error::TryRecvError::Empty => (),
-                tokio::sync::mpsc::error::TryRecvError::Disconnected => {
-                    unreachable!("{}", consts_err::BACKEND_TX);
-                }
-            },
+        // try to handle as much to avoid channel overflow
+        loop {
+            let op = rx.try_recv();
+            match op {
+                Ok(op) => match op {
+                    CallBack::Error(error) => {
+                        self.msg_popup.clear();
+                        self.msg_popup.show_msg(super::PopMsg::Prompt(vec![
+                            "Error Happened".to_owned(),
+                            error,
+                        ]));
+                        self.there_is_msg_pop = true;
+                    }
+                    CallBack::Logs(logs) => {
+                        self.get_list_popup().set("Log", logs);
+                        self.there_is_list_pop = true;
+                    }
+                    // `SwitchMode` goes here
+                    // Just update StateBar
+                    CallBack::State(state) => {
+                        self.state.replace(state);
+                    }
+                    // assume ProfileTab is the first tab
+                    CallBack::ProfileInit(..) => self.tabs[0].apply_backend_call(op),
+                    #[cfg(feature = "template")]
+                    CallBack::TemplateInit(_) => self.tabs[0].apply_backend_call(op),
+                    CallBack::ProfileCTL(_) | CallBack::ServiceCTL(_) => {
+                        self.tabs[self.tab_index].apply_backend_call(op)
+                    }
+                },
+                Err(e) => match e {
+                    tokio::sync::mpsc::error::TryRecvError::Empty => break,
+                    tokio::sync::mpsc::error::TryRecvError::Disconnected => {
+                        unreachable!("{}", consts_err::BACKEND_TX);
+                    }
+                },
+            }
         }
     }
     fn get_list_popup(&mut self) -> &mut Box<ListPopup> {
