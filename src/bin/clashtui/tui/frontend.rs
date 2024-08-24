@@ -112,6 +112,10 @@ impl FrontEnd {
                         self.get_list_popup().set("Log", logs);
                         self.there_is_list_pop = true;
                     }
+                    CallBack::Infos(infos) => {
+                        self.get_list_popup().set("Infos", infos);
+                        self.there_is_list_pop = true;
+                    }
                     // `SwitchMode` goes here
                     // Just update StateBar
                     CallBack::State(state) => {
@@ -239,7 +243,7 @@ impl Drawable for FrontEnd {
                     );
                     self.there_is_list_pop = true;
                 }
-                Keys::AppInfo => todo!(),
+                Keys::AppInfo => self.backend_content = Some(Call::Infos),
                 Keys::AppQuit => {
                     self.should_quit = true;
                 }

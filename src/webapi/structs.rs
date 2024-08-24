@@ -21,6 +21,56 @@ pub struct ClashConfig {
     pub geo_update_interval: Option<u16>,
     pub find_process_mode: Option<String>,
 }
+impl ClashConfig {
+    pub fn build(self) -> Vec<String> {
+        macro_rules! build {
+            ($($value:ident),+ $(,)? $(#Option $(,)? $($option_value:ident),+)? $(,)?) => {
+                [$(
+                    format!("{}:{}", stringify!($value), $value),
+                )+
+                $($(
+                    match $option_value {
+                        Some(v) => format!("{}:{}", stringify!($option_value), v),
+                        None => format!("{}:Unknown", stringify!($option_value)),
+                    },
+                )+)?
+                ].to_vec()
+            };
+        }
+        let ClashConfig {
+            mode,
+            tun,
+            log_level,
+            bind_address,
+            allow_lan,
+            ipv6,
+            global_client_fingerprint,
+            tcp_concurrent,
+            global_ua,
+            dns,
+            geodata_mode,
+            unified_delay,
+            geo_auto_update,
+            geo_update_interval,
+            find_process_mode,
+        } = self;
+        build!(mode, tun,
+            #Option
+            log_level,
+            bind_address,
+            allow_lan,
+            ipv6,
+            global_client_fingerprint,
+            tcp_concurrent,
+            global_ua,
+            dns,
+            geodata_mode,
+            unified_delay,
+            geo_auto_update,
+            geo_update_interval,
+            find_process_mode)
+    }
+}
 impl std::str::FromStr for ClashConfig {
     type Err = std::fmt::Error;
 
@@ -83,6 +133,15 @@ impl std::fmt::Display for LogLevel {
 pub struct TunConfig {
     pub enable: bool,
     pub stack: TunStack,
+}
+impl std::fmt::Display for TunConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.enable {
+            write!(f, "{}", self.stack)
+        } else {
+            write!(f, "Off")
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]

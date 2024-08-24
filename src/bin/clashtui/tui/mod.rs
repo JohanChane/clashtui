@@ -21,6 +21,8 @@ pub enum Call {
     Service(tabs::service::BackendOp),
     /// read file by lines, from `total_len-start-length` to `total_len-start`
     Logs(usize, usize),
+    /// ask backend for clash infos
+    Infos,
     /// ask to refresh
     Tick,
     /// ask to shutdown
@@ -36,6 +38,7 @@ impl std::fmt::Display for Call {
                 Call::Profile(_) => "Profile",
                 Call::Service(_) => "Service",
                 Call::Logs(..) => "Logs",
+                Call::Infos => "Infos",
                 Call::Tick => "Tick",
                 Call::Stop => "Stop",
             }

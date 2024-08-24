@@ -15,6 +15,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 pub enum CallBack {
     Error(String),
     State(String),
+    Infos(Vec<String>),
     Logs(Vec<String>),
     ServiceCTL(String),
     ProfileCTL(Vec<String>),
@@ -31,9 +32,10 @@ impl std::fmt::Display for CallBack {
                 CallBack::Error(_) => "Error",
                 CallBack::State(_) => "State",
                 CallBack::Logs(_) => "Logs",
+                CallBack::Infos(_) => "Infos",
                 CallBack::ServiceCTL(_) => "ServiceCTL",
                 CallBack::ProfileCTL(_) => "ProfileCTL",
-                CallBack::ProfileInit(_, _) => "ProfileInit",
+                CallBack::ProfileInit(..) => "ProfileInit",
                 #[cfg(feature = "template")]
                 CallBack::TemplateInit(_) => "TemplateInit",
             }
@@ -172,7 +174,27 @@ impl BackEnd {
                     Ok(v) => CallBack::Logs(v),
                     Err(e) => CallBack::Error(e.to_string()),
                 },
-                // unfortunately, this might(in facmatches!(rx.recv().await.unwrap(), Call::Stop)t almost always) block by
+                Call::Infos => {
+                    match self
+                        .inner
+                        .api
+                        .version()
+                        .map_err(|e| e.into())
+                        .and_then(|ver| {
+                            self.inner.api.config_get().map(|cfg| {
+                                let mut cfg = cfg.build();
+                                cfg.insert(0, format!("# CLASHTUI"));
+                                cfg.insert(1, format!("version:{}", crate::utils::consts::VERSION));
+                                cfg.insert(2, format!("# CLASH"));
+                                cfg.insert(3, format!("version:{ver}"));
+                                cfg
+                            })
+                        }) {
+                        Ok(infos) => CallBack::Infos(infos),
+                        Err(e) => CallBack::Error(e.to_string()),
+                    }
+                }
+                // unfortunately, this might(in fact almost always) block by
                 // thousand of [Call::Tick],
                 //
                 // another match might help
