@@ -92,7 +92,6 @@ impl TabCont for ProfileTab {
             #[cfg(not(feature = "template"))]
             self.backend_content.take()
         } else {
-            self.is_profiles_inited = true;
             Some(Call::Profile(BackendOp::Profile(ProfileOp::GetALL)))
         }
     }
@@ -104,6 +103,8 @@ impl TabCont for ProfileTab {
     fn apply_backend_call(&mut self, op: CallBack) {
         match op {
             CallBack::ProfileCTL(result) => {
+                // require a refresh
+                self.is_profiles_inited = false;
                 self.popup_content.replace(PopMsg::Prompt(
                     ["Done".to_string()]
                         .into_iter()
