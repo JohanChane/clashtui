@@ -17,7 +17,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                     backend
                         .get_all_profiles()
                         .into_iter()
-                        .inspect(|s| println!("\nProfile: {}", s.name))
+                        .inspect(|s| println!("Profile: {}", s.name))
                         .filter_map(|v| {
                             backend
                                 .update_profile(&v, Some(with_proxy))
@@ -29,16 +29,37 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                     if let Err(e) = backend.select_profile(backend.get_current_profile()) {
                         eprintln!("Select Profile: {e}")
                     };
-                    Ok("Done".to_string())
-                } else if let Some(_name) = name {
-                    println!("Update Profile:{_name}");
-                    todo!()
+                } else if let Some(name) = name {
+                    println!("Profile: {name}");
+                    let pf = if let Some(v) = backend.get_profile(name) {
+                        v
+                    } else {
+                        anyhow::bail!("Not found in database!");
+                    };
+                    match backend.update_profile(&pf, Some(with_proxy)) {
+                        Ok(v) => {
+                            v.into_iter().for_each(|s| println!("- {s}"));
+                        }
+                        Err(e) => {
+                            println!("- Error! {e}")
+                        }
+                    }
                 } else {
                     anyhow::bail!("Not providing Profile");
                 }
+                Ok("Done".to_string())
             }
-            ProfileCommand::Select(ProfileSelect { name: _name }) => {
-                todo!()
+            ProfileCommand::Select(ProfileSelect { name }) => {
+                let pf = if let Some(v) = backend.get_profile(&name) {
+                    v
+                } else {
+                    anyhow::bail!("Not found in database!");
+                };
+                if let Err(e) = backend.select_profile(pf) {
+                    eprint!("Cannot select {name} due to {e}");
+                    return Err(e);
+                };
+                Ok("Done".to_string())
             }
         },
         #[cfg(any(target_os = "linux", target_os = "windows"))]
