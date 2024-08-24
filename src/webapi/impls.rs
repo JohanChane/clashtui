@@ -44,7 +44,13 @@ impl ClashUtil {
         self.request(
             Method::Put,
             "/configs?force=true",
-            Some(format!(r#"{{"path":{},"payload":""}}"#, path.as_ref())),
+            Some(
+                serde_json::json!({
+                    "path": path.as_ref(),
+                    "payload": ""
+                })
+                .to_string(),
+            ),
         )
         .and_then(|r| r.as_str().map(|s| s.to_owned()))
     }
