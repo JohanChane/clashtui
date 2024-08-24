@@ -99,7 +99,7 @@ impl BackEnd {
                             ) {
                                 CallBack::Error(e.to_string())
                             } else {
-                                CallBack::ProfileCTL(vec!["Done".to_owned()])
+                                CallBack::ProfileCTL(vec!["Profile is now removed".to_owned()])
                             }
                         }
                         tabs::profile::ProfileOp::Update(name, with_proxy) => {
@@ -120,7 +120,7 @@ impl BackEnd {
                             ) {
                                 CallBack::Error(e.to_string())
                             } else {
-                                CallBack::ProfileCTL(vec!["Done".to_owned()])
+                                CallBack::ProfileCTL(vec!["Profile is now loaded".to_owned()])
                             }
                         }
                     },
