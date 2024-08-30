@@ -94,6 +94,6 @@ script = '''
     tar -xf upx-4.2.4-win64.zip
     cp ./upx-4.2.4-win64/upx.exe .
     rm -r ./upx-4.2.4-win64
-    ./upx.exe artifacts/*.exe
+    upx.exe artifacts/*.exe
     rm upx.exe
 '''
