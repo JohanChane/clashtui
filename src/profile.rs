@@ -73,8 +73,7 @@ impl LocalProfile {
     /// Note: need to call [`LocalProfile::sync_from_disk`] before call this
     pub fn merge(&mut self, base: &LocalProfile) -> anyhow::Result<()> {
         if self.content.is_none() || base.content.is_none() {
-            // this should be handled at develop time
-            panic!("one of the input content is none");
+            anyhow::bail!("one of the input content is none");
         }
 
         FILTER
