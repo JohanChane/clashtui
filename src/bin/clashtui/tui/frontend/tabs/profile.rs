@@ -166,6 +166,7 @@ impl TabCont for ProfileTab {
                     | EventState::WorkDone => return EventState::NotConsumed,
                 };
             }
+            self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
         } else {
             // apply for [PopMsg::Prompt]
             match evst {
@@ -208,7 +209,22 @@ impl Drawable for ProfileTab {
     // call [`TabCont::apply_popup_result`] first
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
         match self.focus {
-            Focus::Profile => self.handle_profile_key_event(ev),
+            Focus::Profile => {
+                if self.profiles.handle_key_event(ev) == EventState::Yes {
+                    let name = self
+                        .profiles
+                        .selected()
+                        .map(|index| self.profiles.get_items()[index].clone());
+                    if let Some(name) = name {
+                        let pak = Call::Profile(BackendOp::Profile(ProfileOp::Select(name)));
+                        self.backend_content = Some(pak);
+                        self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                    }
+                    EventState::WorkDone
+                } else {
+                    self.handle_profile_key_event(ev)
+                }
+            }
             #[cfg(feature = "template")]
             Focus::Template => {
                 if self.templates.handle_key_event(ev) == EventState::Yes {

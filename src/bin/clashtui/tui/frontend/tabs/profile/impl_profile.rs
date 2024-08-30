@@ -8,13 +8,6 @@ impl ProfileTab {
             .map(|index| self.profiles.get_items()[index].clone());
 
         match ev.code.into() {
-            Keys::Select => {
-                if let Some(name) = name {
-                    let pak = Call::Profile(BackendOp::Profile(ProfileOp::Select(name)));
-                    self.backend_content = Some(pak);
-                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
-                }
-            }
             Keys::ProfileImport => {
                 self.last_focus = self.focus;
                 self.focus = Focus::Input;
