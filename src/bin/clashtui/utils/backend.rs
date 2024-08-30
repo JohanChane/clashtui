@@ -105,6 +105,10 @@ impl BackEnd {
                     Err(e) => CallBack::Error(e.to_string()),
                 },
                 Call::Infos => {
+                    let mut infos = vec![
+                        "# CLASHTUI".to_owned(),
+                        format!("version:{}", crate::utils::consts::VERSION),
+                    ];
                     match self
                         .inner
                         .api
@@ -113,15 +117,19 @@ impl BackEnd {
                         .and_then(|ver| {
                             self.inner.api.config_get().map(|cfg| {
                                 let mut cfg = cfg.build();
-                                cfg.insert(0, format!("# CLASHTUI"));
-                                cfg.insert(1, format!("version:{}", crate::utils::consts::VERSION));
-                                cfg.insert(2, format!("# CLASH"));
+                                cfg.insert(2, "# CLASH".to_owned());
                                 cfg.insert(3, format!("version:{ver}"));
                                 cfg
                             })
                         }) {
-                        Ok(infos) => CallBack::Infos(infos),
-                        Err(e) => CallBack::Error(e.to_string()),
+                        Ok(info) => {
+                            infos.extend(info);
+                            CallBack::Infos(infos)
+                        }
+                        Err(e) => {
+                            infos.extend(["# CLASH".to_owned(), format!("{e}")]);
+                            CallBack::Infos(infos)
+                        }
                     }
                 }
                 // unfortunately, this might(in fact almost always) block by
