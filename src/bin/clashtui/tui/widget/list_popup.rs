@@ -39,7 +39,7 @@ impl Drawable for ListPopup {
                 i.chars().skip(self.offset).collect::<String>(),
             ))
             .style(Ra::Style::default())
-            }));
+        }));
         f.render_stateful_widget(
             list.block(
                 Raw::Block::default()

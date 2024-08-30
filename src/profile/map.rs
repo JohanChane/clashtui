@@ -86,9 +86,7 @@ impl ProfileType {
                 crate::backend::util::extract_domain(url).map(|s| s.to_owned())
             }
             #[cfg(feature = "template")]
-            ProfileType::Generated(name) => {
-                Some(format!("From template {name}"))
-            }
+            ProfileType::Generated(name) => Some(format!("From template {name}")),
         }
     }
     pub fn into_inner(self) -> Option<String> {

@@ -106,19 +106,17 @@ impl TabCont for ProfileTab {
                 // require a refresh
                 self.is_profiles_inited = false;
                 self.popup_content.replace(PopMsg::Prompt(
-                    ["Done".to_string()]
-                        .into_iter()
-                        .chain(result)
-                        .collect(),
+                    ["Done".to_string()].into_iter().chain(result).collect(),
                 ));
             }
             CallBack::ProfileInit(content, times) => {
                 if !self.is_profiles_inited {
                     self.profiles.set_items(content);
-                    self.profiles.set_extras(times.into_iter().map(|t| {
-                        t.map( display_duration)
-                            .unwrap_or("Never/Err".to_string())
-                    }));
+                    self.profiles.set_extras(
+                        times
+                            .into_iter()
+                            .map(|t| t.map(display_duration).unwrap_or("Never/Err".to_string())),
+                    );
                     self.is_profiles_inited = true;
                 }
             }

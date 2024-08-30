@@ -24,11 +24,11 @@ pub enum ProfileOp {
     /// > but I'll keep it
     Test(String, bool),
     /// ask for preview
-    /// 
+    ///
     /// though this is asked by tab, but it will be handled at frontend
     Preview(String),
     /// ask for edit
-    /// 
+    ///
     /// though this is asked by tab, but it will be handled at frontend
     Edit(String),
 }

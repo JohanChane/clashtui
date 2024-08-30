@@ -1,0 +1,8 @@
+mode: rule
+mixed-port: 7890
+allow-lan: false
+log-level: debug
+ipv6: true
+
+secret: test
+external-controller: 127.0.0.1:9090

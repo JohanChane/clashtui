@@ -47,7 +47,7 @@ serde = { version = "^1.0.208", features = ["derive"] }
 minreq = { version = "^2.12.0", features = ["proxy", "https"] }
 serde_json = "^1.0.125"
 serde_yaml = "0.9.34"
-futures = {version = "0.3.30", default-features = false}
+futures = { version = "0.3.30", default-features = false }
 
 [dependencies.tokio]
 version = "^1.39.0"
@@ -98,7 +98,7 @@ assets = [
     '755',
   ],
   [
-    '../README.md',
+    'README.md',
     'usr/share/doc/clashtui/README.md',
     '644',
   ],

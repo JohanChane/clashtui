@@ -85,7 +85,7 @@ mod tests {
     fn sym() -> ClashUtil {
         ClashUtil::new(
             "http://127.0.0.1:9090".to_string(),
-            None,
+            Some("test".to_owned()),
             "http://127.0.0.1:7890".to_string(),
             None,
             None,
@@ -127,10 +127,10 @@ mod tests {
         let mut tf = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
-            .open("test")
+            .open("/tmp/test")
             .unwrap();
         std::io::copy(&mut r, &mut tf).unwrap();
         drop(tf);
-        std::fs::remove_file("test").unwrap();
+        std::fs::remove_file("/tmp/test").unwrap();
     }
 }
