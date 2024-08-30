@@ -23,8 +23,7 @@ impl FrontEnd {
         // load from local cache
         let state = self
             .state
-            .as_ref()
-            .map(|s| s.as_str())
+            .as_deref()
             .unwrap_or("Waiting State Cache Update");
         let this = Raw::Paragraph::new(Ra::Span::styled(
             state,

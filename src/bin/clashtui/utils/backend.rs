@@ -155,7 +155,7 @@ impl BackEnd {
                     }
                 }
             };
-            if let Err(_) = tx.send(cb).await {
+            if tx.send(cb).await.is_err() {
                 return match rx.recv().await {
                     // normal shutdown
                     Some(Call::Stop) => Ok(self.save()),
@@ -179,11 +179,10 @@ impl BackEnd {
     }
     fn save(&self) -> DataFile {
         let (current_profile, profiles) = self.inner.pm.clone_inner();
-        let data = DataFile {
+        DataFile {
             profiles,
             current_profile,
-        };
-        data
+        }
     }
 }
 
@@ -200,7 +199,7 @@ impl BackEnd {
         };
         fp.seek(std::io::SeekFrom::Start(0))?;
         let fp = std::io::BufReader::new(fp).lines();
-        let start = (size as usize).checked_sub(start + length).unwrap_or(0);
+        let start = size.saturating_sub(start + length);
         let vec = fp
             .skip(start)
             .take(length)

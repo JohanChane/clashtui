@@ -33,10 +33,10 @@ impl Drawable for ConfirmPopup {
                     format!("Press y for Yes, n for No, o for {ch2}")
                 }
             } else {
-                format!("Press y for Yes, n for No")
+                "Press y for Yes, n for No".to_owned()
             }
         } else {
-            format!("Press Esc to close")
+            "Press Esc to close".to_owned()
         };
         let text: Vec<Ra::Line> = if let Some(msg) = &self.msg {
             match msg {

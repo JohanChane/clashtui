@@ -151,7 +151,7 @@ impl FrontEnd {
         }
     }
     fn get_list_popup(&mut self) -> &mut Box<ListPopup> {
-        if let None = self.list_popup.as_ref() {
+        if self.list_popup.is_none() {
             self.list_popup = Some(Box::new(ListPopup::new()));
         }
         self.list_popup.as_mut().unwrap()
@@ -194,14 +194,14 @@ impl Drawable for FrontEnd {
         // if there is a popup, other part will be blocked.
         if self.there_is_msg_pop {
             evst = self.msg_popup.handle_key_event(ev);
-            if let EventState::WorkDone = tab.apply_popup_result(evst) {
+            if EventState::WorkDone == tab.apply_popup_result(evst) {
                 self.there_is_msg_pop = false;
             }
             return EventState::WorkDone;
         }
         if self.there_is_list_pop {
             evst = self.get_list_popup().handle_key_event(ev);
-            if let EventState::Cancel = evst {
+            if EventState::Cancel == evst {
                 self.there_is_list_pop = false;
             }
             return EventState::WorkDone;

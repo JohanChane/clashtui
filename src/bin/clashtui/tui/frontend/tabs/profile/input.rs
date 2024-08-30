@@ -40,13 +40,13 @@ impl Drawable for InputPopup {
             .split(input_area);
 
         fn render_single(
-            input: &String,
+            input: &str,
             f: &mut ratatui::Frame,
             area: Ra::Rect,
             is_selected: bool,
             title: &str,
         ) {
-            let input = Raw::Paragraph::new(input.as_str())
+            let input = Raw::Paragraph::new(input)
                 .style(Ra::Style::default().fg(if is_selected {
                     Theme::get().input_text_selected_fg
                 } else {

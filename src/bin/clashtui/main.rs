@@ -23,7 +23,7 @@ fn main() {
         // pre-setup flags are done here
         let flags = flags;
         log::debug!("Current flags: {:?}", flags);
-        let buildconfig = match load_config(&HOME_DIR.get().unwrap()) {
+        let buildconfig = match load_config(HOME_DIR.get().unwrap()) {
             Ok(v) => v,
             Err(e) => {
                 use std::io::{Read, Write};
@@ -40,7 +40,7 @@ fn main() {
                 let rep = std::io::stdin().read(&mut buf);
                 if rep.is_ok_and(|l| l != 0) && buf[0] == b'y' {
                     // accept 'y' only
-                    if let Err(e) = init_config(&HOME_DIR.get().unwrap()) {
+                    if let Err(e) = init_config(HOME_DIR.get().unwrap()) {
                         eprint!("init config failed: {e}");
                         std::process::exit(-1);
                     } else {

@@ -21,7 +21,7 @@ pub enum ProfileOp {
     /// test the profile content
     ///
     /// > I don't really know what `geodata_mode` can do,
-    /// but I'll keep it
+    /// > but I'll keep it
     Test(String, bool),
     /// ask for preview
     /// 
