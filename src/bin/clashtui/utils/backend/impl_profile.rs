@@ -62,17 +62,22 @@ impl BackEnd {
 impl BackEnd {
     pub(super) fn handle_profile_op(&self, op: ProfileOp) -> CallBack {
         match op {
-            ProfileOp::GetALL => CallBack::ProfileInit(
-                self.get_all_profiles()
+            ProfileOp::GetALL => {
+                let mut composed: Vec<(String, Option<std::time::Duration>)> = self
+                    .get_all_profiles()
                     .into_iter()
-                    .map(|p| p.name)
-                    .collect(),
-                self.get_all_profiles()
-                    .into_iter()
-                    .map(|p| self.load_local_profile(&p).ok())
-                    .map(|lp| lp.and_then(|lp| lp.atime()))
-                    .collect(),
-            ),
+                    .map(|p| {
+                        (
+                            self.load_local_profile(&p).ok().and_then(|lp| lp.atime()),
+                            p.name,
+                        )
+                    })
+                    .map(|(t, n)| (n, t))
+                    .collect();
+                composed.sort();
+                let (name, atime) = composed.into_iter().collect();
+                CallBack::ProfileInit(name, atime)
+            }
             ProfileOp::Add(name, url) => {
                 self.create_profile(&name, url);
                 match self.update_profile(
