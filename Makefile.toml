@@ -1,14 +1,21 @@
 
 [env]
 # use for build arm64 in docker
-CROSS_CONTAINER_IN_CONTAINER = true
+# CROSS_CONTAINER_IN_CONTAINER = true
 
 
 [tasks.ci]
 dependencies = ["setup_mihomo", "ci-flow"]
 script = ["rm mihomo", "rm Doc/clash_test/cache.db"]
 
+[tasks.ci.windows]
+# ignore this shit
+dependencies = []
+script = ""
+
 [tasks.setup_mihomo.windows]
+script_runner = "pwsh"
+script_extension = "ps1"
 script = '''
     curl --output mihomo.zip -L https://github.com/MetaCubeX/mihomo/releases/download/v1.18.4/mihomo-windows-amd64-v1.18.4.zip
     7z x mihomo.zip
@@ -43,7 +50,9 @@ script = '''
 '''
 
 [tasks.clear-artifacts]
+private = true
 script_runner = "@shell"
+ignore_errors = true
 script = ["rm -r artifacts"]
 
 [tasks.build_deb]
@@ -62,4 +71,29 @@ script = '''
 script = '''
     cargo build --bin clashtui --all-features
     cargo build --bin clashtui --all-features --release
+'''
+
+
+[tasks.upx.linux]
+dependencies = ["release"]
+script = '''
+    chmod +x artifacts/*
+    curl -OL https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz
+    tar -xf upx-4.2.4-amd64_linux.tar.xz
+    rm upx-4.2.4-amd64_linux.tar.xz
+    cp ./upx-4.2.4-amd64_linux/upx .
+    rm -r ./upx-4.2.4-amd64_linux
+    ./upx artifacts/*.release artifacts/*.debug
+    rm upx
+'''
+
+[tasks.upx.windows]
+dependencies = ["release"]
+script = '''
+    curl -OL https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip
+    tar -xf upx-4.2.4-win64.zip
+    cp ./upx-4.2.4-win64/upx.exe .
+    rm -r ./upx-4.2.4-win64
+    ./upx.exe artifacts/*.exe
+    rm upx.exe
 '''

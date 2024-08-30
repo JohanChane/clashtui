@@ -20,7 +20,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Cache Target
+      - name: Cache
         if: ${{ ! startsWith(github.ref, 'refs/tags/') }}
         uses: actions/cache@v4
         with:
@@ -32,21 +32,24 @@ jobs:
             ci-${{ runner.os }}-${{ hashFiles('./Cargo.lock') }}
             ci-${{ runner.os }}-
 
-      - name: Download Dependencies
+      - name: Test
         run: |
           cargo install --debug cargo-make
           cargo make ci
 
+      - name: Build
+        run: cargo make upx
+
       - name: upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: artifacts
+          name: Artifacts-${{ runner.os }}
           path: artifacts
           retention-days: 5
 
   release:
-    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
 
     needs: build
 
@@ -59,14 +62,6 @@ jobs:
         with:
           merge-multiple: true
           path: ./artifacts
-
-      - name: UPX compress
-        run: |
-          chmod +x ./artifacts/*
-          curl -OL https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz
-          tar -xf upx-4.2.4-amd64_linux.tar.xz
-          cp ./upx-4.2.4-amd64_linux/upx .
-          ./upx ./artifacts/*
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
