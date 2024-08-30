@@ -13,6 +13,7 @@ pub struct ListPopup {
     items: Vec<String>,
     list_state: Raw::ListState,
     scrollbar: Raw::ScrollbarState,
+    offset: usize,
 }
 
 impl ListPopup {
@@ -20,6 +21,8 @@ impl ListPopup {
         Default::default()
     }
     pub fn set(&mut self, title: &str, items: Vec<String>) {
+        self.list_state = Default::default();
+        self.offset = 0;
         self.title = title.to_owned();
         self.scrollbar = self.scrollbar.content_length(items.len());
         self.items = items;
@@ -31,9 +34,11 @@ impl Drawable for ListPopup {
     fn render(&mut self, f: &mut ratatui::Frame, _: ratatui::layout::Rect, _: bool) {
         let area = tools::centered_percent_rect(60, 60, f.area());
         f.render_widget(Raw::Clear, area);
-        let list =
-            Raw::List::from_iter(self.items.iter().map(|i| {
-                Raw::ListItem::new(Ra::Line::from(i.as_str())).style(Ra::Style::default())
+        let list = Raw::List::from_iter(self.items.iter().map(|i| {
+            Raw::ListItem::new(Ra::Text::from(
+                i.chars().skip(self.offset).collect::<String>(),
+            ))
+            .style(Ra::Style::default())
             }));
         f.render_stateful_widget(
             list.block(
@@ -73,6 +78,8 @@ impl Drawable for ListPopup {
         match ev.code {
             KeyCode::Down | KeyCode::Char('j') => self.next(),
             KeyCode::Up | KeyCode::Char('k') => self.previous(),
+            KeyCode::Left | KeyCode::Char('h') => self.offset = self.offset.saturating_sub(1),
+            KeyCode::Right | KeyCode::Char('l') => self.offset = self.offset.saturating_add(1),
             KeyCode::Esc => return EventState::Cancel,
             _ => return EventState::NotConsumed,
         };
