@@ -1,0 +1,8 @@
+[Unit]
+Description=Clashtui profile cron update via systemd
+
+[Service]
+ExecStart=path/to/clashtui profile update -a
+
+[Install]
+WantedBy=timers.target

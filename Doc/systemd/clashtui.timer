@@ -1,0 +1,11 @@
+[Unit]
+Description=Clashtui profile cron update timer
+Wants=network-online.target
+After=network-online.target
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1d
+
+[Install]
+WantedBy=timers.target
