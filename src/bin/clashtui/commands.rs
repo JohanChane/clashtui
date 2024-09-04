@@ -92,7 +92,7 @@ struct ProfileUpdate {
     name: Option<String>,
     /// update profile with proxy
     #[arg(long)]
-    with_proxy: bool,
+    with_proxy: Option<bool>,
 }
 /// select profile
 #[derive(clap::Args)]

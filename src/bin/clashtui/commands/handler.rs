@@ -5,6 +5,9 @@ use crate::utils::BackEnd;
 use super::*;
 
 pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<String> {
+    // let var: Option<bool> = std::env::var("CLASHTUI_")
+    //     .ok()
+    //     .and_then(|s| s.parse().ok());
     let PackedArgs(command) = command;
     match command {
         ArgCommand::Profile(Profile { command }) => match command {
@@ -20,7 +23,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                         .inspect(|s| println!("Profile: {}", s.name))
                         .filter_map(|v| {
                             backend
-                                .update_profile(&v, Some(with_proxy))
+                                .update_profile(&v, with_proxy)
                                 .map_err(|e| println!("- Error! {e}"))
                                 .ok()
                         })
@@ -36,7 +39,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                     } else {
                         anyhow::bail!("Not found in database!");
                     };
-                    match backend.update_profile(&pf, Some(with_proxy)) {
+                    match backend.update_profile(&pf, with_proxy) {
                         Ok(v) => {
                             v.into_iter().for_each(|s| println!("- {s}"));
                         }
@@ -73,19 +76,6 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
             }
             ServiceCommand::Stop => Ok(backend.clash_srv_ctl(ServiceOp::StopClashService)?),
         },
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
-        ArgCommand::Mode(Mode { command }) => match command {
-            ModeCommand::Rule => Ok(backend
-                .update_state(None, Some(cMode::Rule.into()))?
-                .to_string()),
-            ModeCommand::Direct => Ok(backend
-                .update_state(None, Some(cMode::Direct.into()))?
-                .to_string()),
-            ModeCommand::Global => Ok(backend
-                .update_state(None, Some(cMode::Global.into()))?
-                .to_string()),
-        },
-        #[cfg(target_os = "windows")]
         ArgCommand::Mode(Mode { command }) => match command {
             ModeCommand::Rule => Ok(backend
                 .update_state(None, Some(cMode::Rule.into()))?
