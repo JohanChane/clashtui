@@ -52,7 +52,7 @@ impl ClashBackend {
     ) -> anyhow::Result<Vec<String>> {
         if profile.dtype.is_upgradable() {
             // store (name,url) to be downloaded
-            let mut work_vec: Vec<(String, String)> = Vec::new();
+            let mut work_vec: Vec<(String, String)> = Vec::with_capacity(2);
             match &profile.dtype {
                 // Imported file won't update, overwrite it if necessary
                 ProfileType::File => unreachable!(),

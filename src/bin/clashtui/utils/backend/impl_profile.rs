@@ -135,7 +135,7 @@ impl BackEnd {
                 }
             }
             ProfileOp::Preview(name) => {
-                let mut lines: Vec<String> = vec![];
+                let mut lines = Vec::with_capacity(1024);
                 let pf = self
                     .get_profile(name)
                     .expect("Cannot find selected profile");

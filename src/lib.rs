@@ -1,11 +1,9 @@
 #![warn(clippy::all)]
+#![deny(unsafe_code)]
 pub mod backend;
+mod error;
 pub mod profile;
 pub mod webapi;
 
-// #[derive(Debug, Default, Serialize, Deserialize)]
-// #[serde(default)]
-// struct Extra {
-//     edit_cmd: String,
-//     open_dir_cmd: String,
-// }
+pub type Result<T> = core::result::Result<T, Error>;
+pub use error::Error;

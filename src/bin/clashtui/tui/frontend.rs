@@ -32,7 +32,14 @@ impl FrontEnd {
     pub fn new() -> Self {
         let service_tab = tabs::service::ServiceTab::new();
         let profile_tab = tabs::profile::ProfileTab::new();
-        let tabs = vec![profile_tab.into(), service_tab.into()];
+        #[cfg(feature = "bin-dev")]
+        let connection_tab = tabs::connection::ConnctionTab::new();
+        let tabs = vec![
+            profile_tab.into(),
+            service_tab.into(),
+            #[cfg(feature = "bin-dev")]
+            connection_tab.into(),
+        ];
         Self {
             tabs,
             tab_index: 0,
@@ -137,9 +144,14 @@ impl FrontEnd {
                     CallBack::ProfileInit(..) => self.tabs[0].apply_backend_call(op),
                     #[cfg(feature = "template")]
                     CallBack::TemplateInit(_) => self.tabs[0].apply_backend_call(op),
+                    // assume ConnctionTab is the third tab
+                    #[cfg(feature = "bin-dev")]
+                    CallBack::ConnctionInit(..) => self.tabs[2].apply_backend_call(op),
                     CallBack::ProfileCTL(_) | CallBack::ServiceCTL(_) => {
                         self.tabs[self.tab_index].apply_backend_call(op)
                     }
+                    #[cfg(feature = "bin-dev")]
+                    CallBack::ConnctionCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
                 },
                 Err(e) => match e {
                     tokio::sync::mpsc::error::TryRecvError::Empty => break,
