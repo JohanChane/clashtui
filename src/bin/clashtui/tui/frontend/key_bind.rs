@@ -163,8 +163,8 @@ define_keys! {
         TemplateSwitch(KeyCode::Char('p')),
         # #[cfg(feature = "bin-dev")]
         # Connction
-        /// work in progress
-        ConnKillAll(KeyCode::Char('k')),
+        /// Terminate all running connections
+        ConnKillAll(KeyCode::Char('c')),
         # Global
         /// Edit this
         Edit(KeyCode::Char('e')),

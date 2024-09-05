@@ -18,6 +18,8 @@ pub struct Theme {
     pub input_text_selected_fg: Color,
     pub input_text_unselected_fg: Color,
 
+    pub table_static_bg: Color,
+
     pub list_block_fouced_fg: Color,
     pub list_block_unfouced_fg: Color,
     pub list_hl_bg_fouced: Color,
@@ -58,6 +60,8 @@ impl Default for Theme {
 
             input_text_selected_fg: Color::Yellow,
             input_text_unselected_fg: Color::Reset,
+
+            table_static_bg: Color::DarkGray,
 
             list_block_fouced_fg: Color::Rgb(0, 204, 153),
             list_block_unfouced_fg: Color::Rgb(220, 220, 220),

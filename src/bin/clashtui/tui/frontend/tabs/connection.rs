@@ -37,22 +37,29 @@ impl Drawable for ConnctionTab {
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, _: bool) {
         use Ra::{Constraint, Stylize};
         use Raw::{Block, Borders, Table};
-        let cur_width = f.area().width;
         let tabs = Table::new(
             self.items
                 .iter()
                 .map(|l| l.build_col().style(Ra::Style::default())),
             [
-                Constraint::Length(cur_width / 5),
-                Constraint::Length(cur_width / 5),
-                Constraint::Length(cur_width / 10),
-                Constraint::Length(cur_width / 5),
-                Constraint::Length(cur_width / 10),
-                Constraint::Length(cur_width / 10),
+                Constraint::Percentage(25),
+                Constraint::Min(6),
+                Constraint::Percentage(5),
+                Constraint::Max(24),
+                Constraint::Max(10),
+                Constraint::Max(10),
             ],
         )
-        .header(Connection::build_header())
-        .footer(Connection::build_footer(self.travel_up, self.travel_down))
+        .header(
+            Connection::build_header()
+                .gray()
+                .bg(Theme::get().table_static_bg),
+        )
+        .footer(
+            Connection::build_footer(self.travel_up, self.travel_down)
+                .gray()
+                .bg(Theme::get().table_static_bg),
+        )
         .fg(if self.selected_con.is_none() {
             Theme::get().list_block_fouced_fg
         } else {
@@ -80,35 +87,8 @@ impl Drawable for ConnctionTab {
         if let Some(con) = self.selected_con.as_ref() {
             let area = tools::centered_percent_rect(60, 60, f.area());
             f.render_widget(Raw::Clear, area);
-            // let list = Raw::List::from_iter(self.items.iter().map(|i| {
-            //     Raw::ListItem::new(Ra::Line::from(i.as_str())).style(Ra::Style::default())
-            // }));
-            // f.render_stateful_widget(
-            //     list.block(
-            //         Raw::Block::default()
-            //             .borders(Raw::Borders::ALL)
-            //             .border_style(Ra::Style::default().fg(Theme::get().list_block_fouced_fg))
-            //             .title(self.title.as_str()),
-            //     )
-            //     .highlight_style(
-            //         Ra::Style::default()
-            //             .bg(Theme::get().list_hl_bg_fouced)
-            //             .add_modifier(Ra::Modifier::BOLD),
-            //     ),
-            //     area,
-            //     &mut self.list_state,
-            // );
-
-            // if self.items.len() + 2 > area.height as usize {
-            //     f.render_stateful_widget(
-            //         Raw::Scrollbar::default()
-            //             .orientation(Raw::ScrollbarOrientation::VerticalRight)
-            //             .begin_symbol(Some("↑"))
-            //             .end_symbol(Some("↓")),
-            //         area,
-            //         &mut self.scrollbar,
-            //     );
-            // }
+            use Ra::Widget;
+            con.render(area, f.buffer_mut());
         }
     }
 

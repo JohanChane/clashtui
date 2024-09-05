@@ -29,16 +29,13 @@ bin-cli = [
 ]
 bin-tui = ["ratatui", "crossterm", "tokio", "bin-cli", "bin-dev"]
 template = []
-bin-dev = []
+bin-dev = ["ratatui/unstable-widget-ref"]
 
 [[bin]]
 name = "clashtui"
 required-features = ["bin-tui"]
 
 [dependencies]
-ratatui = { version = "^0.28.0", default-features = false, features = [
-  "crossterm",
-], optional = true }
 log = "^0.4.22"
 enumflags2 = { version = "^0.7.10", optional = true }
 clap_complete = { version = "^4.5.7", optional = true }
@@ -64,6 +61,12 @@ optional = true
 version = "^0.28.1"
 default-features = false
 features = ["events", "event-stream"]
+optional = true
+
+[dependencies.ratatui]
+version = "^0.28.1"
+default-features = false
+features = ["crossterm"]
 optional = true
 
 [target.'cfg(windows)'.dependencies]
