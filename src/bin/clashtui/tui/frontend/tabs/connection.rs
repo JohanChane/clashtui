@@ -85,8 +85,6 @@ impl Drawable for ConnctionTab {
             &mut self.state,
         );
         if let Some(con) = self.selected_con.as_ref() {
-            let area = tools::centered_rect(Constraint::Percentage(60), Constraint::Percentage(60), f.area());
-            f.render_widget(Raw::Clear, area);
             use Ra::Widget;
             con.render(area, f.buffer_mut());
         }

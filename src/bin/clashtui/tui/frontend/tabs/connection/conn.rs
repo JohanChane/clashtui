@@ -17,8 +17,8 @@ impl Connection {
             Text::from(self.chains.as_str()).centered(),
             Text::from(self.rule_type.to_string()).centered(),
             Text::from(self.start.as_str()).centered(),
-            Text::from(bytes_to_readable(self.upload)).centered(),
-            Text::from(bytes_to_readable(self.download)).centered(),
+            Text::from(bytes_to_readable(self.upload, None)).centered(),
+            Text::from(bytes_to_readable(self.download, None)).centered(),
         ])
     }
     /// once lose track, this [Connection] will never be tracked again
@@ -37,8 +37,8 @@ impl Connection {
             Text::from("").centered(),
             Text::from("").centered(),
             Text::from("").centered(),
-            Text::from(bytes_to_readable(upload)).centered(),
-            Text::from(bytes_to_readable(download)).centered(),
+            Text::from(bytes_to_readable(upload, None)).centered(),
+            Text::from(bytes_to_readable(download, None)).centered(),
         ])
     }
 }
@@ -116,11 +116,11 @@ fn t() {
 impl Raw::WidgetRef for Connection {
     /// draw like
     ///```md
-    /// ┌────────────────────────────────────┬──────────┐
-    /// │domain                              │upload    │
-    /// ├────────────────────────────────────┼──────────┤
-    /// │chain                               │download  │
-    /// ├──────────────────────┬─────────────┴──────────┤
+    /// ┌───────────────────────────────────┬───────────┐
+    /// │domain                             │↑upload    │
+    /// ├───────────────────────────────────┼───────────┤
+    /// │chain                              │↓download  │
+    /// ├──────────────────────┬────────────┴───────────┤
     /// │Type                  │start time              │
     /// ├──────────────────────┴────────────────────────┤
     /// │Id                                             │
@@ -136,20 +136,22 @@ impl Raw::WidgetRef for Connection {
             symbols::{border, line::NORMAL},
             Constraint,
             Constraint::Length,
-            Layout,
+            Layout, Stylize,
         };
         use Raw::{Block, Borders, Paragraph};
 
         // 5 rows, offset = 10
         let a_centered =
             tools::centered_rect(Constraint::Percentage(60), Constraint::Length(11), area);
+        Raw::Clear.render(a_centered, buf);
+
         let hes = Layout::vertical([Length(3), Length(1), Length(3), Length(1), Length(3)])
             .split(a_centered);
-        let rc_r0 = Layout::horizontal([Constraint::Percentage(100), Constraint::Min(10 + 2)])
+        let rc_r0 = Layout::horizontal([Constraint::Percentage(100), Constraint::Min(10 + 1 + 2)])
             .split(hes[0]);
-        let a_chain = rc_r0[0];
+        let a_domain = rc_r0[0];
         // ┌────────────────────────────────────
-        // │domain                              
+        // │domain
         // ├────────────────────────────────────
         let b_domain = Block::new()
             .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
@@ -169,11 +171,11 @@ impl Raw::WidgetRef for Connection {
                 bottom_right: NORMAL.vertical_left,
                 ..border::PLAIN
             });
-        let rc_r1 = Layout::horizontal([Constraint::Percentage(100), Constraint::Min(10 + 2)])
+        let rc_r1 = Layout::horizontal([Constraint::Percentage(100), Constraint::Min(10 + 1 + 2)])
             .split(hes[1]);
-        let a_domain = rc_r1[0];
+        let a_chain = rc_r1[0];
         //
-        // │chain                               
+        // │chain
         //
         let b_chain = Block::new().borders(Borders::LEFT);
         let a_download = rc_r1[1];
@@ -183,13 +185,13 @@ impl Raw::WidgetRef for Connection {
         let b_download = Block::new().borders(Borders::LEFT | Borders::RIGHT);
         let rc_r2 = Layout::horizontal([
             Constraint::Percentage(100),
-            Constraint::Min(14),
-            Constraint::Min(10 + 2),
+            Constraint::Min(24 - 10 - 1),
+            Constraint::Min(10 + 1 + 2),
         ])
         .split(hes[2]);
         let a_type = rc_r2[0];
         // ├──────────────────────
-        // │Type                  
+        // │Type
         // ├──────────────────────
         let b_type = Block::new()
             .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
@@ -200,7 +202,7 @@ impl Raw::WidgetRef for Connection {
             });
         let a_startime_0 = rc_r2[1];
         // ┬─────────────
-        // │start time   
+        // │start time
         // ┴─────────────
         let b_startime_0 = Block::new()
             .borders(Borders::LEFT | Borders::TOP | Borders::BOTTOM)
@@ -241,50 +243,61 @@ impl Raw::WidgetRef for Connection {
             });
         use Ra::Widget;
         Paragraph::new(self.domain.as_str())
-            .block(b_chain)
+            .block(b_domain.fg(Theme::get().popup_block_fg))
+            .fg(Theme::get().popup_text_fg)
             .render(a_domain, buf);
         Paragraph::new(self.rule_type.as_str())
-            .block(b_type)
+            .block(b_type.fg(Theme::get().popup_block_fg))
+            .fg(Theme::get().popup_text_fg)
             .render(a_type, buf);
         Paragraph::new(self.chains.as_str())
-            .block(b_domain)
+            .block(b_chain.fg(Theme::get().popup_block_fg))
+            .fg(Theme::get().popup_text_fg)
             .render(a_chain, buf);
         Paragraph::new(self.start.chars().take(14).collect::<String>())
-            .block(b_startime_0)
+            .block(b_startime_0.fg(Theme::get().popup_block_fg))
+            .fg(Theme::get().popup_text_fg)
             .render(a_startime_0, buf);
         Paragraph::new(self.start.chars().skip(14).collect::<String>())
-            .block(b_startime_1)
+            .block(b_startime_1.fg(Theme::get().popup_block_fg))
+            .fg(Theme::get().popup_text_fg)
             .render(a_startime_1, buf);
-        Paragraph::new(bytes_to_readable(self.upload))
-            .block(b_upload)
+        Paragraph::new(bytes_to_readable(self.upload, Some("↑")))
+            .block(b_upload.fg(Theme::get().popup_block_fg))
+            .fg(Theme::get().popup_text_fg)
             .render(a_upload, buf);
-        Paragraph::new(bytes_to_readable(self.download))
-            .block(b_download)
+        Paragraph::new(bytes_to_readable(self.download, Some("↓")))
+            .block(b_download.fg(Theme::get().popup_block_fg))
+            .fg(Theme::get().popup_text_fg)
             .render(a_download, buf);
         Paragraph::new(self.id.as_str())
-            .block(b_id)
+            .block(b_id.fg(Theme::get().popup_block_fg))
+            .fg(Theme::get().popup_text_fg)
             .render(a_id, buf);
         Paragraph::new("Press Enter to terminate this connection, Esc to close")
-            .block(b_promopt)
+            .block(b_promopt.fg(Theme::get().popup_block_fg))
+            .fg(Theme::get().popup_text_fg)
             .render(a_promopt, buf);
     }
 }
 
-fn bytes_to_readable(bytes: u64) -> String {
+fn bytes_to_readable(bytes: u64, prefix: Option<&str>) -> String {
     const KILOBYTE: u64 = 1024;
     const MEGABYTE: u64 = KILOBYTE * 1024;
     const GIGABYTE: u64 = MEGABYTE * 1024;
     const TERABYTE: u64 = GIGABYTE * 1024;
 
+    let prefix = prefix.unwrap_or_default();
+
     if bytes >= TERABYTE {
-        format!("{:.2} TB", bytes as f64 / TERABYTE as f64)
+        format!("{prefix}{:.2} TB", bytes as f64 / TERABYTE as f64)
     } else if bytes >= GIGABYTE {
-        format!("{:.2} GB", bytes as f64 / GIGABYTE as f64)
+        format!("{prefix}{:.2} GB", bytes as f64 / GIGABYTE as f64)
     } else if bytes >= MEGABYTE {
-        format!("{:.2} MB", bytes as f64 / MEGABYTE as f64)
+        format!("{prefix}{:.2} MB", bytes as f64 / MEGABYTE as f64)
     } else if bytes >= KILOBYTE {
-        format!("{:.2} KB", bytes as f64 / KILOBYTE as f64)
+        format!("{prefix}{:.2} KB", bytes as f64 / KILOBYTE as f64)
     } else {
-        format!("{} Bytes", bytes)
+        format!("{prefix}{} Bytes", bytes)
     }
 }
