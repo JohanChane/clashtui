@@ -87,7 +87,9 @@ fn main() {
 #[tokio::main(flavor = "current_thread")]
 async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     use tui::setup;
-    tui::Theme::load(None)?;
+    if let Err(_) = tui::Theme::load(None) {
+        log::error!("Global Theme has been loaded");
+    }
     let app = tui::FrontEnd::new();
     setup::setup()?;
     // make terminal restore after panic

@@ -3,14 +3,9 @@ use std::sync::OnceLock;
 
 static GLOBAL_THEME: OnceLock<Theme> = OnceLock::new();
 
-// Given that this is a single-theard app, sync do not seem to be important
-// But OnceCell impl !Sync, so this new type is needed
-// However, there seems to be not need to bypass this, so I should just keep it
-//
-// struct Bx(std::cell::OnceCell<Theme>);
-// unsafe impl Sync for Bx {}
-
 // #[derive(serde::Serialize, serde::Deserialize)]
+// in avoid some feature not enable causing a warning
+#[allow(unused)]
 pub struct Theme {
     pub popup_block_fg: Color,
     pub popup_text_fg: Color,
@@ -33,7 +28,7 @@ pub struct Theme {
 }
 
 impl Theme {
-    pub fn load(_ph: Option<&std::path::PathBuf>) -> Result<(), anyhow::Error> {
+    pub fn load(_ph: Option<&std::path::PathBuf>) -> Result<(), ()> {
         let _ = GLOBAL_THEME.set(Self::default());
         Ok(())
     }

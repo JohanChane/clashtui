@@ -161,7 +161,7 @@ define_keys! {
         # Template
         /// Switch to profile sub tab
         TemplateSwitch(KeyCode::Char('p')),
-        # #[cfg(feature = "bin-dev")]
+        # #[cfg(feature = "connection-tab")]
         # Connction
         /// Terminate all running connections
         ConnKillAll(KeyCode::Char('c')),

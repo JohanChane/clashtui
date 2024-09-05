@@ -25,9 +25,9 @@ pub enum CallBack {
     Preview(Vec<String>),
     ServiceCTL(String),
     ProfileCTL(Vec<String>),
-    #[cfg(feature = "bin-dev")]
+    #[cfg(feature = "connection-tab")]
     ConnctionCTL(String),
-    #[cfg(feature = "bin-dev")]
+    #[cfg(feature = "connection-tab")]
     ConnctionInit(clashtui::webapi::ConnInfo),
     ProfileInit(Vec<String>, Vec<Option<core::time::Duration>>),
     #[cfg(feature = "template")]
@@ -50,9 +50,9 @@ impl std::fmt::Display for CallBack {
                 CallBack::ProfileInit(..) => "ProfileInit",
                 #[cfg(feature = "template")]
                 CallBack::TemplateInit(_) => "TemplateInit",
-                #[cfg(feature = "bin-dev")]
+                #[cfg(feature = "connection-tab")]
                 CallBack::ConnctionCTL(_) => "ConnctionTab",
-                #[cfg(feature = "bin-dev")]
+                #[cfg(feature = "connection-tab")]
                 CallBack::ConnctionInit(_) => "ConnctionInit",
             }
         )
@@ -92,7 +92,7 @@ impl BackEnd {
                 // DO NEVER return [`CallBack::Error`],
                 // otherwise tui might be 'blocked' by error message
                 let state = match self.update_state(None, None) {
-                    // TODO: add connection update return here
+                    // TODO: add connection-tab update return here
                     Ok(v) => CallBack::State(v.to_string()),
                     Err(e) => {
                         if !errs.contains(&e.to_string()) {
@@ -104,7 +104,7 @@ impl BackEnd {
                     }
                 };
                 cbs.push(state);
-                #[cfg(feature = "bin-dev")]
+                #[cfg(feature = "connection-tab")]
                 let conns = match self.inner.api.get_connections() {
                     Ok(v) => CallBack::ConnctionInit(v),
                     Err(e) => {
@@ -116,7 +116,7 @@ impl BackEnd {
                         //write this direct to log, write only once
                     }
                 };
-                #[cfg(feature = "bin-dev")]
+                #[cfg(feature = "connection-tab")]
                 cbs.push(conns);
             } else {
                 let cb = match op {
@@ -145,7 +145,7 @@ impl BackEnd {
                             }
                         }
                     }
-                    #[cfg(feature = "bin-dev")]
+                    #[cfg(feature = "connection-tab")]
                     Call::Connection(op) => match op {
                         tabs::connection::BackendOp::Terminal(id) => {
                             match self.inner.api.terminate_connection(Some(id)) {

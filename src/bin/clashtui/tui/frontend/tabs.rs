@@ -1,4 +1,4 @@
-#[cfg(feature = "bin-dev")]
+#[cfg(feature = "connection-tab")]
 pub mod connection;
 pub mod profile;
 pub mod service;
@@ -13,7 +13,7 @@ use crossterm::event::KeyEvent;
 use ratatui::prelude as Ra;
 use Ra::{Frame, Rect};
 
-#[cfg(feature = "bin-dev")]
+#[cfg(feature = "connection-tab")]
 use connection::ConnctionTab;
 use profile::ProfileTab;
 use service::ServiceTab;
@@ -32,7 +32,7 @@ build_tabs!(
     enum Tabs {
         Profile(ProfileTab),
         Service(ServiceTab),
-        #[cfg(feature = "bin-dev")]
+        #[cfg(feature = "connection-tab")]
         Connection(ConnctionTab),
     }
 );
@@ -47,7 +47,7 @@ impl std::fmt::Display for TabContainer {
             match self.0 {
                 Tabs::Profile(_) => consts::TAB_TITLE_PROFILE,
                 Tabs::Service(_) => consts::TAB_TITLE_SERVICE,
-                #[cfg(feature = "bin-dev")]
+                #[cfg(feature = "connection-tab")]
                 Tabs::Connection(_) => consts::TAB_TITLE_CONNECTION,
             }
         )

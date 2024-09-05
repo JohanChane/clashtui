@@ -27,9 +27,9 @@ bin-cli = [
   "log4rs",
   "encoding",
 ]
-bin-tui = ["ratatui", "crossterm", "tokio", "bin-cli", "bin-dev"]
+bin-tui = ["ratatui", "crossterm", "tokio", "bin-cli", "connection-tab"]
 template = []
-bin-dev = ["ratatui/unstable-widget-ref"]
+connection-tab = ["ratatui/unstable-widget-ref"]
 
 [[bin]]
 name = "clashtui"

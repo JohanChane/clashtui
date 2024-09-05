@@ -32,12 +32,12 @@ impl FrontEnd {
     pub fn new() -> Self {
         let service_tab = tabs::service::ServiceTab::new();
         let profile_tab = tabs::profile::ProfileTab::new();
-        #[cfg(feature = "bin-dev")]
+        #[cfg(feature = "connection-tab")]
         let connection_tab = tabs::connection::ConnctionTab::new();
         let tabs = vec![
             profile_tab.into(),
             service_tab.into(),
-            #[cfg(feature = "bin-dev")]
+            #[cfg(feature = "connection-tab")]
             connection_tab.into(),
         ];
         Self {
@@ -145,12 +145,12 @@ impl FrontEnd {
                     #[cfg(feature = "template")]
                     CallBack::TemplateInit(_) => self.tabs[0].apply_backend_call(op),
                     // assume ConnctionTab is the third tab
-                    #[cfg(feature = "bin-dev")]
+                    #[cfg(feature = "connection-tab")]
                     CallBack::ConnctionInit(..) => self.tabs[2].apply_backend_call(op),
                     CallBack::ProfileCTL(_) | CallBack::ServiceCTL(_) => {
                         self.tabs[self.tab_index].apply_backend_call(op)
                     }
-                    #[cfg(feature = "bin-dev")]
+                    #[cfg(feature = "connection-tab")]
                     CallBack::ConnctionCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
                 },
                 Err(e) => match e {
