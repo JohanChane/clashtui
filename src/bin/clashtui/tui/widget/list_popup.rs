@@ -32,7 +32,7 @@ impl ListPopup {
 impl Drawable for ListPopup {
     /// No need to [Raw::clear], or plan aera
     fn render(&mut self, f: &mut ratatui::Frame, _: ratatui::layout::Rect, _: bool) {
-        let area = tools::centered_percent_rect(60, 60, f.area());
+        let area = tools::centered_rect(Ra::Constraint::Percentage(60), Ra::Constraint::Percentage(60), f.area());
         f.render_widget(Raw::Clear, area);
         let list = Raw::List::from_iter(self.items.iter().map(|i| {
             Raw::ListItem::new(Ra::Text::from(

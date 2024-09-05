@@ -64,7 +64,11 @@ impl Drawable for ConfirmPopup {
                 if text.is_empty() { 3 } else { text.len() + 2 },
                 f.area().height as usize - 6,
             );
-            tools::centered_lenght_rect(dialog_width as u16, dialog_height as u16, f.area())
+            tools::centered_rect(
+                Ra::Constraint::Length(dialog_width as u16),
+                Ra::Constraint::Length(dialog_height as u16),
+                f.area(),
+            )
         };
 
         let paragraph = if text.len() == 1 && max_item_width < area.width as usize {
