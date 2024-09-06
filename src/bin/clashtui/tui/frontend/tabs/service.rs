@@ -71,8 +71,12 @@ impl TabCont for ServiceTab {
 
     fn apply_backend_call(&mut self, op: CallBack) {
         if let CallBack::ServiceCTL(result) = op {
-            self.popup_content
-                .replace(PopMsg::Prompt(vec!["Success".to_string(), result]));
+            let result = ["Success"]
+                .into_iter()
+                .chain(result.lines())
+                .map(|s| s.to_owned())
+                .collect();
+            self.popup_content.replace(PopMsg::Prompt(result));
         } else {
             unreachable!("{} get unexpected op", TAB_TITLE_SERVICE)
         }
