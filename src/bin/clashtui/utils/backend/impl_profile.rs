@@ -168,9 +168,18 @@ impl BackEnd {
                 let pf = self
                     .get_profile(name)
                     .expect("Cannot find selected profile");
+
                 match self.load_local_profile(&pf).and_then(|pf| {
-                    clashtui::backend::ipc::spawn(&self.edit_cmd, vec![&pf.path.to_string_lossy()])
-                        .map_err(|e| e.into())
+                    clashtui::backend::ipc::spawn(
+                        "sh",
+                        vec![
+                            "-c",
+                            self.edit_cmd
+                                .replace("%s", &pf.path.to_string_lossy())
+                                .as_str(),
+                        ],
+                    )
+                    .map_err(|e| e.into())
                 }) {
                     Ok(_) => CallBack::Edit,
                     Err(e) => CallBack::Error(e.to_string()),
