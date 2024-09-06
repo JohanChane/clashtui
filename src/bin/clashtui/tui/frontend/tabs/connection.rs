@@ -99,9 +99,12 @@ impl Drawable for ConnctionTab {
         if self.selected_con.is_some() {
             match ev.code {
                 KeyCode::Enter => {
-                    self.backend_content = Some(Call::Connection(BackendOp::Terminal(
-                        self.selected_con.take().unwrap().id,
-                    )))
+                    self.backend_content = self
+                        .selected_con
+                        .take()
+                        .unwrap()
+                        .id
+                        .map(|id| Call::Connection(BackendOp::Terminal(id)))
                 }
                 // KeyCode::Left => todo!(),
                 // KeyCode::Right => todo!(),

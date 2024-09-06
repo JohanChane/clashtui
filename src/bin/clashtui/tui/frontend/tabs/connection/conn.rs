@@ -7,7 +7,7 @@ pub struct Connection {
     start: String,
     upload: u64,
     download: u64,
-    pub id: String,
+    pub id: Option<String>,
 }
 impl Connection {
     pub fn build_col(&self) -> Raw::Row {
@@ -23,7 +23,7 @@ impl Connection {
     }
     /// once lose track, this [Connection] will never be tracked again
     pub fn lose_track(mut self) -> Box<Self> {
-        self.id = "Lose Track, Maybe Closed".to_owned();
+        self.id = None;
         Box::new(self)
     }
     pub fn build_header() -> Raw::Row<'static> {
@@ -79,7 +79,7 @@ impl From<clashtui::webapi::Conn> for Connection {
             start,
             upload,
             download,
-            id,
+            id: Some(id),
         }
     }
 }
@@ -96,7 +96,7 @@ fn t() {
             start: "start time".to_owned(),
             upload: 100,
             download: 10000,
-            id: "id".to_owned(),
+            id: Some("id".to_owned()),
         };
         f.render_widget(&this, f.area())
     }
@@ -270,10 +270,15 @@ impl Raw::WidgetRef for Connection {
             .block(b_download.fg(Theme::get().popup_block_fg))
             .fg(Theme::get().popup_text_fg)
             .render(a_download, buf);
-        Paragraph::new(self.id.as_str())
-            .block(b_id.fg(Theme::get().popup_block_fg))
-            .fg(Theme::get().popup_text_fg)
-            .render(a_id, buf);
+        Paragraph::new(
+            self.id
+                .as_ref()
+                .map(|s| s.as_str())
+                .unwrap_or("Lose Track, Maybe Closed"),
+        )
+        .block(b_id.fg(Theme::get().popup_block_fg))
+        .fg(Theme::get().popup_text_fg)
+        .render(a_id, buf);
         Paragraph::new("Press Enter to terminate this connection, Esc to close")
             .block(b_promopt.fg(Theme::get().popup_block_fg))
             .fg(Theme::get().popup_text_fg)
