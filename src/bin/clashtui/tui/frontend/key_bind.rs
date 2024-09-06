@@ -60,7 +60,7 @@ macro_rules! define_keys {
     ($(#[$attr:meta])*
     $vis:vis enum $name: ident
     {$(
-        $(##[cfg($prompt_cfg_attr:meta)])*
+        $(# #[cfg($prompt_cfg_attr:meta)])*
         # $prompt:ident $(,)?
         $(
             $(#[doc = $doc:expr])*
@@ -103,6 +103,7 @@ macro_rules! define_keys {
                 [$(
                     $(#[cfg($prompt_cfg_attr)])*
                     concat!("# ",stringify!($prompt)),
+                    $(#[cfg($prompt_cfg_attr)])*
                     $(
                         $(#[cfg($cfg_attr)])*
                         (concat!($($ch)? $($chs)?, ":" $(, $doc)*)),
@@ -119,6 +120,7 @@ macro_rules! define_keys {
                 <[()]>::len(&[$(
                     $(#[cfg($prompt_cfg_attr)])*
                     replace_expr!($prompt, ()),
+                    $(#[cfg($prompt_cfg_attr)])*
                     $(
                         $(#[cfg($cfg_attr)])*
                         replace_expr!($variant, ()),
@@ -159,6 +161,10 @@ define_keys! {
         # Template
         /// Switch to profile sub tab
         TemplateSwitch(KeyCode::Char('p')),
+        # #[cfg(feature = "connection-tab")]
+        # Connction
+        /// Terminate all running connections
+        ConnKillAll(KeyCode::Char('c')),
         # Global
         /// Edit this
         Edit(KeyCode::Char('e')),

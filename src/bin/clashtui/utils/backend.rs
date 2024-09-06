@@ -25,6 +25,10 @@ pub enum CallBack {
     Preview(Vec<String>),
     ServiceCTL(String),
     ProfileCTL(Vec<String>),
+    #[cfg(feature = "connection-tab")]
+    ConnctionCTL(String),
+    #[cfg(feature = "connection-tab")]
+    ConnctionInit(clashtui::webapi::ConnInfo),
     ProfileInit(Vec<String>, Vec<Option<core::time::Duration>>),
     #[cfg(feature = "template")]
     TemplateInit(Vec<String>),
@@ -46,6 +50,10 @@ impl std::fmt::Display for CallBack {
                 CallBack::ProfileInit(..) => "ProfileInit",
                 #[cfg(feature = "template")]
                 CallBack::TemplateInit(_) => "TemplateInit",
+                #[cfg(feature = "connection-tab")]
+                CallBack::ConnctionCTL(_) => "ConnctionTab",
+                #[cfg(feature = "connection-tab")]
+                CallBack::ConnctionInit(_) => "ConnctionInit",
             }
         )
     }
@@ -77,103 +85,152 @@ impl BackEnd {
                 .recv()
                 .await
                 .ok_or(anyhow::anyhow!("{}", consts_err::APP_TX))?;
-            let cb = match op {
-                Call::Profile(op) => match op {
-                    tabs::profile::BackendOp::Profile(op) => self.handle_profile_op(op),
-                    #[cfg(feature = "template")]
-                    tabs::profile::BackendOp::Template(op) => self.handle_template_op(op),
-                },
-                Call::Service(op) => {
-                    match op {
-                        tabs::service::BackendOp::SwitchMode(mode) => {
-                            // tick will refresh state
-                            match self.update_state(None, Some(mode.to_string())) {
-                                Ok(_) => {
-                                    CallBack::ServiceCTL(format!("Mode is switched to {}", mode))
-                                }
-                                Err(e) => CallBack::Error(e.to_string()),
-                            }
-                        }
-                        tabs::service::BackendOp::ServiceCTL(op) => match self.clash_srv_ctl(op) {
-                            Ok(v) => CallBack::ServiceCTL(v),
-                            Err(e) => CallBack::Error(e.to_string()),
-                        },
-                    }
-                }
-                Call::Logs(start, len) => match self.logcat(start, len) {
-                    Ok(v) => CallBack::Logs(v),
-                    Err(e) => CallBack::Error(e.to_string()),
-                },
-                Call::Infos => {
-                    let mut infos = vec![
-                        "# CLASHTUI".to_owned(),
-                        format!("version:{}", crate::utils::consts::VERSION),
-                    ];
-                    match self
-                        .inner
-                        .api
-                        .version()
-                        .map_err(|e| e.into())
-                        .and_then(|ver| {
-                            self.inner.api.config_get().map(|cfg| {
-                                let mut cfg = cfg.build();
-                                cfg.insert(2, "# CLASH".to_owned());
-                                cfg.insert(3, format!("version:{ver}"));
-                                cfg
-                            })
-                        }) {
-                        Ok(info) => {
-                            infos.extend(info);
-                            CallBack::Infos(infos)
-                        }
-                        Err(e) => {
-                            infos.extend(["# CLASH".to_owned(), format!("{e}")]);
-                            CallBack::Infos(infos)
-                        }
-                    }
-                }
-                // unfortunately, this might(in fact almost always) block by
-                // thousand of [Call::Tick],
-                //
-                // another match might help
-                Call::Stop => return Ok(self.save()),
+            let mut cbs = Vec::with_capacity(2);
+            if let Call::Tick = op {
                 // register some real-time work here
                 //
                 // DO NEVER return [`CallBack::Error`],
                 // otherwise tui might be 'blocked' by error message
-                Call::Tick => {
-                    match self.update_state(None, None) {
-                        Ok(v) => CallBack::State(v.to_string()),
-                        Err(e) => {
-                            if !errs.contains(&e.to_string()) {
-                                log::error!("An error happens in Tick:{e}");
-                                errs.push(e.to_string());
+                let state = match self.update_state(None, None) {
+                    // TODO: add connection-tab update return here
+                    Ok(v) => CallBack::State(v.to_string()),
+                    Err(e) => {
+                        if !errs.contains(&e.to_string()) {
+                            log::error!("An error happens in Tick:{e}");
+                            errs.push(e.to_string());
+                        }
+                        CallBack::State(State::unknown(self.get_current_profile().name))
+                        //write this direct to log, write only once
+                    }
+                };
+                cbs.push(state);
+                #[cfg(feature = "connection-tab")]
+                let conns = match self.inner.api.get_connections() {
+                    Ok(v) => CallBack::ConnctionInit(v),
+                    Err(e) => {
+                        if !errs.contains(&e.to_string()) {
+                            log::error!("An error happens in Tick:{e}");
+                            errs.push(e.to_string());
+                        }
+                        CallBack::ConnctionInit(Default::default())
+                        //write this direct to log, write only once
+                    }
+                };
+                #[cfg(feature = "connection-tab")]
+                cbs.push(conns);
+            } else {
+                let cb = match op {
+                    Call::Profile(op) => match op {
+                        tabs::profile::BackendOp::Profile(op) => self.handle_profile_op(op),
+                        #[cfg(feature = "template")]
+                        tabs::profile::BackendOp::Template(op) => self.handle_template_op(op),
+                    },
+                    Call::Service(op) => {
+                        match op {
+                            tabs::service::BackendOp::SwitchMode(mode) => {
+                                // tick will refresh state
+                                match self.update_state(None, Some(mode.to_string())) {
+                                    Ok(_) => CallBack::ServiceCTL(format!(
+                                        "Mode is switched to {}",
+                                        mode
+                                    )),
+                                    Err(e) => CallBack::Error(e.to_string()),
+                                }
                             }
-                            CallBack::State(State::unknown(self.get_current_profile().name))
-                            //write this direct to log, write only once
+                            tabs::service::BackendOp::ServiceCTL(op) => {
+                                match self.clash_srv_ctl(op) {
+                                    Ok(v) => CallBack::ServiceCTL(v),
+                                    Err(e) => CallBack::Error(e.to_string()),
+                                }
+                            }
                         }
                     }
-                }
-            };
-            if tx.send(cb).await.is_err() {
-                return match rx.recv().await {
-                    // normal shutdown
-                    Some(Call::Stop) => Ok(self.save()),
-                    // try match other op in channel if there is
-                    //
-                    // I use panic in hope to catch those at develop time
-                    Some(Call::Tick) => {
-                        let mut buf = vec![];
-                        rx.recv_many(&mut buf, 10).await;
-                        buf.into_iter().for_each(|op| match op {
-                            Call::Tick | Call::Stop => {}
-                            _ => panic!("leftover value in backend rx {op}"),
-                        });
-                        Ok(self.save())
+                    #[cfg(feature = "connection-tab")]
+                    Call::Connection(op) => match op {
+                        tabs::connection::BackendOp::Terminal(id) => {
+                            match self.inner.api.terminate_connection(Some(id)) {
+                                Ok(v) => CallBack::ConnctionCTL(if v {
+                                    "Success".to_owned()
+                                } else {
+                                    "Failed, log as debug level".to_owned()
+                                }),
+                                Err(e) => CallBack::Error(e.to_string()),
+                            }
+                        }
+                        tabs::connection::BackendOp::TerminalAll => {
+                            match self.inner.api.terminate_connection(None) {
+                                Ok(v) => CallBack::ConnctionCTL(if v {
+                                    "Success".to_owned()
+                                } else {
+                                    "Failed, log as debug level".to_owned()
+                                }),
+                                Err(e) => CallBack::Error(e.to_string()),
+                            }
+                        }
+                    },
+                    Call::Logs(start, len) => match self.logcat(start, len) {
+                        Ok(v) => CallBack::Logs(v),
+                        Err(e) => CallBack::Error(e.to_string()),
+                    },
+                    Call::Infos => {
+                        let mut infos = vec![
+                            "# CLASHTUI".to_owned(),
+                            format!("version:{}", crate::utils::consts::VERSION),
+                        ];
+                        match self
+                            .inner
+                            .api
+                            .version()
+                            .map_err(|e| e.into())
+                            .and_then(|ver| {
+                                self.inner.api.config_get().map(|cfg| {
+                                    let mut cfg = cfg.build();
+                                    cfg.insert(2, "# CLASH".to_owned());
+                                    cfg.insert(3, format!("version:{ver}"));
+                                    cfg
+                                })
+                            }) {
+                            Ok(info) => {
+                                infos.extend(info);
+                                CallBack::Infos(infos)
+                            }
+                            Err(e) => {
+                                infos.extend(["# CLASH".to_owned(), format!("{e}")]);
+                                CallBack::Infos(infos)
+                            }
+                        }
                     }
-                    Some(op) => panic!("a leftover value in backend rx {op}"),
-                    None => Err(anyhow::anyhow!("{}", consts_err::APP_RX)),
+                    // unfortunately, this might(in fact almost always) block by
+                    // thousand of [Call::Tick],
+                    //
+                    // another match might help
+                    Call::Stop => return Ok(self.save()),
+                    Call::Tick => unreachable!("Done in another"),
                 };
+                cbs.push(cb);
+            }
+            //
+            for cb in cbs {
+                if tx.send(cb).await.is_err() {
+                    return match rx.recv().await {
+                        // normal shutdown
+                        Some(Call::Stop) => Ok(self.save()),
+                        // try match other op in channel if there is
+                        //
+                        // I use panic in hope to catch those at develop time
+                        Some(Call::Tick) => {
+                            let mut buf = vec![];
+                            rx.recv_many(&mut buf, 10).await;
+                            buf.into_iter().for_each(|op| match op {
+                                Call::Tick | Call::Stop => {}
+                                _ => panic!("leftover value in backend rx {op}"),
+                            });
+                            Ok(self.save())
+                        }
+                        Some(op) => panic!("a leftover value in backend rx {op}"),
+                        None => Err(anyhow::anyhow!("{}", consts_err::APP_RX)),
+                    };
+                }
             }
         }
     }

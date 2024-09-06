@@ -2,34 +2,37 @@
 macro_rules! build_tabs {
     ($(#[$attr:meta])*
     $vis:vis enum $name: ident
-    {$($variant:ident($typ:ty),)*}) => {
+    {$($(#[$attr_:meta])* $variant:ident($typ:ty),)*}) => {
         $(#[$attr])*
         $vis enum $name {
-            $($variant($typ)),*
+            $(
+                $(#[$attr_])*
+                $variant($typ)
+            ),*
         }
 
         impl TabCont for $name{
             fn get_backend_call(&mut self) -> Option<Call> {
                 match self {
-                    $(Self::$variant(ref mut tab) => tab.get_backend_call(),)*
+                    $($(#[$attr_])* Self::$variant(ref mut tab) => tab.get_backend_call(),)*
                 }
             }
 
             fn get_popup_content(&mut self) -> Option<PopMsg> {
                 match self {
-                    $(Self::$variant(ref mut tab) => tab.get_popup_content(),)*
+                    $($(#[$attr_])* Self::$variant(ref mut tab) => tab.get_popup_content(),)*
                 }
             }
 
             fn apply_backend_call(&mut self, op: CallBack) {
                 match self {
-                    $(Self::$variant(ref mut tab) => tab.apply_backend_call(op),)*
+                    $($(#[$attr_])* Self::$variant(ref mut tab) => tab.apply_backend_call(op),)*
                 }
             }
 
             fn apply_popup_result(&mut self, evst: EventState) -> EventState {
                 match self {
-                    $(Self::$variant(ref mut tab) => tab.apply_popup_result(evst),)*
+                    $($(#[$attr_])* Self::$variant(ref mut tab) => tab.apply_popup_result(evst),)*
                 }
             }
         }
@@ -37,33 +40,30 @@ macro_rules! build_tabs {
         impl Drawable for $name{
             fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
                 match self {
-                    $(Self::$variant(ref mut tab) => tab.handle_key_event(ev),)*
+                    $($(#[$attr_])* Self::$variant(ref mut tab) => tab.handle_key_event(ev),)*
                 }
             }
 
             fn render(&mut self, f: &mut Frame, area: Rect, is_fouced: bool) {
                 match self {
-                    $(Self::$variant(ref mut tab) => tab.render(f, area, is_fouced),)*
+                    $($(#[$attr_])* Self::$variant(ref mut tab) => tab.render(f, area, is_fouced),)*
                 }
             }
         }
+        // impl From tab to tabcontainer
+        $(
+            $(#[$attr_])*
+            impl From<$typ> for TabContainer{
+                fn from(value: $typ) -> Self {
+                    Self(Tabs::$variant(value))
+                }
+            }
+        )*
 
     };
 }
 
 use super::*;
-
-impl From<ServiceTab> for TabContainer {
-    fn from(value: ServiceTab) -> Self {
-        Self(Tabs::Service(value))
-    }
-}
-
-impl From<ProfileTab> for TabContainer {
-    fn from(value: ProfileTab) -> Self {
-        Self(Tabs::Profile(value))
-    }
-}
 
 impl TabCont for TabContainer {
     fn get_backend_call(&mut self) -> Option<Call> {

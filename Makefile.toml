@@ -3,9 +3,14 @@
 # use for build arm64 in docker
 # CROSS_CONTAINER_IN_CONTAINER = true
 
+[tasks.rd]
+alias = "rundev"
+[tasks.rundev]
+command = "cargo"
+args = ["run", "--features", "bin-tui", "--bin", "clashtui"]
 
 [tasks.ci]
-dependencies = ["setup_mihomo", "ci-flow"]
+dependencies = ["setup-mihomo", "ci-flow"]
 script = ["rm mihomo", "rm Doc/clash_test/cache.db"]
 
 [tasks.ci.windows]
@@ -13,7 +18,7 @@ script = ["rm mihomo", "rm Doc/clash_test/cache.db"]
 dependencies = []
 script = ""
 
-[tasks.setup_mihomo.windows]
+[tasks.setup-mihomo.windows]
 script_runner = "pwsh"
 script_extension = "ps1"
 script = '''
@@ -21,7 +26,7 @@ script = '''
     7z x mihomo.zip
     mihomo-windows-amd64.exe -d Doc/clash_test -f Doc/clash_test/config.yaml &
 '''
-[tasks.setup_mihomo.linux]
+[tasks.setup-mihomo.linux]
 script = '''
     curl --output mihomo.gz -L https://github.com/MetaCubeX/mihomo/releases/download/v1.18.4/mihomo-linux-amd64-v1.18.4.gz
     gunzip mihomo.gz

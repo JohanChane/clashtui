@@ -260,6 +260,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "thiserror",
  "tokio",
 ]
 
@@ -709,6 +710,8 @@ dependencies = [
  "once_cell",
  "rustls",
  "rustls-webpki",
+ "serde",
+ "serde_json",
  "webpki-roots",
 ]
 

@@ -19,6 +19,8 @@ trait Drawable {
 pub enum Call {
     Profile(tabs::profile::BackendOp),
     Service(tabs::service::BackendOp),
+    #[cfg(feature = "connection-tab")]
+    Connection(tabs::connection::BackendOp),
     /// read file by lines, from `total_len-start-length` to `total_len-start`
     Logs(usize, usize),
     /// ask backend for clash infos
@@ -37,6 +39,8 @@ impl std::fmt::Display for Call {
             match self {
                 Call::Profile(_) => "Profile",
                 Call::Service(_) => "Service",
+                #[cfg(feature = "connection-tab")]
+                Call::Connection(_) => "Connection",
                 Call::Logs(..) => "Logs",
                 Call::Infos => "Infos",
                 Call::Tick => "Tick",
