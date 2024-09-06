@@ -43,8 +43,8 @@ dependencies = ["clear-artifacts", "arm64", "amd64", "build_deb"]
 script = '''
     mkdir artifacts
     cp target/debian/*.deb artifacts/clashtui.deb
-    cp target/release/clashtui artifacts/clashtui.release
-    cp target/debug/clashtui artifacts/clashtui.debug
+    cp target/release/clashtui artifacts/clashtui.amd64.release
+    cp target/debug/clashtui artifacts/clashtui.amd64.debug
     cp target/aarch64-unknown-linux-gnu/release/clashtui artifacts/clashtui.arm64.release
     cp target/aarch64-unknown-linux-gnu/debug/clashtui artifacts/clashtui.arm64.debug
 '''

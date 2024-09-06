@@ -8,9 +8,9 @@ pub enum ProfileOp {
     /// Send after [ProfileOp::Update],[ProfileOp::Add],[ProfileOp::Remove]
     /// and [TemplateOp::Generate] if enable template feature
     GetALL,
-    /// go wwithout ask
+    /// go without ask
     Select(String),
-    /// go wwithout ask
+    /// go without ask
     Add(String, String),
     /// ask for two option(`Yes/No`)
     Remove(String),
@@ -36,9 +36,9 @@ pub enum ProfileOp {
 pub enum TemplateOp {
     /// Send after [TemplateOp::Add],[TemplateOp::Remove]
     GetALL,
-    /// go wwithout ask
+    /// go without ask
     Generate(String),
-    /// go wwithout ask
+    /// go without ask
     Add(String),
     /// ask for two option(`Yes/No`)
     Remove(String),
