@@ -10,12 +10,12 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
     //     .and_then(|s| s.parse().ok());
     let PackedArgs(command) = command;
     match command {
-        ArgCommand::Profile(Profile { command }) => match command {
-            ProfileCommand::Update(ProfileUpdate {
+        ArgCommand::Profile { command } => match command {
+            ProfileCommand::Update {
                 all,
                 name,
                 with_proxy,
-            }) => {
+            } => {
                 if all {
                     backend
                         .get_all_profiles()
@@ -52,7 +52,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                 }
                 Ok("Done".to_string())
             }
-            ProfileCommand::Select(ProfileSelect { name }) => {
+            ProfileCommand::Select { name } => {
                 let pf = if let Some(v) = backend.get_profile(&name) {
                     v
                 } else {
@@ -66,8 +66,8 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
             }
         },
         #[cfg(any(target_os = "linux", target_os = "windows"))]
-        ArgCommand::Service(Service { command }) => match command {
-            ServiceCommand::Restart(ServiceRestart { soft }) => {
+        ArgCommand::Service { command } => match command {
+            ServiceCommand::Restart { soft } => {
                 if soft {
                     backend.restart_clash().map_err(|e| anyhow::anyhow!(e))
                 } else {
@@ -76,7 +76,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
             }
             ServiceCommand::Stop => Ok(backend.clash_srv_ctl(ServiceOp::StopClashService)?),
         },
-        ArgCommand::Mode(Mode { command }) => match command {
+        ArgCommand::Mode { mode } => match mode {
             ModeCommand::Rule => Ok(backend
                 .update_state(None, Some(cMode::Rule.into()))?
                 .to_string()),

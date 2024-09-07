@@ -43,19 +43,24 @@ pub(crate) struct CliCmds {
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 enum ArgCommand {
-    Profile(Profile),
+    /// profile related
+    Profile {
+        #[command(subcommand)]
+        command: ProfileCommand,
+    },
     #[cfg(any(target_os = "linux", target_os = "windows"))]
-    Service(Service),
-    Mode(Mode),
+    /// service related
+    Service {
+        #[command(subcommand)]
+        command: ServiceCommand,
+    },
+    /// proxy mode related
+    Mode {
+        #[command(subcommand)]
+        mode: ModeCommand,
+    },
 }
 
-/// proxy mode related
-#[derive(clap::Args)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-struct Mode {
-    #[command(subcommand)]
-    command: ModeCommand,
-}
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 enum ModeCommand {
@@ -67,62 +72,40 @@ enum ModeCommand {
     Global,
 }
 
-/// profile related
-#[derive(clap::Args)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-struct Profile {
-    #[command(subcommand)]
-    command: ProfileCommand,
-}
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 enum ProfileCommand {
-    Update(ProfileUpdate),
-    Select(ProfileSelect),
-}
-/// update the selected profile or all
-#[derive(clap::Args)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-struct ProfileUpdate {
-    /// update all profiles
-    #[arg(short, long)]
-    all: bool,
-    /// the profile name
-    #[arg(short, long)]
-    name: Option<String>,
-    /// update profile with proxy
-    #[arg(long)]
-    with_proxy: Option<bool>,
-}
-/// select profile
-#[derive(clap::Args)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-struct ProfileSelect {
-    /// the profile name
-    #[arg(short, long)]
-    name: String,
+    /// update the selected profile or all
+    Update {
+        /// update all profiles,
+        /// this will also update config clash is using, 
+        /// while --name does not
+        #[arg(short, long)]
+        all: bool,
+        /// the profile name
+        #[arg(short, long)]
+        name: Option<String>,
+        /// update profile with proxy
+        #[arg(long)]
+        with_proxy: Option<bool>,
+    },
+    /// select profile
+    Select {
+        /// the profile name
+        #[arg(short, long)]
+        name: String,
+    },
 }
 
-/// service related
-#[derive(clap::Args)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-struct Service {
-    #[command(subcommand)]
-    command: ServiceCommand,
-}
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 enum ServiceCommand {
     /// start/restart service, can be soft
-    Restart(ServiceRestart),
+    Restart {
+        /// restart by send POST request to mihomo
+        #[arg(short, long)]
+        soft: bool,
+    },
     /// stop service
     Stop,
-}
-
-#[derive(clap::Args)]
-#[cfg_attr(debug_assertions, derive(Debug))]
-struct ServiceRestart {
-    /// restart by send POST request to mihomo
-    #[arg(short, long)]
-    soft: bool,
 }

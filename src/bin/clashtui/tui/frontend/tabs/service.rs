@@ -97,7 +97,11 @@ impl Drawable for ServiceTab {
     fn render(&mut self, f: &mut Frame, area: Rect, _: bool) {
         self.inner.render(f, area, !self.select_mode);
         if self.select_mode {
-            let select_area = tools::centered_rect(Ra::Constraint::Percentage(60), Ra::Constraint::Percentage(30), f.area());
+            let select_area = tools::centered_rect(
+                Ra::Constraint::Percentage(60),
+                Ra::Constraint::Percentage(30),
+                f.area(),
+            );
             f.render_widget(Raw::Clear, select_area);
             self.mode_selector.render(f, select_area, true);
         }
