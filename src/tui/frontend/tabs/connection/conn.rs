@@ -27,7 +27,7 @@ impl Connection {
         Box::new(self)
     }
     pub fn build_header() -> Raw::Row<'static> {
-        const BAR: [&'static str; 6] = ["Url", "Chain", "Type", "Start Time", "Recvived", "Send"];
+        const BAR: [&str; 6] = ["Url", "Chain", "Type", "Start Time", "Recvived", "Send"];
         Raw::Row::new(BAR.into_iter().map(|s| Ra::Text::from(s).centered()))
     }
     pub fn build_footer(upload: u64, download: u64) -> Raw::Row<'static> {
@@ -43,9 +43,9 @@ impl Connection {
     }
 }
 
-impl From<clashtui::webapi::Conn> for Connection {
-    fn from(value: clashtui::webapi::Conn) -> Self {
-        let clashtui::webapi::Conn {
+impl From<Conn> for Connection {
+    fn from(value: Conn) -> Self {
+        let Conn {
             id,
             metadata,
             upload,
@@ -53,7 +53,7 @@ impl From<clashtui::webapi::Conn> for Connection {
             start,
             mut chains,
         } = value;
-        let clashtui::webapi::ConnMetaData {
+        let ConnMetaData {
             network: _,
             ctype,
             host,
@@ -270,15 +270,10 @@ impl Raw::WidgetRef for Connection {
             .block(b_download.fg(Theme::get().popup_block_fg))
             .fg(Theme::get().popup_text_fg)
             .render(a_download, buf);
-        Paragraph::new(
-            self.id
-                .as_ref()
-                .map(|s| s.as_str())
-                .unwrap_or("Lose Track, Maybe Closed"),
-        )
-        .block(b_id.fg(Theme::get().popup_block_fg))
-        .fg(Theme::get().popup_text_fg)
-        .render(a_id, buf);
+        Paragraph::new(self.id.as_deref().unwrap_or("Lose Track, Maybe Closed"))
+            .block(b_id.fg(Theme::get().popup_block_fg))
+            .fg(Theme::get().popup_text_fg)
+            .render(a_id, buf);
         Paragraph::new("Press Enter to terminate this connection, Esc to close")
             .block(b_promopt.fg(Theme::get().popup_block_fg))
             .fg(Theme::get().popup_text_fg)

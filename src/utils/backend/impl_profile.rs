@@ -1,12 +1,12 @@
 use super::*;
+use crate::clash::{backend::ipc, profile::ProfileType};
 use crate::tui::tabs::profile::ProfileOp;
 
 impl BackEnd {
     pub(super) fn create_profile<S: AsRef<str>, S2: AsRef<str>>(&self, name: S, url: S2) {
-        self.inner.pm.insert(
-            name,
-            clashtui::profile::ProfileType::Url(url.as_ref().to_owned()),
-        );
+        self.inner
+            .pm
+            .insert(name, ProfileType::Url(url.as_ref().to_owned()));
     }
     pub(super) fn remove_profile(&self, pf: Profile) -> anyhow::Result<()> {
         let LocalProfile { path, .. } = self.load_local_profile(&pf)?;
@@ -37,7 +37,7 @@ impl BackEnd {
         with_proxy: Option<bool>,
     ) -> anyhow::Result<Vec<String>> {
         let profile = self.load_local_profile(profile)?;
-        self.inner.update_profile(&profile, with_proxy)
+        self.inner.update_profile(&profile, with_proxy.is_some_and(|b| b))
     }
 
     pub fn select_profile(&self, profile: Profile) -> anyhow::Result<()> {
@@ -170,7 +170,7 @@ impl BackEnd {
                     .expect("Cannot find selected profile");
 
                 match self.load_local_profile(&pf).and_then(|pf| {
-                    clashtui::backend::ipc::spawn(
+                    ipc::spawn(
                         "sh",
                         vec![
                             "-c",

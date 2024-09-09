@@ -1,5 +1,5 @@
 use super::{ClashConfig, ClashUtil};
-use crate::Result;
+use super::super::Result;
 use minreq::Method;
 
 impl ClashUtil {
@@ -46,7 +46,7 @@ mod tests {
     #[test]
     fn config_reload_test() {
         let sym = ClashUtil::build_test();
-        sym.config_reload(crate::webapi::DEFAULT_PAYLOAD.to_string())
+        sym.config_reload(super::super::DEFAULT_PAYLOAD.to_string())
             .unwrap();
     }
 }

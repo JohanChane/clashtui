@@ -1,5 +1,3 @@
-#![warn(clippy::all)]
-#![deny(unsafe_code)]
 pub mod backend;
 mod error;
 pub mod profile;

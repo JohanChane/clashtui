@@ -1,4 +1,4 @@
-use clashtui::{backend::ServiceOp, webapi::Mode as cMode};
+use crate::clash::{backend::ServiceOp, webapi::Mode as cMode};
 
 use crate::utils::BackEnd;
 

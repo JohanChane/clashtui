@@ -1,5 +1,5 @@
 use super::{ClashUtil, DEFAULT_PAYLOAD};
-use crate::Result;
+use super::super::Result;
 use minreq::Method;
 
 impl ClashUtil {

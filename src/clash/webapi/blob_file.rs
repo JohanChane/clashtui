@@ -1,5 +1,5 @@
+use super::super::Result;
 use super::ClashUtil;
-use crate::Result;
 
 impl ClashUtil {
     pub fn mock_clash_core<S: Into<minreq::URL>>(
@@ -7,12 +7,26 @@ impl ClashUtil {
         url: S,
         with_proxy: bool,
     ) -> Result<minreq::ResponseLazy> {
+        self.get_blob(
+            url,
+            with_proxy.then_some(self.proxy_addr.as_str()),
+            Some(self.ua.as_deref().unwrap_or("clash.meta")),
+        )
+    }
+    pub fn get_blob<U: Into<minreq::URL>, S1: AsRef<str>, S2: Into<String>>(
+        &self,
+        url: U,
+        proxy: Option<S1>,
+        ua: Option<S2>,
+    ) -> Result<minreq::ResponseLazy> {
         let mut req = minreq::get(url);
-        if with_proxy {
-            req = req.with_proxy(minreq::Proxy::new(self.proxy_addr.clone())?)
+        if let Some(proxy) = proxy {
+            req = req.with_proxy(minreq::Proxy::new(proxy)?)
         }
-        req.with_header("user-agent", self.ua.as_deref().unwrap_or("clash.meta"))
-            .with_timeout(self.timeout)
+        if let Some(ua) = ua {
+            req = req.with_header("user-agent", ua)
+        }
+        req.with_timeout(self.timeout)
             .send_lazy()
             .map_err(|e| e.into())
     }

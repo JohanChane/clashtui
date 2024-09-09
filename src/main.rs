@@ -1,4 +1,6 @@
 #![warn(clippy::all)]
+#![deny(unsafe_code)]
+mod clash;
 mod commands;
 mod tui;
 mod utils;
@@ -87,7 +89,7 @@ fn main() {
 #[tokio::main(flavor = "current_thread")]
 async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     use tui::setup;
-    if let Err(_) = tui::Theme::load(None) {
+    if tui::Theme::load(None).is_err() {
         log::error!("Global Theme has been loaded");
     }
     let app = tui::FrontEnd::new();

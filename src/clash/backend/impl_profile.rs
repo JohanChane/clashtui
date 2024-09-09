@@ -1,5 +1,5 @@
 use super::{util::extract_domain, ClashBackend};
-use crate::profile::{LocalProfile, Profile, ProfileType};
+use super::super::profile::{LocalProfile, Profile, ProfileType};
 use std::fs::{create_dir_all, File};
 use std::path::Path;
 
@@ -48,7 +48,7 @@ impl ClashBackend {
     pub fn update_profile(
         &self,
         profile: &LocalProfile,
-        with_proxy: Option<bool>,
+        with_proxy: bool,
     ) -> anyhow::Result<Vec<String>> {
         if profile.dtype.is_upgradable() {
             // store (name,url) to be downloaded
@@ -90,7 +90,7 @@ impl ClashBackend {
         &self,
         url: U,
         path: P,
-        with_proxy: Option<bool>,
+        with_proxy: bool,
     ) -> anyhow::Result<()> {
         assert!(
             path.as_ref().is_absolute(),
@@ -105,7 +105,7 @@ impl ClashBackend {
         }
         let mut response = self
             .api
-            .mock_clash_core(url, with_proxy.is_some_and(|b| b))?;
+            .mock_clash_core(url, with_proxy)?;
         let mut output_file = File::create(path)?;
         std::io::copy(&mut response, &mut output_file)?;
         Ok(())

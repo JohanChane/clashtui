@@ -1,8 +1,10 @@
+use super::super::Result;
 use minreq::Method;
 use serde::Deserialize;
 
 use super::ClashUtil;
-#[derive(Debug, Deserialize, Default)]
+#[cfg_attr(test, derive(Debug))]
+#[derive(Deserialize, Default)]
 pub struct ConnInfo {
     #[serde(rename = "downloadTotal")]
     pub download_total: u64,
@@ -14,12 +16,13 @@ pub struct ConnInfo {
 impl TryFrom<String> for ConnInfo {
     type Error = String;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+    fn try_from(value: String) -> core::result::Result<Self, Self::Error> {
         serde_json::from_str(&value).map_err(|e| format!("{e:?}"))
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[cfg_attr(test, derive(Debug))]
+#[derive(Deserialize)]
 pub struct Conn {
     pub id: String,
     pub metadata: ConnMetaData,
@@ -29,7 +32,9 @@ pub struct Conn {
     pub chains: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[allow(unused)]
+#[cfg_attr(test, derive(Debug))]
+#[derive(Deserialize)]
 pub struct ConnMetaData {
     pub network: String,
     #[serde(rename = "type")]
@@ -51,7 +56,7 @@ pub struct ConnMetaData {
 
 impl ClashUtil {
     /// returne [ConnInfo]
-    pub fn get_connections(&self) -> crate::Result<ConnInfo> {
+    pub fn get_connections(&self) -> Result<ConnInfo> {
         self.request(Method::Get, "/connections", None)
             .and_then(|r| r.json())
             .map_err(|e| e.into())
@@ -64,7 +69,7 @@ impl ClashUtil {
     ///
     /// > NOTE:
     /// > Empty str is returned if connection is terminated successfully
-    pub fn terminate_connection(&self, id: Option<String>) -> crate::Result<bool> {
+    pub fn terminate_connection(&self, id: Option<String>) -> Result<bool> {
         self.request(
             Method::Delete,
             &format!(

@@ -83,7 +83,7 @@ impl ProfileType {
         match self {
             ProfileType::File => None,
             ProfileType::Url(url) => {
-                crate::backend::util::extract_domain(url).map(|s| s.to_owned())
+                super::super::backend::util::extract_domain(url).map(|s| s.to_owned())
             }
             #[cfg(feature = "template")]
             ProfileType::Generated(name) => Some(format!("From template {name}")),

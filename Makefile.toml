@@ -7,7 +7,7 @@
 alias = "rundev"
 [tasks.rundev]
 command = "cargo"
-args = ["run", "--features", "bin-tui", "--bin", "clashtui"]
+args = ["run", "--all-features"]
 
 [tasks.ci]
 dependencies = ["setup-mihomo", "ci-flow"]
@@ -63,19 +63,19 @@ script = ["rm -r artifacts"]
 [tasks.build_deb]
 install_crate = "cargo-deb"
 command = "cargo"
-args = ["deb", "--", "--bin", "clashtui", "--all-features"]
+args = ["deb", "--", "--all-features"]
 
 [tasks.arm64]
 install_crate = "cross"
 script = '''
-    cross build --bin clashtui --all-features --target=aarch64-unknown-linux-gnu
-    cross build --bin clashtui --all-features --release --target=aarch64-unknown-linux-gnu
+    cross build --all-features --target=aarch64-unknown-linux-gnu
+    cross build --all-features --release --target=aarch64-unknown-linux-gnu
 '''
 
 [tasks.amd64]
 script = '''
-    cargo build --bin clashtui --all-features
-    cargo build --bin clashtui --all-features --release
+    cargo build --all-features
+    cargo build --all-features --release
 '''
 
 

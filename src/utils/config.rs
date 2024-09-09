@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::fs::File;
 use std::path::Path;
 
-use clashtui::{
+use crate::clash::{
     backend::config::{Basic, Service},
     profile::map::ProfileDataBase,
 };

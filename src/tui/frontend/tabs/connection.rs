@@ -3,6 +3,8 @@ use crate::{
     tui::{frontend::consts::TAB_TITLE_CONNECTION, widget::tools, Drawable, EventState, Theme},
     utils::CallBack,
 };
+
+use crate::clash::webapi::{Conn, ConnInfo, ConnMetaData};
 use ratatui::prelude as Ra;
 use ratatui::widgets as Raw;
 
@@ -168,7 +170,7 @@ impl TabCont for ConnctionTab {
                 self.popup_content = Some(PopMsg::Prompt(vec!["Done".to_owned(), res]))
             }
             CallBack::ConnctionInit(items) => {
-                let clashtui::webapi::ConnInfo {
+                let ConnInfo {
                     download_total,
                     upload_total,
                     connections,

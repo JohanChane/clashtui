@@ -1,4 +1,4 @@
-use clashtui::{backend::ServiceOp, webapi::Mode};
+use crate::clash::{backend::ServiceOp, webapi::Mode};
 use crossterm::event::KeyEvent;
 
 use crate::{

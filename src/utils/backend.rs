@@ -8,12 +8,12 @@ use super::{
     config::{BuildConfig, ConfigFile, DataFile},
     state::State,
 };
-use crate::tui::Call;
-use clashtui::{
+use crate::clash::{
     backend::{config::LibConfig, ClashBackend, ServiceOp},
     profile::{map::ProfileManager, LocalProfile, Profile},
-    webapi::{ClashConfig, ClashUtil},
+    webapi::{ClashConfig, ClashUtil, ConnInfo},
 };
+use crate::tui::Call;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 pub enum CallBack {
@@ -28,7 +28,7 @@ pub enum CallBack {
     #[cfg(feature = "connection-tab")]
     ConnctionCTL(String),
     #[cfg(feature = "connection-tab")]
-    ConnctionInit(clashtui::webapi::ConnInfo),
+    ConnctionInit(ConnInfo),
     ProfileInit(Vec<String>, Vec<Option<core::time::Duration>>),
     #[cfg(feature = "template")]
     TemplateInit(Vec<String>),

@@ -30,10 +30,8 @@ bin-cli = [
 bin-tui = ["ratatui", "crossterm", "tokio", "bin-cli", "connection-tab"]
 template = []
 connection-tab = ["ratatui/unstable-widget-ref"]
+default = ["bin-tui"]
 
-[[bin]]
-name = "clashtui"
-required-features = ["bin-tui"]
 
 [dependencies]
 log = "^0.4.22"
