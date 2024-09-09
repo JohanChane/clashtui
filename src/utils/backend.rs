@@ -1,3 +1,4 @@
+mod handle_ops;
 mod impl_profile;
 mod impl_service;
 #[cfg(feature = "template")]
@@ -9,11 +10,12 @@ use super::{
     state::State,
 };
 use crate::clash::{
-    backend::{config::LibConfig, ClashBackend, ServiceOp},
+    config::LibConfig,
     profile::{map::ProfileManager, LocalProfile, Profile},
     webapi::{ClashConfig, ClashUtil, ConnInfo},
 };
 use crate::tui::Call;
+pub use impl_service::ServiceOp;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 pub enum CallBack {
@@ -63,7 +65,10 @@ impl std::fmt::Display for CallBack {
 ///
 /// impl some other functions
 pub struct BackEnd {
-    inner: ClashBackend,
+    api: ClashUtil,
+    cfg: LibConfig,
+    pm: ProfileManager,
+    // inner: ClashBackend,
     edit_cmd: String,
     /// just clone and merge, DO NEVER sync_to_disk/sync_from_disk
     base_profile: LocalProfile,
@@ -105,7 +110,7 @@ impl BackEnd {
                 };
                 cbs.push(state);
                 #[cfg(feature = "connection-tab")]
-                let conns = match self.inner.api.get_connections() {
+                let conns = match self.api.get_connections() {
                     Ok(v) => CallBack::ConnctionInit(v),
                     Err(e) => {
                         if !errs.contains(&e.to_string()) {
@@ -148,7 +153,7 @@ impl BackEnd {
                     #[cfg(feature = "connection-tab")]
                     Call::Connection(op) => match op {
                         tabs::connection::BackendOp::Terminal(id) => {
-                            match self.inner.api.terminate_connection(Some(id)) {
+                            match self.api.terminate_connection(Some(id)) {
                                 Ok(v) => CallBack::ConnctionCTL(if v {
                                     "Success".to_owned()
                                 } else {
@@ -158,7 +163,7 @@ impl BackEnd {
                             }
                         }
                         tabs::connection::BackendOp::TerminalAll => {
-                            match self.inner.api.terminate_connection(None) {
+                            match self.api.terminate_connection(None) {
                                 Ok(v) => CallBack::ConnctionCTL(if v {
                                     "Success".to_owned()
                                 } else {
@@ -177,19 +182,14 @@ impl BackEnd {
                             "# CLASHTUI".to_owned(),
                             format!("version:{}", crate::utils::consts::VERSION),
                         ];
-                        match self
-                            .inner
-                            .api
-                            .version()
-                            .map_err(|e| e.into())
-                            .and_then(|ver| {
-                                self.inner.api.config_get().map(|cfg| {
-                                    let mut cfg = cfg.build();
-                                    cfg.insert(2, "# CLASH".to_owned());
-                                    cfg.insert(3, format!("version:{ver}"));
-                                    cfg
-                                })
-                            }) {
+                        match self.api.version().map_err(|e| e.into()).and_then(|ver| {
+                            self.api.config_get().map(|cfg| {
+                                let mut cfg = cfg.build();
+                                cfg.insert(2, "# CLASH".to_owned());
+                                cfg.insert(3, format!("version:{ver}"));
+                                cfg
+                            })
+                        }) {
                             Ok(info) => {
                                 infos.extend(info);
                                 CallBack::Infos(infos)
@@ -235,7 +235,7 @@ impl BackEnd {
         }
     }
     fn save(&self) -> DataFile {
-        let (current_profile, profiles) = self.inner.pm.clone_inner();
+        let (current_profile, profiles) = self.pm.clone_inner();
         DataFile {
             profiles,
             current_profile,
@@ -268,31 +268,33 @@ impl BackEnd {
 impl BackEnd {
     pub fn build(value: BuildConfig) -> Result<Self, anyhow::Error> {
         let BuildConfig {
-            cfg,
+            cfg:
+                ConfigFile {
+                    basic,
+                    service,
+                    timeout,
+                    edit_cmd,
+                },
             basic: info,
-            data,
+            data:
+                DataFile {
+                    profiles,
+                    current_profile,
+                },
             base_raw,
         } = value;
-        let ConfigFile {
-            basic,
-            service,
-            timeout,
-            edit_cmd,
-        } = cfg;
         let cfg = LibConfig { basic, service };
         let (external_controller, proxy_addr, secret, global_ua) = info.build()?;
         let api = ClashUtil::new(external_controller, secret, proxy_addr, global_ua, timeout);
-        let DataFile {
-            profiles,
-            current_profile,
-        } = data;
         let pm = ProfileManager::new(current_profile, profiles);
         let base_profile = LocalProfile {
             content: Some(base_raw),
             ..LocalProfile::default()
         };
         Ok(Self {
-            inner: ClashBackend { api, cfg, pm },
+            api,
+            cfg,
+            pm,
             edit_cmd,
             base_profile,
         })

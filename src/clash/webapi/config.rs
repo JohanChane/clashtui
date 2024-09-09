@@ -1,5 +1,5 @@
 use super::{ClashConfig, ClashUtil};
-use super::super::Result;
+use crate::CResult;
 use minreq::Method;
 
 impl ClashUtil {
@@ -8,7 +8,7 @@ impl ClashUtil {
             self.request(Method::Get, "/configs", None)?.as_str()?,
         )?)
     }
-    pub fn config_reload<S: AsRef<str>>(&self, path: S) -> Result<String> {
+    pub fn config_reload<S: AsRef<str>>(&self, path: S) -> CResult<String> {
         self.request(
             Method::Put,
             "/configs?force=true",
@@ -23,7 +23,7 @@ impl ClashUtil {
         .and_then(|r| r.as_str().map(|s| s.to_owned()))
         .map_err(|e| e.into())
     }
-    pub fn config_patch(&self, payload: String) -> Result<String> {
+    pub fn config_patch(&self, payload: String) -> CResult<String> {
         self.request(Method::Patch, "/configs", Some(payload))
             .and_then(|r| r.as_str().map(|s| s.to_owned()))
             .map_err(|e| e.into())

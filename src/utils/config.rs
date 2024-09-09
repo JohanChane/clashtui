@@ -3,7 +3,7 @@ use std::fs::File;
 use std::path::Path;
 
 use crate::clash::{
-    backend::config::{Basic, Service},
+    config::{Basic, Service},
     profile::map::ProfileDataBase,
 };
 use serde::{Deserialize, Serialize};

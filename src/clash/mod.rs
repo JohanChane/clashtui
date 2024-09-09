@@ -1,7 +1,5 @@
-pub mod backend;
-mod error;
+pub mod config;
+pub mod ipc;
 pub mod profile;
+pub mod util;
 pub mod webapi;
-
-pub type Result<T> = core::result::Result<T, Error>;
-pub use error::Error;

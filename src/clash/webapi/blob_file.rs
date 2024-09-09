@@ -1,12 +1,12 @@
-use super::super::Result;
 use super::ClashUtil;
+use crate::CResult;
 
 impl ClashUtil {
     pub fn mock_clash_core<S: Into<minreq::URL>>(
         &self,
         url: S,
         with_proxy: bool,
-    ) -> Result<minreq::ResponseLazy> {
+    ) -> CResult<minreq::ResponseLazy> {
         self.get_blob(
             url,
             with_proxy.then_some(self.proxy_addr.as_str()),
@@ -18,7 +18,7 @@ impl ClashUtil {
         url: U,
         proxy: Option<S1>,
         ua: Option<S2>,
-    ) -> Result<minreq::ResponseLazy> {
+    ) -> CResult<minreq::ResponseLazy> {
         let mut req = minreq::get(url);
         if let Some(proxy) = proxy {
             req = req.with_proxy(minreq::Proxy::new(proxy)?)

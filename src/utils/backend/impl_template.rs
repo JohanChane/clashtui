@@ -3,7 +3,7 @@ use crate::tui::tabs::profile::TemplateOp;
 
 impl BackEnd {
     pub fn get_all_templates(&self) -> Vec<String> {
-        self.inner.get_all_templates()
+        vec![]
     }
 }
 

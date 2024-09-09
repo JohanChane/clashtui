@@ -76,6 +76,9 @@ default-features = false
 optional = true
 features = ["pattern_encoder", "file_appender"]
 
+[patch.crates-io]
+log4rs ={ git = "https://github.com/Jackhr-arch/log4rs"}
+
 [dependencies.clap]
 version = "^4.5.8"
 default-features = false

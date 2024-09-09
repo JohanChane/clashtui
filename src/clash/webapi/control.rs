@@ -1,9 +1,9 @@
 use super::{ClashUtil, DEFAULT_PAYLOAD};
-use super::super::Result;
+use crate::CResult;
 use minreq::Method;
 
 impl ClashUtil {
-    pub fn restart(&self, payload: Option<String>) -> Result<String> {
+    pub fn restart(&self, payload: Option<String>) -> CResult<String> {
         self.request(
             Method::Post,
             "/restart",
@@ -12,12 +12,12 @@ impl ClashUtil {
         .and_then(|r| r.as_str().map(|s| s.to_owned()))
         .map_err(|e| e.into())
     }
-    pub fn version(&self) -> Result<String> {
+    pub fn version(&self) -> CResult<String> {
         self.request(Method::Get, "/version", None)
             .and_then(|r| r.as_str().map(|s| s.to_owned()))
             .map_err(|e| e.into())
     }
-    pub fn check_connectivity(&self) -> Result<()> {
+    pub fn check_connectivity(&self) -> CResult<()> {
         minreq::get("https://www.gstatic.com/generate_204")
             .with_timeout(self.timeout)
             .with_proxy(minreq::Proxy::new(self.proxy_addr.clone())?)

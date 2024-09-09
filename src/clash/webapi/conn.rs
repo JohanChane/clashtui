@@ -1,4 +1,4 @@
-use super::super::Result;
+use crate::CResult;
 use minreq::Method;
 use serde::Deserialize;
 
@@ -56,7 +56,7 @@ pub struct ConnMetaData {
 
 impl ClashUtil {
     /// returne [ConnInfo]
-    pub fn get_connections(&self) -> Result<ConnInfo> {
+    pub fn get_connections(&self) -> CResult<ConnInfo> {
         self.request(Method::Get, "/connections", None)
             .and_then(|r| r.json())
             .map_err(|e| e.into())
@@ -69,7 +69,7 @@ impl ClashUtil {
     ///
     /// > NOTE:
     /// > Empty str is returned if connection is terminated successfully
-    pub fn terminate_connection(&self, id: Option<String>) -> Result<bool> {
+    pub fn terminate_connection(&self, id: Option<String>) -> CResult<bool> {
         self.request(
             Method::Delete,
             &format!(

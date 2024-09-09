@@ -2,8 +2,12 @@
 #![deny(unsafe_code)]
 mod clash;
 mod commands;
+mod error;
 mod tui;
 mod utils;
+
+use error::Error;
+pub type CResult<T> = core::result::Result<T, Error>;
 
 use utils::{consts, init_config, load_config, BackEnd, Flag, Flags};
 

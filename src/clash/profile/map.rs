@@ -82,19 +82,17 @@ impl ProfileType {
     pub fn get_domain(&self) -> Option<String> {
         match self {
             ProfileType::File => None,
-            ProfileType::Url(url) => {
-                super::super::backend::util::extract_domain(url).map(|s| s.to_owned())
-            }
+            ProfileType::Url(url) => super::super::util::extract_domain(url).map(|s| s.to_owned()),
             #[cfg(feature = "template")]
             ProfileType::Generated(name) => Some(format!("From template {name}")),
         }
     }
-    pub fn into_inner(self) -> Option<String> {
-        match self {
-            ProfileType::File => None,
-            ProfileType::Url(s) => Some(s),
-            #[cfg(feature = "template")]
-            ProfileType::Generated(s) => Some(s),
-        }
-    }
+    // pub fn into_inner(self) -> Option<String> {
+    //     match self {
+    //         ProfileType::File => None,
+    //         ProfileType::Url(s) => Some(s),
+    //         #[cfg(feature = "template")]
+    //         ProfileType::Generated(s) => Some(s),
+    //     }
+    // }
 }

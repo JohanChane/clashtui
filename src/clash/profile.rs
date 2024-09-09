@@ -1,12 +1,10 @@
-use std::{
-    fs::File,
-    path::{Path, PathBuf},
-};
+use std::{fs::File, path::PathBuf};
 
 pub mod map;
 
 pub use map::ProfileType;
 
+#[derive(Clone)]
 pub struct Profile {
     pub name: String,
     pub dtype: ProfileType,
@@ -47,23 +45,12 @@ impl Default for LocalProfile {
 }
 
 impl LocalProfile {
-    pub fn new<P: AsRef<Path>>(path: P, profile: Profile) -> anyhow::Result<Self> {
-        let Profile { name, dtype } = profile;
-        let fp = File::open(path.as_ref())?;
-        let content = serde_yaml::from_reader(fp)?;
-        Ok(Self {
-            name,
-            dtype,
-            path: path.as_ref().into(),
-            content,
-        })
-    }
     /// Returns the atime of this [`LocalProfile`].
     ///
     /// Errors are ignored and return will be replaced with [None]
     pub fn atime(&self) -> Option<core::time::Duration> {
         let now = std::time::SystemTime::now();
-        super::backend::util::get_modify_time(&self.path)
+        super::util::get_modify_time(&self.path)
             .ok()
             .and_then(|file| now.duration_since(file).ok())
     }
@@ -91,10 +78,21 @@ impl LocalProfile {
         let fp = File::create(path)?;
         Ok(serde_yaml::to_writer(fp, &content)?)
     }
+    pub fn from_pf(pf: Profile, path: std::path::PathBuf) -> Self {
+        let Profile { name, dtype } = pf;
+       Self {
+            name,
+            dtype,
+            path,
+            content: None,
+        }
+    }
     /// sync the content from disk by [`LocalProfile::path`]
     pub fn sync_from_disk(&mut self) -> anyhow::Result<()> {
-        let fp = File::open(&self.path)?;
-        self.content = serde_yaml::from_reader(fp)?;
+        if self.path.is_file(){
+            let fp = File::open(&self.path)?;
+            self.content = serde_yaml::from_reader(fp)?;
+        }
         Ok(())
     }
 }

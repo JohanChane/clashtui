@@ -3,7 +3,7 @@ mod config;
 mod flags;
 mod state;
 
-pub(crate) use backend::{BackEnd, CallBack};
+pub(crate) use backend::{BackEnd, CallBack, ServiceOp};
 pub(crate) use flags::{BitFlags as Flags, Flag};
 pub(crate) mod consts;
 

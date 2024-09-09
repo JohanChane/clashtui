@@ -78,7 +78,7 @@ enum ProfileCommand {
     /// update the selected profile or all
     Update {
         /// update all profiles,
-        /// this will also update config clash is using, 
+        /// this will also update config clash is using,
         /// while --name does not
         #[arg(short, long)]
         all: bool,

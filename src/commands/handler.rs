@@ -1,6 +1,6 @@
-use crate::clash::{backend::ServiceOp, webapi::Mode as cMode};
+use crate::clash::webapi::Mode as cMode;
 
-use crate::utils::BackEnd;
+use crate::utils::{BackEnd, ServiceOp};
 
 use super::*;
 
@@ -23,7 +23,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                         .inspect(|s| println!("Profile: {}", s.name))
                         .filter_map(|v| {
                             backend
-                                .update_profile(&v, with_proxy)
+                                .update_profile(v, with_proxy)
                                 .map_err(|e| println!("- Error! {e}"))
                                 .ok()
                         })
@@ -39,7 +39,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                     } else {
                         anyhow::bail!("Not found in database!");
                     };
-                    match backend.update_profile(&pf, with_proxy) {
+                    match backend.update_profile(pf, with_proxy) {
                         Ok(v) => {
                             v.into_iter().for_each(|s| println!("- {s}"));
                         }
