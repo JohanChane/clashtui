@@ -1,4 +1,4 @@
-use super::ClashUtil;
+use super::{headers, ClashUtil};
 use crate::CResult;
 
 impl ClashUtil {
@@ -13,10 +13,10 @@ impl ClashUtil {
             Some(self.ua.as_deref().unwrap_or("clash.meta")),
         )
     }
-    pub fn get_blob<U: Into<minreq::URL>, S1: AsRef<str>, S2: Into<String>>(
+    pub fn get_blob<U: Into<minreq::URL>, S2: Into<String>>(
         &self,
         url: U,
-        proxy: Option<S1>,
+        proxy: Option<&str>,
         ua: Option<S2>,
     ) -> CResult<minreq::ResponseLazy> {
         let mut req = minreq::get(url);
@@ -24,7 +24,7 @@ impl ClashUtil {
             req = req.with_proxy(minreq::Proxy::new(proxy)?)
         }
         if let Some(ua) = ua {
-            req = req.with_header("user-agent", ua)
+            req = req.with_header(headers::USER_AGENT, ua)
         }
         req.with_timeout(self.timeout)
             .send_lazy()

@@ -59,6 +59,11 @@ enum ArgCommand {
         #[command(subcommand)]
         mode: ModeCommand,
     },
+    /// check for update
+    CheckUpdate {
+        #[arg(long, short = 'y')]
+        without_ask: bool,
+    },
 }
 
 #[derive(clap::Subcommand)]
@@ -99,8 +104,8 @@ enum ProfileCommand {
     List {
         /// without domain hint
         #[arg(long)]
-        name_only:bool,
-    }
+        name_only: bool,
+    },
 }
 
 #[derive(clap::Subcommand)]

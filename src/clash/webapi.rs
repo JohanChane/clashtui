@@ -3,6 +3,7 @@ mod config;
 mod config_struct;
 mod conn;
 mod control;
+pub mod github;
 #[allow(unused)]
 pub use config_struct::{ClashConfig, LogLevel, Mode, TunConfig, TunStack};
 #[cfg(feature = "connection-tab")]
@@ -10,6 +11,12 @@ pub use conn::{Conn, ConnInfo, ConnMetaData};
 
 const DEFAULT_PAYLOAD: &str = r#"'{"path": "", "payload": ""}'"#;
 const TIMEOUT: u64 = 5;
+mod headers {
+    pub const USER_AGENT: &str = "user-agent";
+    pub const AUTHORIZATION: &str = "authorization";
+
+    pub const DEFAULT_USER_AGENT: &str = "github.com/celeo/github_version_check";
+}
 
 #[derive(Debug)]
 pub struct ClashUtil {
@@ -47,7 +54,7 @@ impl ClashUtil {
             req = req.with_body(kv);
         }
         if let Some(s) = self.secret.as_ref() {
-            req = req.with_header("Authorization", format!("Bearer {s}"));
+            req = req.with_header(headers::AUTHORIZATION, format!("Bearer {s}"));
         }
         req.with_timeout(self.timeout).send()
         // .and_then(|r| r.as_str().map(|s| s.to_owned()))

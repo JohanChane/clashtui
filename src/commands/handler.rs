@@ -105,5 +105,64 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                 .update_state(None, Some(cMode::Global.into()))?
                 .to_string()),
         },
+        ArgCommand::CheckUpdate { without_ask } => {
+            for info in backend.check_update()? {
+                println!("\n{}", info.as_info());
+                if !without_ask {
+                    use std::io::Write;
+                    let mut out = std::io::stdout().lock();
+                    write!(out, "\nDo you want to download one now?")?;
+                    out.flush()?;
+                    let mut maybe_name = String::with_capacity(50);
+                    std::io::stdin().read_line(&mut maybe_name)?;
+                    match maybe_name.as_str().trim() {
+                        "y" | "yes" => (),
+                        &_ => continue,
+                    }
+                    println!("\nAvaliable asserts:");
+                    info.assets
+                        .iter()
+                        .for_each(|a| println!("{}  {}", a.name, a.browser_download_url));
+                    write!(out, "\nType the name:")?;
+                    out.flush()?;
+                    std::io::stdin().read_line(&mut maybe_name)?;
+                    maybe_name = maybe_name
+                        .trim_start_matches("yes")
+                        .trim_start_matches('y')
+                        .trim()
+                        .to_owned();
+                    println!("{}", maybe_name);
+                    let al: Vec<String> = info
+                        .assets
+                        .into_iter()
+                        .filter(|a| a.name == maybe_name)
+                        .map(|a| a.browser_download_url)
+                        .collect();
+                    if let Some(url) = al.get(0) {
+                        println!("\nDownload start for {} {}", maybe_name, url);
+                        backend.download_to_file(&maybe_name, url)?;
+                        println!(
+                            "\nDownloaded to {}",
+                            std::env::current_dir()?.join(maybe_name).display()
+                        );
+                    } else {
+                        println!("Not select any, continue");
+                    }
+                } else {
+                    if let Some(asset) = info.assets.get(0) {
+                        println!(
+                            "\nDownload start for {} {}",
+                            asset.name, asset.browser_download_url
+                        );
+                        backend.download_to_file(&asset.name, &asset.browser_download_url)?;
+                        println!(
+                            "\nDownloaded to {}",
+                            std::env::current_dir()?.join(&asset.name).display()
+                        );
+                    }
+                }
+            }
+            Ok("Done".to_owned())
+        }
     }
 }

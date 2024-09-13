@@ -24,6 +24,15 @@ crate::define_enum!(
 );
 
 impl BackEnd {
+    pub fn check_update(&self) -> anyhow::Result<Vec<crate::clash::webapi::github::Response>> {
+        Ok(self.api.check_update()?)
+    }
+    pub fn download_to_file(&self, name: &str, url: &str) -> anyhow::Result<()> {
+        let mut rp = self.api.get_file(url)?;
+        let mut fp = std::fs::File::create(std::env::current_dir()?.join(name))?;
+        std::io::copy(&mut rp, &mut fp)?;
+        Ok(())
+    }
     pub fn update_mode(&self, mode: String) -> anyhow::Result<()> {
         let load = format!(r#"{{"mode": "{mode}"}}"#);
         self.api.config_patch(load)?;

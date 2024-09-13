@@ -4,6 +4,7 @@ use thiserror::Error;
 pub enum Error {
     IO(#[from] std::io::Error),
     Net(#[from] minreq::Error),
+    SerdeJson(#[from] serde_json::Error),
 }
 
 impl core::fmt::Display for Error {
