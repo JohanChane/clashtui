@@ -9,10 +9,12 @@ use super::{
     config::{BuildConfig, ConfigFile, DataFile},
     state::State,
 };
+#[cfg(feature = "connection-tab")]
+use crate::clash::webapi::ConnInfo;
 use crate::clash::{
     config::LibConfig,
     profile::{map::ProfileManager, LocalProfile, Profile},
-    webapi::{ClashConfig, ClashUtil, ConnInfo},
+    webapi::{ClashConfig, ClashUtil},
 };
 use crate::tui::Call;
 pub use impl_service::ServiceOp;

@@ -8,7 +8,7 @@ use super::widget::{ConfirmPopup, ListPopup};
 use super::{Call, Drawable, EventState, Theme};
 use crate::utils::{consts::err as consts_err, CallBack};
 use key_bind::Keys;
-use tabs::{TabCont, TabContainer};
+use tabs::{TabCont as _, Tabs};
 
 use crossterm::event::{self, KeyCode, KeyEvent};
 use ratatui::prelude as Ra;
@@ -17,7 +17,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use Ra::{Frame, Rect};
 
 pub struct FrontEnd {
-    tabs: Vec<TabContainer>,
+    tabs: Vec<Tabs>,
     tab_index: usize,
     there_is_list_pop: bool,
     list_popup: Option<Box<ListPopup>>,
@@ -30,15 +30,11 @@ pub struct FrontEnd {
 
 impl FrontEnd {
     pub fn new() -> Self {
-        let service_tab = tabs::service::ServiceTab::new();
-        let profile_tab = tabs::profile::ProfileTab::new();
-        #[cfg(feature = "connection-tab")]
-        let connection_tab = tabs::connection::ConnctionTab::new();
         let tabs = vec![
-            profile_tab.into(),
-            service_tab.into(),
+            tabs::profile::ProfileTab::new().into(),
+            tabs::service::ServiceTab::new().into(),
             #[cfg(feature = "connection-tab")]
-            connection_tab.into(),
+            tabs::connection::ConnctionTab::new().into(),
         ];
         Self {
             tabs,
@@ -235,8 +231,7 @@ impl Drawable for FrontEnd {
                 // need to kown the range
                 #[allow(clippy::is_digit_ascii_radix)]
                 KeyCode::Char(c) if c.is_digit(10) && c != '0' => {
-                    let digit = c.to_digit(10);
-                    if let Some(d) = digit {
+                    if let Some(d) = c.to_digit(10) {
                         if d <= self.tabs.len() as u32 {
                             // select target tab
                             self.tab_index = (d - 1) as usize;

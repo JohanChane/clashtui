@@ -29,22 +29,20 @@ pub(super) trait TabCont {
 }
 
 build_tabs!(
-    enum Tabs {
+    pub(super) enum Tabs {
         Profile(ProfileTab),
         Service(ServiceTab),
         #[cfg(feature = "connection-tab")]
         Connection(ConnctionTab),
     }
 );
-/// a wrapper for [`Tabs`]
-pub(super) struct TabContainer(Tabs);
 
-impl std::fmt::Display for TabContainer {
+impl std::fmt::Display for Tabs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
-            match self.0 {
+            match self {
                 Tabs::Profile(_) => consts::TAB_TITLE_PROFILE,
                 Tabs::Service(_) => consts::TAB_TITLE_SERVICE,
                 #[cfg(feature = "connection-tab")]

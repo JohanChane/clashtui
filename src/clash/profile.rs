@@ -80,7 +80,7 @@ impl LocalProfile {
     }
     pub fn from_pf(pf: Profile, path: std::path::PathBuf) -> Self {
         let Profile { name, dtype } = pf;
-       Self {
+        Self {
             name,
             dtype,
             path,
@@ -89,7 +89,7 @@ impl LocalProfile {
     }
     /// sync the content from disk by [`LocalProfile::path`]
     pub fn sync_from_disk(&mut self) -> anyhow::Result<()> {
-        if self.path.is_file(){
+        if self.path.is_file() {
             let fp = File::open(&self.path)?;
             self.content = serde_yaml::from_reader(fp)?;
         }

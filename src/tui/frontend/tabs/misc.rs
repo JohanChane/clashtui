@@ -50,45 +50,15 @@ macro_rules! build_tabs {
                 }
             }
         }
-        // impl From tab to tabcontainer
+
         $(
             $(#[$attr_])*
-            impl From<$typ> for TabContainer{
+            impl From<$typ> for $name{
                 fn from(value: $typ) -> Self {
-                    Self(Tabs::$variant(value))
+                    $name::$variant(value)
                 }
             }
         )*
 
     };
-}
-
-use super::*;
-
-impl TabCont for TabContainer {
-    fn get_backend_call(&mut self) -> Option<Call> {
-        self.0.get_backend_call()
-    }
-
-    fn get_popup_content(&mut self) -> Option<PopMsg> {
-        self.0.get_popup_content()
-    }
-
-    fn apply_backend_call(&mut self, op: CallBack) {
-        self.0.apply_backend_call(op)
-    }
-
-    fn apply_popup_result(&mut self, evst: EventState) -> EventState {
-        self.0.apply_popup_result(evst)
-    }
-}
-impl Drawable for TabContainer {
-    /// call [`TabCont::apply_popup_result`] first
-    fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
-        self.0.handle_key_event(ev)
-    }
-
-    fn render(&mut self, f: &mut Frame, area: Rect, is_fouced: bool) {
-        self.0.render(f, area, is_fouced)
-    }
 }

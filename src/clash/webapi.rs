@@ -5,6 +5,7 @@ mod conn;
 mod control;
 #[allow(unused)]
 pub use config_struct::{ClashConfig, LogLevel, Mode, TunConfig, TunStack};
+#[cfg(feature = "connection-tab")]
 pub use conn::{Conn, ConnInfo, ConnMetaData};
 
 const DEFAULT_PAYLOAD: &str = r#"'{"path": "", "payload": ""}'"#;
