@@ -29,7 +29,7 @@ default = ["tui"]
 log = "^0.4.22"
 clap_complete = { version = "^4.5.7" }
 anyhow = "^1.0.86"
-is-root = { version = "0.1.3" }
+is-root = { version = "0.1.4" }
 serde = { version = "^1.0.208", features = ["derive"] }
 minreq = { version = "^2.12.0", features = [
   "proxy",
@@ -69,6 +69,7 @@ features = ["pattern_encoder", "file_appender"]
 
 [patch.crates-io]
 log4rs = { git = "https://github.com/Jackhr-arch/log4rs" }
+is-root = { git = "https://github.com/Jackhr-arch/is-root" }
 
 [dependencies.clap]
 version = "^4.5.8"
