@@ -50,7 +50,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                 } else {
                     anyhow::bail!("Not providing Profile");
                 }
-                Ok("Done".to_string())
+                Ok("Done".to_owned())
             }
             ProfileCommand::Select { name } => {
                 let pf = if let Some(v) = backend.get_profile(&name) {
@@ -62,7 +62,25 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                     eprint!("Cannot select {name} due to {e}");
                     return Err(e);
                 };
-                Ok("Done".to_string())
+                Ok("Done".to_owned())
+            }
+            ProfileCommand::List { name_only } => {
+                let mut pfs = backend.get_all_profiles();
+                pfs.sort_by(|a, b| a.name.cmp(&b.name));
+                pfs.into_iter()
+                    .map(|pf| {
+                        if name_only {
+                            pf.name
+                        } else {
+                            format!(
+                                "{} : {}",
+                                pf.name,
+                                pf.dtype.get_domain().as_ref().map_or("Unknown", |v| v)
+                            )
+                        }
+                    })
+                    .for_each(|pf| println!("{}", pf));
+                Ok("Done".to_owned())
             }
         },
         #[cfg(any(target_os = "linux", target_os = "windows"))]

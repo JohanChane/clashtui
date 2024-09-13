@@ -95,6 +95,12 @@ enum ProfileCommand {
         #[arg(short, long)]
         name: String,
     },
+    /// list all profile
+    List {
+        /// without domain hint
+        #[arg(long)]
+        name_only:bool,
+    }
 }
 
 #[derive(clap::Subcommand)]
