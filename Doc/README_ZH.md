@@ -1,3 +1,5 @@
+# 注意，中文文档更新滞后，请以英文文档为准
+
 # ClashTui
 
 ![Demo](./Assets/clashtui_demo.gif)
@@ -30,8 +32,8 @@ Language: [English](../README.md) | [中文](./README_ZH.md)
 
 ## 支持的平台
 
--   Linux
--   Windows. 请转到 [Windows README](https://github.com/JohanChane/clashtui/blob/win/README_ZH.md)
+- Linux(amd64, arm64)
+- Windows
 
 ## 适用人群
 
@@ -159,15 +161,17 @@ clashtui 后续的版本没有上传到 `crates.io`, 因为现在 clashtui 分�
 
 ### 结合 cronie 定时更新 profiles
 
+> 你也可以[通过`systemd`解决](/Doc/systemd/README.md)
+
 ```sh
-clashtui -u         # 以命令行的模式更新所有 profiles。如果 profile 有 proxy-providers, 同时也会更新它们。
+clashtui profile update -a         # 以命令行的模式更新所有 profiles。如果 profile 有 proxy-providers, 同时也会更新它们。
 ```
 
 所以可以结合 cronie 来定时更新 profiles:
 
 ```sh
 # crontab -e
-0 10,14,16,22 * * * /usr/bin/env clashtui -u >> ~/cron.out 2>&1
+0 10,14,16,22 * * * /usr/bin/env clashtui profile update -a >> ~/cron.out 2>&1
 ```
 
 cronie 的使用, See [ref](https://wiki.archlinuxcn.org/wiki/Cron)。

@@ -30,9 +30,8 @@ Language: [English](./README.md) | [中文](./Doc/README_ZH.md)
 
 ## Supported Platforms
 
-- Linux(x86_64, arm64(CI in fixing))
+- Linux(amd64, arm64)
 - Windows
-- MacOS(In test, You need to build from source by youself)
 
 ## Target Audience
 
@@ -222,6 +221,8 @@ If it is the first time installing clashtui:
 - Restart the mihomo service (StartClashService in ClashSrvCtl Tab).
 
 ### Scheduled Updates with cronie
+
+> Here is also `systemd` solution under [`/Doc/systemd`](/Doc/systemd/README.md)
 
 ```sh
 clashtui profile update -a         # Updates all profiles in command-line mode. If the profile has proxy-providers, they will also be updated.
