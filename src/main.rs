@@ -9,7 +9,7 @@ mod utils;
 use error::Error;
 pub type CResult<T> = core::result::Result<T, Error>;
 
-use utils::{consts, init_config, load_config, BackEnd, Flag, Flags};
+use utils::{consts, init_config, load_config, BackEnd};
 
 static HOME_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 
@@ -19,16 +19,11 @@ fn main() {
     }
     // Err here means to generate completion
     if let Ok(infos) = commands::parse_args() {
-        // store pre-setup flags
-        let mut flags = Flags::empty();
         // setup home dir
-        let _ = HOME_DIR.set(load_home_dir(&mut flags));
+        let _ = HOME_DIR.set(load_home_dir());
 
         let log_file = HOME_DIR.get().unwrap().join(consts::LOG_FILE);
         setup_logging(&log_file);
-        // pre-setup flags are done here
-        let flags = flags;
-        log::debug!("Current flags: {:?}", flags);
         let buildconfig = match load_config(HOME_DIR.get().unwrap()) {
             Ok(v) => v,
             Err(e) => {
@@ -115,7 +110,7 @@ async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn load_home_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
+fn load_home_dir() -> std::path::PathBuf {
     let config_dir = {
         use std::{env, path::PathBuf};
         let exe_dir = env::current_exe()
@@ -126,7 +121,6 @@ fn load_home_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
         let data_dir = exe_dir.join("data");
         if data_dir.exists() && data_dir.is_dir() {
             // portable mode
-            flags.insert(Flag::PortableMode);
             data_dir
         } else {
             #[cfg(target_os = "linux")]

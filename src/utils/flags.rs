@@ -1,26 +1,25 @@
-use enumflags2::bitflags;
-pub use enumflags2::BitFlags;
+use bitflags::bitflags;
 
-#[derive(Clone, Copy, Debug)]
-#[bitflags]
-#[repr(u8)]
-pub enum Flag {
-    FirstInit,
-    PortableMode,
+bitflags! {
+    #[derive(Clone, Copy, Debug)]
+    pub struct Flag: u8 {
+        const FirstInit = 1;
+        const PortableMode = 1<<1;
+    }
 }
+
 #[cfg(test)]
 mod test {
     use super::*;
     #[test]
     fn test_flags() {
-        let mut flags = BitFlags::EMPTY;
+        let mut flags = Flag::empty();
         flags.insert(Flag::FirstInit);
         println!("{flags:?}");
         assert!(flags.contains(Flag::FirstInit));
-        println!("{:?}", flags.exactly_one());
-        flags.insert(Flag::FirstInit);
+        flags.insert(Flag::PortableMode);
         println!("{flags:?}");
         assert!(flags.contains(Flag::FirstInit));
-        println!("{:?}", flags.exactly_one())
+        assert!(flags.contains(Flag::PortableMode));
     }
 }
