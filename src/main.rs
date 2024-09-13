@@ -3,6 +3,7 @@
 mod clash;
 mod commands;
 mod error;
+#[cfg(feature = "tui")]
 mod tui;
 mod utils;
 
@@ -71,19 +72,25 @@ fn main() {
                 }
             }
         } else {
-            println!("Entering TUI...");
-            if let Err(e) = start_tui(backend) {
-                eprintln!("clashtui encounter some error");
-                eprintln!("{e}");
-                log::error!("Tui:{e:?}");
-                std::process::exit(-1)
+            #[cfg(feature = "tui")]
+            {
+                println!("Entering TUI...");
+                if let Err(e) = start_tui(backend) {
+                    eprintln!("clashtui encounter some error");
+                    eprintln!("{e}");
+                    log::error!("Tui:{e:?}");
+                    std::process::exit(-1)
+                }
             }
+            #[cfg(not(feature = "tui"))]
+            eprintln!("use `--help/-h` for help")
         }
     } else {
         eprint!("generate completion success");
     }
     std::process::exit(0)
 }
+#[cfg(feature = "tui")]
 // run a single thread, since there is no high-cpu-usage task
 #[tokio::main(flavor = "current_thread")]
 async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {

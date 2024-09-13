@@ -19,18 +19,17 @@ exclude = [".github", ".gitignore", "PkgManagers"]
 # maintenance = { status = "passively-maintained" }
 
 [features]
-bin-cli = ["clap_complete", "is-root", "clap", "log4rs", "encoding"]
-bin-tui = ["ratatui", "crossterm", "tokio", "bin-cli", "connection-tab"]
+tui = ["ratatui", "crossterm", "tokio", "connection-tab"]
 template = []
 connection-tab = ["ratatui/unstable-widget-ref"]
-default = ["bin-tui"]
+default = ["tui"]
 
 
 [dependencies]
 log = "^0.4.22"
-clap_complete = { version = "^4.5.7", optional = true }
+clap_complete = { version = "^4.5.7" }
 anyhow = "^1.0.86"
-is-root = { version = "0.1.3", optional = true }
+is-root = { version = "0.1.3" }
 serde = { version = "^1.0.208", features = ["derive"] }
 minreq = { version = "^2.12.0", features = [
   "proxy",
@@ -61,12 +60,11 @@ features = ["crossterm"]
 optional = true
 
 [target.'cfg(windows)'.dependencies]
-encoding = { version = "^0.2.33", optional = true }
+encoding = { version = "^0.2.33" }
 
 [dependencies.log4rs]
 version = "^1.3.0"
 default-features = false
-optional = true
 features = ["pattern_encoder", "file_appender"]
 
 [patch.crates-io]
@@ -75,7 +73,6 @@ log4rs = { git = "https://github.com/Jackhr-arch/log4rs" }
 [dependencies.clap]
 version = "^4.5.8"
 default-features = false
-optional = true
 features = ["std", "derive", "help", "usage", "suggestions", "color"]
 
 

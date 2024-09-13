@@ -2,6 +2,49 @@ use super::*;
 use crate::clash::ipc;
 use crate::tui::tabs::profile::ProfileOp;
 
+pub enum CallBack {
+    Error(String),
+    State(String),
+    Logs(Vec<String>),
+    Infos(Vec<String>),
+    Edit,
+    Preview(Vec<String>),
+    ServiceCTL(String),
+    ProfileCTL(Vec<String>),
+    #[cfg(feature = "connection-tab")]
+    ConnctionCTL(String),
+    #[cfg(feature = "connection-tab")]
+    ConnctionInit(ConnInfo),
+    ProfileInit(Vec<String>, Vec<Option<core::time::Duration>>),
+    #[cfg(feature = "template")]
+    TemplateInit(Vec<String>),
+}
+impl std::fmt::Display for CallBack {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                CallBack::Error(_) => "Error",
+                CallBack::State(_) => "State",
+                CallBack::Logs(_) => "Logs",
+                CallBack::Infos(_) => "Infos",
+                CallBack::Edit => "Edit",
+                CallBack::Preview(_) => "Preview",
+                CallBack::ServiceCTL(_) => "ServiceCTL",
+                CallBack::ProfileCTL(_) => "ProfileCTL",
+                CallBack::ProfileInit(..) => "ProfileInit",
+                #[cfg(feature = "template")]
+                CallBack::TemplateInit(_) => "TemplateInit",
+                #[cfg(feature = "connection-tab")]
+                CallBack::ConnctionCTL(_) => "ConnctionTab",
+                #[cfg(feature = "connection-tab")]
+                CallBack::ConnctionInit(_) => "ConnctionInit",
+            }
+        )
+    }
+}
+
 impl BackEnd {
     pub(super) fn handle_profile_op(&self, op: ProfileOp) -> CallBack {
         match op {

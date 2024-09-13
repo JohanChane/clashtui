@@ -1,8 +1,16 @@
+#[cfg(feature = "tui")]
 mod handle_ops;
 mod impl_profile;
 mod impl_service;
 #[cfg(feature = "template")]
 mod impl_template;
+
+#[cfg(feature = "tui")]
+use crate::tui::Call;
+#[cfg(feature = "tui")]
+pub use handle_ops::CallBack;
+#[cfg(feature = "tui")]
+use tokio::sync::mpsc::{Receiver, Sender};
 
 use super::consts::err as consts_err;
 use super::{
@@ -16,52 +24,7 @@ use crate::clash::{
     profile::{map::ProfileManager, LocalProfile, Profile},
     webapi::{ClashConfig, ClashUtil},
 };
-use crate::tui::Call;
 pub use impl_service::ServiceOp;
-use tokio::sync::mpsc::{Receiver, Sender};
-
-pub enum CallBack {
-    Error(String),
-    State(String),
-    Logs(Vec<String>),
-    Infos(Vec<String>),
-    Edit,
-    Preview(Vec<String>),
-    ServiceCTL(String),
-    ProfileCTL(Vec<String>),
-    #[cfg(feature = "connection-tab")]
-    ConnctionCTL(String),
-    #[cfg(feature = "connection-tab")]
-    ConnctionInit(ConnInfo),
-    ProfileInit(Vec<String>, Vec<Option<core::time::Duration>>),
-    #[cfg(feature = "template")]
-    TemplateInit(Vec<String>),
-}
-impl std::fmt::Display for CallBack {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                CallBack::Error(_) => "Error",
-                CallBack::State(_) => "State",
-                CallBack::Logs(_) => "Logs",
-                CallBack::Infos(_) => "Infos",
-                CallBack::Edit => "Edit",
-                CallBack::Preview(_) => "Preview",
-                CallBack::ServiceCTL(_) => "ServiceCTL",
-                CallBack::ProfileCTL(_) => "ProfileCTL",
-                CallBack::ProfileInit(..) => "ProfileInit",
-                #[cfg(feature = "template")]
-                CallBack::TemplateInit(_) => "TemplateInit",
-                #[cfg(feature = "connection-tab")]
-                CallBack::ConnctionCTL(_) => "ConnctionTab",
-                #[cfg(feature = "connection-tab")]
-                CallBack::ConnctionInit(_) => "ConnctionInit",
-            }
-        )
-    }
-}
 
 /// a wrapper for [`ClashBackend`]
 ///
@@ -70,12 +33,12 @@ pub struct BackEnd {
     api: ClashUtil,
     cfg: LibConfig,
     pm: ProfileManager,
-    // inner: ClashBackend,
     edit_cmd: String,
     /// just clone and merge, DO NEVER sync_to_disk/sync_from_disk
     base_profile: LocalProfile,
 }
 impl BackEnd {
+    #[cfg(feature = "tui")]
     /// async runtime entry
     ///
     /// use [`tokio::sync::mpsc`] to exchange data and command
