@@ -140,11 +140,8 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                         .collect();
                     if let Some(url) = al.get(0) {
                         println!("\nDownload start for {} {}", maybe_name, url);
-                        backend.download_to_file(&maybe_name, url)?;
-                        println!(
-                            "\nDownloaded to {}",
-                            std::env::current_dir()?.join(maybe_name).display()
-                        );
+                        let path = backend.download_to_file(&maybe_name, url)?;
+                        println!("\nDownloaded to {}", path.display());
                     } else {
                         println!("Not select any, continue");
                     }
@@ -154,11 +151,9 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                             "\nDownload start for {} {}",
                             asset.name, asset.browser_download_url
                         );
-                        backend.download_to_file(&asset.name, &asset.browser_download_url)?;
-                        println!(
-                            "\nDownloaded to {}",
-                            std::env::current_dir()?.join(&asset.name).display()
-                        );
+                        let path =
+                            backend.download_to_file(&asset.name, &asset.browser_download_url)?;
+                        println!("\nDownloaded to {}", path.display());
                     }
                 }
             }

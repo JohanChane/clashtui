@@ -27,11 +27,12 @@ impl BackEnd {
     pub fn check_update(&self) -> anyhow::Result<Vec<crate::clash::webapi::github::Response>> {
         Ok(self.api.check_update()?)
     }
-    pub fn download_to_file(&self, name: &str, url: &str) -> anyhow::Result<()> {
+    pub fn download_to_file(&self, name: &str, url: &str) -> anyhow::Result<std::path::PathBuf> {
+        let path = std::env::current_dir()?.join(name);
         let mut rp = self.api.get_file(url)?;
-        let mut fp = std::fs::File::create(std::env::current_dir()?.join(name))?;
+        let mut fp = std::fs::File::create(&path)?;
         std::io::copy(&mut rp, &mut fp)?;
-        Ok(())
+        Ok(path)
     }
     pub fn update_mode(&self, mode: String) -> anyhow::Result<()> {
         let load = format!(r#"{{"mode": "{mode}"}}"#);

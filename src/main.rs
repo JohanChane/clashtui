@@ -118,29 +118,30 @@ async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
 }
 
 fn load_home_dir() -> std::path::PathBuf {
-    let config_dir = {
-        use std::{env, path::PathBuf};
-        let exe_dir = env::current_exe()
-            .expect("Err loading exe_file_path")
-            .parent()
-            .expect("Err finding exe_dir")
-            .to_path_buf();
-        let data_dir = exe_dir.join("data");
-        if data_dir.exists() && data_dir.is_dir() {
-            // portable mode
-            data_dir
+    use std::{env, path};
+    let data_dir = env::current_exe()
+        .expect("Err loading exe_file_path")
+        .parent()
+        .expect("Err finding exe_dir")
+        .join("data");
+    if data_dir.exists() && data_dir.is_dir() {
+        // portable mode
+        data_dir
+    } else {
+        if cfg!(target_os = "linux") {
+            env::var_os("XDG_CONFIG_HOME")
+                .map(|c| path::PathBuf::from(c))
+                .or(env::var_os("HOME").map(|h| path::PathBuf::from(h).join(".config")))
+        } else if cfg!(target_os = "windows") {
+            env::var_os("APPDATA").map(|c| path::PathBuf::from(c))
+        } else if cfg!(target_os = "macos") {
+            env::var_os("HOME").map(|h| path::PathBuf::from(h).join(".config"))
         } else {
-            #[cfg(target_os = "linux")]
-            let config_dir_str = env::var("XDG_CONFIG_HOME")
-                .or_else(|_| env::var("HOME").map(|home| format!("{}/.config/clashtui", home)));
-            #[cfg(target_os = "windows")]
-            let config_dir_str = env::var("APPDATA").map(|appdata| format!("{}/clashtui", appdata));
-            #[cfg(target_os = "macos")]
-            let config_dir_str = env::var("HOME").map(|home| format!("{}/.config/clashtui", home));
-            PathBuf::from(&config_dir_str.expect("Err loading global config dir"))
+            unimplemented!("Not supported platform")
         }
-    };
-    config_dir
+        .map(|c| c.join("clashtui"))
+        .unwrap()
+    }
 }
 
 fn setup_logging<P: AsRef<std::path::Path>>(log_file: P) {
@@ -158,11 +159,11 @@ fn setup_logging<P: AsRef<std::path::Path>>(log_file: P) {
     } else {
         false
     };
-    // No need to change. This is set to auto switch to Info level when build release
-    #[allow(unused_variables)]
-    let log_level = log::LevelFilter::Info;
-    #[cfg(debug_assertions)]
-    let log_level = log::LevelFilter::Debug;
+    let log_level = if cfg!(debug_assertions) {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Info
+    };
     let file_appender = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
             "{d(%H:%M:%S)} [{l}] {t} - {m}{n}",
