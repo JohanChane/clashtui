@@ -60,7 +60,7 @@ features = ["crossterm"]
 optional = true
 
 [target.'cfg(windows)'.dependencies]
-encoding = { version = "^0.2.33" }
+encoding_rs = "0.8.34"
 
 [dependencies.log4rs]
 version = "^1.3.0"

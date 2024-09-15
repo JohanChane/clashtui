@@ -1,4 +1,3 @@
-use encoding::{all::GBK, DecoderTrap, Encoding};
 use std::process::{Command, Output};
 
 use std::io::Result;
@@ -94,25 +93,12 @@ pub fn is_system_proxy_enabled() -> Result<bool> {
 
 pub(super) fn string_process_output(output: Output) -> Result<String> {
     let stdout_vec: Vec<u8> = output.stdout;
-    use std::io::{Error, ErrorKind};
 
-    let stdout_str = GBK
-        .decode(&stdout_vec, DecoderTrap::Strict)
-        .map_err(|err| {
-            Error::new(
-                ErrorKind::InvalidData,
-                format!("Failed to decode stdout: {err}"),
-            )
-        })?;
+    let (stdout_str, _encoding, _contain_bad_char) =
+        encoding_rs::Encoding::decode(encoding_rs::GBK, &stdout_vec);
 
-    let stderr_str = GBK
-        .decode(&output.stderr, DecoderTrap::Strict)
-        .map_err(|err| {
-            Error::new(
-                ErrorKind::InvalidData,
-                format!("Failed to decode stderr: {err}"),
-            )
-        })?;
+    let (stderr_str, _encoding, _contain_bad_char) =
+        encoding_rs::Encoding::decode(encoding_rs::GBK, &stdout_vec);
 
     let result_str = format!(
         r#"
