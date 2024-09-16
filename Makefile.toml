@@ -40,18 +40,18 @@ dependencies = ["clear-artifacts", "amd64"]
 script_runner = "@shell"
 script = [
     "mkdir artifacts",
-    "cp target/release/clashtui.exe artifacts/clashtui.release.exe",
-    "cp target/debug/clashtui.exe artifacts/clashtui.debug.exe",
+    "cp target/release/clashtui.exe artifacts/clashtui.windows.release.exe",
+    "cp target/debug/clashtui.exe artifacts/clashtui.windows.debug.exe",
 ]
 [tasks.release.linux]
 dependencies = ["clear-artifacts", "arm64", "amd64", "build_deb"]
 script = '''
     mkdir artifacts
-    cp target/debian/*.deb artifacts/clashtui.deb
-    cp target/release/clashtui artifacts/clashtui.amd64.release
-    cp target/debug/clashtui artifacts/clashtui.amd64.debug
-    cp target/aarch64-unknown-linux-gnu/release/clashtui artifacts/clashtui.arm64.release
-    cp target/aarch64-unknown-linux-gnu/debug/clashtui artifacts/clashtui.arm64.debug
+    cp target/debian/*.deb artifacts/clashtui.linux.amd64.deb
+    cp target/release/clashtui artifacts/clashtui.linux.amd64.release
+    cp target/debug/clashtui artifacts/clashtui.linux.amd64.debug
+    cp target/aarch64-unknown-linux-gnu/release/clashtui artifacts/clashtui.linux.arm64.release
+    cp target/aarch64-unknown-linux-gnu/debug/clashtui artifacts/clashtui.linux.arm64.debug
 '''
 
 [tasks.clear-artifacts]
