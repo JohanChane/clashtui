@@ -14,16 +14,12 @@ impl ClashUtil {
         self.get_blob(url, None, Some(headers::DEFAULT_USER_AGENT))
     }
 }
-
+#[cfg_attr(test, derive(Deserialize))]
 pub enum Request<'a> {
     Latest(&'a str),
     CI(&'a str, &'a str),
 }
 impl Request<'_> {
-    const MIHOMO: &'static str = "MetaCubeX/mihomo";
-    const MIHOMO_CI: &'static str = "Prerelease-Alpha";
-    const CLASHTUI: &'static str = "JohanChane/clashtui";
-    const CLASHTUI_CI: &'static str = "Continuous_Integration";
     pub fn as_url(&self) -> String {
         match self {
             Request::Latest(repo) => format!("https://api.github.com/repos/{repo}/releases/latest"),
@@ -32,6 +28,12 @@ impl Request<'_> {
             }
         }
     }
+}
+impl Request<'static> {
+    const MIHOMO: &str = "MetaCubeX/mihomo";
+    const MIHOMO_CI: &str = "Prerelease-Alpha";
+    const CLASHTUI: &str = "JohanChane/clashtui";
+    const CLASHTUI_CI: &str = "Continuous_Integration";
     pub fn s_mihomo() -> Self {
         Self::Latest(Self::MIHOMO)
     }
@@ -137,5 +139,19 @@ mod test {
         assert!(!r.is_newer_than(crate::consts::VERSION));
         r.tag_name = crate::consts::VERSION.to_owned();
         assert!(!r.is_newer_than(crate::consts::VERSION))
+    }
+    #[test]
+    fn load_request() {
+        let raw = "!Latest JohanChane/clashtui";
+        let _: Request = serde_yaml::from_str(raw).unwrap();
+        let raw = "!CI\n- Jackhr-arch/clashtui\n- Continuous_Integration";
+        let _: Request = serde_yaml::from_str(raw).unwrap();
+        let raw = r#"
+- !CI
+  - Jackhr-arch/clashtui
+  - Continuous_Integration
+- !Latest JohanChane/clashtui
+"#;
+        let _: Vec<Request> = serde_yaml::from_str(raw).unwrap();
     }
 }

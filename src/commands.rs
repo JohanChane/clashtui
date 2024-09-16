@@ -61,8 +61,10 @@ enum ArgCommand {
     },
     /// check for update
     CheckUpdate {
+        /// download the first item (filtered by arch)
         #[arg(long, short = 'y')]
         without_ask: bool,
+        /// check ci/alpha release instead
         #[arg(long, short = 'c')]
         check_ci: bool,
     },
