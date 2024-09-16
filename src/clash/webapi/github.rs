@@ -13,50 +13,36 @@ impl ClashUtil {
         use super::headers;
         self.get_blob(url, None, Some(headers::DEFAULT_USER_AGENT))
     }
-    /// check self and clash(current:`mihomo`)
-    pub fn check_update(&self) -> CResult<Vec<(Response, String)>> {
-        let mut clashtui = self.get_github_info(&Request::s_clashtui())?;
-        let mut clash = self.get_github_info(&Request::s_clash())?;
-        let mut vec = Vec::with_capacity(2);
-        if clashtui.is_newer_than(crate::consts::VERSION) {
-            clashtui.name = "ClashTUI".to_string();
-            vec.push((clashtui.filter_asserts(), crate::consts::VERSION.to_owned()));
-        }
-        let clash_core_version = match self.version() {
-            Ok(v) => {
-                let v = serde_json::to_value(v)?;
-                // test mihomo
-                let mihomo = v.get("version").and_then(|v| v.as_str());
-                // try get any
-                None.or(mihomo).map(|s| s.to_owned())
-            }
-            Err(_) => None,
-        }
-        // if None is get, assume there is no clash core installed/running
-        .unwrap_or("v0.0.0".to_owned());
-        if clash.is_newer_than(&clash_core_version) {
-            clash.name = "Clash Core".to_string();
-            vec.push((clash.filter_asserts(), clash_core_version))
-        }
-        Ok(vec)
-    }
 }
 
-/// e.g. `MetaCubeX/mihomo`
-pub struct Request(String);
-impl Request {
-    const CLASH: &str = "MetaCubeX/mihomo";
-    const CLASHTUI: &str = "JohanChane/clashtui";
+pub enum Request<'a> {
+    Latest(&'a str),
+    CI(&'a str, &'a str),
+}
+impl Request<'_> {
+    const MIHOMO: &'static str = "MetaCubeX/mihomo";
+    const MIHOMO_CI: &'static str = "Prerelease-Alpha";
+    const CLASHTUI: &'static str = "JohanChane/clashtui";
+    const CLASHTUI_CI: &'static str = "Continuous_Integration";
     pub fn as_url(&self) -> String {
-        format!("https://api.github.com/repos/{}/releases/latest", self.0)
+        match self {
+            Request::Latest(repo) => format!("https://api.github.com/repos/{repo}/releases/latest"),
+            Request::CI(repo, name) => {
+                format!("https://api.github.com/repos/{repo}/releases/tags/{name}")
+            }
+        }
     }
-    /// a shortcut for `Request(Request::MIHOMO.to_owned())`
-    pub fn s_clash() -> Self {
-        Self(Self::CLASH.to_owned())
+    pub fn s_mihomo() -> Self {
+        Self::Latest(Self::MIHOMO)
     }
-    /// a shortcut for `Request(Request::CLASHTUI.to_owned())`
     pub fn s_clashtui() -> Self {
-        Self(Self::CLASHTUI.to_owned())
+        Self::Latest(Self::CLASHTUI)
+    }
+    pub fn s_clashtui_ci() -> Self {
+        Self::CI("Jackhr-arch/clashtui", Self::CLASHTUI_CI)
+    }
+    pub fn s_mihomo_ci() -> Self {
+        Self::CI(Self::MIHOMO, Self::MIHOMO_CI)
     }
 }
 

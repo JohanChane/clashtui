@@ -105,9 +105,12 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                 .update_state(None, Some(cMode::Global.into()))?
                 .to_string()),
         },
-        ArgCommand::CheckUpdate { without_ask } => {
+        ArgCommand::CheckUpdate {
+            without_ask,
+            check_ci,
+        } => {
             for (info, current_version) in backend
-                .check_update()
+                .check_update(check_ci)
                 .map_err(|e| anyhow::anyhow!("failed to fetch github release due to {e}"))?
             {
                 println!("\n{}", info.as_info(current_version));

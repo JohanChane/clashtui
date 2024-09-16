@@ -63,6 +63,8 @@ enum ArgCommand {
     CheckUpdate {
         #[arg(long, short = 'y')]
         without_ask: bool,
+        #[arg(long, short = 'c')]
+        check_ci: bool,
     },
 }
 

@@ -30,9 +30,9 @@ fn get_version() -> String {
     let cargo_pkg_version = env::var("CARGO_PKG_VERSION").unwrap();
 
     let build_type: bool = env::var("DEBUG").unwrap().parse().unwrap();
-    let build_type_str = if build_type { "-debug" } else { "" };
+    let build_type_str = if build_type { "debug" } else { "" };
 
-    let version = format!("v{cargo_pkg_version}-{branch_name}-{git_describe}{build_type_str}");
+    let version = format!("v{cargo_pkg_version}-{branch_name}-{git_describe}-{build_type_str}");
 
     version
 }

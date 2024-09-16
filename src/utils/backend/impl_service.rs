@@ -24,10 +24,54 @@ crate::define_enum!(
 );
 
 impl BackEnd {
+    /// check self and clash(current:`mihomo`)
     pub fn check_update(
         &self,
+        check_ci: bool,
     ) -> anyhow::Result<Vec<(crate::clash::webapi::github::Response, String)>> {
-        Ok(self.api.check_update()?)
+        use crate::clash::webapi::github::Request;
+        let clash_core_version = match self.api.version() {
+            Ok(v) => {
+                let v = serde_json::to_value(v)?;
+                // test mihomo
+                let mihomo = v.get("version").and_then(|v| v.as_str());
+                // try get any
+                None.or(mihomo).map(|s| s.to_owned())
+            }
+            Err(_) => None,
+        }
+        // if None is get, assume there is no clash core installed/running
+        .unwrap_or("v0.0.0".to_owned());
+
+        if check_ci {
+            return Ok(vec![
+                (
+                    self.api
+                        .get_github_info(&Request::s_clashtui_ci())?
+                        .filter_asserts(),
+                    crate::consts::VERSION.to_owned(),
+                ),
+                (
+                    self.api
+                        .get_github_info(&Request::s_mihomo_ci())?
+                        .filter_asserts(),
+                    clash_core_version,
+                ),
+            ]);
+        };
+
+        let mut clashtui = self.api.get_github_info(&Request::s_clashtui())?;
+        let mut mihomo = self.api.get_github_info(&Request::s_mihomo())?;
+        let mut vec = Vec::with_capacity(2);
+        if clashtui.is_newer_than(crate::consts::VERSION) {
+            clashtui.name = "ClashTUI".to_string();
+            vec.push((clashtui.filter_asserts(), crate::consts::VERSION.to_owned()));
+        }
+        if mihomo.is_newer_than(&clash_core_version) {
+            mihomo.name = "Clash Core".to_string();
+            vec.push((mihomo.filter_asserts(), clash_core_version))
+        }
+        Ok(vec)
     }
     pub fn download_to_file(&self, name: &str, url: &str) -> anyhow::Result<std::path::PathBuf> {
         let path = std::env::current_dir()?.join(name);
