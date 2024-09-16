@@ -22,13 +22,13 @@ script = ""
 script_runner = "pwsh"
 script_extension = "ps1"
 script = '''
-    curl --output mihomo.zip -L https://github.com/MetaCubeX/mihomo/releases/download/v1.18.4/mihomo-windows-amd64-v1.18.4.zip
+    curl --output mihomo.zip -L https://github.com/MetaCubeX/mihomo/releases/download/v1.18.8/mihomo-windows-amd64-v1.18.8.zip
     7z x mihomo.zip
     mihomo-windows-amd64.exe -d Doc/clash_test -f Doc/clash_test/config.yaml &
 '''
 [tasks.setup-mihomo.linux]
 script = '''
-    curl --output mihomo.gz -L https://github.com/MetaCubeX/mihomo/releases/download/v1.18.4/mihomo-linux-amd64-v1.18.4.gz
+    curl --output mihomo.gz -L https://github.com/MetaCubeX/mihomo/releases/download/v1.18.8/mihomo-linux-amd64-v1.18.8.gz
     gunzip mihomo.gz
     chmod +x mihomo
     nohup ./mihomo -d Doc/clash_test -f Doc/clash_test/config.yaml > /dev/null &
