@@ -21,8 +21,7 @@ pub fn gen_complete(shell: Option<clap_complete::Shell>) {
     clap_complete::generate(
         gen,
         &mut CliCmds::command(),
-        // gen bin name by argv[0]
-        std::env::args().next().unwrap(),
+        "clashtui",
         &mut std::io::stdout(),
     )
 }
