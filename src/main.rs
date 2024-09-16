@@ -130,10 +130,10 @@ fn load_home_dir() -> std::path::PathBuf {
     } else {
         if cfg!(target_os = "linux") {
             env::var_os("XDG_CONFIG_HOME")
-                .map(|c| path::PathBuf::from(c))
+                .map(path::PathBuf::from)
                 .or(env::var_os("HOME").map(|h| path::PathBuf::from(h).join(".config")))
         } else if cfg!(target_os = "windows") {
-            env::var_os("APPDATA").map(|c| path::PathBuf::from(c))
+            env::var_os("APPDATA").map(path::PathBuf::from)
         } else if cfg!(target_os = "macos") {
             env::var_os("HOME").map(|h| path::PathBuf::from(h).join(".config"))
         } else {

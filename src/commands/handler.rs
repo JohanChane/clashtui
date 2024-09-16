@@ -141,23 +141,21 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                         .filter(|a| a.name == maybe_name)
                         .map(|a| a.browser_download_url)
                         .collect();
-                    if let Some(url) = al.get(0) {
+                    if let Some(url) = al.first() {
                         println!("\nDownload start for {} {}", maybe_name, url);
                         let path = backend.download_to_file(&maybe_name, url)?;
                         println!("\nDownloaded to {}", path.display());
                     } else {
                         println!("Not select any, continue");
                     }
-                } else {
-                    if let Some(asset) = info.assets.get(0) {
-                        println!(
-                            "\nDownload start for {} {}",
-                            asset.name, asset.browser_download_url
-                        );
-                        let path =
-                            backend.download_to_file(&asset.name, &asset.browser_download_url)?;
-                        println!("\nDownloaded to {}", path.display());
-                    }
+                } else if let Some(asset) = info.assets.first() {
+                    println!(
+                        "\nDownload start for {} {}",
+                        asset.name, asset.browser_download_url
+                    );
+                    let path =
+                        backend.download_to_file(&asset.name, &asset.browser_download_url)?;
+                    println!("\nDownloaded to {}", path.display());
                 }
             }
             Ok("Done".to_owned())

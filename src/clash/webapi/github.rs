@@ -118,10 +118,9 @@ fn get_triple_code(tag: &str) -> Option<Vec<u8>> {
     let triple_code: Vec<u8> = tag
         .trim_start_matches('v')
         .split('-')
-        .filter(|s| s.len() != 0)
+        .filter(|s| !s.is_empty())
         .take(1)
-        .map(|s| s.split('.'))
-        .flatten()
+        .flat_map(|s| s.split('.'))
         .map(|s| s.parse::<u8>().unwrap_or(0))
         .collect();
     if triple_code.len() == 3 {
