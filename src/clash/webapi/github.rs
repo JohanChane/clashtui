@@ -14,13 +14,13 @@ impl ClashUtil {
         self.get_blob(url, None, Some(headers::DEFAULT_USER_AGENT))
     }
     /// check self and clash(current:`mihomo`)
-    pub fn check_update(&self) -> CResult<Vec<Response>> {
+    pub fn check_update(&self) -> CResult<Vec<(Response, String)>> {
         let mut clashtui = self.get_github_info(&Request::s_clashtui())?;
         let mut clash = self.get_github_info(&Request::s_clash())?;
         let mut vec = Vec::with_capacity(2);
         if clashtui.is_newer_than(crate::consts::VERSION) {
             clashtui.name = "ClashTUI".to_string();
-            vec.push(clashtui.filter_asserts());
+            vec.push((clashtui.filter_asserts(), crate::consts::VERSION.to_owned()));
         }
         let clash_core_version = match self.version() {
             Ok(v) => {
@@ -36,7 +36,7 @@ impl ClashUtil {
         .unwrap_or("v0.0.0".to_owned());
         if clash.is_newer_than(&clash_core_version) {
             clash.name = "Clash Core".to_string();
-            vec.push(clash.filter_asserts())
+            vec.push((clash.filter_asserts(), clash_core_version))
         }
         Ok(vec)
     }
@@ -100,9 +100,9 @@ impl Response {
             .collect();
         self
     }
-    pub fn as_info(&self) -> String {
+    pub fn as_info(&self, version: String) -> String {
         format!(
-            "There is a new update for `{}`\nPublished at {}\n\n---\n\nCHANGELOG:\n{}",
+            "There is a new update for `{}`\nCurrent installed version is {version}\nPublished at {}\n\n---\n\nCHANGELOG:\n{}",
             self.name,
             self.published_at,
             self.body.trim_end().trim_start()
@@ -152,14 +152,5 @@ mod test {
         assert!(!r.is_newer_than(crate::consts::VERSION));
         r.tag_name = crate::consts::VERSION.to_owned();
         assert!(!r.is_newer_than(crate::consts::VERSION))
-    }
-
-    #[test]
-    fn doit() {
-        let have_curl = std::process::Command::new("which")
-            .arg("curl")
-            .output()
-            .is_ok_and(|r| r.status.success());
-        println!("{:?}", have_curl);
     }
 }

@@ -106,8 +106,11 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                 .to_string()),
         },
         ArgCommand::CheckUpdate { without_ask } => {
-            for info in backend.check_update()? {
-                println!("\n{}", info.as_info());
+            for (info, current_version) in backend
+                .check_update()
+                .map_err(|e| anyhow::anyhow!("failed to fetch github release due to {e}"))?
+            {
+                println!("\n{}", info.as_info(current_version));
                 if !without_ask {
                     use std::io::Write;
                     let mut out = std::io::stdout().lock();

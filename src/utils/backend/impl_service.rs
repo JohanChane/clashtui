@@ -24,14 +24,45 @@ crate::define_enum!(
 );
 
 impl BackEnd {
-    pub fn check_update(&self) -> anyhow::Result<Vec<crate::clash::webapi::github::Response>> {
+    pub fn check_update(
+        &self,
+    ) -> anyhow::Result<Vec<(crate::clash::webapi::github::Response, String)>> {
         Ok(self.api.check_update()?)
     }
     pub fn download_to_file(&self, name: &str, url: &str) -> anyhow::Result<std::path::PathBuf> {
         let path = std::env::current_dir()?.join(name);
-        let mut rp = self.api.get_file(url)?;
-        let mut fp = std::fs::File::create(&path)?;
-        std::io::copy(&mut rp, &mut fp)?;
+        match self.api.get_file(url) {
+            Ok(mut rp) => {
+                let mut fp = std::fs::File::create(&path)?;
+                std::io::copy(&mut rp, &mut fp)
+                    .map_err(|e| anyhow::anyhow!("{e}\nincrease timeout might help"))?;
+            }
+            Err(e) => {
+                eprintln!("{e}\ntry to download with `curl/wget`");
+                use std::process::{Command, Stdio};
+                fn have_this(name: &str) -> bool {
+                    Command::new("which")
+                        .arg(name)
+                        .output()
+                        .is_ok_and(|r| r.status.success())
+                }
+                if have_this("curl") {
+                    println!("using curl");
+                    Command::new("curl")
+                        .args(["-o", &path.to_string_lossy(), "-L", url])
+                        .stdin(Stdio::null())
+                        .status()?;
+                } else if have_this("wget") {
+                    println!("using wget");
+                    Command::new("wget")
+                        .args(["-O", &path.to_string_lossy(), url])
+                        .stdin(Stdio::null())
+                        .status()?;
+                } else {
+                    anyhow::bail!("Unable to find curl/wget")
+                }
+            }
+        }
         Ok(path)
     }
     pub fn update_mode(&self, mode: String) -> anyhow::Result<()> {
