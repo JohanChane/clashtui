@@ -32,7 +32,7 @@ impl BackEnd {
         use crate::clash::webapi::github::Request;
         let clash_core_version = match self.api.version() {
             Ok(v) => {
-                let v = serde_json::to_value(v)?;
+                let v: serde_json::Value = serde_json::from_str(&v).unwrap();
                 // test mihomo
                 let mihomo = v.get("version").and_then(|v| v.as_str());
                 // try get any
