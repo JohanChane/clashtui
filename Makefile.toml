@@ -52,7 +52,7 @@ script = ["rm -r artifacts"]
 install_crate = "cargo-deb"
 dependencies = ["create-artifacts"]
 script = """
-    cargo deb -- --all-features
+    cargo deb
     cp target/debian/*.deb artifacts/clashtui.linux.amd64.deb
 """
 
@@ -62,8 +62,8 @@ script = """
 install_crate = "cross"
 dependencies = ["create-artifacts"]
 script = '''
-    cross build --all-features --target=aarch64-unknown-linux-gnu
-    cross build --all-features --release --target=aarch64-unknown-linux-gnu
+    cross build --target=aarch64-unknown-linux-gnu
+    cross build --release --target=aarch64-unknown-linux-gnu
     cp target/aarch64-unknown-linux-gnu/release/clashtui artifacts/clashtui.linux.arm64.release
     cp target/aarch64-unknown-linux-gnu/debug/clashtui artifacts/clashtui.linux.arm64.debug
 '''
@@ -71,8 +71,8 @@ script = '''
 [tasks.amd64]
 dependencies = ["create-artifacts"]
 script = '''
-    cargo build --all-features
-    cargo build --all-features --release
+    cargo build
+    cargo build --release
     cp target/release/clashtui artifacts/clashtui.linux.amd64.release
     cp target/debug/clashtui artifacts/clashtui.linux.amd64.debug
 '''

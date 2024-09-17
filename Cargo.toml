@@ -19,10 +19,10 @@ exclude = [".github", ".gitignore", "PkgManagers"]
 # maintenance = { status = "passively-maintained" }
 
 [features]
-tui = ["ratatui", "crossterm", "tokio", "connection-tab"]
+tui = ["ratatui", "crossterm", "tokio"]
 template = []
-connection-tab = ["ratatui/unstable-widget-ref"]
-default = ["tui"]
+connection-tab = ["tui", "ratatui/unstable-widget-ref"]
+default = ["tui", "connection-tab"]
 
 
 [dependencies]
