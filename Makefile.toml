@@ -1,14 +1,4 @@
 
-[env]
-# use for build arm64 in docker
-# CROSS_CONTAINER_IN_CONTAINER = true
-
-[tasks.rd]
-alias = "rundev"
-[tasks.rundev]
-command = "cargo"
-args = ["run", "--all-features"]
-
 [tasks.ci]
 dependencies = ["setup-mihomo", "ci-flow"]
 script = ["rm mihomo", "rm Doc/clash_test/cache.db"]
@@ -36,7 +26,7 @@ script = '''
 
 
 [tasks.release.windows]
-dependencies = ["clear-artifacts", "amd64"]
+dependencies = ["clear-artifacts", "amd64", "upx"]
 script_runner = "@shell"
 script = [
     "mkdir artifacts",
@@ -44,15 +34,13 @@ script = [
     "cp target/debug/clashtui.exe artifacts/clashtui.windows.debug.exe",
 ]
 [tasks.release.linux]
-dependencies = ["clear-artifacts", "arm64", "amd64", "build_deb"]
-script = '''
-    mkdir artifacts
-    cp target/debian/*.deb artifacts/clashtui.linux.amd64.deb
-    cp target/release/clashtui artifacts/clashtui.linux.amd64.release
-    cp target/debug/clashtui artifacts/clashtui.linux.amd64.debug
-    cp target/aarch64-unknown-linux-gnu/release/clashtui artifacts/clashtui.linux.arm64.release
-    cp target/aarch64-unknown-linux-gnu/debug/clashtui artifacts/clashtui.linux.arm64.debug
-'''
+dependencies = ["clear-artifacts", "amd64", "arm64", "build_deb", "upx"]
+
+[tasks.create-artifacts]
+private = true
+script_runner = "@shell"
+ignore_errors = true
+script = ["mkdir artifacts"]
 
 [tasks.clear-artifacts]
 private = true
@@ -62,25 +50,35 @@ script = ["rm -r artifacts"]
 
 [tasks.build_deb]
 install_crate = "cargo-deb"
-command = "cargo"
-args = ["deb", "--", "--all-features"]
+dependencies = ["create-artifacts"]
+script = """
+    cargo deb -- --all-features
+    cp target/debian/*.deb artifacts/clashtui.linux.amd64.deb
+"""
 
 [tasks.arm64]
+# use for build arm64 in docker
+# env = { CROSS_CONTAINER_IN_CONTAINER = true }
 install_crate = "cross"
+dependencies = ["create-artifacts"]
 script = '''
     cross build --all-features --target=aarch64-unknown-linux-gnu
     cross build --all-features --release --target=aarch64-unknown-linux-gnu
+    cp target/aarch64-unknown-linux-gnu/release/clashtui artifacts/clashtui.linux.arm64.release
+    cp target/aarch64-unknown-linux-gnu/debug/clashtui artifacts/clashtui.linux.arm64.debug
 '''
 
 [tasks.amd64]
+dependencies = ["create-artifacts"]
 script = '''
     cargo build --all-features
     cargo build --all-features --release
+    cp target/release/clashtui artifacts/clashtui.linux.amd64.release
+    cp target/debug/clashtui artifacts/clashtui.linux.amd64.debug
 '''
 
 
 [tasks.upx.linux]
-dependencies = ["release"]
 script = '''
     chmod +x artifacts/*
     curl -OL https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz
@@ -93,7 +91,6 @@ script = '''
 '''
 
 [tasks.upx.windows]
-dependencies = ["release"]
 script = '''
     curl -OL https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip
     tar -xf upx-4.2.4-win64.zip
