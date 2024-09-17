@@ -19,12 +19,12 @@ pub struct ConfigFile {
 impl ConfigFile {
     pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let fp = File::create(path)?;
-        serde_yaml::to_writer(fp, &self)?;
+        serde_yml::to_writer(fp, &self)?;
         Ok(())
     }
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let fp = File::open(path)?;
-        Ok(serde_yaml::from_reader(fp)?)
+        Ok(serde_yml::from_reader(fp)?)
     }
 }
 
@@ -37,12 +37,12 @@ pub struct DataFile {
 impl DataFile {
     pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let fp = File::create(path)?;
-        serde_yaml::to_writer(fp, &self)?;
+        serde_yml::to_writer(fp, &self)?;
         Ok(())
     }
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let fp = File::open(path)?;
-        Ok(serde_yaml::from_reader(fp)?)
+        Ok(serde_yml::from_reader(fp)?)
     }
 }
 
@@ -92,7 +92,7 @@ pub fn load_config<P: AsRef<Path>>(config_dir: P) -> Result<BuildConfig> {
 pub struct BuildConfig {
     pub cfg: ConfigFile,
     pub basic: BasicInfo,
-    pub base_raw: serde_yaml::Mapping,
+    pub base_raw: serde_yml::Mapping,
     pub data: DataFile,
 }
 
@@ -129,18 +129,18 @@ impl Default for BasicInfo {
 impl BasicInfo {
     pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let fp = File::create(path)?;
-        Ok(serde_yaml::to_writer(fp, &self)?)
+        Ok(serde_yml::to_writer(fp, &self)?)
     }
     // pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
     //     let fp = File::open(path)?;
-    //     Ok(serde_yaml::from_reader(fp)?)
+    //     Ok(serde_yml::from_reader(fp)?)
     // }
-    pub fn get_raw<P: AsRef<Path>>(path: P) -> Result<serde_yaml::Mapping> {
+    pub fn get_raw<P: AsRef<Path>>(path: P) -> Result<serde_yml::Mapping> {
         let fp = File::open(path)?;
-        Ok(serde_yaml::from_reader(fp)?)
+        Ok(serde_yml::from_reader(fp)?)
     }
-    pub fn from_raw(raw: serde_yaml::Mapping) -> Result<Self> {
-        Ok(serde_yaml::from_value(serde_yaml::Value::Mapping(raw))?)
+    pub fn from_raw(raw: serde_yml::Mapping) -> Result<Self> {
+        Ok(serde_yml::from_value(serde_yml::Value::Mapping(raw))?)
     }
 }
 impl BasicInfo {

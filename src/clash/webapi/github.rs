@@ -143,15 +143,15 @@ mod test {
     #[test]
     fn load_request() {
         let raw = "!Latest JohanChane/clashtui";
-        let _: Request = serde_yaml::from_str(raw).unwrap();
+        let _: Request = serde_yml::from_str(raw).unwrap();
         let raw = "!CI\n- Jackhr-arch/clashtui\n- Continuous_Integration";
-        let _: Request = serde_yaml::from_str(raw).unwrap();
+        let _: Request = serde_yml::from_str(raw).unwrap();
         let raw = r#"
 - !CI
   - Jackhr-arch/clashtui
   - Continuous_Integration
 - !Latest JohanChane/clashtui
 "#;
-        let _: Vec<Request> = serde_yaml::from_str(raw).unwrap();
+        let _: Vec<Request> = serde_yml::from_str(raw).unwrap();
     }
 }

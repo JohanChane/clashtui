@@ -31,7 +31,7 @@ pub struct LocalProfile {
     pub name: String,
     pub dtype: ProfileType,
     pub path: PathBuf,
-    pub content: Option<serde_yaml::Mapping>,
+    pub content: Option<serde_yml::Mapping>,
 }
 impl Default for LocalProfile {
     fn default() -> Self {
@@ -76,7 +76,7 @@ impl LocalProfile {
     pub fn sync_to_disk(self) -> anyhow::Result<()> {
         let LocalProfile { path, content, .. } = self;
         let fp = File::create(path)?;
-        Ok(serde_yaml::to_writer(fp, &content)?)
+        Ok(serde_yml::to_writer(fp, &content)?)
     }
     pub fn from_pf(pf: Profile, path: std::path::PathBuf) -> Self {
         let Profile { name, dtype } = pf;
@@ -91,7 +91,7 @@ impl LocalProfile {
     pub fn sync_from_disk(&mut self) -> anyhow::Result<()> {
         if self.path.is_file() {
             let fp = File::open(&self.path)?;
-            self.content = serde_yaml::from_reader(fp)?;
+            self.content = serde_yml::from_reader(fp)?;
         }
         Ok(())
     }

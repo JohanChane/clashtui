@@ -131,7 +131,7 @@ impl BackEnd {
                     .load_local_profile(pf)
                     .and_then(|pf| match pf.content.as_ref() {
                         Some(content) => {
-                            serde_yaml::to_string(content)
+                            serde_yml::to_string(content)
                                 .map_err(|e| e.into())
                                 .map(|content| {
                                     lines.extend(content.lines().map(|s| s.to_owned()));
