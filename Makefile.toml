@@ -34,7 +34,7 @@ script = [
     "cp target/debug/clashtui.exe artifacts/clashtui.windows.debug.exe",
 ]
 [tasks.release.linux]
-dependencies = ["clear-artifacts", "amd64", "arm64", "build_deb", "upx"]
+dependencies = ["clear-artifacts", "arm64", "amd64", "build_deb", "upx"]
 
 [tasks.create-artifacts]
 private = true
