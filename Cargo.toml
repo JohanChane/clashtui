@@ -20,6 +20,7 @@ exclude = [".github", ".gitignore", "PkgManagers"]
 
 [features]
 tui = ["ratatui", "crossterm", "tokio"]
+customized-theme = ["tui", "ratatui/serde"]
 template = []
 connection-tab = ["tui", "ratatui/unstable-widget-ref"]
 default = ["tui", "connection-tab"]

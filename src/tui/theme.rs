@@ -5,8 +5,10 @@ use std::sync::OnceLock;
 /// because the path to theme file is wanted
 static GLOBAL_THEME: OnceLock<Theme> = OnceLock::new();
 
-// #[derive(serde::Serialize, serde::Deserialize)]
-// in avoid some feature not enable causing a warning
+#[cfg_attr(
+    feature = "customized-theme",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[allow(unused)]
 pub struct Theme {
     pub popup_block_fg: Color,
@@ -30,23 +32,26 @@ pub struct Theme {
 }
 
 impl Theme {
-    pub fn load(_ph: Option<&std::path::PathBuf>) -> Result<(), ()> {
-        let _ = GLOBAL_THEME.set(Self::default());
-        Ok(())
+    const NOT_LOADED: &str = "Global Theme should be loaded before used";
+    const ALREADY_LOADED: &str = "Global Theme should be loaded only once";
+    #[cfg(not(feature = "customized-theme"))]
+    pub fn load(_pb: Option<&std::path::PathBuf>) -> anyhow::Result<()> {
+        GLOBAL_THEME
+            .set(Self::default())
+            .map_err(|_| anyhow::anyhow!(Self::ALREADY_LOADED))
     }
     pub fn get() -> &'static Self {
-        GLOBAL_THEME.get_or_init(Self::default)
+        GLOBAL_THEME.get().expect(Self::NOT_LOADED)
     }
-    //pub fn load(ph: Option<&std::path::PathBuf>) -> Result<Self, String> {
-    //    ph.map_or_else(
-    //        || Ok(Self::default()),
-    //        |ph| {
-    //            std::fs::File::open(ph)
-    //                .map_err(|e| e.to_string())
-    //                .and_then(|f| serde_yaml::from_reader(f).map_err(|e| e.to_string()))
-    //        },
-    //    )
-    //}
+    #[cfg(feature = "customized-theme")]
+    pub fn load(ph: Option<&std::path::PathBuf>) -> anyhow::Result<()> {
+        GLOBAL_THEME
+            .set(match ph {
+                Some(pb) => serde_yml::from_reader(std::fs::File::open(pb)?)?,
+                None => Self::default(),
+            })
+            .map_err(|_| anyhow::anyhow!(Self::ALREADY_LOADED))
+    }
 }
 
 impl Default for Theme {
