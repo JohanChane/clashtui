@@ -214,7 +214,7 @@ impl BackEnd {
         use crate::{utils::consts::LOG_FILE, HOME_DIR};
         use std::io::BufRead as _;
         use std::io::Seek as _;
-        let mut fp = std::fs::File::open(HOME_DIR.get().unwrap().join(LOG_FILE))?;
+        let mut fp = std::fs::File::open(HOME_DIR.join(LOG_FILE))?;
         let size = {
             let fp = fp.try_clone()?;
             std::io::BufReader::new(fp).lines().count()

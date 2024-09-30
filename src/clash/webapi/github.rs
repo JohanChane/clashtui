@@ -5,7 +5,7 @@ use crate::CResult;
 
 impl ClashUtil {
     /// Fetch info from given input
-    /// 
+    ///
     /// support Github only
     pub fn get_github_info(&self, request: &Request) -> CResult<Response> {
         use super::headers;
@@ -13,7 +13,7 @@ impl ClashUtil {
             .and_then(|r| serde_json::from_reader(r).map_err(|e| e.into()))
     }
     /// try GET raw data from given `url`
-    /// 
+    ///
     /// return an object that impl [Read](std::io::Read)
     pub fn get_file(&self, url: &str) -> CResult<minreq::ResponseLazy> {
         use super::headers;
@@ -71,8 +71,8 @@ pub struct Response {
     pub assets: Vec<Asset>,
 }
 impl Response {
-    /// compare the version code 
-    /// 
+    /// compare the version code
+    ///
     /// it should be like `v0.12.432-bear`,
     /// and only `v0.12.432-` will be matched
     pub fn is_newer_than(&self, other: &str) -> bool {

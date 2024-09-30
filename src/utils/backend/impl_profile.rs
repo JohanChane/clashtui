@@ -33,11 +33,7 @@ impl BackEnd {
 
     pub(super) fn load_local_profile(&self, pf: Profile) -> anyhow::Result<LocalProfile> {
         use crate::{utils::consts, HOME_DIR};
-        let path = HOME_DIR
-            .get()
-            .unwrap()
-            .join(consts::PROFILE_PATH)
-            .join(&pf.name);
+        let path = HOME_DIR.join(consts::PROFILE_PATH).join(&pf.name);
         let mut lpf = LocalProfile::from_pf(pf, path);
         lpf.sync_from_disk()?;
         Ok(lpf)

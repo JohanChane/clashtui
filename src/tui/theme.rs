@@ -1,6 +1,8 @@
 use ratatui::style::Color;
 use std::sync::OnceLock;
 
+/// using [OnceLock],
+/// because the path to theme file is wanted
 static GLOBAL_THEME: OnceLock<Theme> = OnceLock::new();
 
 // #[derive(serde::Serialize, serde::Deserialize)]

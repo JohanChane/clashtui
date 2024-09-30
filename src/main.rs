@@ -12,7 +12,7 @@ pub type CResult<T> = core::result::Result<T, Error>;
 
 use utils::{consts, init_config, load_config, BackEnd};
 
-static HOME_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::new(load_home_dir);
 
 fn main() {
     if is_root::is_root() {
@@ -20,12 +20,10 @@ fn main() {
     }
     // Err here means to generate completion
     if let Ok(infos) = commands::parse_args() {
-        // setup home dir
-        let _ = HOME_DIR.set(load_home_dir());
-
-        let log_file = HOME_DIR.get().unwrap().join(consts::LOG_FILE);
+        // home dir is inited here
+        let log_file = HOME_DIR.join(consts::LOG_FILE);
         setup_logging(&log_file);
-        let buildconfig = match load_config(HOME_DIR.get().unwrap()) {
+        let buildconfig = match load_config(HOME_DIR.as_path()) {
             Ok(v) => v,
             Err(e) => {
                 use std::io::{Read, Write};
@@ -33,7 +31,7 @@ fn main() {
                 println!("program will try to init default config");
                 println!(
                     "WARNING! THIS WILL DELETE ALL FILE UNDER {}",
-                    HOME_DIR.get().unwrap().to_string_lossy()
+                    HOME_DIR.to_string_lossy()
                 );
                 // we don't really do so, as it can be dangerous
                 print!("Are you sure to continue[y/n]?");
@@ -42,7 +40,7 @@ fn main() {
                 let rep = std::io::stdin().read(&mut buf);
                 if rep.is_ok_and(|l| l != 0) && buf[0] == b'y' {
                     // accept 'y' only
-                    if let Err(e) = init_config(HOME_DIR.get().unwrap()) {
+                    if let Err(e) = init_config(HOME_DIR.as_path()) {
                         eprint!("init config failed: {e}");
                         std::process::exit(-1);
                     } else {
@@ -95,9 +93,7 @@ fn main() {
 #[tokio::main(flavor = "current_thread")]
 async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     use tui::setup;
-    if tui::Theme::load(None).is_err() {
-        log::error!("Global Theme has been loaded");
-    }
+    tui::Theme::load(None).expect("Global Theme should be loaded only once");
     let app = tui::FrontEnd::new();
     setup::setup()?;
     // make terminal restore after panic
@@ -113,7 +109,7 @@ async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     let (a, b) = tokio::try_join!(app, backend)?;
     setup::restore()?;
     a?;
-    b?.to_file(HOME_DIR.get().unwrap().join(consts::DATA_FILE))?;
+    b?.to_file(HOME_DIR.join(consts::DATA_FILE))?;
     Ok(())
 }
 
@@ -140,21 +136,21 @@ fn load_home_dir() -> std::path::PathBuf {
             unimplemented!("Not supported platform")
         }
         .map(|c| c.join("clashtui"))
-        .unwrap()
+        .expect("failed to load home dir")
     }
 }
 
-fn setup_logging<P: AsRef<std::path::Path>>(log_file: P) {
+fn setup_logging(log_file: &std::path::Path) {
     use log4rs::append::file::FileAppender;
     use log4rs::config::{Appender, Config, Root};
     use log4rs::encode::pattern::PatternEncoder;
     #[cfg(debug_assertions)]
-    let _ = std::fs::remove_file(&log_file); // auto rm old log for debug
-    let flag = if std::fs::File::open(&log_file)
+    let _ = std::fs::remove_file(log_file); // auto rm old log for debug
+    let flag = if std::fs::File::open(log_file)
         .and_then(|f| f.metadata())
         .is_ok_and(|m| m.len() > 1024 * 1024)
     {
-        let _ = std::fs::remove_file(&log_file);
+        let _ = std::fs::remove_file(log_file);
         true
     } else {
         false

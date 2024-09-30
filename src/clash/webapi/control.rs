@@ -4,7 +4,7 @@ use minreq::Method;
 
 impl ClashUtil {
     /// Restart clash core via http
-    /// 
+    ///
     /// usually, an empty str is returned
     pub fn restart(&self, payload: Option<String>) -> CResult<String> {
         self.request(
@@ -16,7 +16,7 @@ impl ClashUtil {
         .map_err(|e| e.into())
     }
     /// Get clash core version
-    /// 
+    ///
     /// for mihomo, it's like `{"meta": true, "version": "v1.1.1"}`
     pub fn version(&self) -> CResult<String> {
         self.request(Method::Get, "/version", None)
@@ -24,7 +24,7 @@ impl ClashUtil {
             .map_err(|e| e.into())
     }
     /// Try GET `https://www.gstatic.com/generate_204`
-    /// 
+    ///
     /// return nothing on success
     pub fn check_connectivity(&self) -> CResult<()> {
         minreq::get("https://www.gstatic.com/generate_204")
