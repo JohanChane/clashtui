@@ -115,41 +115,40 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
             {
                 println!("\n{}", info.as_info(current_version));
                 if !without_ask {
-                    use std::io::Write;
-                    let mut out = std::io::stdout().lock();
-                    write!(out, "\nDo you want to download one now?")?;
-                    out.flush()?;
-                    let mut maybe_name = String::with_capacity(50);
-                    std::io::stdin().read_line(&mut maybe_name)?;
-                    match maybe_name.as_str().trim() {
+                    fn prompt_ask(prompt: &str) -> std::io::Result<String> {
+                        use std::io::Write;
+                        let mut out = std::io::stdout().lock();
+                        write!(out, "{}", prompt)?;
+                        out.flush()?;
+                        let mut reads = String::with_capacity(50);
+                        std::io::stdin().read_line(&mut reads)?;
+                        writeln!(out)?;
+                        Ok(reads.trim().to_owned())
+                    }
+                    let maybe_name = prompt_ask("Do you want to download one now?")?;
+                    match maybe_name.trim() {
                         "y" | "yes" => (),
                         &_ => continue,
                     }
-                    println!("\nAvaliable asserts:");
+                    println!("Avaliable asserts:");
                     info.assets
                         .iter()
                         .for_each(|a| println!("{}  {}", a.name, a.browser_download_url));
-                    write!(out, "\nType the name:")?;
-                    out.flush()?;
-                    std::io::stdin().read_line(&mut maybe_name)?;
-                    maybe_name = maybe_name
-                        .trim_start_matches("yes")
-                        .trim_start_matches('y')
-                        .trim()
-                        .to_owned();
-                    println!("{}", maybe_name);
+                    let maybe_name = prompt_ask("Type the name:")?;
+                    println!("Select {}", maybe_name);
                     let al: Vec<String> = info
                         .assets
                         .into_iter()
                         .filter(|a| a.name == maybe_name)
                         .map(|a| a.browser_download_url)
+                        .take(1)
                         .collect();
                     if let Some(url) = al.first() {
                         println!("\nDownload start for {} {}", maybe_name, url);
                         let path = backend.download_to_file(&maybe_name, url)?;
                         println!("\nDownloaded to {}", path.display());
                     } else {
-                        println!("Not select any, continue");
+                        println!("Not match any, continue");
                     }
                 } else if let Some(asset) = info.assets.first() {
                     println!(

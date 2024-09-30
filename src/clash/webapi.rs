@@ -14,7 +14,7 @@ const TIMEOUT: u64 = 5;
 mod headers {
     pub const USER_AGENT: &str = "user-agent";
     pub const AUTHORIZATION: &str = "authorization";
-
+    // TODO: change this
     pub const DEFAULT_USER_AGENT: &str = "github.com/celeo/github_version_check";
 }
 

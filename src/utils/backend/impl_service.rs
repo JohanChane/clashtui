@@ -84,24 +84,29 @@ impl BackEnd {
             Err(e) => {
                 eprintln!("{e}\ntry to download with `curl/wget`");
                 use std::process::{Command, Stdio};
-                fn have_this(name: &str) -> bool {
+                fn have_this(this: &str) -> bool {
                     Command::new("which")
-                        .arg(name)
+                        .arg(this)
                         .output()
                         .is_ok_and(|r| r.status.success())
                 }
+                fn exec_this(this: &str, args: &[&str]) -> anyhow::Result<()> {
+                    println!("using {this}");
+                    if Command::new(this)
+                        .args(args)
+                        .stdin(Stdio::null())
+                        .status()?
+                        .success()
+                    {
+                        Ok(())
+                    } else {
+                        Err(anyhow::anyhow!("Failed to download with curl"))
+                    }
+                }
                 if have_this("curl") {
-                    println!("using curl");
-                    Command::new("curl")
-                        .args(["-o", &path.to_string_lossy(), "-L", url])
-                        .stdin(Stdio::null())
-                        .status()?;
+                    exec_this("curl", &["-o", &path.to_string_lossy(), "-L", url])?;
                 } else if have_this("wget") {
-                    println!("using wget");
-                    Command::new("wget")
-                        .args(["-O", &path.to_string_lossy(), url])
-                        .stdin(Stdio::null())
-                        .status()?;
+                    exec_this("wget", &["-O", &path.to_string_lossy(), url])?;
                 } else {
                     anyhow::bail!("Unable to find curl/wget")
                 }

@@ -18,14 +18,6 @@ impl Default for Profile {
     }
 }
 
-const FILTER: [&str; 6] = [
-    "proxy-groups",
-    "proxy-providers",
-    "proxies",
-    "sub-rules",
-    "rules",
-    "rule-providers",
-];
 #[derive(Clone)]
 pub struct LocalProfile {
     pub name: String,
@@ -45,6 +37,14 @@ impl Default for LocalProfile {
 }
 
 impl LocalProfile {
+    const FILTER: [&str; 6] = [
+        "proxy-groups",
+        "proxy-providers",
+        "proxies",
+        "sub-rules",
+        "rules",
+        "rule-providers",
+    ];
     /// Returns the atime of this [`LocalProfile`].
     ///
     /// Errors are ignored and return will be replaced with [None]
@@ -63,9 +63,14 @@ impl LocalProfile {
             anyhow::bail!("one of the input content is none");
         }
 
-        FILTER
+        Self::FILTER
             .into_iter()
-            .filter(|s| base.content.as_ref().unwrap().contains_key(s))
+            .filter(|s| {
+                base.content
+                    .as_ref()
+                    .expect("need to call sync from disk")
+                    .contains_key(s)
+            })
             .map(|key| (key, base.content.as_ref().unwrap().get(key).unwrap()))
             .for_each(|(k, v)| {
                 self.content.as_mut().unwrap().insert(k.into(), v.clone());

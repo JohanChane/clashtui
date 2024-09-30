@@ -4,26 +4,33 @@ use super::ClashUtil;
 use crate::CResult;
 
 impl ClashUtil {
+    /// Fetch info from given input
+    /// 
+    /// support Github only
     pub fn get_github_info(&self, request: &Request) -> CResult<Response> {
         use super::headers;
         self.get_blob(request.as_url(), None, Some(headers::DEFAULT_USER_AGENT))
             .and_then(|r| serde_json::from_reader(r).map_err(|e| e.into()))
     }
+    /// try GET raw data from given `url`
+    /// 
+    /// return an object that impl [Read](std::io::Read)
     pub fn get_file(&self, url: &str) -> CResult<minreq::ResponseLazy> {
         use super::headers;
         self.get_blob(url, None, Some(headers::DEFAULT_USER_AGENT))
     }
 }
 #[cfg_attr(test, derive(Deserialize))]
+/// Describe target repo and tag
 pub enum Request<'a> {
     Latest(&'a str),
-    CI(&'a str, &'a str),
+    WithTag(&'a str, &'a str),
 }
 impl Request<'_> {
     pub fn as_url(&self) -> String {
         match self {
             Request::Latest(repo) => format!("https://api.github.com/repos/{repo}/releases/latest"),
-            Request::CI(repo, name) => {
+            Request::WithTag(repo, name) => {
                 format!("https://api.github.com/repos/{repo}/releases/tags/{name}")
             }
         }
@@ -41,15 +48,18 @@ impl Request<'static> {
         Self::Latest(Self::CLASHTUI)
     }
     pub fn s_clashtui_ci() -> Self {
-        Self::CI("Jackhr-arch/clashtui", Self::CLASHTUI_CI)
+        // main repo hasn't start CI release yet
+        Self::WithTag("Jackhr-arch/clashtui", Self::CLASHTUI_CI)
     }
+    /// Alpha version
     pub fn s_mihomo_ci() -> Self {
-        Self::CI(Self::MIHOMO, Self::MIHOMO_CI)
+        Self::WithTag(Self::MIHOMO, Self::MIHOMO_CI)
     }
 }
 
 #[cfg_attr(test, derive(Default))]
 #[derive(Debug, Deserialize)]
+/// Github API return form
 pub struct Response {
     pub name: String,
     pub tag_name: String,
@@ -61,6 +71,10 @@ pub struct Response {
     pub assets: Vec<Asset>,
 }
 impl Response {
+    /// compare the version code 
+    /// 
+    /// it should be like `v0.12.432-bear`,
+    /// and only `v0.12.432-` will be matched
     pub fn is_newer_than(&self, other: &str) -> bool {
         if let (Some(origin), Some(other)) =
             (get_triple_code(&self.tag_name), get_triple_code(other))
@@ -102,14 +116,16 @@ pub struct Asset {
     pub name: String,
     pub browser_download_url: String,
 }
-fn get_triple_code(tag: &str) -> Option<Vec<u8>> {
-    let triple_code: Vec<u8> = tag
+/// actually match `v0.12.432-`,
+/// return a [Vec] of [u16], len = 3
+fn get_triple_code(tag: &str) -> Option<Vec<u16>> {
+    let triple_code: Vec<u16> = tag
         .trim_start_matches('v')
         .split('-')
         .filter(|s| !s.is_empty())
         .take(1)
         .flat_map(|s| s.split('.'))
-        .map(|s| s.parse::<u8>().unwrap_or(0))
+        .map(|s| s.parse().unwrap_or(0))
         .collect();
     if triple_code.len() == 3 {
         Some(triple_code)
@@ -120,7 +136,7 @@ fn get_triple_code(tag: &str) -> Option<Vec<u8>> {
 }
 fn get_arch() -> &'static str {
     match std::env::consts::ARCH {
-        "x86" => "386",
+        // "x86" => "386",
         "x86_64" => "amd64",
         // "arm" => "",
         "aarch64" => "arm64",
