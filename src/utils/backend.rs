@@ -26,9 +26,6 @@ use crate::clash::{
 };
 pub use impl_service::ServiceOp;
 
-/// a wrapper for [`ClashBackend`]
-///
-/// impl some other functions
 pub struct BackEnd {
     api: ClashUtil,
     cfg: LibConfig,
@@ -199,8 +196,8 @@ impl BackEnd {
             }
         }
     }
-    fn save(&self) -> DataFile {
-        let (current_profile, profiles) = self.pm.clone_inner();
+    fn save(self) -> DataFile {
+        let (current_profile, profiles) = self.pm.into_inner();
         DataFile {
             profiles,
             current_profile,

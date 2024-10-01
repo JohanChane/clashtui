@@ -144,8 +144,9 @@ impl BasicInfo {
     }
 }
 impl BasicInfo {
+    const LOCALHOST: &str = "127.0.0.1";
     pub fn build(self) -> Result<(String, String, Option<String>, Option<String>)> {
-        use crate::consts::{BASIC_FILE, LOCALHOST};
+        use crate::consts::BASIC_FILE;
         let BasicInfo {
             mut external_controller,
             mixed_port,
@@ -162,13 +163,10 @@ impl BasicInfo {
             );
         }
         external_controller = format!("http://{external_controller}");
-        let proxy_addr = match mixed_port
-            .or(port)
-            .map(|p| format!("http://{LOCALHOST}:{p}"))
-        {
-            Some(s) => s,
+        let proxy_addr = match mixed_port.or(port) {
+            Some(p) => format!("http://{}:{p}", Self::LOCALHOST),
             None => socks_port
-                .map(|p| format!("socks5://{LOCALHOST}:{p}"))
+                .map(|p| format!("socks5://{}:{p}", Self::LOCALHOST))
                 .ok_or(anyhow::anyhow!(
                     "failed to load proxy_addr from {BASIC_FILE}"
                 ))?,

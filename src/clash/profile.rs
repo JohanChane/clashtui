@@ -55,7 +55,7 @@ impl LocalProfile {
             .and_then(|file| now.duration_since(file).ok())
     }
     /// merge `base` into [`LocalProfile::content`],
-    /// using [`FILTER`]
+    /// using [`FILTER`](Self::FILTER)
     ///
     /// Note: need to call [`LocalProfile::sync_from_disk`] before call this
     pub fn merge(&mut self, base: &LocalProfile) -> anyhow::Result<()> {

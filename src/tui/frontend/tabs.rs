@@ -10,8 +10,6 @@ use crate::{
     utils::CallBack,
 };
 use crossterm::event::KeyEvent;
-use ratatui::prelude as Ra;
-use Ra::{Frame, Rect};
 
 #[cfg(feature = "connection-tab")]
 use connection::ConnctionTab;

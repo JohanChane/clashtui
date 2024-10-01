@@ -44,7 +44,7 @@ macro_rules! build_tabs {
                 }
             }
 
-            fn render(&mut self, f: &mut Frame, area: Rect, is_fouced: bool) {
+            fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::prelude::Rect, is_fouced: bool) {
                 match self {
                     $($(#[$attr_])* Self::$variant(ref mut tab) => tab.render(f, area, is_fouced),)*
                 }

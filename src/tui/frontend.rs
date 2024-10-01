@@ -1,4 +1,3 @@
-// use std::cell::OnceCell;
 mod bars;
 mod consts;
 mod key_bind;
@@ -24,10 +23,9 @@ pub struct FrontEnd {
     there_is_msg_pop: bool,
     msg_popup: ConfirmPopup,
     should_quit: bool,
+    /// StateBar
     state: Option<String>,
     backend_content: Option<Call>,
-    #[cfg(debug_assertions)]
-    the_egg: TheEgg,
 }
 
 impl FrontEnd {
@@ -48,8 +46,6 @@ impl FrontEnd {
             should_quit: false,
             state: None,
             backend_content: None,
-            #[cfg(debug_assertions)]
-            the_egg: TheEgg::new(),
         }
     }
     pub async fn run(mut self, tx: Sender<Call>, mut rx: Receiver<CallBack>) -> anyhow::Result<()> {
@@ -77,7 +73,7 @@ impl FrontEnd {
             if let Some(ev) = ev {
                 if let event::Event::Key(key) = ev? {
                     #[cfg(debug_assertions)]
-                    if self.the_egg.match_key(key.code) {
+                    if the_egg(key.code) {
                         log::debug!("You've found the egg!")
                     };
                     self.handle_key_event(&key);
@@ -237,8 +233,7 @@ impl Drawable for FrontEnd {
                 // ## the tabbar
                 // 1..=9
                 // need to kown the range
-                #[allow(clippy::is_digit_ascii_radix)]
-                KeyCode::Char(c) if c.is_digit(10) && c != '0' => {
+                KeyCode::Char(c) if c.is_ascii_digit() && c != '0' => {
                     if let Some(d) = c.to_digit(10) {
                         if d <= self.tabs.len() as u32 {
                             // select target tab
@@ -282,30 +277,28 @@ impl Drawable for FrontEnd {
 }
 
 #[cfg(debug_assertions)]
-struct TheEgg(u8);
-#[cfg(debug_assertions)]
-impl TheEgg {
-    pub fn new() -> Self {
-        Self(0)
-    }
-    pub fn match_key(&mut self, key: KeyCode) -> bool {
-        match self.0 {
-            0 if key == KeyCode::Up => (),
-            1 if key == KeyCode::Up => (),
-            2 if key == KeyCode::Down => (),
-            3 if key == KeyCode::Down => (),
-            4 if key == KeyCode::Left => (),
-            5 if key == KeyCode::Right => (),
-            6 if key == KeyCode::Left => (),
-            7 if key == KeyCode::Right => (),
-            8 if (key == KeyCode::Char('b')) | (key == KeyCode::Char('B')) => (),
-            9 if (key == KeyCode::Char('a')) | (key == KeyCode::Char('A')) => (),
-            10 if (key == KeyCode::Char('b')) | (key == KeyCode::Char('B')) => (),
-            11 if (key == KeyCode::Char('a')) | (key == KeyCode::Char('A')) => (),
-            12 => self.0 = 0,
-            _ => return false,
+pub fn the_egg(key: KeyCode) -> bool {
+    static INSTANCE: std::sync::RwLock<u8> = std::sync::RwLock::new(0);
+    let mut current = INSTANCE.write().unwrap();
+    match *current {
+        0 if key == KeyCode::Up => (),
+        1 if key == KeyCode::Up => (),
+        2 if key == KeyCode::Down => (),
+        3 if key == KeyCode::Down => (),
+        4 if key == KeyCode::Left => (),
+        5 if key == KeyCode::Right => (),
+        6 if key == KeyCode::Left => (),
+        7 if key == KeyCode::Right => (),
+        8 if (key == KeyCode::Char('b')) | (key == KeyCode::Char('B')) => (),
+        9 if (key == KeyCode::Char('a')) | (key == KeyCode::Char('A')) => (),
+        10 if (key == KeyCode::Char('b')) | (key == KeyCode::Char('B')) => (),
+        11 if (key == KeyCode::Char('a')) | (key == KeyCode::Char('A')) => (),
+        12 => *current = 0,
+        _ => {
+            *current = 0;
+            return false;
         }
-        self.0 += 1;
-        self.0 == 12
     }
+    *current += 1;
+    *current == 12
 }

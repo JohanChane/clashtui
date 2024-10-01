@@ -15,11 +15,8 @@ impl ProfileManager {
             all: all.into(),
         }
     }
-    pub fn clone_inner(&self) -> (String, ProfileDataBase) {
-        (
-            self.current.clone().into_inner(),
-            self.all.clone().into_inner(),
-        )
+    pub fn into_inner(self) -> (String, ProfileDataBase) {
+        (self.current.into_inner(), self.all.into_inner())
     }
     pub fn insert<S: AsRef<str>>(&self, name: S, dtype: ProfileType) -> Option<Profile> {
         self.all
@@ -57,7 +54,10 @@ impl ProfileManager {
         self.get(self.current.borrow().as_str())
     }
     pub fn set_current(&self, pf: Profile) {
-        assert!(self.get(&pf.name).is_some());
+        assert!(
+            self.get(&pf.name).is_some(),
+            "Selected profile not in database"
+        );
         *self.current.borrow_mut() = pf.name;
     }
 }

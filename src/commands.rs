@@ -12,15 +12,13 @@ pub(crate) fn parse_args() -> Result<Option<PackedArgs>, ()> {
     let CliCmds {
         command,
         generate_shell_completion,
-        shell,
     } = CliCmds::parse();
-    if generate_shell_completion {
-        gen_complete(shell);
+    if let Some(generate_shell_completion) = generate_shell_completion {
+        gen_complete(generate_shell_completion);
         return Err(());
     }
     Ok(command.map(PackedArgs))
 }
-
 /// Mihomo (Clash.Meta) Control Client
 ///
 /// A tool for mihomo
@@ -30,14 +28,11 @@ pub(crate) fn parse_args() -> Result<Option<PackedArgs>, ()> {
 pub(crate) struct CliCmds {
     #[command(subcommand)]
     command: Option<ArgCommand>,
-    /// generate completion for current shell
-    #[arg(long)]
-    generate_shell_completion: bool,
-    /// specify target shell
-    ///
-    /// avaliable when --generate-shell-completion is set
-    #[arg(long)]
-    shell: Option<clap_complete::Shell>,
+    // `clashtui --generate-shell-completion` in fact get `Some(None)`
+    // while `clashtui` get `None`
+    /// generate shell completion
+    #[arg(long, require_equals=true, num_args=0..=1, default_missing_value=None)]
+    generate_shell_completion: Option<Option<clap_complete::Shell>>,
 }
 
 #[derive(clap::Subcommand)]

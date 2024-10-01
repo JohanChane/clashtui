@@ -10,8 +10,6 @@ pub(crate) const _TMP_FILE: &str = "/tmp/clashtui_mihomo_config_file.tmp";
 pub(crate) const PROFILE_PATH: &str = "profiles";
 pub(crate) const TEMPLATE_PATH: &str = "templates";
 
-pub(crate) const LOCALHOST: &str = "127.0.0.1";
-
 pub mod err {
     pub const BACKEND_RX: &str = "backend rx dropped before STOP singal";
     pub const BACKEND_TX: &str = "backend tx dropped before STOP singal";
