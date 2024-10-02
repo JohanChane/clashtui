@@ -20,7 +20,7 @@ impl ClashUtil {
         self.get_blob(url, None, Some(headers::DEFAULT_USER_AGENT))
     }
 }
-#[cfg_attr(test, derive(Deserialize))]
+#[cfg_attr(test, derive(Deserialize, Debug, PartialEq))]
 /// Describe target repo and tag
 pub enum Request<'a> {
     Latest(&'a str),
@@ -159,15 +159,24 @@ mod test {
     #[test]
     fn load_request() {
         let raw = "!Latest JohanChane/clashtui";
-        let _: Request = serde_yml::from_str(raw).unwrap();
+        assert_eq!(
+            serde_yml::from_str::<Request>(raw).unwrap(),
+            Request::s_clashtui()
+        );
         let raw = "!WithTag\n- Jackhr-arch/clashtui\n- Continuous_Integration";
-        let _: Request = serde_yml::from_str(raw).unwrap();
+        assert_eq!(
+            serde_yml::from_str::<Request>(raw).unwrap(),
+            Request::s_clashtui_ci()
+        );
         let raw = r#"
 - !WithTag
   - Jackhr-arch/clashtui
   - Continuous_Integration
 - !Latest JohanChane/clashtui
 "#;
-        let _: Vec<Request> = serde_yml::from_str(raw).unwrap();
+        assert_eq!(
+            serde_yml::from_str::<Vec<Request>>(raw).unwrap(),
+            vec![Request::s_clashtui_ci(), Request::s_clashtui()]
+        );
     }
 }

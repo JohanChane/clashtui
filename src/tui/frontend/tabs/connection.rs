@@ -190,7 +190,7 @@ impl TabCont for ConnctionTab {
                     };
                 }
             }
-            _ => unreachable!("{} get unexpected op: {}", TAB_TITLE_CONNECTION, op),
+            _ => unreachable!("{} get unexpected op: {:?}", TAB_TITLE_CONNECTION, op),
         }
     }
 

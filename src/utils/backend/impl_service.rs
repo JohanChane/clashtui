@@ -1,6 +1,6 @@
 use super::*;
 #[allow(unused_imports)] // currently, only [`SwitchMode`] is impl on macos
-use crate::clash::ipc::{self, exec};
+use ipc::exec;
 use std::io::Error;
 
 crate::define_enum!(

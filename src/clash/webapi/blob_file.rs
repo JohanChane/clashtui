@@ -2,9 +2,9 @@ use super::{headers, ClashUtil};
 use crate::CResult;
 
 impl ClashUtil {
-    pub fn mock_clash_core<S: Into<minreq::URL>>(
+    pub fn mock_clash_core<U: Into<minreq::URL>>(
         &self,
-        url: S,
+        url: U,
         with_proxy: bool,
     ) -> CResult<minreq::ResponseLazy> {
         self.get_blob(
@@ -13,11 +13,11 @@ impl ClashUtil {
             Some(self.ua.as_deref().unwrap_or("clash.meta")),
         )
     }
-    pub fn get_blob<U: Into<minreq::URL>, S2: Into<String>>(
+    pub fn get_blob<U: Into<minreq::URL>, S: Into<String>>(
         &self,
         url: U,
         proxy: Option<&str>,
-        ua: Option<S2>,
+        ua: Option<S>,
     ) -> CResult<minreq::ResponseLazy> {
         let mut req = minreq::get(url);
         if let Some(proxy) = proxy {
@@ -44,10 +44,10 @@ mod tests {
         let mut tf = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
-            .open("/tmp/test")
+            .open("/tmp/clashtui.test")
             .unwrap();
         std::io::copy(&mut r, &mut tf).unwrap();
         drop(tf);
-        std::fs::remove_file("/tmp/test").unwrap();
+        std::fs::remove_file("/tmp/clashtui.test").unwrap();
     }
 }

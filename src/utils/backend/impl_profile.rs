@@ -1,5 +1,5 @@
 use super::*;
-use crate::clash::{ipc, profile::ProfileType, util::extract_domain};
+use crate::clash::{profile::ProfileType, util::extract_domain};
 use std::fs::File;
 
 impl BackEnd {

@@ -127,7 +127,7 @@ impl TabCont for ProfileTab {
                     self.is_templates_inited = true;
                 }
             }
-            _ => unreachable!("{} get unexpected op: {}", TAB_TITLE_PROFILE, op),
+            _ => unreachable!("{} get unexpected op: {:?}", TAB_TITLE_PROFILE, op),
         }
     }
 

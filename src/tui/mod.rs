@@ -13,14 +13,18 @@ trait Drawable {
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, is_fouced: bool);
     fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState;
 }
-
+#[derive(derive_more::Debug)]
 /// Wrap the caller,
 /// the inner ops are defined in their own files.
 pub enum Call {
+    #[debug("Profile")]
     Profile(tabs::profile::BackendOp),
+    #[debug("Service")]
     Service(tabs::service::BackendOp),
     #[cfg(feature = "connection-tab")]
+    #[debug("Connection")]
     Connection(tabs::connection::BackendOp),
+    #[debug("Logs")]
     /// read file by lines, from `total_len-start-length` to `total_len-start`
     Logs(usize, usize),
     /// ask backend for clash infos
@@ -29,25 +33,6 @@ pub enum Call {
     Tick,
     /// ask to shutdown
     Stop,
-}
-
-impl std::fmt::Display for Call {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Call::Profile(_) => "Profile",
-                Call::Service(_) => "Service",
-                #[cfg(feature = "connection-tab")]
-                Call::Connection(_) => "Connection",
-                Call::Logs(..) => "Logs",
-                Call::Infos => "Infos",
-                Call::Tick => "Tick",
-                Call::Stop => "Stop",
-            }
-        )
-    }
 }
 
 /// turn terminal from/into Raw mode

@@ -1,5 +1,6 @@
 mod backend;
 mod config;
+pub mod ipc;
 mod state;
 
 #[cfg(feature = "tui")]
