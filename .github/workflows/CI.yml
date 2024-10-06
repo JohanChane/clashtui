@@ -38,9 +38,12 @@ jobs:
             ci-${{ runner.os }}-${{ hashFiles('./Cargo.lock') }}
             ci-${{ runner.os }}-
 
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cross, cargo-make, cargo-deb
+
       - name: Test
         run: |
-          cargo install --debug cargo-make
           cargo make ci
 
       - name: Build
@@ -57,7 +60,7 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' && ( startsWith(github.ref, 'refs/tags/') || startsWith(github.ref, 'refs/heads/master') )}}
 
     needs: build
 

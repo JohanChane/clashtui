@@ -27,12 +27,7 @@ script = '''
 
 [tasks.release.windows]
 dependencies = ["clear-artifacts", "amd64", "upx"]
-script_runner = "@shell"
-script = [
-    "mkdir artifacts",
-    "cp target/release/clashtui.exe artifacts/clashtui.windows.release.exe",
-    "cp target/debug/clashtui.exe artifacts/clashtui.windows.debug.exe",
-]
+
 [tasks.release.linux]
 dependencies = ["clear-artifacts", "arm64", "amd64", "build_deb", "upx"]
 
@@ -48,39 +43,48 @@ script_runner = "@shell"
 ignore_errors = true
 script = ["rm -r artifacts"]
 
-[tasks.build_deb]
-install_crate = "cargo-deb"
+[tasks.build_deb.linux]
+# install_crate = "cargo-deb"
 dependencies = ["create-artifacts"]
 script = """
-    cargo deb
+    cargo deb --locked 
     cp target/debian/*.deb artifacts/clashtui.linux.amd64.deb
 """
 
-[tasks.arm64]
+[tasks.arm64.linux]
 # use for build arm64 in docker
 # env = { CROSS_CONTAINER_IN_CONTAINER = true }
-install_crate = "cross"
+# install_crate = "cross"
 dependencies = ["create-artifacts"]
 script = '''
-    cross build --target=aarch64-unknown-linux-gnu
-    cross build --release --target=aarch64-unknown-linux-gnu
+    cross build --locked  --target=aarch64-unknown-linux-gnu
+    cross build --locked --release --target=aarch64-unknown-linux-gnu
     cp target/aarch64-unknown-linux-gnu/release/clashtui artifacts/clashtui.linux.arm64.release
     cp target/aarch64-unknown-linux-gnu/debug/clashtui artifacts/clashtui.linux.arm64.debug
 '''
 
-[tasks.amd64]
+[tasks.amd64.linux]
 dependencies = ["create-artifacts"]
 script = '''
-    cargo build
-    cargo build --release
+    cargo build --locked
+    cargo build --locked --release
     cp target/release/clashtui artifacts/clashtui.linux.amd64.release
     cp target/debug/clashtui artifacts/clashtui.linux.amd64.debug
 '''
 
+[tasks.amd64.windows]
+dependencies = ["create-artifacts"]
+script_runner = "@shell"
+script = '''
+    cargo build --locked
+    cargo build --locked --release
+    cp target/release/clashtui.exe artifacts/clashtui.windows.release.exe
+    cp target/debug/clashtui.exe artifacts/clashtui.windows.debug.exe
+'''
 
 [tasks.upx.linux]
 script = '''
-    chmod +x artifacts/*
+    chmod +x artifacts/*.release artifacts/*.debug
     curl -OL https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz
     tar -xf upx-4.2.4-amd64_linux.tar.xz
     rm upx-4.2.4-amd64_linux.tar.xz
@@ -91,6 +95,7 @@ script = '''
 '''
 
 [tasks.upx.windows]
+script_runner = "@shell"
 script = '''
     curl -OL https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip
     tar -xf upx-4.2.4-win64.zip
