@@ -1,7 +1,6 @@
 use serde::Deserialize;
 
-use super::ClashUtil;
-use crate::CResult;
+use super::{ClashUtil,CResult};
 
 impl ClashUtil {
     /// Fetch info from given input

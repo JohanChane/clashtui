@@ -1,5 +1,4 @@
-use super::{ClashConfig, ClashUtil};
-use crate::CResult;
+use super::{ClashConfig, ClashUtil, CResult};
 use minreq::Method;
 
 impl ClashUtil {

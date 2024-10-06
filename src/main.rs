@@ -2,15 +2,11 @@
 #![deny(unsafe_code)]
 mod clash;
 mod commands;
-mod error;
 #[cfg(feature = "tui")]
 mod tui;
 mod utils;
 
-use error::Error;
-pub type CResult<T> = core::result::Result<T, Error>;
-
-use utils::{consts, init_config, load_config, BackEnd};
+use utils::{consts, BackEnd, BuildConfig};
 
 static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::new(load_home_dir);
 
@@ -23,7 +19,7 @@ fn main() {
         // home dir is inited here
         let log_file = HOME_DIR.join(consts::LOG_FILE);
         setup_logging(&log_file);
-        let buildconfig = match load_config(HOME_DIR.as_path()) {
+        let buildconfig = match BuildConfig::load_config(HOME_DIR.as_path()) {
             Ok(v) => v,
             Err(e) => {
                 use std::io::{Read, Write};
@@ -37,10 +33,10 @@ fn main() {
                 print!("Are you sure to continue[y/n]?");
                 std::io::stdout().flush().unwrap();
                 let mut buf = [0_u8; 1];
-                let rep = std::io::stdin().read(&mut buf);
-                if rep.is_ok_and(|l| l != 0) && buf[0] == b'y' {
+                let rep = std::io::stdin().read_exact(&mut buf);
+                if rep.is_ok() && buf[0] == b'y' {
                     // accept 'y' only
-                    if let Err(e) = init_config(HOME_DIR.as_path()) {
+                    if let Err(e) = BuildConfig::init_config(HOME_DIR.as_path()) {
                         eprint!("init config failed: {e}");
                         std::process::exit(-1);
                     } else {
@@ -63,8 +59,7 @@ fn main() {
                     println!("{v}")
                 }
                 Err(e) => {
-                    eprintln!("clashtui encounter some error");
-                    eprintln!("{e}");
+                    eprintln!("clashtui encounter some error:{e}");
                     log::error!("Cli:{e:?}");
                     std::process::exit(-1)
                 }
@@ -74,8 +69,7 @@ fn main() {
             {
                 println!("Entering TUI...");
                 if let Err(e) = start_tui(backend) {
-                    eprintln!("clashtui encounter some error");
-                    eprintln!("{e}");
+                    eprintln!("clashtui encounter some error:{e}");
                     log::error!("Tui:{e:?}");
                     std::process::exit(-1)
                 }

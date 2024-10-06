@@ -25,7 +25,7 @@ impl ClashConfig {
     pub fn build(self) -> Vec<String> {
         macro_rules! build {
             ($($value:ident),+ $(,)? $(#Option $(,)? $($option_value:ident),+)? $(,)?) => {
-                [$(
+                vec![$(
                     format!("{}:{}", stringify!($value), $value),
                 )+
                 $($(
@@ -34,7 +34,7 @@ impl ClashConfig {
                         None => format!("{}:Unknown", stringify!($option_value)),
                     },
                 )+)?
-                ].to_vec()
+                ]
             };
         }
         let ClashConfig {
@@ -69,16 +69,6 @@ impl ClashConfig {
             geo_auto_update,
             geo_update_interval,
             find_process_mode)
-    }
-}
-impl std::str::FromStr for ClashConfig {
-    type Err = std::fmt::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.is_empty() {
-            return Err(std::fmt::Error);
-        };
-        serde_json::from_str(s).map_err(|_| std::fmt::Error)
     }
 }
 

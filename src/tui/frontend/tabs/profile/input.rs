@@ -218,8 +218,8 @@ mod test {
         let mut s2 = s.clone();
         s.remove(1);
         delete_char_from_string(&mut s2, 1 + 1);
-        assert!(s == String::from("ac"));
-        assert!(s == s2);
+        assert_eq!(s, *"ac");
+        assert_eq!(s, s2);
     }
     #[test]
     #[should_panic = "byte index 1 is not a char boundary; it is inside '一' (bytes 0..3) of `一二三`"]
@@ -228,18 +228,18 @@ mod test {
         assert!(!s.is_ascii());
         let mut s2 = s.clone();
         delete_char_from_string(&mut s2, 1 + 1);
-        assert!(s2 == String::from("一三"));
+        assert_eq!(s2, *"一三");
         // panic here, utf-8 require more space
         // and a single index is not enough
         s.remove(1);
-        assert!(s == s2);
+        assert_eq!(s, s2);
     }
     #[test]
     fn handle_insert_ascii() {
         let mut s = String::from("abc");
         assert!(s.is_ascii());
         s.insert(2, 'd');
-        assert!(s == String::from("abdc"));
+        assert_eq!(s, *"abdc");
     }
     #[test]
     #[should_panic = "assertion failed: self.is_char_boundary(idx)"]
@@ -248,17 +248,17 @@ mod test {
         assert!(!s.is_ascii());
         // panic here, the reason is same
         s.insert(2, '四');
-        assert!(s == String::from("一二四三"));
+        assert_eq!(s, *"一二四三");
     }
     #[test]
     fn handle_append_by_insert() {
         let mut s = String::from("abc");
         let mut l = s.len();
         assert!(s.is_ascii());
-        assert!(l == 3);
+        assert_eq!(l, 3);
         s.insert(l, 'd');
         l += 1;
-        assert!(s == String::from("abcd"));
-        assert!(l == 4);
+        assert_eq!(s, *"abcd");
+        assert_eq!(l, 4);
     }
 }

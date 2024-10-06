@@ -46,54 +46,55 @@ impl DataFile {
     }
 }
 
-pub fn init_config(config_dir: &Path) -> Result<()> {
-    use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE, PROFILE_PATH, TEMPLATE_PATH};
-    use std::fs;
-
-    let template_dir = config_dir.join(TEMPLATE_PATH);
-    let profile_dir = config_dir.join(PROFILE_PATH);
-    let basic_path = config_dir.join(BASIC_FILE);
-    let config_path = config_dir.join(CONFIG_FILE);
-    let data_path = config_dir.join(DATA_FILE);
-
-    fs::create_dir_all(config_dir)?;
-
-    BasicInfo::default().to_file(basic_path)?;
-    ConfigFile::default().to_file(config_path)?;
-    DataFile::default().to_file(data_path)?;
-
-    fs::create_dir(template_dir)?;
-    fs::create_dir(profile_dir)?;
-
-    // fs::write(config_dir.join(BASIC_FILE), DEFAULT_BASIC_CLASH_CFG_CONTENT)?;
-    Ok(())
-}
-
-pub fn load_config(config_dir: &Path) -> Result<BuildConfig> {
-    use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE};
-
-    let basic_path = config_dir.join(BASIC_FILE);
-    let config_path = config_dir.join(CONFIG_FILE);
-    let data_path = config_dir.join(DATA_FILE);
-
-    let cfg = ConfigFile::from_file(config_path)?;
-    let data = DataFile::from_file(data_path)?;
-    let raw = BasicInfo::get_raw(basic_path)?;
-    let base = BasicInfo::from_raw(raw.clone())?;
-
-    Ok(BuildConfig {
-        cfg,
-        basic: base,
-        base_raw: raw,
-        data,
-    })
-}
-
 pub struct BuildConfig {
     pub cfg: ConfigFile,
     pub basic: BasicInfo,
     pub base_raw: serde_yml::Mapping,
     pub data: DataFile,
+}
+impl BuildConfig {
+    pub fn init_config(config_dir: &Path) -> Result<()> {
+        use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE, PROFILE_PATH, TEMPLATE_PATH};
+        use std::fs;
+
+        let template_dir = config_dir.join(TEMPLATE_PATH);
+        let profile_dir = config_dir.join(PROFILE_PATH);
+        let basic_path = config_dir.join(BASIC_FILE);
+        let config_path = config_dir.join(CONFIG_FILE);
+        let data_path = config_dir.join(DATA_FILE);
+
+        fs::create_dir_all(config_dir)?;
+
+        BasicInfo::default().to_file(basic_path)?;
+        ConfigFile::default().to_file(config_path)?;
+        DataFile::default().to_file(data_path)?;
+
+        fs::create_dir(template_dir)?;
+        fs::create_dir(profile_dir)?;
+
+        // fs::write(config_dir.join(BASIC_FILE), DEFAULT_BASIC_CLASH_CFG_CONTENT)?;
+        Ok(())
+    }
+
+    pub fn load_config(config_dir: &Path) -> Result<BuildConfig> {
+        use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE};
+
+        let basic_path = config_dir.join(BASIC_FILE);
+        let config_path = config_dir.join(CONFIG_FILE);
+        let data_path = config_dir.join(DATA_FILE);
+
+        let cfg = ConfigFile::from_file(config_path)?;
+        let data = DataFile::from_file(data_path)?;
+        let raw = BasicInfo::get_raw(basic_path)?;
+        let base = BasicInfo::from_raw(raw.clone())?;
+
+        Ok(BuildConfig {
+            cfg,
+            basic: base,
+            base_raw: raw,
+            data,
+        })
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

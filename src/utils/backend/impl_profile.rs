@@ -89,7 +89,7 @@ impl BackEnd {
         path: P,
         with_proxy: bool,
     ) -> anyhow::Result<()> {
-        assert!(
+        anyhow::ensure!(
             path.as_ref().is_absolute(),
             "trying to call `download_blob` without absolute path"
         );

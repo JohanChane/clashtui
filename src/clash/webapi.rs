@@ -3,6 +3,9 @@ mod config;
 mod config_struct;
 mod conn;
 mod control;
+mod error;
+type CResult<T> = Result<T, error::Error>;
+
 pub mod github;
 #[allow(unused)]
 pub use config_struct::{ClashConfig, LogLevel, Mode, TunConfig, TunStack};
@@ -57,8 +60,8 @@ impl ClashUtil {
             req = req.with_header(headers::AUTHORIZATION, format!("Bearer {s}"));
         }
         req.with_timeout(self.timeout).send()
-        // .and_then(|r| r.as_str().map(|s| s.to_owned()))
     }
+    
     #[cfg(test)]
     /// used for test
     fn build_test() -> Self {

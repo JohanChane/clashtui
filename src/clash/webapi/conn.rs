@@ -1,4 +1,4 @@
-use crate::CResult;
+use super::CResult;
 use minreq::Method;
 use serde::Deserialize;
 
@@ -11,14 +11,6 @@ pub struct ConnInfo {
     #[serde(rename = "uploadTotal")]
     pub upload_total: u64,
     pub connections: Option<Vec<Conn>>,
-}
-
-impl TryFrom<String> for ConnInfo {
-    type Error = String;
-
-    fn try_from(value: String) -> core::result::Result<Self, Self::Error> {
-        serde_json::from_str(&value).map_err(|e| format!("{e:?}"))
-    }
 }
 
 #[cfg_attr(test, derive(Debug))]

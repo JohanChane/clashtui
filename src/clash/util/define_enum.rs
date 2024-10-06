@@ -8,30 +8,6 @@
 /// ### WARNING
 /// current, only `#[cfg(predicate)]` is tested,
 /// other thing like `#[default]` will fail.
-///
-/// ```rust
-/// use clashtui::define_enum;
-/// define_enum!{
-///     #[derive(Clone, Copy, PartialEq)]
-///     pub enum Test
-///     {
-///         Test1,
-///         // this mean true
-///         #[cfg(all())]
-///         Test2,
-///         // this mean false
-///         #[cfg(any())]
-///         #[cfg(any())]
-///         Test3,
-///     }
-/// }
-///
-/// assert!(Test::Test1.to_string() == String::from("Test1"));
-/// assert!(Into::<String>::into(Test::Test1) == String::from("Test1"));
-///
-/// assert!(Test::const_array() == [Test::Test1, Test::Test2]);
-/// assert!(Test::const_len() == 2);
-/// ```
 macro_rules! define_enum {
     ($(#[$attr:meta])*
     $vis:vis enum $name: ident
@@ -83,4 +59,30 @@ macro_rules! define_enum {
             }
         }
     };
+}
+
+#[cfg(test)]
+mod test {
+    define_enum! {
+        #[derive(Clone, Copy, PartialEq, Debug)]
+        pub enum Test
+        {
+            Test1,
+            // this mean true
+            #[cfg(all())]
+            Test2,
+            // this mean false
+            #[cfg(any())]
+            #[cfg(any())]
+            Test3,
+        }
+    }
+    #[test]
+    fn test() {
+        assert_eq!(Test::Test1.to_string(), String::from("Test1"));
+        assert_eq!(Into::<String>::into(Test::Test1), String::from("Test1"));
+
+        assert_eq!(Test::const_array(), [Test::Test1, Test::Test2]);
+        assert_eq!(Test::const_len(), 2);
+    }
 }

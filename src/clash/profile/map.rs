@@ -87,12 +87,4 @@ impl ProfileType {
             ProfileType::Generated(name) => Some(format!("From template {name}")),
         }
     }
-    // pub fn into_inner(self) -> Option<String> {
-    //     match self {
-    //         ProfileType::File => None,
-    //         ProfileType::Url(s) => Some(s),
-    //         #[cfg(feature = "template")]
-    //         ProfileType::Generated(s) => Some(s),
-    //     }
-    // }
 }

@@ -29,17 +29,17 @@ fn get_version() -> String {
 
     let cargo_pkg_version = env::var("CARGO_PKG_VERSION").unwrap();
 
-    let build_type: bool = env::var("DEBUG").unwrap().parse().unwrap();
-    let build_type_str = if build_type { "debug" } else { "" };
+    let build_type = if env::var("DEBUG").unwrap().parse().unwrap() {
+        "-debug"
+    } else {
+        ""
+    };
 
-    let version = format!("v{cargo_pkg_version}-{branch_name}-{git_describe}-{build_type_str}");
-
-    version
+    format!("v{cargo_pkg_version}-{branch_name}-{git_describe}{build_type}")
 }
 
 fn main() {
     println!("cargo:rerun-if-changed=../.git/HEAD");
-    println!("cargo:rerun-if-changed=../.git/refs/heads/dev");
     println!("cargo:rerun-if-changed=build.rs",);
 
     if env::var("CLASHTUI_VERSION").is_err() {

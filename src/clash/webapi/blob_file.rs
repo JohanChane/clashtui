@@ -1,5 +1,4 @@
-use super::{headers, ClashUtil};
-use crate::CResult;
+use super::{headers, CResult, ClashUtil};
 
 impl ClashUtil {
     pub fn mock_clash_core<U: Into<minreq::URL>>(
@@ -44,6 +43,7 @@ mod tests {
         let mut tf = std::fs::OpenOptions::new()
             .write(true)
             .create(true)
+            .truncate(false)
             .open("/tmp/clashtui.test")
             .unwrap();
         std::io::copy(&mut r, &mut tf).unwrap();
