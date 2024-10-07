@@ -2,14 +2,14 @@ use super::CliCmds;
 
 pub fn gen_complete(shell: Option<clap_complete::Shell>) {
     use clap::CommandFactory;
-    let gen = if let Some(gen) = shell {
-        eprintln!("Target Shell: {gen}");
-        gen
+    let shell = if let Some(shell) = shell {
+        eprintln!("Target Shell: {shell}");
+        shell
     } else {
         match clap_complete::shells::Shell::from_env() {
-            Some(gen) => {
-                eprintln!("Current Shell: {gen}");
-                gen
+            Some(shell) => {
+                eprintln!("Current Shell: {shell}");
+                shell
             }
             None => {
                 eprintln!("Unable to determine what shell this is");
@@ -19,7 +19,7 @@ pub fn gen_complete(shell: Option<clap_complete::Shell>) {
         }
     };
     clap_complete::generate(
-        gen,
+        shell,
         &mut CliCmds::command(),
         "clashtui",
         &mut std::io::stdout(),

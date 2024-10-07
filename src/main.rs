@@ -1,5 +1,6 @@
 #![warn(clippy::all)]
 #![deny(unsafe_code)]
+#![warn(keyword_idents_2024)]
 mod clash;
 mod commands;
 #[cfg(feature = "tui")]
