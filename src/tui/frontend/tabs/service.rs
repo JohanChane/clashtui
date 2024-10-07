@@ -29,8 +29,6 @@ pub(in crate::tui::frontend) struct ServiceTab {
     backend_content: Option<Call>,
 }
 
-const INNER: [ServiceOp; ServiceOp::const_len()] = ServiceOp::const_array();
-
 const MODE: [Mode; 3] = [Mode::Rule, Mode::Direct, Mode::Global];
 
 impl ServiceTab {
@@ -38,7 +36,7 @@ impl ServiceTab {
     pub fn new() -> Self {
         let mut operations = List::new(TAB_TITLE_SERVICE.to_string());
         let mut inner_items = vec!["SwitchMode".to_owned()];
-        inner_items.extend(INNER.into_iter().map(|v| v.into()));
+        inner_items.extend(ServiceOp::ALL.into_iter().map(|v| v.into()));
         operations.set_items(inner_items);
 
         let mut modes = List::new("Mode".to_owned());
@@ -139,7 +137,7 @@ impl Drawable for ServiceTab {
                         if index == 0 {
                             self.select_mode = true;
                         } else {
-                            let op = INNER[index - 1];
+                            let op = ServiceOp::ALL[index - 1];
                             let pak = Call::Service(BackendOp::ServiceCTL(op));
                             self.backend_content.replace(pak);
                         }

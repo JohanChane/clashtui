@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::{ClashUtil,CResult};
+use super::{CResult, ClashUtil};
 
 impl ClashUtil {
     /// Fetch info from given input

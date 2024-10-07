@@ -43,11 +43,11 @@ macro_rules! define_enum {
         }
 
         impl $name {
-            #[doc = concat!("give a const array of [`", stringify!($name), "`],
-            with its length [`", stringify!($name), "::const_len`]")]
-            pub const fn const_array() -> [$name; $name::const_len()] {
-                [$($(#[$item_attr])* $name::$variant),*]
-            }
+        //     #[doc = concat!("give a const array of [`", stringify!($name), "`],
+        //     with its length [`", stringify!($name), "::const_len`]")]
+        //     pub const fn const_array() -> [$name; $name::const_len()] {
+        //         [$($(#[$item_attr])* $name::$variant),*]
+        //     }
             #[doc = concat!("give the length of [`", stringify!($name), "::const_array`]")]
             pub const fn const_len() -> usize {
                 macro_rules! replace_expr {
@@ -57,6 +57,7 @@ macro_rules! define_enum {
                 }
                 <[()]>::len(&[$($(#[$item_attr])* replace_expr!($variant, ())),*])
             }
+            pub const ALL: [$name; Self::const_len()] = [$($(#[$item_attr])* $name::$variant),*];
         }
     };
 }
@@ -82,7 +83,6 @@ mod test {
         assert_eq!(Test::Test1.to_string(), String::from("Test1"));
         assert_eq!(Into::<String>::into(Test::Test1), String::from("Test1"));
 
-        assert_eq!(Test::const_array(), [Test::Test1, Test::Test2]);
-        assert_eq!(Test::const_len(), 2);
+        assert_eq!(Test::ALL, [Test::Test1, Test::Test2]);
     }
 }

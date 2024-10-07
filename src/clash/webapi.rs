@@ -61,7 +61,7 @@ impl ClashUtil {
         }
         req.with_timeout(self.timeout).send()
     }
-    
+
     #[cfg(test)]
     /// used for test
     fn build_test() -> Self {

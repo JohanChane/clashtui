@@ -1,5 +1,3 @@
-mod define_enum;
-
 pub fn get_modify_time<P>(file_path: P) -> std::io::Result<std::time::SystemTime>
 where
     P: AsRef<std::path::Path>,

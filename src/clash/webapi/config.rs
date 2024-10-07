@@ -1,4 +1,4 @@
-use super::{ClashConfig, ClashUtil, CResult};
+use super::{CResult, ClashConfig, ClashUtil};
 use minreq::Method;
 
 impl ClashUtil {

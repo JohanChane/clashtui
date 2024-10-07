@@ -258,10 +258,7 @@ impl Drawable for FrontEnd {
                 Keys::AppHelp => {
                     self.get_list_popup().set(
                         "Help",
-                        Keys::const_doc()
-                            .into_iter()
-                            .map(|s| s.to_owned())
-                            .collect(),
+                        Keys::ALL_DOC.into_iter().map(|s| s.to_owned()).collect(),
                     );
                     self.there_is_list_pop = true;
                 }

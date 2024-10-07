@@ -47,20 +47,20 @@ macro_rules! define_keys {
         }
 
         impl $name {
-            #[doc = concat!("give a const array of [`", stringify!($name), "`]'s doc,
-            with its length [`", stringify!($name), "::doc_len`]")]
-            #[doc = "this is used for build help content"]
-            pub const fn const_doc() -> [&'static str; $name::doc_len()]{
-                [$(
-                    $(#[cfg($prompt_cfg_attr)])*
-                    concat!("# ",stringify!($prompt)),
-                    $(#[cfg($prompt_cfg_attr)])*
-                    $(
-                        $(#[cfg($cfg_attr)])*
-                        (concat!($($ch)? $($chs)?, ":" $(, $doc)*)),
-                    )*
-                )*]
-            }
+        //     #[doc = concat!("give a const array of [`", stringify!($name), "`]'s doc,
+        //     with its length [`", stringify!($name), "::doc_len`]")]
+        //     #[doc = "this is used for build help content"]
+        //     pub const fn const_doc() -> [&'static str; $name::doc_len()]{
+        //         [$(
+        //             $(#[cfg($prompt_cfg_attr)])*
+        //             concat!("# ",stringify!($prompt)),
+        //             $(#[cfg($prompt_cfg_attr)])*
+        //             $(
+        //                 $(#[cfg($cfg_attr)])*
+        //                 (concat!($($ch)? $($chs)?, ":" $(, $doc)*)),
+        //             )*
+        //         )*]
+        //     }
             #[doc = concat!("give the length of [`", stringify!($name), "::const_doc`]")]
             pub const fn doc_len() -> usize{
                 macro_rules! replace_expr {
@@ -78,6 +78,15 @@ macro_rules! define_keys {
                     )*
                 )*])
             }
+            pub const ALL_DOC: [&'static str; Self::doc_len()] = [$(
+                            $(#[cfg($prompt_cfg_attr)])*
+                            concat!("# ",stringify!($prompt)),
+                            $(#[cfg($prompt_cfg_attr)])*
+                            $(
+                                $(#[cfg($cfg_attr)])*
+                                (concat!($($ch)? $($chs)?, ":" $(, $doc)*)),
+                            )*
+                        )*];
         }
     };
 }
