@@ -74,7 +74,7 @@ impl Drawable for ConnctionTab {
                     .borders(Borders::ALL)
                     .title(TAB_TITLE_CONNECTION),
             )
-            .highlight_style(
+            .row_highlight_style(
                 Ra::Style::default()
                     .bg(if true {
                         Theme::get().list_hl_bg_fouced

@@ -60,7 +60,7 @@ features = ["events", "event-stream"]
 optional = true
 
 [dependencies.ratatui]
-version = "0.28.1"
+version = "0.29.0"
 default-features = false
 features = ["crossterm"]
 optional = true
