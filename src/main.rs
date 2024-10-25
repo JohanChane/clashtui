@@ -11,7 +11,8 @@ use utils::{consts, BackEnd, BuildConfig};
 
 static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::new(load_home_dir);
 
-fn main() {
+
+fn main() -> anyhow::Result<()> {
     if is_root::is_root() {
         println!("{}", consts::ROOT_WARNING)
     }
@@ -23,19 +24,17 @@ fn main() {
         let buildconfig = match BuildConfig::load_config(HOME_DIR.as_path()) {
             Ok(v) => v,
             Err(e) => {
-                use std::io::{Read, Write};
-                eprintln!("failed to load config: {e}");
-                println!("program will try to init default config");
-                println!(
-                    "WARNING! THIS WILL DELETE ALL FILE UNDER {}",
-                    HOME_DIR.to_string_lossy()
-                );
                 // we don't really do so, as it can be dangerous
-                print!("Are you sure to continue[y/n]?");
-                std::io::stdout().flush().unwrap();
-                let mut buf = [0_u8; 1];
-                let rep = std::io::stdin().read_exact(&mut buf);
-                if rep.is_ok() && buf[0] == b'y' {
+                if commands::Confirm::default()
+                    .append_prompt(format!("failed to load config: {e}"))
+                    .append_prompt("program will try to init default config")
+                    .append_prompt(format!(
+                        "WARNING! THIS WILL DELETE ALL FILE UNDER {}",
+                        HOME_DIR.display()
+                    ))
+                    .append_prompt("Are you sure to continue?")
+                    .interact()?
+                {
                     // accept 'y' only
                     if let Err(e) = BuildConfig::init_config(HOME_DIR.as_path()) {
                         eprint!("init config failed: {e}");

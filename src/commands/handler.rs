@@ -115,41 +115,24 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
             {
                 println!("\n{}", info.as_info(current_version));
                 if !without_ask {
-                    fn prompt_ask(prompt: &str) -> std::io::Result<String> {
-                        use std::io::Write;
-                        let mut out = std::io::stdout().lock();
-                        write!(out, "{}", prompt)?;
-                        out.flush()?;
-                        let mut reads = String::with_capacity(50);
-                        std::io::stdin().read_line(&mut reads)?;
-                        writeln!(out)?;
-                        Ok(reads.trim().to_owned())
+                    if !Confirm::default()
+                        .append_prompt("Do you want to download one now?")
+                        .interact()?
+                    {
+                        continue;
                     }
-                    let maybe_name = prompt_ask("Do you want to download one now?")?;
-                    match maybe_name.trim() {
-                        "y" | "yes" => (),
-                        &_ => continue,
-                    }
-                    println!("Avaliable asserts:");
-                    info.assets
-                        .iter()
-                        .for_each(|a| println!("{}  {}", a.name, a.browser_download_url));
-                    let maybe_name = prompt_ask("Type the name:")?;
-                    println!("Select {}", maybe_name);
-                    let al: Vec<String> = info
-                        .assets
-                        .into_iter()
-                        .filter(|a| a.name == maybe_name)
-                        .map(|a| a.browser_download_url)
-                        .take(1)
-                        .collect();
-                    if let Some(url) = al.first() {
-                        println!("\nDownload start for {} {}", maybe_name, url);
-                        let path = backend.download_to_file(&maybe_name, url)?;
-                        println!("\nDownloaded to {}", path.display());
-                    } else {
-                        println!("Not match any, continue");
-                    }
+                    let asset = Select::default()
+                        .append_start_prompt("Avaliable asserts:")
+                        .append_end_prompt("Type the num:")
+                        .append_items(info.assets.iter())
+                        .interact()?;
+                    println!(
+                        "\nDownload start for {} {}",
+                        asset.name, asset.browser_download_url
+                    );
+                    let path =
+                        backend.download_to_file(&asset.name, &asset.browser_download_url)?;
+                    println!("\nDownloaded to {}", path.display());
                 } else if let Some(asset) = info.assets.first() {
                     println!(
                         "\nDownload start for {} {}",

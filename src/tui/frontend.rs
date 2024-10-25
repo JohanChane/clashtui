@@ -71,12 +71,18 @@ impl FrontEnd {
                 () = tokio::time::sleep(TICK_RATE) => {ev = None}
             };
             if let Some(ev) = ev {
-                if let event::Event::Key(key) = ev? {
-                    #[cfg(debug_assertions)]
-                    if the_egg(key.code) {
-                        log::debug!("You've found the egg!")
-                    };
-                    self.handle_key_event(&key);
+                match ev? {
+                    event::Event::FocusGained | event::Event::FocusLost => (),
+                    event::Event::Mouse(_) => (),
+                    event::Event::Paste(_) => (),
+                    event::Event::Key(key_event) => {
+                        #[cfg(debug_assertions)]
+                        if the_egg(key_event.code) {
+                            log::debug!("You've found the egg!")
+                        };
+                        self.handle_key_event(&key_event);
+                    }
+                    event::Event::Resize(_, _) => terminal.autoresize()?,
                 }
             }
         }

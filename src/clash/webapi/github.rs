@@ -115,6 +115,11 @@ pub struct Asset {
     pub name: String,
     pub browser_download_url: String,
 }
+impl std::fmt::Display for Asset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.name, self.browser_download_url)
+    }
+}
 /// actually match `v0.12.432-`,
 /// return a [Vec] of [u16], len = 3
 fn get_triple_code(tag: &str) -> Option<Vec<u16>> {
