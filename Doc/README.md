@@ -23,3 +23,23 @@
 -   所以创建 uuid 目录, 可以防止别人通过猜测其他文件的路径, 从而通过私人令牌取得其他文件。
 -   如果害怕泄露个人令牌, 可以单独创建一个专门用于共享订阅链接的 gitlab 帐号。
 
+## 使用 github 私有仓库存放个人的 profile
+
+添加 `Personal access tokens`:
+
+```
+Settings -> Developer settings -> Personal access tokens -> Tokens (classic) -> Generate new token -> Select scopes (check `repo`)
+```
+
+The Url of file in private repo:
+
+```
+# the url of raw file in private repo
+https://raw.githubusercontent.com/xxx
+
+# Add token
+https://<token>@raw.githubusercontent.com/xxx
+
+# OR
+https://x-access-token:<token>@raw.githubusercontent.com/xxx
+```

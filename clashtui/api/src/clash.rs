@@ -6,6 +6,7 @@ const GEO_URI: &str = "https://api.github.com/repos/MetaCubeX/meta-rules-dat/rel
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 use minreq::Method;
+use url::Url;
 use std::io::Result;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -243,7 +244,21 @@ impl ClashUtil {
         url_item: &UrlItem,
         timeout: Option<u64>,
     ) -> Result<minreq::Request> {
-        let mut request = minreq::get(url_item.url.as_str());
+        let url = Url::parse(url_item.gen_url().unwrap_or_default().as_str()).expect("Failed to parse URL");
+        let username = url.username();
+        let password = url.password().unwrap_or("");
+
+        let mut request_url = url.clone();
+        request_url.set_username("").unwrap();
+        request_url.set_password(None).unwrap();
+
+        let auth_value = format!("{}:{}", username, password);
+        let auth_header = format!("Basic {}", base64::encode(auth_value));
+
+        let mut request = minreq::get(request_url.as_str())
+            .with_header("Authorization", auth_header);
+
+        // let mut request = minreq::get(url_item.url.as_str());
 
         if url_item.typ == UrlType::GitHub {
         } else if url_item.typ == UrlType::Gitee {
