@@ -31,7 +31,7 @@ fn main() {
     let mut flags = Flags::empty();
 
     // ## Setup logging as early as possible. So We can log.
-    let config_dir = load_app_dir(&mut flags);
+    let config_dir = cli_env.config_dir.unwrap_or_else(|| load_app_dir(&mut flags));
     setup_logging(config_dir.join("clashtui.log").to_str().unwrap());
 
     let tick_rate = 250;    // time in ms between two ticks.
