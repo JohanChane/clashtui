@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 serde = { version = "^1", features = ["derive"] }
 minreq = { version = "^2", features = ["proxy", "https"] }
+url = {version = "^2"}
+base64 = {version = "^0"}
 serde_json = "^1"
 serde-this-or-that = { version = "^0", optional = true }
 chrono = "^0"

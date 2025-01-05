@@ -9,6 +9,7 @@ const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KH
 
 use std::io::Result;
 use minreq::Method;
+use url::Url;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ProfileSectionType {
@@ -124,7 +125,20 @@ impl ClashUtil {
             .map(|_| ())
     }
     pub fn mock_clash_core<S: Into<minreq::URL>>(&self, url: S, with_proxy: bool) -> Result<Resp> {
-        let mut request = minreq::get(url)
+        let minreq_url: minreq::URL = url.into();
+        let parsed_url = Url::parse(minreq_url.as_str()).expect("Failed to parse URL");
+        let username = parsed_url.username();
+        let password = parsed_url.password().unwrap_or("");
+
+        let mut request_url = parsed_url.clone();
+        request_url.set_username("").unwrap();
+        request_url.set_password(None).unwrap();
+
+        let auth_value = format!("{}:{}", username, password);
+        let auth_header = format!("Basic {}", base64::encode(auth_value));
+
+        let mut request = minreq::get(request_url.as_str())
+            .with_header("Authorization", auth_header)
             .with_header("user-agent", self.clash_ua.clone())
             .with_timeout(TIMEOUT.into());
 

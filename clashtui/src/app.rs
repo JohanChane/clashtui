@@ -25,6 +25,9 @@ pub struct CliEnv {
     /// print version information and exit
     #[argh(switch, short = 'v')]
     pub version: bool,
+    /// specify the ClashTUI config directory
+    #[argh(option, short = 'c', long = "config")]
+    pub config_dir: Option<PathBuf>,
 }
 
 pub struct App {
