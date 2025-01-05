@@ -35,6 +35,7 @@ impl ClashSrvCtlTab {
             ClashSrvOp::StartClashService.into(),
             ClashSrvOp::StopClashService.into(),
             ClashSrvOp::SwitchMode.into(),
+            ClashSrvOp::CloseConnections.into(),
         ]);
         let mut modes = List::new("Mode".to_string());
         modes.set_items(vec![

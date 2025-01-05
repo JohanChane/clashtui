@@ -3,12 +3,13 @@ use crate::utils::state::_State;
 use std::path::Path;
 // IPC Related
 impl ClashTuiUtil {
-    pub fn update_state(&self, new_pf: Option<String>, new_mode: Option<String>) -> _State {
-        let (pf, mode, tun) = self._update_state(new_pf, new_mode);
+    pub fn update_state(&self, new_pf: Option<String>, new_mode: Option<String>, no_pp: Option<bool>) -> _State {
+        let (pf, mode, tun, no_pp_value) = self._update_state(new_pf, new_mode, no_pp);
         _State {
             profile: pf,
             mode,
             tun,
+            no_pp: no_pp_value,
         }
     }
 
@@ -44,7 +45,8 @@ impl ClashTuiUtil {
         &self,
         new_pf: Option<String>,
         new_mode: Option<String>,
-    ) -> (String, Option<api::Mode>, Option<api::TunStack>) {
+        no_pp: Option<bool>,
+    ) -> (String, Option<api::Mode>, Option<api::TunStack>, bool) {
         if let Some(v) = new_mode {
             let load = format!(r#"{{"mode": "{}"}}"#, v);
             let _ = self
@@ -75,6 +77,12 @@ impl ClashTuiUtil {
             ),
             None => (None, None),
         };
-        (pf, mode, tun)
+
+        if let Some(v) = no_pp {
+            self.clashtui_data.borrow_mut().no_pp = v;
+        }
+        let no_pp_value = self.clashtui_data.borrow().no_pp;
+
+        (pf, mode, tun, no_pp_value)
     }
 }

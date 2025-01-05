@@ -27,6 +27,9 @@ pub struct CliEnv {
     /// print version information and exit
     #[argh(switch, short = 'v')]
     pub version: bool,
+    /// specify the ClashTUI config directory
+    #[argh(option, short = 'c', long = "config")]
+    pub config_dir: Option<PathBuf>,
 }
 
 pub struct App {
@@ -311,12 +314,11 @@ impl App {
                     }
                 }
 
-                // To avoid affecting the updates of other profiles, load the current profile after updating all profiles.
-                // ToDo: Check Content(profile, proxy-providers) of the current profile. If they are changed, reload the profile. However, the update times of proxy providers in mihomo will not be updated. So ?
                 let current_profile = &self.clashtui_util.clashtui_data.borrow().current_profile;
                 if ok_profiles.contains(current_profile) {
+                    let no_pp = self.clashtui_util.clashtui_data.borrow().no_pp;
                     println!("\nSelect profile `{current_profile}`:");
-                    match self.clashtui_util.select_profile(current_profile) {
+                    match self.clashtui_util.select_profile(current_profile, no_pp) {
                         Ok(_) => println!("-   Ok"),
                         Err(e) => println!("-   Err: {e}"),
                     }

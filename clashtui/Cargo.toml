@@ -1,6 +1,6 @@
 [package]
 name = "clashtui"
-version = "0.2.1"
+version = "0.2.3"
 edition = "2021"
 
 authors = ["Johan Chane <johanchanex at gmail dot com>"]
@@ -32,6 +32,8 @@ enumflags2 = "^0"
 nix = {version = "^0", features = ["fs", "user"]}
 regex = {version = "^1", default-features = false, features = ["std", "unicode-perl"]}
 chrono = "^0"
+strum = "^0"
+strum_macros = "^0.23"
 
 [workspace]
 resolver = '2'

@@ -1,13 +1,13 @@
 use super::profile_input::ProfileInputPopup;
-use crate::tui::{
+use crate::{tui::{
     symbols::{PROFILE, TEMPALTE},
     utils::Keys,
     widgets::{ConfirmPopup, List, MsgPopup},
     EventState, Visibility,
-};
+}, utils::ClashTuiUtil};
 use crate::utils::{self, SharedClashTuiState, SharedClashTuiUtil, ProfileType};
 use crate::{msgpopup_methods, utils::get_mtime};
-crate::define_enum!(PTOp, [Update, UpdateAll, Select, Delete]);   // PTOp: ProfileTabOperation
+crate::define_enum!(PTOp, [Update, UpdateAll, Select, Delete, GenInfo]);   // PTOp: ProfileTabOperation
 
 #[derive(PartialEq)]
 enum Fouce {
@@ -70,7 +70,8 @@ impl ProfileTab {
 
     fn handle_select_profile_ev(&mut self) {
         if let Some(profile_name) = self.profile_list.selected() {
-            if let Err(err) = self.clashtui_util.select_profile(profile_name) {
+            let no_pp = self.clashtui_state.borrow().get_no_pp();
+            if let Err(err) = self.clashtui_util.select_profile(profile_name, no_pp) {
                 self.popup_txt_msg(err.to_string())
             } else {
                 self.clashtui_state
@@ -87,7 +88,8 @@ impl ProfileTab {
             {
                 Ok(mut msg) => {
                     if profile_name == self.clashtui_state.borrow().get_profile() {
-                        if let Err(err) = self.clashtui_util.select_profile(profile_name) {
+                        let no_pp = self.clashtui_state.borrow().get_no_pp();
+                        if let Err(err) = self.clashtui_util.select_profile(profile_name, no_pp) {
                             log::error!("{profile_name} => {err:?}");
                             msg.push(err.to_string());
                         } else {
@@ -133,6 +135,20 @@ impl ProfileTab {
             } else {
                 self.popup_txt_msg("Created".to_string());
                 self.update_profile_list();
+            }
+        }
+    }
+
+    fn handle_gen_profile_info_ev(&mut self) {
+        if let Some(profile_name) = self.profile_list.selected() {
+            let is_cur_profile = profile_name == self.clashtui_state.borrow().get_profile();
+            match self.clashtui_util.gen_profile_info(profile_name, is_cur_profile) {
+                Ok(info) => {
+                    self.popup_list_msg(info);
+                },
+                Err(e) => {
+                    self.popup_txt_msg(e.to_string());
+                }
             }
         }
     }
@@ -290,9 +306,8 @@ impl super::TabEvent for ProfileTab {
                                         .collect();
 
                                 if self.clashtui_util.get_profile_type(profile_name)
-                                    .is_some_and(|t| t == ProfileType::Url)
+                                    .is_some_and(|t| ClashTuiUtil::is_profile_with_suburl(&t))
                                 {
-                                    log::debug!("get_profile_type: is url");
                                     lines.push(String::new());
                                     profile_path =
                                         self.clashtui_util.get_profile_yaml_path(profile_name).ok();
@@ -326,6 +341,16 @@ impl super::TabEvent for ProfileTab {
                                     Err(err) => self.popup_txt_msg(err.to_string()),
                                 }
                             }
+                            EventState::WorkDone
+                        }
+                        Keys::ProfileInfo => {
+                            self.popup_txt_msg("Generating info...".to_string());
+                            self.op.replace(PTOp::GenInfo);
+                            EventState::WorkDone
+
+                        }
+                        Keys::ProfileNoPp => {
+                            self.clashtui_state.borrow_mut().switch_no_pp();
                             EventState::WorkDone
                         }
                         _ => EventState::NotConsumed,
@@ -391,6 +416,7 @@ impl super::TabEvent for ProfileTab {
                 PTOp::UpdateAll => self.handle_update_profile_ev(true),
                 PTOp::Select => self.handle_select_profile_ev(),
                 PTOp::Delete => self.handle_delete_profile_ev(),
+                PTOp::GenInfo => self.handle_gen_profile_info_ev(),
             }
         }
     }

@@ -64,6 +64,14 @@ pub fn str_duration(t: std::time::Duration) -> String {
     }
 }
 
+pub fn gen_file_dur_str(path: &PathBuf, now: Option<std::time::SystemTime>) -> std::io::Result<String> {
+    if let Some(n) = now {
+        get_mtime(path).map(|time| str_duration(n.duration_since(time).unwrap_or_default()))
+    } else {
+        get_mtime(path).map(|time| str_duration(time.elapsed().unwrap_or_default()))
+    }
+}
+
 pub fn modify_file_perms_in_dir(dir: &PathBuf, group_name: &str) {
     // dir add set-group-id: `chmod g+s dir`
     if let Ok(metadata) = std::fs::metadata(dir) {
@@ -281,4 +289,42 @@ pub fn is_clashtui_ep() -> bool {
     }
 
     false
+}
+
+pub fn extract_domain(url: &str) -> Option<&str> {
+    if let Some(protocol_end) = url.find("://") {
+        let rest = &url[(protocol_end + 3)..];
+        if let Some(path_start) = rest.find('/') {
+            return Some(&rest[..path_start]);
+        } else {
+            return Some(rest);
+        }
+    }
+    None
+}
+
+pub fn bytes_to_readable(bytes: u64) -> String {
+    const KILOBYTE: u64 = 1024;
+    const MEGABYTE: u64 = KILOBYTE * 1024;
+    const GIGABYTE: u64 = MEGABYTE * 1024;
+    const TERABYTE: u64 = GIGABYTE * 1024;
+
+    if bytes >= TERABYTE {
+        format!("{:.2} TB", bytes as f64 / TERABYTE as f64)
+    } else if bytes >= GIGABYTE {
+        format!("{:.2} GB", bytes as f64 / GIGABYTE as f64)
+    } else if bytes >= MEGABYTE {
+        format!("{:.2} MB", bytes as f64 / MEGABYTE as f64)
+    } else if bytes >= KILOBYTE {
+        format!("{:.2} KB", bytes as f64 / KILOBYTE as f64)
+    } else {
+        format!("{} Bytes", bytes)
+    }
+}
+
+pub fn timestamp_to_readable(timestamp: u64) -> String {
+    let duration = std::time::Duration::from_secs(timestamp);
+    let datetime = std::time::UNIX_EPOCH + duration;
+    let datetime: chrono::DateTime<chrono::Utc> = datetime.into();
+    datetime.format("%Y-%m-%d %H:%M:%S").to_string()
 }

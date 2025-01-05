@@ -9,8 +9,8 @@ proxy-groups:
   - name: "Entry"
     type: select
     proxies:
-      #- FltAllAt
-      #- FltAllLb
+      - FltAllAt
+      - FltAllLb
       - <FltAt>
       #- <FltFb>
       #- <FltLb>
@@ -20,7 +20,7 @@ proxy-groups:
 
   - name: "FltAllSl"
     type: select
-    use: 
+    use:
       - <pvd>
     <<: *pa_flt
 
@@ -29,19 +29,19 @@ proxy-groups:
       providers: ["pvd"]
     type: select
 
-  #- name: "FltAllAt"
-  #  type: url-test
-  #  proxies:
-  #    - <FltAt>
-  #  <<: *pa_dt
+  - name: "FltAllAt"
+    type: url-test
+    proxies:
+      - <FltAt>
+    <<: *pa_dt
 
-  #- name: "FltAllLb"
-  #  proxies:
-  #    - <FltAt>
-  #  type: load-balance
-  #  #strategy: consistent-hashing
-  #  #strategy: round-robin
-  #  <<: *pa_dt
+  - name: "FltAllLb"
+    proxies:
+      - <FltAt>
+    type: load-balance
+    #strategy: consistent-hashing
+    #strategy: round-robin
+    <<: *pa_dt
 
   - name: "FltAt"
     tpl_param:
@@ -88,28 +88,16 @@ proxy-providers:
     <<: *pa_pp
 
 rules:
-  #- DOMAIN-SUFFIX,cn.bing.com,DIRECT
-  #- DOMAIN-SUFFIX,bing.com,Entry
-  #- DOMAIN,aur.archlinux.org,Entry
+  - DOMAIN-SUFFIX,cn.bing.com,DIRECT
+  - DOMAIN-SUFFIX,bing.com,Entry
+  - DOMAIN,aur.archlinux.org,Entry
 
   - GEOIP,lan,DIRECT,no-resolve
-  - GEOSITE,biliintl,Entry
-  - GEOSITE,ehentai,Entry
   - GEOSITE,github,Entry
-  - GEOSITE,twitter,Entry
-  - GEOSITE,youtube,Entry
-  - GEOSITE,google,Entry
+  - GEOSITE,openai,Entry
   - GEOSITE,telegram,Entry
-  - GEOSITE,netflix,Entry
-  - GEOSITE,bilibili,Entry-RuleMode
-  - GEOSITE,bahamut,Entry
-  - GEOSITE,spotify,Entry
-  - GEOSITE,geolocation-!cn,Entry
-  - GEOIP,google,Entry
-  - GEOIP,netflix,Entry
-  - GEOIP,telegram,Entry
-  - GEOIP,twitter,Entry
-  - GEOSITE,pixiv,Entry
-  - GEOSITE,CN,Entry-RuleMode
+  - GEOSITE,youtube,Entry
+  - GEOSITE,reddit,Entry
+  - GEOSITE,gfw,Entry
   - GEOIP,CN,Entry-RuleMode
   - MATCH,Entry-LastMatch
