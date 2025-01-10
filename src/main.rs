@@ -11,7 +11,6 @@ use utils::{consts, BackEnd, BuildConfig};
 
 static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::new(load_home_dir);
 
-
 fn main() -> anyhow::Result<()> {
     if is_root::is_root() {
         println!("{}", consts::ROOT_WARNING)

@@ -87,7 +87,6 @@ features = ["std", "derive", "help", "usage", "suggestions", "color"]
 lto = "fat"
 opt-level = 's'
 strip = true
-incremental = true
 
 
 [package.metadata.deb]

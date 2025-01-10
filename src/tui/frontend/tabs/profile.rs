@@ -75,6 +75,12 @@ impl Default for ProfileTab {
     }
 }
 
+impl std::fmt::Display for ProfileTab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", crate::tui::frontend::consts::TAB_TITLE_PROFILE)
+    }
+}
+
 impl TabCont for ProfileTab {
     fn get_backend_call(&mut self) -> Option<Call> {
         // if not is_inited, init profiles

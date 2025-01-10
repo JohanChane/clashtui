@@ -59,6 +59,12 @@ impl Default for ServiceTab {
     }
 }
 
+impl std::fmt::Display for ServiceTab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", crate::tui::frontend::consts::TAB_TITLE_SERVICE)
+    }
+}
+
 impl TabCont for ServiceTab {
     fn get_backend_call(&mut self) -> Option<Call> {
         self.backend_content.take()

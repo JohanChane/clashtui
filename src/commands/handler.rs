@@ -126,18 +126,12 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                         .append_end_prompt("Type the num:")
                         .append_items(info.assets.iter())
                         .interact()?;
-                    println!(
-                        "\nDownload start for {} {}",
-                        asset.name, asset.browser_download_url
-                    );
+                    println!("\nDownload start for {}", asset);
                     let path =
                         backend.download_to_file(&asset.name, &asset.browser_download_url)?;
                     println!("\nDownloaded to {}", path.display());
                 } else if let Some(asset) = info.assets.first() {
-                    println!(
-                        "\nDownload start for {} {}",
-                        asset.name, asset.browser_download_url
-                    );
+                    println!("\nDownload start for {}", asset);
                     let path =
                         backend.download_to_file(&asset.name, &asset.browser_download_url)?;
                     println!("\nDownloaded to {}", path.display());

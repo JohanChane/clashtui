@@ -79,36 +79,36 @@ impl BackEnd {
             Ok(mut rp) => {
                 let mut fp = std::fs::File::create(&path)?;
                 std::io::copy(&mut rp, &mut fp)
-                    .map_err(|e| anyhow::anyhow!("{e}\nincrease timeout might help"))?;
+                    .map_err(|e| anyhow::anyhow!("{e}, increase timeout might help"))?;
             }
             Err(e) => {
-                eprintln!("{e}\ntry to download with `curl/wget`");
+                eprintln!("{e}, try to download with `curl/wget`");
                 use std::process::{Command, Stdio};
-                fn have_this(this: &str) -> bool {
-                    Command::new("which")
+                fn have_this_and_exec(this: &str, args: &[&str]) -> anyhow::Result<bool> {
+                    if Command::new("which")
                         .arg(this)
                         .output()
                         .is_ok_and(|r| r.status.success())
-                }
-                fn exec_this(this: &str, args: &[&str]) -> anyhow::Result<()> {
-                    println!("using {this}");
-                    if Command::new(this)
-                        .args(args)
-                        .stdin(Stdio::null())
-                        .status()?
-                        .success()
                     {
-                        Ok(())
+                        println!("using {this}");
+                        if Command::new(this)
+                            .args(args)
+                            .stdin(Stdio::null())
+                            .status()?
+                            .success()
+                        {
+                            Ok(true)
+                        } else {
+                            Err(anyhow::anyhow!("Failed to download with {this}"))
+                        }
                     } else {
-                        Err(anyhow::anyhow!("Failed to download with curl"))
+                        Ok(false)
                     }
                 }
-                if have_this("curl") {
-                    exec_this("curl", &["-o", &path.to_string_lossy(), "-L", url])?;
-                } else if have_this("wget") {
-                    exec_this("wget", &["-O", &path.to_string_lossy(), url])?;
-                } else {
-                    anyhow::bail!("Unable to find curl/wget")
+                if !have_this_and_exec("curl", &["-o", &path.to_string_lossy(), "-L", url])? {
+                    if !have_this_and_exec("wget", &["-O", &path.to_string_lossy(), url])? {
+                        anyhow::bail!("Unable to find curl/wget")
+                    }
                 }
             }
         }

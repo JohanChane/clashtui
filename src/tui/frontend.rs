@@ -7,7 +7,7 @@ use super::widget::{ConfirmPopup, ListPopup};
 use super::{Call, Drawable, EventState, Theme};
 use crate::utils::{consts::err as consts_err, CallBack};
 use key_bind::Keys;
-use tabs::{TabCont as _, Tabs};
+use tabs::TabCont;
 
 use crossterm::event::{self, KeyCode, KeyEvent};
 use ratatui::prelude as Ra;
@@ -16,7 +16,7 @@ use tokio::sync::mpsc::{Receiver, Sender};
 use Ra::{Frame, Rect};
 
 pub struct FrontEnd {
-    tabs: Vec<Tabs>,
+    tabs: Vec<Box<dyn TabCont + Send>>,
     tab_index: usize,
     there_is_list_pop: bool,
     list_popup: Option<Box<ListPopup>>,
@@ -30,11 +30,11 @@ pub struct FrontEnd {
 
 impl FrontEnd {
     pub fn new() -> Self {
-        let tabs = vec![
-            tabs::profile::ProfileTab::new().into(),
-            tabs::service::ServiceTab::new().into(),
+        let tabs: Vec<Box<dyn TabCont + Send>> = vec![
+            Box::new(tabs::profile::ProfileTab::new()),
+            Box::new(tabs::service::ServiceTab::new()),
             #[cfg(feature = "connection-tab")]
-            tabs::connection::ConnctionTab::new().into(),
+            Box::new(tabs::connection::ConnctionTab::new()),
         ];
         Self {
             tabs,

@@ -35,6 +35,12 @@ impl ConnctionTab {
     }
 }
 
+impl std::fmt::Display for ConnctionTab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", crate::tui::frontend::consts::TAB_TITLE_CONNECTION)
+    }
+}
+
 impl Drawable for ConnctionTab {
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, _: bool) {
         use Ra::{Constraint, Stylize};
