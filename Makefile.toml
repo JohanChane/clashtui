@@ -57,7 +57,7 @@ script = """
 # install_crate = "cross"
 dependencies = ["create-artifacts"]
 script = '''
-    cross build --locked  --target=aarch64-unknown-linux-musl
+    cross build --locked --target=aarch64-unknown-linux-musl
     cross build --locked --release --target=aarch64-unknown-linux-musl
     cp target/aarch64-unknown-linux-musl/release/clashtui artifacts/clashtui.linux.arm64.release
     cp target/aarch64-unknown-linux-musl/debug/clashtui artifacts/clashtui.linux.arm64.debug
@@ -66,8 +66,8 @@ script = '''
 [tasks.amd64.linux]
 dependencies = ["create-artifacts"]
 script = '''
-    cargo build --locked
-    cargo build --locked --release
+    cross build --locked --target=x86_64-unknown-linux-musl
+    cross build --locked --release --target=x86_64-unknown-linux-musl
     cp target/release/clashtui artifacts/clashtui.linux.amd64.release
     cp target/debug/clashtui artifacts/clashtui.linux.amd64.debug
 '''
