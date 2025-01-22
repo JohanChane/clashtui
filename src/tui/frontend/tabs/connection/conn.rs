@@ -26,6 +26,9 @@ impl Connection {
         self.id = None;
         Box::new(self)
     }
+    pub fn match_keyword(&self, pat: &str) -> bool {
+        self.chains.contains(pat) || self.domain.contains(pat) || self.rule_type.contains(pat)
+    }
     pub fn build_header() -> Raw::Row<'static> {
         const BAR: [&str; 6] = ["Url", "Chain", "Type", "Start Time", "Recvived", "Send"];
         Raw::Row::new(BAR.into_iter().map(|s| Ra::Text::from(s).centered()))

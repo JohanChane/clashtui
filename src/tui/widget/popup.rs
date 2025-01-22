@@ -23,7 +23,7 @@ pub struct ConfirmPopup {
 }
 
 impl Drawable for ConfirmPopup {
-    /// No need to [Raw::clear], or plan aera
+    /// No need to [clear](Raw::clear), or plan aera
     fn render(&mut self, f: &mut ratatui::Frame, _: ratatui::layout::Rect, _: bool) {
         let prompt = if let Some(PopMsg::Ask(_, ch2, ch3)) = self.msg.as_ref() {
             if let Some(ch2) = ch2 {

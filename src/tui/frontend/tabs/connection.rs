@@ -19,6 +19,7 @@ pub enum BackendOp {
 #[derive(Default)]
 pub(in crate::tui::frontend) struct ConnctionTab {
     items: Vec<Connection>,
+    filter: Option<String>,
     travel_up: u64,
     travel_down: u64,
     state: Raw::TableState,
@@ -145,6 +146,9 @@ impl Drawable for ConnctionTab {
             }
             // KeyCode::PageUp => todo!(),
             // KeyCode::PageDown => todo!(),
+            _ if crate::tui::frontend::key_bind::Keys::Search == ev.code.into() => {
+                todo!("write an input dialog for `search`")
+            }
             _ if crate::tui::frontend::key_bind::Keys::ConnKillAll == ev.code.into() => {
                 self.popup_content = Some(PopMsg::Ask(
                     vec![
@@ -181,9 +185,17 @@ impl TabCont for ConnctionTab {
                     upload_total,
                     connections,
                 } = items;
-                self.items = connections
-                    .map(|v| v.into_iter().map(|c| c.into()).collect())
-                    .unwrap_or_default();
+                self.items = if let Some(pat) = &self.filter {
+                    connections.map(|v| {
+                        v.into_iter()
+                            .map(|c| c.into())
+                            .filter(|c: &Connection| c.match_keyword(&pat))
+                            .collect()
+                    })
+                } else {
+                    connections.map(|v| v.into_iter().map(|c| c.into()).collect())
+                }
+                .unwrap_or_default();
                 self.travel_up = upload_total;
                 self.travel_down = download_total;
                 // try update track here

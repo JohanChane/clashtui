@@ -125,6 +125,8 @@ define_keys! {
         # Connction
         /// Terminate all running connections
         ConnKillAll(KeyCode::Char('c')),
+        /// Search the content
+        Search(KeyCode::Char('/')),
         # Global
         /// Edit this
         Edit(KeyCode::Char('e')),
