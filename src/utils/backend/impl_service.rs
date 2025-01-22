@@ -105,10 +105,10 @@ impl BackEnd {
                         Ok(false)
                     }
                 }
-                if !have_this_and_exec("curl", &["-o", &path.to_string_lossy(), "-L", url])? {
-                    if !have_this_and_exec("wget", &["-O", &path.to_string_lossy(), url])? {
-                        anyhow::bail!("Unable to find curl/wget")
-                    }
+                if !have_this_and_exec("curl", &["-o", &path.to_string_lossy(), "-L", url])?
+                    && !have_this_and_exec("wget", &["-O", &path.to_string_lossy(), url])?
+                {
+                    anyhow::bail!("Unable to find curl/wget")
                 }
             }
         }

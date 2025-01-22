@@ -1,6 +1,10 @@
 use super::{Call, PopMsg, TabCont};
 use crate::{
-    tui::{frontend::consts::TAB_TITLE_CONNECTION, widget::tools, Drawable, EventState, Theme},
+    tui::{
+        frontend::consts::TAB_TITLE_CONNECTION,
+        widget::{tools, InputPopup},
+        Drawable, EventState, Theme,
+    },
     utils::CallBack,
 };
 
@@ -20,6 +24,7 @@ pub enum BackendOp {
 pub(in crate::tui::frontend) struct ConnctionTab {
     items: Vec<Connection>,
     filter: Option<String>,
+    input: Option<InputPopup>,
     travel_up: u64,
     travel_down: u64,
     state: Raw::TableState,
@@ -97,12 +102,28 @@ impl Drawable for ConnctionTab {
             use Ra::Widget;
             con.render(area, f.buffer_mut());
         }
+        if let Some(input) = self.input.as_mut() {
+            input.render(f, area, true);
+        }
     }
 
     fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState {
         use crossterm::event::KeyCode;
         if ev.kind != crossterm::event::KeyEventKind::Press {
             return EventState::NotConsumed;
+        }
+        if let Some(input) = self.input.as_mut() {
+            return match input.handle_key_event(ev) {
+                EventState::Yes => {
+                    self.filter = Some(self.input.take().unwrap().collect().remove(0));
+                    EventState::Yes
+                }
+                EventState::Cancel => {
+                    self.input.take();
+                    EventState::Cancel
+                }
+                es => es,
+            };
         }
         // doing popup
         if self.selected_con.is_some() {
@@ -147,7 +168,10 @@ impl Drawable for ConnctionTab {
             // KeyCode::PageUp => todo!(),
             // KeyCode::PageDown => todo!(),
             _ if crate::tui::frontend::key_bind::Keys::Search == ev.code.into() => {
-                todo!("write an input dialog for `search`")
+                self.input = Some(InputPopup::with_msg(
+                    vec!["Url/Chain/Type".to_owned()],
+                ));
+                // todo!("write an input dialog for `search`")
             }
             _ if crate::tui::frontend::key_bind::Keys::ConnKillAll == ev.code.into() => {
                 self.popup_content = Some(PopMsg::Ask(
@@ -189,7 +213,7 @@ impl TabCont for ConnctionTab {
                     connections.map(|v| {
                         v.into_iter()
                             .map(|c| c.into())
-                            .filter(|c: &Connection| c.match_keyword(&pat))
+                            .filter(|c: &Connection| c.match_keyword(pat))
                             .collect()
                     })
                 } else {

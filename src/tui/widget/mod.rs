@@ -1,3 +1,4 @@
+mod input_popup;
 mod list;
 mod list_popup;
 mod popup;
@@ -6,6 +7,7 @@ pub mod tools;
 pub use list::List;
 pub use list_popup::ListPopup;
 pub use popup::ConfirmPopup;
+pub use input_popup::InputPopup;
 
 pub enum PopMsg {
     /// the first stand for the `question`,
