@@ -10,6 +10,10 @@ impl ProfileTab {
         match ev.code.into() {
             Keys::ProfileImport => {
                 self.last_focus = self.focus;
+                self.input_popup = Some(InputPopup::with_msg(vec![
+                    "Name".to_owned(),
+                    "Url".to_owned(),
+                ]));
                 self.focus = Focus::Input;
             }
             #[cfg(feature = "template")]

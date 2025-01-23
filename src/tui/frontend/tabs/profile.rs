@@ -1,15 +1,13 @@
 mod impl_profile;
-mod input;
 mod ops;
 
 use crossterm::event::KeyEvent;
-use input::InputPopup;
 pub use ops::*;
 
 use crate::{
     tui::{
         frontend::{consts::TAB_TITLE_PROFILE, key_bind::Keys},
-        widget::List,
+        widget::{InputPopup, List},
         Drawable, EventState,
     },
     utils::CallBack,
@@ -40,7 +38,7 @@ pub(in crate::tui::frontend) struct ProfileTab {
     is_profiles_inited: bool,
     #[cfg(feature = "template")]
     is_templates_inited: bool,
-    input_popup: std::cell::OnceCell<InputPopup>,
+    input_popup: Option<InputPopup>,
 }
 
 impl ProfileTab {
@@ -64,7 +62,7 @@ impl ProfileTab {
             is_profiles_inited: false,
             #[cfg(feature = "template")]
             is_templates_inited: false,
-            input_popup: std::cell::OnceCell::new(),
+            input_popup: None,
         }
     }
 }
@@ -201,12 +199,8 @@ impl Drawable for ProfileTab {
         #[cfg(not(feature = "template"))]
         self.profiles.render(f, area, self.focus == Focus::Profile);
         if self.focus == Focus::Input {
-            if let Some(ip) = self.input_popup.get_mut() {
+            if let Some(ip) = self.input_popup.as_mut() {
                 ip.render(f, area, true);
-            } else {
-                // this is called very first
-                let _ = self.input_popup.set(Default::default());
-                self.input_popup.get_mut().unwrap().render(f, area, true);
             }
         }
     }
@@ -245,23 +239,28 @@ impl Drawable for ProfileTab {
                 }
             }
             Focus::Input => {
-                let ip = self.input_popup.get_mut().unwrap();
-                let evst = ip.handle_key_event(ev);
-                match evst {
-                    EventState::Yes => {
-                        let (name, url) = ip.get_name_url();
-                        self.backend_content =
-                            Some(Call::Profile(BackendOp::Profile(ProfileOp::Add(name, url))));
-                        self.popup_content = Some(PopMsg::Prompt(vec!["Processing".to_owned()]));
-                        self.focus = self.last_focus
+                if let Some(ip) = self.input_popup.as_mut() {
+                    match ip.handle_key_event(ev) {
+                        EventState::Yes => {
+                            let mut vec = self.input_popup.take().unwrap().collect();
+                            self.backend_content = Some(Call::Profile(BackendOp::Profile(
+                                // there will only be 2 String, using swap_remove is safe
+                                ProfileOp::Add(vec.swap_remove(0), vec.swap_remove(0)),
+                            )));
+                            self.popup_content =
+                                Some(PopMsg::Prompt(vec!["Processing".to_owned()]));
+                            self.focus = self.last_focus;
+                            EventState::Yes
+                        }
+                        EventState::Cancel => {
+                            self.focus = self.last_focus;
+                            EventState::Cancel
+                        }
+                        evst => evst,
                     }
-                    EventState::Cancel => self.focus = self.last_focus,
+                } else {
                     EventState::NotConsumed
-                    | EventState::WorkDone
-                    | EventState::Choice2
-                    | EventState::Choice3 => (),
                 }
-                evst
             }
         }
         .unify()

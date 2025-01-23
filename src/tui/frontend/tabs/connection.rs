@@ -168,10 +168,7 @@ impl Drawable for ConnctionTab {
             // KeyCode::PageUp => todo!(),
             // KeyCode::PageDown => todo!(),
             _ if crate::tui::frontend::key_bind::Keys::Search == ev.code.into() => {
-                self.input = Some(InputPopup::with_msg(
-                    vec!["Url/Chain/Type".to_owned()],
-                ));
-                // todo!("write an input dialog for `search`")
+                self.input = Some(InputPopup::with_msg(vec!["Url/Chain/Type".to_owned()]));
             }
             _ if crate::tui::frontend::key_bind::Keys::ConnKillAll == ev.code.into() => {
                 self.popup_content = Some(PopMsg::Ask(
