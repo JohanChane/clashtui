@@ -71,6 +71,11 @@ impl ProfileTab {
                     self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
                 }
             }
+            Keys::Search => {
+                self.last_focus = self.focus;
+                self.input_popup = Some(InputPopup::with_msg(vec!["Name".to_owned()]));
+                self.focus = Focus::Input;
+            }
             _ => return EventState::NotConsumed,
         };
         EventState::WorkDone

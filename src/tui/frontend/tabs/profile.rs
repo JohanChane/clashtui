@@ -243,12 +243,18 @@ impl Drawable for ProfileTab {
                     match ip.handle_key_event(ev) {
                         EventState::Yes => {
                             let mut vec = self.input_popup.take().unwrap().collect();
-                            self.backend_content = Some(Call::Profile(BackendOp::Profile(
-                                // there will only be 2 String, using swap_remove is safe
-                                ProfileOp::Add(vec.swap_remove(0), vec.swap_remove(0)),
-                            )));
-                            self.popup_content =
-                                Some(PopMsg::Prompt(vec!["Processing".to_owned()]));
+                            match vec.len() {
+                                2 => {
+                                    self.backend_content = Some(Call::Profile(BackendOp::Profile(
+                                        // there will only be 2 String, using swap_remove is safe
+                                        ProfileOp::Add(vec.swap_remove(0), vec.swap_remove(0)),
+                                    )));
+                                    self.popup_content =
+                                        Some(PopMsg::Prompt(vec!["Processing".to_owned()]));
+                                }
+                                1 => self.profiles.set_filter(vec.swap_remove(0)),
+                                _ => unimplemented!(),
+                            }
                             self.focus = self.last_focus;
                             EventState::Yes
                         }

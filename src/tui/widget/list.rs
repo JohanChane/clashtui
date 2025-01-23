@@ -8,6 +8,7 @@ use crate::tui::{Drawable, EventState, Theme};
 /// Using arrow keys or j\k(vim-like) to navigate.
 pub struct List {
     title: String,
+    filter: Option<String>,
     items: Vec<String>,
     extra: Option<Vec<String>>,
     list_state: Raw::ListState,
@@ -16,21 +17,42 @@ pub struct List {
 impl Drawable for List {
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, is_fouced: bool) {
         let list = if let Some(extras) = self.extra.as_ref() {
-            Raw::List::from_iter(self.items.iter().zip(extras.iter()).map(|(value, extra)| {
-                Raw::ListItem::new(Ra::Line::from(vec![
-                    Ra::Span::styled(value.to_owned(), Ra::Style::default()),
-                    Ra::Span::styled("(".to_owned(), Ra::Style::default()),
-                    Ra::Span::styled(
-                        extra,
-                        Ra::Style::default().fg(Theme::get().profile_update_interval_fg),
-                    ),
-                    Ra::Span::styled(")".to_owned(), Ra::Style::default()),
-                ]))
-            }))
+            Raw::List::from_iter(
+                self.items
+                    .iter()
+                    .zip(extras.iter())
+                    .filter_map(|(value, extra)| {
+                        self.filter
+                            .as_ref()
+                            .is_none_or(|pat| value.contains(pat))
+                            .then_some((value, extra))
+                    })
+                    .map(|(value, extra)| {
+                        Raw::ListItem::new(Ra::Line::from(vec![
+                            Ra::Span::styled(value.to_owned(), Ra::Style::default()),
+                            Ra::Span::styled("(".to_owned(), Ra::Style::default()),
+                            Ra::Span::styled(
+                                extra,
+                                Ra::Style::default().fg(Theme::get().profile_update_interval_fg),
+                            ),
+                            Ra::Span::styled(")".to_owned(), Ra::Style::default()),
+                        ]))
+                    }),
+            )
         } else {
-            Raw::List::from_iter(self.items.iter().map(|i| {
-                Raw::ListItem::new(Ra::Line::from(i.as_str())).style(Ra::Style::default())
-            }))
+            Raw::List::from_iter(
+                self.items
+                    .iter()
+                    .map_while(|value| {
+                        self.filter
+                            .as_ref()
+                            .is_none_or(|pat| value.contains(pat))
+                            .then_some(value)
+                    })
+                    .map(|i| {
+                        Raw::ListItem::new(Ra::Line::from(i.as_str())).style(Ra::Style::default())
+                    }),
+            )
         };
         f.render_stateful_widget(
             list.block(
@@ -87,6 +109,7 @@ impl List {
     pub fn new(title: String) -> Self {
         Self {
             title,
+            filter: None,
             items: vec![],
             extra: None,
             list_state: Raw::ListState::default(),
@@ -180,6 +203,10 @@ impl List {
 
     pub fn get_items(&self) -> &Vec<String> {
         &self.items
+    }
+
+    pub fn set_filter(&mut self, filter: String) {
+        self.filter = filter.into();
     }
 
     // pub fn select(&mut self, name: &str) {
