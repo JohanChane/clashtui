@@ -28,8 +28,8 @@ impl BackEnd {
     pub fn check_update(
         &self,
         check_ci: bool,
-    ) -> anyhow::Result<Vec<(crate::clash::webapi::github::Response, String)>> {
-        use crate::clash::webapi::github::Request;
+    ) -> anyhow::Result<Vec<(crate::clash::net_file::self_update::Response, String)>> {
+        use crate::clash::net_file::self_update::Request;
         let clash_core_version = match self.api.version() {
             Ok(v) => {
                 let v: serde_json::Value = serde_json::from_str(&v)?;
@@ -46,22 +46,18 @@ impl BackEnd {
         if check_ci {
             return Ok(vec![
                 (
-                    self.api
-                        .get_github_info(&Request::s_clashtui_ci())?
-                        .filter_asserts(),
+                    Request::s_clashtui_ci().get_info()?.filter_asserts(),
                     crate::consts::VERSION.to_owned(),
                 ),
                 (
-                    self.api
-                        .get_github_info(&Request::s_mihomo_ci())?
-                        .filter_asserts(),
+                    Request::s_mihomo_ci().get_info()?.filter_asserts(),
                     clash_core_version,
                 ),
             ]);
         };
 
-        let mut clashtui = self.api.get_github_info(&Request::s_clashtui())?;
-        let mut mihomo = self.api.get_github_info(&Request::s_mihomo())?;
+        let mut clashtui = Request::s_clashtui().get_info()?;
+        let mut mihomo = Request::s_mihomo().get_info()?;
         let mut vec = Vec::with_capacity(2);
         if clashtui.is_newer_than(crate::consts::VERSION) {
             clashtui.name = "ClashTUI".to_string();
@@ -74,8 +70,9 @@ impl BackEnd {
         Ok(vec)
     }
     pub fn download_to_file(&self, name: &str, url: &str) -> anyhow::Result<std::path::PathBuf> {
+        use crate::clash::net_file::get_file;
         let path = std::env::current_dir()?.join(name);
-        match self.api.get_file(url) {
+        match get_file(url) {
             Ok(mut rp) => {
                 let mut fp = std::fs::File::create(&path)?;
                 std::io::copy(&mut rp, &mut fp)

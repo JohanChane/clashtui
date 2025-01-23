@@ -12,7 +12,7 @@ pub use popup::ConfirmPopup;
 pub enum PopMsg {
     /// the first stand for the `question`,
     /// the sencond and third stand for the `extra choices`
-    /// 
+    ///
     /// **NOTE**: support 2 extra choice only
     ///
     /// this will be like

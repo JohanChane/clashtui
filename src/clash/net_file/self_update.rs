@@ -1,24 +1,7 @@
 use serde::Deserialize;
 
-use super::{CResult, ClashUtil};
+use super::CResult;
 
-impl ClashUtil {
-    /// Fetch info from given input
-    ///
-    /// support Github only
-    pub fn get_github_info(&self, request: &Request) -> CResult<Response> {
-        use super::headers;
-        self.get_blob(request.as_url(), None, Some(headers::DEFAULT_USER_AGENT))
-            .and_then(|r| serde_json::from_reader(r).map_err(|e| e.into()))
-    }
-    /// try GET raw data from given `url`
-    ///
-    /// return an object that impl [Read](std::io::Read)
-    pub fn get_file(&self, url: &str) -> CResult<minreq::ResponseLazy> {
-        use super::headers;
-        self.get_blob(url, None, Some(headers::DEFAULT_USER_AGENT))
-    }
-}
 #[cfg_attr(test, derive(Deserialize, Debug, PartialEq))]
 /// Describe target repo and tag
 pub enum Request<'a> {
@@ -33,6 +16,14 @@ impl Request<'_> {
                 format!("https://api.github.com/repos/{repo}/releases/tags/{name}")
             }
         }
+    }
+    /// Fetch info from given input
+    ///
+    /// support Github only
+    pub fn get_info(&self) -> CResult<Response> {
+        use super::headers;
+        super::get_blob(self.as_url(), None, Some(headers::DEFAULT_USER_AGENT))
+            .and_then(|r| serde_json::from_reader(r).map_err(|e| e.into()))
     }
 }
 impl Request<'static> {

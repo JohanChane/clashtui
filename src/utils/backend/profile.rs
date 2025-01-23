@@ -49,8 +49,22 @@ impl LocalProfile {
     ///
     /// Errors are ignored and return will be replaced with [None]
     pub fn atime(&self) -> Option<core::time::Duration> {
+        pub fn get_modify_time<P>(file_path: P) -> std::io::Result<std::time::SystemTime>
+        where
+            P: AsRef<std::path::Path>,
+        {
+            let file = std::fs::metadata(file_path)?;
+            if file.is_file() {
+                file.modified()
+            } else {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Not a file",
+                ))
+            }
+        }
         let now = std::time::SystemTime::now();
-        super::util::get_modify_time(&self.path)
+        get_modify_time(&self.path)
             .ok()
             .and_then(|file| now.duration_since(file).ok())
     }

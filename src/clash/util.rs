@@ -1,17 +1,3 @@
-pub fn get_modify_time<P>(file_path: P) -> std::io::Result<std::time::SystemTime>
-where
-    P: AsRef<std::path::Path>,
-{
-    let file = std::fs::metadata(file_path)?;
-    if file.is_file() {
-        file.modified()
-    } else {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "Not a file",
-        ))
-    }
-}
 pub fn extract_domain(url: &str) -> Option<&str> {
     if let Some(protocol_end) = url.find("://") {
         let rest = &url[(protocol_end + 3)..];

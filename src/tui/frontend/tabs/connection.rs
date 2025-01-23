@@ -176,7 +176,7 @@ impl Drawable for ConnctionTab {
                         "Are you sure to terminate all connections?".to_owned(),
                         "This cannot be undone!".to_owned(),
                     ],
-                    vec![]
+                    vec![],
                 ));
             }
             _ => return EventState::NotConsumed,

@@ -2,11 +2,10 @@ use anyhow::Result;
 use std::fs::File;
 use std::path::Path;
 
-use crate::clash::{
-    config::{Basic, Service},
-    profile::map::ProfileDataBase,
-};
+use crate::clash::webapi::local_config::{Basic, Service};
 use serde::{Deserialize, Serialize};
+
+use super::backend::profile::map::ProfileDataBase;
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default)]

@@ -1,5 +1,7 @@
+use profile::ProfileType;
+
 use super::*;
-use crate::clash::{profile::ProfileType, util::extract_domain};
+use crate::clash::util::extract_domain;
 use std::fs::File;
 
 impl BackEnd {

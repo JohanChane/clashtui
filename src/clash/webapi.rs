@@ -3,30 +3,20 @@ mod config;
 mod config_struct;
 mod conn;
 mod control;
-mod error;
-type CResult<T> = Result<T, error::Error>;
+pub mod local_config;
 
-pub mod github;
+use super::*;
 #[allow(unused)]
 pub use config_struct::{ClashConfig, LogLevel, Mode, TunConfig, TunStack};
 #[cfg(feature = "connection-tab")]
 pub use conn::{Conn, ConnInfo, ConnMetaData};
-
-const DEFAULT_PAYLOAD: &str = r#"'{"path": "", "payload": ""}'"#;
-const TIMEOUT: u64 = 5;
-mod headers {
-    pub const USER_AGENT: &str = "user-agent";
-    pub const AUTHORIZATION: &str = "authorization";
-    // TODO: change this
-    pub const DEFAULT_USER_AGENT: &str = "github.com/celeo/github_version_check";
-}
 
 #[derive(Debug)]
 pub struct ClashUtil {
     api: String,
     secret: Option<String>,
     ua: Option<String>,
-    timeout: u64,
+    // timeout: u64,
     pub proxy_addr: String,
 }
 
@@ -38,12 +28,12 @@ impl ClashUtil {
         ua: Option<String>,
         timeout: Option<u64>,
     ) -> Self {
+        TIMEOUT.set(timeout.unwrap_or(DEFAULT_TIMEOUT)).unwrap();
         Self {
             api: controller_api,
             secret,
             ua,
             proxy_addr,
-            timeout: timeout.unwrap_or(TIMEOUT),
         }
     }
     fn request(
@@ -59,7 +49,10 @@ impl ClashUtil {
         if let Some(s) = self.secret.as_ref() {
             req = req.with_header(headers::AUTHORIZATION, format!("Bearer {s}"));
         }
-        req.with_timeout(self.timeout).send()
+        req.with_timeout(Self::timeout()).send()
+    }
+    fn timeout() -> u64 {
+        *TIMEOUT.get().unwrap()
     }
 
     #[cfg(test)]

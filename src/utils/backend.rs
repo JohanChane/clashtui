@@ -4,6 +4,7 @@ mod impl_service;
 mod impl_template;
 #[cfg(feature = "tui")]
 mod impl_tui;
+pub mod profile;
 
 #[cfg(feature = "tui")]
 #[derive(derive_more::Debug)]
@@ -30,11 +31,9 @@ use super::{
     ipc,
     state::State,
 };
-use crate::clash::{
-    config::LibConfig,
-    profile::{map::ProfileManager, LocalProfile, Profile},
-    webapi::{ClashConfig, ClashUtil},
-};
+use crate::clash::webapi::{local_config::LibConfig, ClashConfig, ClashUtil};
+use profile::{map::ProfileManager, LocalProfile, Profile};
+
 pub use impl_service::ServiceOp;
 
 pub struct BackEnd {

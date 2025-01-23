@@ -27,7 +27,7 @@ impl ClashUtil {
     /// return nothing on success
     pub fn check_connectivity(&self) -> CResult<()> {
         minreq::get("https://www.gstatic.com/generate_204")
-            .with_timeout(self.timeout)
+            .with_timeout(Self::timeout())
             .with_proxy(minreq::Proxy::new(self.proxy_addr.clone())?)
             .send()
             .map(|_| ())

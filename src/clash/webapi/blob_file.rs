@@ -1,4 +1,4 @@
-use super::{headers, CResult, ClashUtil};
+use super::{CResult, ClashUtil};
 
 impl ClashUtil {
     pub fn mock_clash_core<U: Into<minreq::URL>>(
@@ -6,28 +6,11 @@ impl ClashUtil {
         url: U,
         with_proxy: bool,
     ) -> CResult<minreq::ResponseLazy> {
-        self.get_blob(
+        super::net_file::get_blob(
             url,
             with_proxy.then_some(self.proxy_addr.as_str()),
             Some(self.ua.as_deref().unwrap_or("clash.meta")),
         )
-    }
-    pub fn get_blob<U: Into<minreq::URL>, S: Into<String>>(
-        &self,
-        url: U,
-        proxy: Option<&str>,
-        ua: Option<S>,
-    ) -> CResult<minreq::ResponseLazy> {
-        let mut req = minreq::get(url);
-        if let Some(proxy) = proxy {
-            req = req.with_proxy(minreq::Proxy::new(proxy)?)
-        }
-        if let Some(ua) = ua {
-            req = req.with_header(headers::USER_AGENT, ua)
-        }
-        req.with_timeout(self.timeout)
-            .send_lazy()
-            .map_err(|e| e.into())
     }
 }
 
