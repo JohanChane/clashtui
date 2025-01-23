@@ -18,8 +18,7 @@ use Ra::{Frame, Rect};
 pub struct FrontEnd {
     tabs: Vec<Box<dyn TabCont + Send>>,
     tab_index: usize,
-    there_is_list_pop: bool,
-    list_popup: Option<Box<ListPopup>>,
+    list_popup: Box<ListPopup>,
     should_quit: bool,
     /// StateBar
     state: Option<String>,
@@ -37,10 +36,7 @@ impl FrontEnd {
         Self {
             tabs,
             tab_index: 0,
-            there_is_list_pop: false,
             list_popup: Default::default(),
-            // there_is_msg_pop: false,
-            // msg_popup: ConfirmPopup::new(),
             should_quit: false,
             state: None,
             backend_content: None,
@@ -61,12 +57,11 @@ impl FrontEnd {
         while !self.should_quit {
             self.tick(&tx, &mut rx).await;
             terminal.draw(|f| self.render(f, Default::default(), true))?;
-            let ev;
-            tokio::select! {
+            let ev = tokio::select! {
                 // avoid tokio cancel the handler
-                e = stream.next() => {ev = e},
+                e = stream.next() => {e},
                 // make sure tui refresh
-                () = tokio::time::sleep(TICK_RATE) => {ev = None}
+                () = tokio::time::sleep(TICK_RATE) => {None}
             };
             if let Some(ev) = ev {
                 match ev? {
@@ -94,8 +89,7 @@ impl FrontEnd {
         // handle tab msg
         let msg = self.tabs[self.tab_index].get_popup_content();
         if let Some(msg) = msg {
-            self.get_list_popup().show_msg(msg);
-            self.there_is_list_pop = true;
+            self.list_popup.show_msg(msg);
         }
         // handle app ops
         if let Some(op) = self.backend_content.take() {
@@ -112,28 +106,23 @@ impl FrontEnd {
             match op {
                 Ok(op) => match op {
                     CallBack::Error(error) => {
-                        self.get_list_popup().show_msg(super::PopMsg::Prompt(vec![
+                        self.list_popup.show_msg(super::PopMsg::Prompt(vec![
                             "Error Happened".to_owned(),
                             error,
                         ]));
-                        self.there_is_list_pop = true;
                     }
                     CallBack::Logs(logs) => {
-                        self.get_list_popup().set("Log", logs);
-                        self.there_is_list_pop = true;
+                        self.list_popup.set("Log", logs);
                     }
                     CallBack::Infos(infos) => {
-                        self.get_list_popup().set("Infos", infos);
-                        self.there_is_list_pop = true;
+                        self.list_popup.set("Infos", infos);
                     }
                     CallBack::Preview(content) => {
-                        self.get_list_popup().set("Preview", content);
-                        self.there_is_list_pop = true;
+                        self.list_popup.set("Preview", content);
                     }
                     CallBack::Edit => {
-                        self.get_list_popup()
+                        self.list_popup
                             .show_msg(super::PopMsg::Prompt(vec!["OK".to_owned()]));
-                        self.there_is_list_pop = true;
                     }
                     // `SwitchMode` goes here
                     // Just update StateBar
@@ -162,12 +151,6 @@ impl FrontEnd {
             }
         }
     }
-    fn get_list_popup(&mut self) -> &mut Box<ListPopup> {
-        if self.list_popup.is_none() {
-            self.list_popup = Some(Box::new(ListPopup::new()));
-        }
-        self.list_popup.as_mut().unwrap()
-    }
 }
 
 impl Drawable for FrontEnd {
@@ -189,8 +172,8 @@ impl Drawable for FrontEnd {
             .get_mut(self.tab_index)
             .unwrap()
             .render(f, chunks[1], true);
-        if self.there_is_list_pop {
-            self.get_list_popup().render(f, chunks[1], true)
+        if !self.list_popup.is_empty() {
+            self.list_popup.render(f, chunks[1], true)
         }
     }
 
@@ -200,11 +183,11 @@ impl Drawable for FrontEnd {
         // handle them only in app to avoid complexity.
         //
         // if there is a popup, other part will be blocked.
-        if self.there_is_list_pop {
-            evst = self.get_list_popup().handle_key_event(ev);
+        if !self.list_popup.is_empty() {
+            evst = self.list_popup.handle_key_event(ev);
             let tab = self.tabs.get_mut(self.tab_index).unwrap();
             if EventState::WorkDone == tab.apply_popup_result(evst) {
-                self.there_is_list_pop = false;
+                self.list_popup.clear();
             }
             return EventState::WorkDone;
         }
@@ -249,11 +232,10 @@ impl Drawable for FrontEnd {
                 Keys::Debug => {}
                 Keys::LogCat => self.backend_content = Some(Call::Logs(0, 20)),
                 Keys::AppHelp => {
-                    self.get_list_popup().set(
+                    self.list_popup.set(
                         "Help",
                         Keys::ALL_DOC.into_iter().map(|s| s.to_owned()).collect(),
                     );
-                    self.there_is_list_pop = true;
                 }
                 Keys::AppInfo => self.backend_content = Some(Call::Infos),
                 Keys::AppQuit => {

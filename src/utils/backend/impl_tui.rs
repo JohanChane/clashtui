@@ -262,7 +262,7 @@ impl BackEnd {
                     self.test_profile_config(&pf.path.to_string_lossy(), geodata_mode)
                         .map_err(|e| e.into())
                 }) {
-                    Ok(v) => CallBack::ProfileCTL(vec![v]),
+                    Ok(v) => CallBack::ProfileCTL(v.lines().map(|s| s.to_owned()).collect()),
                     Err(e) => CallBack::Error(e.to_string()),
                 }
             }

@@ -18,9 +18,6 @@ pub struct ListPopup {
 }
 
 impl ListPopup {
-    pub fn new() -> Self {
-        Default::default()
-    }
     pub fn set(&mut self, title: &str, items: Vec<String>) {
         self.list_state = Default::default();
         self.offset = 0;
@@ -47,6 +44,12 @@ impl ListPopup {
         }
         self.items.push(prompt);
     }
+    pub fn is_empty(&self) -> bool{
+        self.items.is_empty()
+    }
+    pub fn clear(&mut self){
+        self.items.clear();
+    }
 }
 
 impl Drawable for ListPopup {
@@ -71,6 +74,7 @@ impl Drawable for ListPopup {
             )
         };
         f.render_widget(Raw::Clear, area);
+
         let list = Raw::List::from_iter(self.items.iter().map(|i| {
             Raw::ListItem::new(i.chars().skip(self.offset).collect::<String>())
                 .style(Ra::Style::default())
