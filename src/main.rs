@@ -17,15 +17,23 @@ static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::
     };
     load_home_dir()
 });
+/// used to support '--config'
+///
+/// since LazyLock does not accept arg,
+/// and using OnceLock can cause code being complex
+///
+/// e.g. `PREFIX_HOME_DIR.get().unwarp()`,
+/// which equal to `HOME_DIR`
 static PREFIX_HOME_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 
-fn main() -> anyhow::Result<()> {
+fn main() {
     if is_root::is_root() {
         println!("{}", consts::ROOT_WARNING)
     }
     // Err here means to generate completion
+    // that will be written to StdOut
     if let Ok(infos) = commands::parse_args() {
-        // home dir is inited here
+        // home dir is inited here with LazyLock
         let log_file = HOME_DIR.join(consts::LOG_FILE);
         setup_logging(&log_file);
         let buildconfig = match BuildConfig::load_config(HOME_DIR.as_path()) {
@@ -40,7 +48,8 @@ fn main() -> anyhow::Result<()> {
                         HOME_DIR.display()
                     ))
                     .append_prompt("Are you sure to continue?")
-                    .interact()?
+                    .interact()
+                    .expect("Unable write/read from stdio")
                 {
                     // accept 'y' only
                     if let Err(e) = BuildConfig::init_config(HOME_DIR.as_path()) {
@@ -72,6 +81,7 @@ fn main() -> anyhow::Result<()> {
                 }
             }
         } else {
+            // if comes without args
             #[cfg(feature = "tui")]
             {
                 println!("Entering TUI...");
@@ -86,22 +96,21 @@ fn main() -> anyhow::Result<()> {
         }
     } else {
         eprint!("generate completion success");
-    }
-    std::process::exit(0)
+    };
 }
 #[cfg(feature = "tui")]
-// run a single thread, since there is no high-cpu-usage task
+/// running in single thread, since there is no high-cpu-usage task
 #[tokio::main(flavor = "current_thread")]
 async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     use tui::setup;
     if let Err(e) = tui::Theme::load(None) {
-        anyhow::bail!("Theme: {e}")
+        anyhow::bail!("Theme loading: {e}")
     };
     let app = tui::FrontEnd::new();
     setup::setup()?;
-    // make terminal restore after panic
-    let original_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic| {
+    // make terminal restorable after panic
+    std::panic::set_hook(Box::new(|panic| {
+        let original_hook = std::panic::take_hook();
         let _ = setup::restore();
         original_hook(panic);
     }));

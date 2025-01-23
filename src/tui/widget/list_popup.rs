@@ -9,6 +9,9 @@ use crate::tui::misc::EventState;
 use crate::tui::{Drawable, Theme};
 
 #[derive(Default)]
+/// Pop a Message Window with line highlight
+///
+/// use arrow keys or `j\k\h\l`(vim-like) to navigate.
 pub struct ListPopup {
     title: String,
     items: Vec<String>,
@@ -44,10 +47,10 @@ impl ListPopup {
         }
         self.items.push(prompt);
     }
-    pub fn is_empty(&self) -> bool{
+    pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
-    pub fn clear(&mut self){
+    pub fn clear(&mut self) {
         self.items.clear();
     }
 }

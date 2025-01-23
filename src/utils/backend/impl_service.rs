@@ -69,9 +69,13 @@ impl BackEnd {
         }
         Ok(vec)
     }
-    pub fn download_to_file(&self, name: &str, url: &str) -> anyhow::Result<std::path::PathBuf> {
+    pub fn download_to_file(
+        &self,
+        filename: &str,
+        url: &str,
+    ) -> anyhow::Result<std::path::PathBuf> {
         use crate::clash::net_file::get_file;
-        let path = std::env::current_dir()?.join(name);
+        let path = std::env::current_dir()?.join(filename);
         match get_file(url) {
             Ok(mut rp) => {
                 let mut fp = std::fs::File::create(&path)?;

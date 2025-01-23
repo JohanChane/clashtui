@@ -87,8 +87,7 @@ impl FrontEnd {
         // the backend thread is activated by this call
         tx.send(Call::Tick).await.expect(consts_err::BACKEND_TX);
         // handle tab msg
-        let msg = self.tabs[self.tab_index].get_popup_content();
-        if let Some(msg) = msg {
+        if let Some(msg) = self.tabs[self.tab_index].get_popup_content() {
             self.list_popup.show_msg(msg);
         }
         // handle app ops
@@ -142,12 +141,10 @@ impl FrontEnd {
                     #[cfg(feature = "connection-tab")]
                     CallBack::ConnctionCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
                 },
-                Err(e) => match e {
-                    tokio::sync::mpsc::error::TryRecvError::Empty => break,
-                    tokio::sync::mpsc::error::TryRecvError::Disconnected => {
-                        unreachable!("{}", consts_err::BACKEND_TX);
-                    }
-                },
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
+                    unreachable!("{}", consts_err::BACKEND_TX);
+                }
             }
         }
     }

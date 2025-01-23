@@ -9,7 +9,6 @@ static GLOBAL_THEME: OnceLock<Theme> = OnceLock::new();
     feature = "customized-theme",
     derive(serde::Serialize, serde::Deserialize)
 )]
-#[allow(unused)]
 pub struct Theme {
     pub popup_block_fg: Color,
     pub popup_text_fg: Color,
@@ -34,14 +33,15 @@ pub struct Theme {
 impl Theme {
     const NOT_LOADED: &str = "Global Theme should be loaded before used";
     const ALREADY_LOADED: &str = "Global Theme should be loaded only once";
+
+    pub fn get() -> &'static Self {
+        GLOBAL_THEME.get().expect(Self::NOT_LOADED)
+    }
     #[cfg(not(feature = "customized-theme"))]
     pub fn load(_pb: Option<&std::path::PathBuf>) -> anyhow::Result<()> {
         GLOBAL_THEME
             .set(Self::default())
             .map_err(|_| anyhow::anyhow!(Self::ALREADY_LOADED))
-    }
-    pub fn get() -> &'static Self {
-        GLOBAL_THEME.get().expect(Self::NOT_LOADED)
     }
     #[cfg(feature = "customized-theme")]
     pub fn load(ph: Option<&std::path::PathBuf>) -> anyhow::Result<()> {

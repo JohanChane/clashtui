@@ -8,7 +8,7 @@ pub struct State {
     pub sysproxy: Option<bool>,
 }
 impl State {
-    pub fn unknown(profile: String) -> String {
+    pub fn unknown(profile: String) -> Self {
         Self {
             profile,
             mode: None,
@@ -16,7 +16,6 @@ impl State {
             #[cfg(target_os = "windows")]
             sysproxy: None,
         }
-        .to_string()
     }
 }
 impl core::fmt::Display for State {

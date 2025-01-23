@@ -8,23 +8,30 @@ pub use interactive::{Confirm, Select};
 
 pub(crate) struct PackedArgs(ArgCommand);
 
+/// collect args and parse
+///
+/// ### Errors
+///
+/// This function will return an error only if `--generate_shell_completion`
+/// is provided. The content will written to StdOut
 pub(crate) fn parse_args() -> Result<Option<PackedArgs>, ()> {
     use clap::Parser;
-    use complete::gen_complete;
     let CliCmds {
         command,
         generate_shell_completion,
         config_dir,
     } = CliCmds::parse();
     if let Some(generate_shell_completion) = generate_shell_completion {
-        gen_complete(generate_shell_completion);
+        complete::gen_complete(generate_shell_completion);
         return Err(());
     }
     if let Some(config_dir) = config_dir {
         super::PREFIX_HOME_DIR.set(config_dir).unwrap();
     }
+    // Pack the content to avoid visibility warning
     Ok(command.map(PackedArgs))
 }
+
 /// Mihomo (Clash.Meta) Control Client
 ///
 /// A tool for mihomo

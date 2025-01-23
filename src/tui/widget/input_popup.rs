@@ -6,6 +6,12 @@ use ratatui::{
 
 use crate::tui::{misc::EventState, Drawable, Theme};
 
+/// A single input widget like
+///```md
+/// ┌title─────────────────────────────┐
+/// │content                           │
+/// └──────────────────────────────────┘
+///```
 pub struct Item {
     buffer: String,
     cursor: usize,
@@ -21,6 +27,7 @@ impl Item {
             is_highlight: Default::default(),
         }
     }
+    /// consume self and get content
     pub fn content(self) -> String {
         self.buffer
     }
@@ -103,6 +110,7 @@ impl InputPopup {
             focus: 0,
         }
     }
+    /// collect all contents, in the origin order
     pub fn collect(self) -> Vec<String> {
         self.items.into_iter().map(|s| s.content()).collect()
     }
@@ -144,7 +152,8 @@ impl Drawable for InputPopup {
             .title("Input")
             .render_ref(input_area, f.buffer_mut());
     }
-
+    /// this will not catch unrecognized key,
+    /// which means key like `Tab` will still work.
     fn handle_key_event(
         &mut self,
         ev: &crossterm::event::KeyEvent,

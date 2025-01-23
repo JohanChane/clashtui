@@ -43,10 +43,12 @@ pub mod setup {
         execute,
         terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     };
+    /// Enable raw mode.
     pub fn setup() -> Result<(), std::io::Error> {
         enable_raw_mode()?;
         execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture)
     }
+    /// Disable raw mode.
     pub fn restore() -> Result<(), std::io::Error> {
         disable_raw_mode()?;
         execute!(

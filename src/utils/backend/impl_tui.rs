@@ -6,6 +6,7 @@ use crate::utils::consts::err as consts_err;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 impl BackEnd {
+    /// Save all in-memory data to file
     fn save(self) -> DataFile {
         let (current_profile, profiles) = self.pm.into_inner();
         DataFile {
@@ -37,7 +38,7 @@ impl BackEnd {
 impl BackEnd {
     /// async runtime entry
     ///
-    /// use [`tokio::sync::mpsc`] to exchange data and command
+    /// using [`tokio::sync::mpsc`] to exchange data and command
     pub async fn run(
         self,
         tx: Sender<CallBack>,
@@ -51,22 +52,20 @@ impl BackEnd {
                 .recv()
                 .await
                 .ok_or(anyhow::anyhow!("{}", consts_err::APP_TX))?;
-            let mut cbs = Vec::with_capacity(2);
+            let mut cbs = Vec::with_capacity(3);
+            // match Tick in advance
+            // DO NEVER return [`CallBack::Error`] here,
+            // otherwise frontend might be 'blocked' by error messages
             if let Call::Tick = op {
-                // register some real-time work here
-                //
-                // DO NEVER return [`CallBack::Error`],
-                // otherwise tui might be 'blocked' by error message
                 let state = match self.update_state(None, None) {
-                    // TODO: add connection-tab update return here
                     Ok(v) => CallBack::State(v.to_string()),
                     Err(e) => {
                         if !errs.contains(&e.to_string()) {
+                            //ensure writing only once
                             log::error!("An error happens in Tick:{e}");
                             errs.push(e.to_string());
                         }
-                        CallBack::State(State::unknown(self.get_current_profile().name))
-                        //write this direct to log, write only once
+                        CallBack::State(State::unknown(self.get_current_profile().name).to_string())
                     }
                 };
                 cbs.push(state);
@@ -75,11 +74,11 @@ impl BackEnd {
                     Ok(v) => CallBack::ConnctionInit(v),
                     Err(e) => {
                         if !errs.contains(&e.to_string()) {
+                            //ensure writing only once
                             log::error!("An error happens in Tick:{e}");
                             errs.push(e.to_string());
                         }
                         CallBack::ConnctionInit(Default::default())
-                        //write this direct to log, write only once
                     }
                 };
                 #[cfg(feature = "connection-tab")]
@@ -170,7 +169,7 @@ impl BackEnd {
                 };
                 cbs.push(cb);
             }
-            //
+            // send all cached package
             for cb in cbs {
                 if tx.send(cb).await.is_err() {
                     return match rx.recv().await {
@@ -292,7 +291,7 @@ impl BackEnd {
                             Ok(())
                         }
                     }) {
-                    Ok(_) => CallBack::Preview(lines),
+                    Ok(()) => CallBack::Preview(lines),
                     Err(e) => CallBack::Error(e.to_string()),
                 }
             }
@@ -313,7 +312,7 @@ impl BackEnd {
                     )
                     .map_err(|e| e.into())
                 }) {
-                    Ok(_) => CallBack::Edit,
+                    Ok(()) => CallBack::Edit,
                     Err(e) => CallBack::Error(e.to_string()),
                 }
             }

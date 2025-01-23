@@ -54,13 +54,12 @@ impl ClashUtil {
             .map_err(|e| e.into())
     }
     /// if `id` is some, will try to terminate that connection,
-    /// otherwise try to terminate all connections.
+    /// otherwise try to terminate **all** connections.
     ///
-    /// ### Return: [bool]
-    /// true on success
+    /// Return true on success
     ///
-    /// > NOTE:
-    /// > Empty str is returned if connection is terminated successfully
+    /// NOTE:
+    /// Empty str is returned if connection is terminated successfully
     pub fn terminate_connection(&self, id: Option<String>) -> CResult<bool> {
         self.request(
             Method::Delete,

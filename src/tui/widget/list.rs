@@ -6,6 +6,8 @@ use crate::tui::{Drawable, EventState, Theme};
 /// Interactive list, mainly used as basic interface
 ///
 /// Using arrow keys or j\k(vim-like) to navigate.
+///
+/// Support 'filter' to filter out display (items are unchanged)
 pub struct List {
     title: String,
     filter: Option<String>,
@@ -21,6 +23,7 @@ impl Drawable for List {
                 self.items
                     .iter()
                     .zip(extras.iter())
+                    // filter content now
                     .filter_map(|(value, extra)| {
                         self.filter
                             .as_ref()
