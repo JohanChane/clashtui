@@ -97,7 +97,8 @@ define_keys! {
         # Common
         /// Action
         Select(KeyCode::Enter["Enter"]),
-        // Down(KeyCode::Down["Down"]),
+        #[cfg(debug_assertions)]
+        Debug(KeyCode::Char('\\')),
         // Up(KeyCode::Up["Up"]),
         // Left(KeyCode::Left["Left"]),
         // Right(KeyCode::Right["Right"]),

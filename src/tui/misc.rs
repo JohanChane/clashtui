@@ -1,4 +1,4 @@
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum EventState {
     Yes,
     /// In fact [EventState::Yes], but means another choice

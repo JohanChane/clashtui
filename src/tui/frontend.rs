@@ -3,7 +3,7 @@ mod consts;
 mod key_bind;
 pub mod tabs;
 
-use super::widget::{ConfirmPopup, ListPopup};
+use super::widget::ListPopup;
 use super::{Call, Drawable, EventState, Theme};
 use crate::utils::{consts::err as consts_err, CallBack};
 use key_bind::Keys;
@@ -20,8 +20,6 @@ pub struct FrontEnd {
     tab_index: usize,
     there_is_list_pop: bool,
     list_popup: Option<Box<ListPopup>>,
-    there_is_msg_pop: bool,
-    msg_popup: ConfirmPopup,
     should_quit: bool,
     /// StateBar
     state: Option<String>,
@@ -41,8 +39,8 @@ impl FrontEnd {
             tab_index: 0,
             there_is_list_pop: false,
             list_popup: Default::default(),
-            there_is_msg_pop: false,
-            msg_popup: ConfirmPopup::new(),
+            // there_is_msg_pop: false,
+            // msg_popup: ConfirmPopup::new(),
             should_quit: false,
             state: None,
             backend_content: None,
@@ -96,8 +94,8 @@ impl FrontEnd {
         // handle tab msg
         let msg = self.tabs[self.tab_index].get_popup_content();
         if let Some(msg) = msg {
-            self.msg_popup.show_msg(msg);
-            self.there_is_msg_pop = true;
+            self.get_list_popup().show_msg(msg);
+            self.there_is_list_pop = true;
         }
         // handle app ops
         if let Some(op) = self.backend_content.take() {
@@ -114,12 +112,11 @@ impl FrontEnd {
             match op {
                 Ok(op) => match op {
                     CallBack::Error(error) => {
-                        self.msg_popup.clear();
-                        self.msg_popup.show_msg(super::PopMsg::Prompt(vec![
+                        self.get_list_popup().show_msg(super::PopMsg::Prompt(vec![
                             "Error Happened".to_owned(),
                             error,
                         ]));
-                        self.there_is_msg_pop = true;
+                        self.there_is_list_pop = true;
                     }
                     CallBack::Logs(logs) => {
                         self.get_list_popup().set("Log", logs);
@@ -130,16 +127,13 @@ impl FrontEnd {
                         self.there_is_list_pop = true;
                     }
                     CallBack::Preview(content) => {
-                        self.msg_popup.clear();
-                        self.there_is_msg_pop = false;
                         self.get_list_popup().set("Preview", content);
                         self.there_is_list_pop = true;
                     }
                     CallBack::Edit => {
-                        self.msg_popup.clear();
-                        self.msg_popup
+                        self.get_list_popup()
                             .show_msg(super::PopMsg::Prompt(vec!["OK".to_owned()]));
-                        self.there_is_msg_pop = true;
+                        self.there_is_list_pop = true;
                     }
                     // `SwitchMode` goes here
                     // Just update StateBar
@@ -198,32 +192,23 @@ impl Drawable for FrontEnd {
         if self.there_is_list_pop {
             self.get_list_popup().render(f, chunks[1], true)
         }
-        if self.there_is_msg_pop {
-            self.msg_popup.render(f, chunks[1], true)
-        }
     }
 
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
         let mut evst;
-        let tab = self.tabs.get_mut(self.tab_index).unwrap();
         // handle popups first
         // handle them only in app to avoid complexity.
         //
         // if there is a popup, other part will be blocked.
-        if self.there_is_msg_pop {
-            evst = self.msg_popup.handle_key_event(ev);
-            if EventState::WorkDone == tab.apply_popup_result(evst) {
-                self.there_is_msg_pop = false;
-            }
-            return EventState::WorkDone;
-        }
         if self.there_is_list_pop {
             evst = self.get_list_popup().handle_key_event(ev);
-            if EventState::Cancel == evst {
+            let tab = self.tabs.get_mut(self.tab_index).unwrap();
+            if EventState::WorkDone == tab.apply_popup_result(evst) {
                 self.there_is_list_pop = false;
             }
             return EventState::WorkDone;
         }
+        let tab = self.tabs.get_mut(self.tab_index).unwrap();
         // handle tabs second
         // select the very one rather iter over vec
         evst = tab.handle_key_event(ev);
@@ -260,6 +245,8 @@ impl Drawable for FrontEnd {
             }
             // ## the other app function
             match ev.code.into() {
+                #[cfg(debug_assertions)]
+                Keys::Debug => {}
                 Keys::LogCat => self.backend_content = Some(Call::Logs(0, 20)),
                 Keys::AppHelp => {
                     self.get_list_popup().set(

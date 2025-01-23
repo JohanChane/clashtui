@@ -17,7 +17,7 @@ use crate::tui::{Drawable, EventState, Theme};
 /// - If press `t`, return [`EventState::Choice3`].
 #[derive(Default)]
 pub struct ConfirmPopup {
-    msg: Option<PopMsg>,
+    msg: Vec<String>,
     scroll_v: u16,
     scroll_h: u16,
 }
@@ -25,35 +25,16 @@ pub struct ConfirmPopup {
 impl Drawable for ConfirmPopup {
     /// No need to [clear](Raw::clear), or plan aera
     fn render(&mut self, f: &mut ratatui::Frame, _: ratatui::layout::Rect, _: bool) {
-        let prompt = if let Some(PopMsg::Ask(_, chs)) = self.msg.as_ref() {
-            match chs.len() {
-                0 => "Press y for Yes, n for No".to_owned(),
-                1 => format!("Press y for Yes, n for No, o for {}", chs[0]),
-                2 => format!(
-                    "Press y for Yes, n for No, o for {}, t for {}",
-                    chs[0], chs[1]
-                ),
-                _ => unimplemented!("more than 2 extra choices!"),
-            }
-        } else {
-            "Press Esc to close".to_owned()
-        };
-        let text: Vec<Ra::Line> = if let Some(msg) = &self.msg {
-            match msg {
-                PopMsg::Ask(msg, ..) | PopMsg::Prompt(msg) => msg,
-            }
+        let text: Vec<Ra::Line> = self
+            .msg
             .iter()
-            .chain([&prompt])
             .map(|s| {
                 Ra::Line::from(Ra::Span::styled(
                     s,
                     Ra::Style::default().fg(Theme::get().popup_text_fg),
                 ))
             })
-            .collect()
-        } else {
-            return;
-        };
+            .collect();
 
         use std::cmp::{max, min};
         // 自适应
@@ -112,10 +93,26 @@ impl ConfirmPopup {
         Self::default()
     }
     pub fn show_msg(&mut self, msg: PopMsg) {
-        self.msg.replace(msg);
+        let prompt = if let PopMsg::Ask(_, chs) = &msg {
+            match chs.len() {
+                0 => "Press y for Yes, n for No".to_owned(),
+                1 => format!("Press y for Yes, n for No, o for {}", chs[0]),
+                2 => format!(
+                    "Press y for Yes, n for No, o for {}, t for {}",
+                    chs[0], chs[1]
+                ),
+                _ => unimplemented!("more than 2 extra choices!"),
+            }
+        } else {
+            "Press Esc to close".to_owned()
+        };
+        match msg {
+            PopMsg::Ask(vec, _) | PopMsg::Prompt(vec) => self.msg = vec,
+        }
+        self.msg.push(prompt);
     }
     pub fn clear(&mut self) {
-        self.msg = None;
+        self.msg.clear();
     }
 
     fn scroll_up(&mut self) {

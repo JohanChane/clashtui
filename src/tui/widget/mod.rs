@@ -1,13 +1,14 @@
 mod input_popup;
 mod list;
 mod list_popup;
-mod popup;
+// mod popup;
+// mod confirm_popup;
 pub mod tools;
 
 pub use input_popup::InputPopup;
 pub use list::List;
 pub use list_popup::ListPopup;
-pub use popup::ConfirmPopup;
+// pub use confirm_popup::ConfirmPopup;
 
 pub enum PopMsg {
     /// the first stand for the `question`,
@@ -23,4 +24,6 @@ pub enum PopMsg {
     Ask(Vec<String>, Vec<String>),
     /// show infos
     Prompt(Vec<String>),
+    // List(String, Vec<String>),
+    // Input(Vec<String>),
 }

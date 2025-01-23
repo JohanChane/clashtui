@@ -6,7 +6,6 @@ use ratatui::{
 
 use crate::tui::{misc::EventState, Drawable, Theme};
 
-// #[derive(Debug)]
 pub struct Item {
     buffer: String,
     cursor: usize,
@@ -26,9 +25,10 @@ impl Item {
         self.buffer
     }
 }
+
 impl WidgetRef for Item {
     fn render_ref(&self, area: Ra::Rect, buf: &mut Ra::Buffer) {
-        let input = Raw::Paragraph::new(self.buffer.as_str())
+        Raw::Paragraph::new(self.buffer.as_str())
             .style(Ra::Style::default().fg(if self.is_highlight {
                 Theme::get().input_text_selected_fg
             } else {
@@ -38,11 +38,10 @@ impl WidgetRef for Item {
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
                     .title(self.title.as_str()),
-            );
-        input.render_ref(area, buf);
+            )
+            .render_ref(area, buf);
     }
 }
-
 impl Item {
     pub fn handle_key_code(&mut self, code: KeyCode) -> crate::tui::misc::EventState {
         match code {
@@ -122,14 +121,14 @@ impl Drawable for InputPopup {
             .horizontal_margin(10)
             .vertical_margin(1)
             .split(f.area())[1];
+
         f.render_widget(Raw::Clear, input_area);
 
         let chunks = Ra::Layout::default()
             .constraints([Ra::Constraint::Fill(1)].repeat(self.items.len()))
             .margin(1)
             .split(input_area);
-        // assert_eq!(chunks.len(), self.items.len());
-        // dbg!(&self.items);
+
         self.items
             .iter_mut()
             .enumerate()
@@ -139,11 +138,11 @@ impl Drawable for InputPopup {
             })
             .for_each(|(idx, itm)| itm.render_ref(chunks[idx], f.buffer_mut()));
 
-        let block = Raw::Block::new()
+        Raw::Block::new()
             .borders(Raw::Borders::ALL)
             .border_style(Ra::Style::default().fg(Ra::Color::Rgb(135, 206, 236)))
-            .title("Input");
-        f.render_widget(block, input_area);
+            .title("Input")
+            .render_ref(input_area, f.buffer_mut());
     }
 
     fn handle_key_event(
