@@ -27,8 +27,7 @@ impl ProfileTab {
                         Some(Call::Profile(BackendOp::Profile(ProfileOp::Remove(name))));
                     self.popup_content = Some(PopMsg::Ask(
                         vec!["Are you sure to delete this?".to_owned()],
-                        None,
-                        None,
+                        vec![],
                     ))
                 }
             }
@@ -44,8 +43,7 @@ impl ProfileTab {
                             "You can decide how to update profile".to_owned(),
                             "The default action is Auto (Currently, without proxy)".to_owned(),
                         ],
-                        Some("with proxy".to_owned()),
-                        Some("without proxy".to_owned()),
+                        vec!["with proxy".to_owned(), "without proxy".to_owned()],
                     ))
                 }
             }

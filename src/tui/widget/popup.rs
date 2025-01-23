@@ -25,15 +25,15 @@ pub struct ConfirmPopup {
 impl Drawable for ConfirmPopup {
     /// No need to [clear](Raw::clear), or plan aera
     fn render(&mut self, f: &mut ratatui::Frame, _: ratatui::layout::Rect, _: bool) {
-        let prompt = if let Some(PopMsg::Ask(_, ch2, ch3)) = self.msg.as_ref() {
-            if let Some(ch2) = ch2 {
-                if let Some(ch3) = ch3 {
-                    format!("Press y for Yes, n for No, o for {ch2}, t for {ch3}")
-                } else {
-                    format!("Press y for Yes, n for No, o for {ch2}")
-                }
-            } else {
-                "Press y for Yes, n for No".to_owned()
+        let prompt = if let Some(PopMsg::Ask(_, chs)) = self.msg.as_ref() {
+            match chs.len() {
+                0 => "Press y for Yes, n for No".to_owned(),
+                1 => format!("Press y for Yes, n for No, o for {}", chs[0]),
+                2 => format!(
+                    "Press y for Yes, n for No, o for {}, t for {}",
+                    chs[0], chs[1]
+                ),
+                _ => unimplemented!("more than 2 extra choices!"),
             }
         } else {
             "Press Esc to close".to_owned()

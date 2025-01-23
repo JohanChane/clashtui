@@ -12,13 +12,15 @@ pub use popup::ConfirmPopup;
 pub enum PopMsg {
     /// the first stand for the `question`,
     /// the sencond and third stand for the `extra choices`
+    /// 
+    /// **NOTE**: support 2 extra choice only
     ///
     /// this will be like
-    /// ```md
+    /// ```
     ///     `the question`
     /// Press y for Yes, n for No, o for `ch2`, t for `ch3`
     /// ```
-    Ask(Vec<String>, Option<String>, Option<String>),
+    Ask(Vec<String>, Vec<String>),
     /// show infos
     Prompt(Vec<String>),
 }
