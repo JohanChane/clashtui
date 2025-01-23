@@ -159,13 +159,11 @@ impl Drawable for InputPopup {
                 self.focus = self.focus.saturating_add(1).clamp(0, self.items.len() - 1)
             }
             _ => {
-                for item in self.items.iter_mut() {
-                    let st = item.handle_key_code(ev.code);
-                    if st.is_consumed() {
-                        return st;
-                    }
-                }
-                return EventState::NotConsumed;
+                return self
+                    .items
+                    .get_mut(self.focus)
+                    .unwrap()
+                    .handle_key_code(ev.code)
             }
         }
         EventState::WorkDone
