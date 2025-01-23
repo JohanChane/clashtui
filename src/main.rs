@@ -9,7 +9,15 @@ mod utils;
 
 use utils::{consts, BackEnd, BuildConfig};
 
-static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::new(load_home_dir);
+static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::new(|| {
+    if let Some(data_dir) = PREFIX_HOME_DIR.get() {
+        if data_dir.exists() && data_dir.is_dir() {
+            return data_dir.clone();
+        }
+    };
+    load_home_dir()
+});
+static PREFIX_HOME_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 
 fn main() -> anyhow::Result<()> {
     if is_root::is_root() {

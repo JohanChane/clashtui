@@ -14,10 +14,14 @@ pub(crate) fn parse_args() -> Result<Option<PackedArgs>, ()> {
     let CliCmds {
         command,
         generate_shell_completion,
+        config_dir,
     } = CliCmds::parse();
     if let Some(generate_shell_completion) = generate_shell_completion {
         gen_complete(generate_shell_completion);
         return Err(());
+    }
+    if let Some(config_dir) = config_dir {
+        super::PREFIX_HOME_DIR.set(config_dir).unwrap();
     }
     Ok(command.map(PackedArgs))
 }
@@ -35,6 +39,9 @@ pub(crate) struct CliCmds {
     /// generate shell completion
     #[arg(long, require_equals=true, num_args=0..=1, default_missing_value=None)]
     generate_shell_completion: Option<Option<clap_complete::Shell>>,
+    /// specify the ClashTUI config directory
+    #[arg(long, short)]
+    pub config_dir: Option<std::path::PathBuf>,
 }
 
 #[derive(clap::Subcommand)]
