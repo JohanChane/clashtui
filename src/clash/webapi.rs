@@ -28,7 +28,7 @@ impl ClashUtil {
         ua: Option<String>,
         timeout: Option<u64>,
     ) -> Self {
-        TIMEOUT.set(timeout.unwrap_or(DEFAULT_TIMEOUT)).unwrap();
+        let _ = TIMEOUT.set(timeout.unwrap_or(DEFAULT_TIMEOUT));
         Self {
             api: controller_api,
             secret,
