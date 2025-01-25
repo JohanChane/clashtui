@@ -111,13 +111,13 @@ impl FrontEnd {
                         ]));
                     }
                     CallBack::Logs(logs) => {
-                        self.list_popup.set_msg("Log", logs, false);
+                        self.list_popup.set_msg("Log", logs);
                     }
                     CallBack::Infos(infos) => {
-                        self.list_popup.set_msg("Infos", infos, false);
+                        self.list_popup.set_msg("Infos", infos);
                     }
                     CallBack::Preview(content) => {
-                        self.list_popup.set_msg("Preview", content, false);
+                        self.list_popup.set_msg("Preview", content);
                     }
                     CallBack::Edit => {
                         self.list_popup
@@ -238,7 +238,6 @@ impl Drawable for FrontEnd {
                     self.list_popup.set_msg(
                         "Help",
                         Keys::ALL_DOC.into_iter().map(|s| s.to_owned()).collect(),
-                        false,
                     );
                 }
                 Keys::AppInfo => self.backend_content = Some(Call::Infos),

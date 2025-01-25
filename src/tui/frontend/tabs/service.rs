@@ -3,19 +3,15 @@ use crate::{clash::webapi::Mode, tui::widget::PopRes};
 use crossterm::event::KeyEvent;
 
 use crate::{
-    tui::{
-        frontend::consts::TAB_TITLE_SERVICE,
-        widget::{tools, List},
-        Drawable, EventState,
-    },
+    tui::{frontend::consts::TAB_TITLE_SERVICE, widget::List, Drawable, EventState},
     utils::CallBack,
 };
 use ratatui::prelude as Ra;
-use ratatui::widgets as Raw;
 use Ra::{Frame, Rect};
 
 use super::{Call, PopMsg, TabCont};
 
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub enum BackendOp {
     SwitchMode(Mode),
     ServiceCTL(ServiceOp),
@@ -23,8 +19,6 @@ pub enum BackendOp {
 
 pub(in crate::tui::frontend) struct ServiceTab {
     inner: List,
-    mode_selector: List,
-    select_mode: bool,
     popup_content: Option<PopMsg>,
     backend_content: Option<Call>,
 }
@@ -39,14 +33,8 @@ impl ServiceTab {
         inner_items.extend(ServiceOp::ALL.into_iter().map(|v| v.into()));
         operations.set_items(inner_items);
 
-        let mut modes = List::new("Mode".to_owned());
-        let mode_items = Vec::from_iter(MODE.into_iter().map(|v| v.into()));
-        modes.set_items(mode_items);
-
         Self {
             inner: operations,
-            mode_selector: modes,
-            select_mode: false,
             popup_content: None,
             backend_content: None,
         }
@@ -87,62 +75,45 @@ impl TabCont for ServiceTab {
         }
     }
     // this tab just display info but don't ask
-    fn apply_popup_result(&mut self, _res: PopRes) -> EventState {
-        unreachable!()
+    fn apply_popup_result(&mut self, res: PopRes) -> EventState {
+        match res {
+            PopRes::Selected_(idx) => {
+                let mode = MODE[idx];
+                let pak = Call::Service(BackendOp::SwitchMode(mode));
+                self.backend_content.replace(pak);
+                let msg = PopMsg::Prompt(vec!["Working".to_owned()]);
+                self.popup_content.replace(msg);
+            }
+            PopRes::Selected(_) | PopRes::Input(_) => unreachable!(),
+        }
+        EventState::WorkDone
     }
 }
 
 impl Drawable for ServiceTab {
     fn render(&mut self, f: &mut Frame, area: Rect, _: bool) {
-        self.inner.render(f, area, !self.select_mode);
-        if self.select_mode {
-            let select_area = tools::centered_rect(
-                Ra::Constraint::Percentage(60),
-                Ra::Constraint::Percentage(30),
-                f.area(),
-            );
-            f.render_widget(Raw::Clear, select_area);
-            self.mode_selector.render(f, select_area, true);
-        }
+        self.inner.render(f, area, true);
     }
     /// - Catched event -> [EventState::WorkDone]
     /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
-        let event_state;
-        if self.select_mode {
-            // ## handle mode_selector
-            event_state = self.mode_selector.handle_key_event(ev);
-            match event_state {
-                EventState::Yes => {
-                    if let Some(mode_index) = self.mode_selector.selected() {
-                        let mode = MODE[mode_index];
-                        let pak = Call::Service(BackendOp::SwitchMode(mode));
+        let event_state = self.inner.handle_key_event(ev);
+        match event_state {
+            EventState::Yes => {
+                if let Some(index) = self.inner.selected() {
+                    if index == 0 {
+                        self.popup_content = Some(PopMsg::SelectList(
+                            "Mode".to_owned(),
+                            Vec::from_iter(MODE.into_iter().map(|v| v.into())),
+                        ));
+                    } else {
+                        let op = ServiceOp::ALL[index - 1];
+                        let pak = Call::Service(BackendOp::ServiceCTL(op));
                         self.backend_content.replace(pak);
-                        let msg = PopMsg::Prompt(vec!["Working".to_owned()]);
-                        self.popup_content.replace(msg);
-                    };
-                    self.select_mode = false;
-                }
-                EventState::Cancel => self.select_mode = false,
-                EventState::NotConsumed | EventState::WorkDone => (),
+                    }
+                };
             }
-        } else {
-            // ## handle inner
-            event_state = self.inner.handle_key_event(ev);
-            match event_state {
-                EventState::Yes => {
-                    if let Some(index) = self.inner.selected() {
-                        if index == 0 {
-                            self.select_mode = true;
-                        } else {
-                            let op = ServiceOp::ALL[index - 1];
-                            let pak = Call::Service(BackendOp::ServiceCTL(op));
-                            self.backend_content.replace(pak);
-                        }
-                    };
-                }
-                EventState::Cancel | EventState::NotConsumed | EventState::WorkDone => (),
-            }
+            EventState::Cancel | EventState::NotConsumed | EventState::WorkDone => (),
         }
         event_state.unify()
     }

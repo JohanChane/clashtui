@@ -37,7 +37,6 @@ pub(in crate::tui::frontend) struct ProfileTab {
     is_profiles_inited: bool,
     #[cfg(feature = "template")]
     is_templates_inited: bool,
-    // input_popup: Option<InputPopup>,
 }
 
 impl ProfileTab {
@@ -184,6 +183,7 @@ impl TabCont for ProfileTab {
                     _ => unimplemented!(),
                 }
             }
+            PopRes::Selected_(..) => unreachable!(),
         }
         EventState::WorkDone
     }

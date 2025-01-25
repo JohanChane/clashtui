@@ -23,7 +23,7 @@ impl ProfileTab {
                 if let Some(name) = name {
                     self.temp_content =
                         Some(Call::Profile(BackendOp::Profile(ProfileOp::Remove(name))));
-                    self.popup_content = Some(PopMsg::Ask(
+                    self.popup_content = Some(PopMsg::AskChoices(
                         vec!["Are you sure to delete this?".to_owned()],
                         vec![],
                     ))
@@ -35,7 +35,7 @@ impl ProfileTab {
                     self.temp_content = Some(Call::Profile(BackendOp::Profile(ProfileOp::Update(
                         name, None,
                     ))));
-                    self.popup_content = Some(PopMsg::Ask(
+                    self.popup_content = Some(PopMsg::AskChoices(
                         vec![
                             "Update Options".to_owned(),
                             "You can decide how to update profile".to_owned(),

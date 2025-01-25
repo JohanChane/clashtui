@@ -21,9 +21,9 @@ pub struct Item {
     title: String,
 }
 impl Item {
-    pub fn title(title: &str) -> Self {
+    pub fn title(title: String) -> Self {
         Self {
-            title: title.to_string(),
+            title,
             buffer: Default::default(),
             cursor: Default::default(),
         }
@@ -101,26 +101,29 @@ impl Item {
 }
 
 enum Items {
-    String(Vec<String>),
+    AskChoices(Vec<String>),
     NoFeedback(Vec<String>),
+    SelectList(Vec<String>),
     Input(Vec<Item>),
 }
 impl Items {
     pub fn is_empty(&self) -> bool {
         match self {
-            Items::NoFeedback(vec) | Items::String(vec) => vec.is_empty(),
+            Items::SelectList(vec) | Items::NoFeedback(vec) | Items::AskChoices(vec) => {
+                vec.is_empty()
+            }
             Items::Input(vec) => vec.is_empty(),
         }
     }
     pub fn clear(&mut self) {
         match self {
-            Items::NoFeedback(vec) | Items::String(vec) => vec.clear(),
+            Items::SelectList(vec) | Items::NoFeedback(vec) | Items::AskChoices(vec) => vec.clear(),
             Items::Input(vec) => vec.clear(),
         }
     }
     pub fn len(&self) -> usize {
         match self {
-            Items::NoFeedback(vec) | Items::String(vec) => vec.len(),
+            Items::SelectList(vec) | Items::NoFeedback(vec) | Items::AskChoices(vec) => vec.len(),
             Items::Input(vec) => vec.len(),
         }
     }
@@ -150,17 +153,13 @@ impl ListPopup {
     ///
     /// When call [collect](Self::collect), an enum will be produced
     /// to show which section are selected
-    pub fn set_msg(&mut self, title: &str, items: Vec<String>, with_feedback: bool) {
+    pub fn set_msg(&mut self, title: &str, items: Vec<String>) {
         self.state = Default::default();
         self.offset = 0;
         self.title = title.to_owned();
         self.scrollbar = Raw::ScrollbarState::new(items.len());
         self.__max_item_width = items.iter().map(|i| i.len()).max().unwrap_or(0);
-        self.items = if with_feedback {
-            Items::String(items)
-        } else {
-            Items::NoFeedback(items)
-        };
+        self.items = Items::NoFeedback(items);
     }
     /// ### Set Strings as input request
     ///
@@ -176,12 +175,7 @@ impl ListPopup {
         self.title = "Input".to_owned();
         self.scrollbar = Raw::ScrollbarState::new(items.len());
         self.__max_item_width = 0;
-        self.items = Items::Input(
-            items
-                .into_iter()
-                .map(|title| Item::title(title.as_str()))
-                .collect(),
-        );
+        self.items = Items::Input(items.into_iter().map(Item::title).collect());
     }
     /// ### Return choice/input content
     /// in form of [Option]
@@ -197,7 +191,7 @@ impl ListPopup {
                 self.clear();
                 None
             }
-            Items::String(..) => {
+            Items::AskChoices(..) => {
                 self.clear();
                 Some(PopRes::Selected(self.selected))
             }
@@ -209,35 +203,44 @@ impl ListPopup {
                 self.clear();
                 Some(PopRes::Input(vec))
             }
+            Items::SelectList(..) => {
+                self.clear();
+                self.state.selected().map(PopRes::Selected_)
+            }
         }
     }
     pub fn show_msg(&mut self, msg: PopMsg) {
+        macro_rules! expending {
+            ($title:expr, $items:expr, $adp:expr) => {
+                self.state = Default::default();
+                self.offset = 0;
+                self.title = $title;
+                self.__max_item_width = $items.iter().map(|i| i.len()).max().unwrap_or(0);
+                self.scrollbar = Raw::ScrollbarState::new($items.len());
+                self.items = $adp($items);
+            };
+        }
         match msg {
-            PopMsg::Ask(vec, chs) => {
-                self.set_msg("Msg", vec, true);
-                if let Items::String(vec) = &mut self.items {
-                    vec.push(match chs.len() {
-                        0 => "Press y for Yes, n for No".to_owned(),
-                        1 => format!("Press y for Yes, n for No, o for {}", chs[0]),
-                        2 => format!(
-                            "Press y for Yes, n for No, o for {}, t for {}",
-                            chs[0], chs[1]
-                        ),
-                        _ => unimplemented!("more than 2 extra choices!"),
-                    });
-                } else {
-                    unreachable!()
-                }
+            PopMsg::AskChoices(mut vec, chs) => {
+                vec.push(match chs.len() {
+                    0 => "Press y for Yes, n for No".to_owned(),
+                    1 => format!("Press y for Yes, n for No, o for {}", chs[0]),
+                    2 => format!(
+                        "Press y for Yes, n for No, o for {}, t for {}",
+                        chs[0], chs[1]
+                    ),
+                    _ => unimplemented!("more than 2 extra choices!"),
+                });
+                expending!("Msg".to_owned(), vec, Items::AskChoices);
             }
-            PopMsg::Prompt(vec) => {
-                self.set_msg("Msg", vec, false);
-                if let Items::NoFeedback(vec) = &mut self.items {
-                    vec.push("Press Esc to close".to_owned());
-                } else {
-                    unreachable!()
-                }
+            PopMsg::Prompt(mut vec) => {
+                vec.push("Press Esc to close".to_owned());
+                expending!("Msg".to_owned(), vec, Items::NoFeedback);
             }
             PopMsg::Input(vec) => self.set_input(vec),
+            PopMsg::SelectList(title, vec) => {
+                expending!(title, vec, Items::SelectList);
+            }
         }
     }
     pub fn is_empty(&self) -> bool {
@@ -258,7 +261,7 @@ impl Drawable for ListPopup {
                 .max(60); // min_width = 60
             let dialog_height = (self.items.len()
                 * match &self.items {
-                    Items::NoFeedback(..) | Items::String(..) => 1,
+                    Items::SelectList(..) | Items::NoFeedback(..) | Items::AskChoices(..) => 1,
                     Items::Input(..) => 3,
                 }
                 + 2)
@@ -276,7 +279,7 @@ impl Drawable for ListPopup {
             .border_style(Ra::Style::default().fg(Theme::get().popup_block_fg))
             .title(self.title.as_str());
         match &mut self.items {
-            Items::NoFeedback(vec) | Items::String(vec) => {
+            Items::SelectList(vec) | Items::NoFeedback(vec) | Items::AskChoices(vec) => {
                 let list = Raw::List::from_iter(vec.iter().map(|i| {
                     Raw::ListItem::new(i.chars().skip(self.offset).collect::<String>())
                         .style(Ra::Style::default())
@@ -338,29 +341,35 @@ impl Drawable for ListPopup {
             return EventState::NotConsumed;
         }
         match &mut self.items {
-            Items::NoFeedback(..) | Items::String(..) => match ev.code {
-                KeyCode::Down | KeyCode::Char('j') => self.next(),
-                KeyCode::Up | KeyCode::Char('k') => self.previous(),
-                KeyCode::Left | KeyCode::Char('h') => self.offset = self.offset.saturating_sub(1),
-                KeyCode::Right | KeyCode::Char('l') => self.offset = self.offset.saturating_add(1),
-                KeyCode::Esc | KeyCode::Char('n') => {
-                    self.selected = 0;
-                    return EventState::Cancel;
+            Items::SelectList(..) | Items::NoFeedback(..) | Items::AskChoices(..) => {
+                match ev.code {
+                    KeyCode::Down | KeyCode::Char('j') => self.next(),
+                    KeyCode::Up | KeyCode::Char('k') => self.previous(),
+                    KeyCode::Left | KeyCode::Char('h') => {
+                        self.offset = self.offset.saturating_sub(1)
+                    }
+                    KeyCode::Right | KeyCode::Char('l') => {
+                        self.offset = self.offset.saturating_add(1)
+                    }
+                    KeyCode::Esc | KeyCode::Char('n') => {
+                        self.selected = 0;
+                        return EventState::Cancel;
+                    }
+                    KeyCode::Enter | KeyCode::Char('y') => {
+                        self.selected = 1;
+                        return EventState::Yes;
+                    }
+                    KeyCode::Char('o') => {
+                        self.selected = 2;
+                        return EventState::Yes;
+                    }
+                    KeyCode::Char('t') => {
+                        self.selected = 3;
+                        return EventState::Yes;
+                    }
+                    _ => return EventState::NotConsumed,
                 }
-                KeyCode::Enter | KeyCode::Char('y') => {
-                    self.selected = 1;
-                    return EventState::Yes;
-                }
-                KeyCode::Char('o') => {
-                    self.selected = 2;
-                    return EventState::Yes;
-                }
-                KeyCode::Char('t') => {
-                    self.selected = 3;
-                    return EventState::Yes;
-                }
-                _ => return EventState::NotConsumed,
-            },
+            }
             Items::Input(vec) => match ev.code {
                 KeyCode::Down => self.next(),
                 KeyCode::Up => self.previous(),

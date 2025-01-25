@@ -84,6 +84,7 @@ impl BackEnd {
                 #[cfg(feature = "connection-tab")]
                 cbs.push(conns);
             } else {
+                log::debug!("Backend got:{op:?}");
                 let cb = match op {
                     Call::Profile(op) => match op {
                         tabs::profile::BackendOp::Profile(op) => self.handle_profile_op(op),

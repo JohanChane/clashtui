@@ -16,14 +16,15 @@ pub enum PopMsg {
     ///     `the question`
     /// Press y for Yes, n for No, o for `ch2`, t for `ch3`
     /// ```
-    Ask(Vec<String>, Vec<String>),
+    AskChoices(Vec<String>, Vec<String>),
     /// show infos
     Prompt(Vec<String>),
-    // List(String, Vec<String>),
+    SelectList(String, Vec<String>),
     Input(Vec<String>),
 }
 
 pub enum PopRes {
     Selected(usize),
+    Selected_(usize),
     Input(Vec<String>),
 }

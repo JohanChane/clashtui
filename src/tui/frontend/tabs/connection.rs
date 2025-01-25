@@ -15,6 +15,7 @@ use ratatui::widgets as Raw;
 mod conn;
 use conn::Connection;
 
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub enum BackendOp {
     Terminal(String),
     TerminalAll,
@@ -152,7 +153,7 @@ impl Drawable for ConnctionTab {
                 self.popup_content = Some(PopMsg::Input(vec!["Url/Chain/Type".to_owned()]));
             }
             _ if crate::tui::frontend::key_bind::Keys::ConnKillAll == ev.code.into() => {
-                self.popup_content = Some(PopMsg::Ask(
+                self.popup_content = Some(PopMsg::AskChoices(
                     vec![
                         "Are you sure to terminate all connections?".to_owned(),
                         "This cannot be undone!".to_owned(),
@@ -219,13 +220,12 @@ impl TabCont for ConnctionTab {
                 // regarded as cancel
                 0 => (),
                 // regarded as yes
-                1 => {
-                    self.backend_content = Some(Call::Connection(BackendOp::TerminalAll))
-                }
+                1 => self.backend_content = Some(Call::Connection(BackendOp::TerminalAll)),
                 // regarded as extra-choices
                 _ => unreachable!(),
             },
             PopRes::Input(mut vec) => self.filter = Some(vec.swap_remove(0)),
+            PopRes::Selected_(..) => unreachable!(),
         }
         EventState::WorkDone
     }
