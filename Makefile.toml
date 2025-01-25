@@ -68,8 +68,8 @@ dependencies = ["create-artifacts"]
 script = '''
     cross build --locked --target=x86_64-unknown-linux-musl
     cross build --locked --release --target=x86_64-unknown-linux-musl
-    cp target/release/clashtui artifacts/clashtui.linux.amd64.release
-    cp target/debug/clashtui artifacts/clashtui.linux.amd64.debug
+    cp target/x86_64-unknown-linux-musl/release/clashtui artifacts/clashtui.linux.amd64.release
+    cp target/x86_64-unknown-linux-musl/debug/clashtui artifacts/clashtui.linux.amd64.debug
 '''
 
 [tasks.amd64.windows]
