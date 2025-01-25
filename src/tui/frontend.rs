@@ -3,7 +3,7 @@ mod consts;
 mod key_bind;
 pub mod tabs;
 
-use super::widget::ListPopup;
+use super::widget::Popup;
 use super::{Call, Drawable, EventState, Theme};
 use crate::utils::{consts::err as consts_err, CallBack};
 use key_bind::Keys;
@@ -18,7 +18,7 @@ use Ra::{Frame, Rect};
 pub struct FrontEnd {
     tabs: Vec<Box<dyn TabCont + Send>>,
     tab_index: usize,
-    list_popup: Box<ListPopup>,
+    popup: Box<Popup>,
     should_quit: bool,
     /// StateBar
     state: Option<String>,
@@ -36,7 +36,7 @@ impl FrontEnd {
         Self {
             tabs,
             tab_index: 0,
-            list_popup: Default::default(),
+            popup: Default::default(),
             should_quit: false,
             state: None,
             backend_content: None,
@@ -88,7 +88,7 @@ impl FrontEnd {
         tx.send(Call::Tick).await.expect(consts_err::BACKEND_TX);
         // handle tab msg
         if let Some(msg) = self.tabs[self.tab_index].get_popup_content() {
-            self.list_popup.show_msg(msg);
+            self.popup.show_msg(msg);
         }
         // handle app ops
         if let Some(op) = self.backend_content.take() {
@@ -105,22 +105,22 @@ impl FrontEnd {
             match op {
                 Ok(op) => match op {
                     CallBack::Error(error) => {
-                        self.list_popup.show_msg(super::PopMsg::Prompt(vec![
+                        self.popup.show_msg(super::PopMsg::Prompt(vec![
                             "Error Happened".to_owned(),
                             error,
                         ]));
                     }
                     CallBack::Logs(logs) => {
-                        self.list_popup.set_msg("Log", logs);
+                        self.popup.set_msg("Log", logs);
                     }
                     CallBack::Infos(infos) => {
-                        self.list_popup.set_msg("Infos", infos);
+                        self.popup.set_msg("Infos", infos);
                     }
                     CallBack::Preview(content) => {
-                        self.list_popup.set_msg("Preview", content);
+                        self.popup.set_msg("Preview", content);
                     }
                     CallBack::Edit => {
-                        self.list_popup
+                        self.popup
                             .show_msg(super::PopMsg::Prompt(vec!["OK".to_owned()]));
                     }
                     // `SwitchMode` goes here
@@ -169,8 +169,8 @@ impl Drawable for FrontEnd {
             .get_mut(self.tab_index)
             .unwrap()
             .render(f, chunks[1], true);
-        if !self.list_popup.is_empty() {
-            self.list_popup.render(f, chunks[1], true)
+        if !self.popup.is_empty() {
+            self.popup.render(f, chunks[1], true)
         }
     }
 
@@ -180,17 +180,17 @@ impl Drawable for FrontEnd {
         // handle them only in app to avoid complexity.
         //
         // if there is a popup, other part will be blocked.
-        if !self.list_popup.is_empty() {
-            evst = self.list_popup.handle_key_event(ev);
+        if !self.popup.is_empty() {
+            evst = self.popup.handle_key_event(ev);
             if evst == EventState::Yes {
-                if let Some(res) = self.list_popup.collect() {
+                if let Some(res) = self.popup.collect() {
                     self.tabs
                         .get_mut(self.tab_index)
                         .unwrap()
                         .apply_popup_result(res);
                 }
             } else if evst == EventState::Cancel {
-                self.list_popup.clear();
+                self.popup.clear();
             }
             return EventState::WorkDone;
         }
@@ -235,7 +235,7 @@ impl Drawable for FrontEnd {
                 Keys::Debug => {}
                 Keys::LogCat => self.backend_content = Some(Call::Logs(0, 20)),
                 Keys::AppHelp => {
-                    self.list_popup.set_msg(
+                    self.popup.set_msg(
                         "Help",
                         Keys::ALL_DOC.into_iter().map(|s| s.to_owned()).collect(),
                     );

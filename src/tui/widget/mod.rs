@@ -1,9 +1,10 @@
+mod input;
 mod list;
-mod list_popup;
+mod popup;
 pub mod tools;
 
 pub use list::List;
-pub use list_popup::ListPopup;
+pub use popup::Popup;
 
 pub enum PopMsg {
     /// the first stand for the `question`,
@@ -22,7 +23,7 @@ pub enum PopMsg {
     SelectList(String, Vec<String>),
     Input(Vec<String>),
 }
-
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum PopRes {
     Selected(usize),
     Selected_(usize),

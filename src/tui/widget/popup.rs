@@ -1,104 +1,9 @@
-use crossterm::event::KeyCode;
-use crossterm::event::KeyEventKind;
-use ratatui::prelude as Ra;
-use ratatui::widgets as Raw;
+use crossterm::event::{KeyCode, KeyEventKind};
+use ratatui::{prelude as Ra, widgets as Raw};
 
-use super::tools;
-use super::PopMsg;
-use super::PopRes;
+use super::{input::Item, tools, PopMsg, PopRes};
 use crate::tui::misc::EventState;
 use crate::tui::{Drawable, Theme};
-
-/// A single input widget like
-///```md
-/// ┌title─────────────────────────────┐
-/// │content                           │
-/// └──────────────────────────────────┘
-///```
-pub struct Item {
-    buffer: String,
-    cursor: usize,
-    title: String,
-}
-impl Item {
-    pub fn title(title: String) -> Self {
-        Self {
-            title,
-            buffer: Default::default(),
-            cursor: Default::default(),
-        }
-    }
-    /// consume self and get content
-    pub fn content(self) -> String {
-        self.buffer
-    }
-}
-
-impl Drawable for Item {
-    fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, is_fouced: bool) {
-        let page = Raw::Paragraph::new(self.buffer.as_str())
-            .style(Ra::Style::default().fg(if is_fouced {
-                Theme::get().input_text_selected_fg
-            } else {
-                Theme::get().input_text_unselected_fg
-            }))
-            .block(
-                Raw::Block::default()
-                    .borders(Raw::Borders::ALL)
-                    .title(self.title.as_str()),
-            );
-        f.render_widget(page, area);
-    }
-
-    fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState {
-        match ev.code {
-            KeyCode::Char(ch) => self.enter_char(ch),
-            KeyCode::Backspace => self.delete_char(),
-            KeyCode::Left => self.move_cursor_left(),
-            KeyCode::Right => self.move_cursor_right(),
-
-            KeyCode::Enter => {
-                self.reset_cursor();
-                return EventState::Yes;
-            }
-            KeyCode::Esc => {
-                self.reset_cursor();
-                return EventState::Cancel;
-            }
-            _ => return EventState::NotConsumed,
-        }
-        EventState::WorkDone
-    }
-}
-impl Item {
-    fn reset_cursor(&mut self) {
-        self.cursor = 0
-    }
-    fn delete_char(&mut self) {
-        if self.cursor != 0 {
-            // Method "remove" is not used on the saved text for deleting the selected char.
-            // Reason: Using remove on String works on bytes instead of the chars.
-            // Using remove would require special care because of char boundaries.
-            self.buffer = self
-                .buffer
-                .char_indices()
-                .filter_map(|(idx, ch)| (idx != self.cursor - 1).then_some(ch))
-                .collect();
-            self.move_cursor_left();
-        }
-    }
-    fn enter_char(&mut self, ch: char) {
-        self.buffer.insert(self.cursor, ch);
-        self.move_cursor_right();
-    }
-    fn move_cursor_left(&mut self) {
-        self.cursor = self.cursor.saturating_sub(1).clamp(0, self.buffer.len());
-    }
-
-    fn move_cursor_right(&mut self) {
-        self.cursor = self.cursor.saturating_add(1).clamp(0, self.buffer.len());
-    }
-}
 
 enum Items {
     AskChoices(Vec<String>),
@@ -138,7 +43,7 @@ impl Default for Items {
 /// Pop a Message Window with line highlight
 ///
 /// use arrow keys or `j\k\h\l`(vim-like) to navigate.
-pub struct ListPopup {
+pub struct Popup {
     title: String,
     items: Items,
     __max_item_width: usize,
@@ -148,7 +53,7 @@ pub struct ListPopup {
     selected: usize,
 }
 
-impl ListPopup {
+impl Popup {
     /// ### Set Strings as message
     ///
     /// When call [collect](Self::collect), an enum will be produced
@@ -251,7 +156,7 @@ impl ListPopup {
     }
 }
 
-impl Drawable for ListPopup {
+impl Drawable for Popup {
     /// No need to [Raw::clear], or plan aera
     fn render(&mut self, f: &mut ratatui::Frame, _: ratatui::layout::Rect, _: bool) {
         let area = {
@@ -300,12 +205,6 @@ impl Drawable for ListPopup {
                     .constraints([Ra::Constraint::Fill(1)].repeat(vec.len()))
                     .margin(1)
                     .split(area);
-
-                // If the selected index is out of bounds, set it to the last item
-                // this is done when rendering List, but there is no list in this branch
-                if self.state.selected().is_some_and(|s| s >= vec.len()) {
-                    self.state.select(Some(vec.len().saturating_sub(1)));
-                }
 
                 vec.iter_mut().enumerate().for_each(|(idx, itm)| {
                     itm.render(
@@ -374,10 +273,15 @@ impl Drawable for ListPopup {
                 KeyCode::Down => self.next(),
                 KeyCode::Up => self.previous(),
                 _ => {
+                    // If the selected index is out of bounds, set it to the last item
+                    // this is done when rendering List, but there is no list in this branch
+                    if self.state.selected().is_some_and(|s| s >= vec.len()) {
+                        self.state.select(Some(vec.len().saturating_sub(1)));
+                    }
                     return vec
                         .get_mut(self.state.selected().unwrap_or_default())
                         .unwrap()
-                        .handle_key_event(ev)
+                        .handle_key_event(ev);
                 }
             },
         };
@@ -385,7 +289,7 @@ impl Drawable for ListPopup {
     }
 }
 
-impl ListPopup {
+impl Popup {
     fn next(&mut self) {
         if self.items.is_empty() {
             return;
@@ -400,5 +304,125 @@ impl ListPopup {
         }
         self.scrollbar.prev();
         self.state.select_previous();
+    }
+}
+/// # TODO:
+/// finish rest of the tests (NoFeedback,AskChoices)
+#[cfg(test)]
+mod test {
+    use super::Popup;
+    use crate::tui::{misc::EventState, widget::PopRes, Drawable, PopMsg};
+    use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+    trait Test {
+        fn apply_test(
+            &mut self,
+            ops: &[KeyCode],
+            check_evsts: &[EventState],
+            check_cursor: &[Option<usize>],
+            check_offsets: &[usize],
+        ) -> &mut Self;
+    }
+    impl Test for Popup {
+        fn apply_test(
+            &mut self,
+            ops: &[KeyCode],
+            check_evsts: &[EventState],
+            check_cursors: &[Option<usize>],
+            check_offsets: &[usize],
+        ) -> &mut Self {
+            for (((&op, &evst), &cursor), &offset) in ops
+                .into_iter()
+                .zip(check_evsts)
+                .zip(check_cursors)
+                .zip(check_offsets)
+            {
+                let e = self.handle_key_event(&KeyEvent::new(op, KeyModifiers::empty()));
+                assert_eq!(e, evst, "now running {op} {evst:?} {cursor:?} {offset}");
+                assert_eq!(
+                    self.state.selected(),
+                    cursor,
+                    "now running {op} {evst:?} {cursor:?} {offset}"
+                );
+                assert_eq!(
+                    self.offset, offset,
+                    "now running {op} {evst:?} {cursor:?} {offset}"
+                );
+            }
+            self
+        }
+    }
+
+    #[test]
+    fn get_input() {
+        let mut popup = Popup::default();
+        popup.show_msg(PopMsg::Input(vec!["test".to_owned(), "test".to_owned()]));
+        popup
+            .apply_test(
+                &[KeyCode::Char('a'), KeyCode::Down, KeyCode::PageDown],
+                &[
+                    EventState::WorkDone,
+                    EventState::WorkDone,
+                    EventState::NotConsumed,
+                ],
+                &[Some(0), Some(1), Some(1)],
+                &[0, 0, 0],
+            )
+            .apply_test(
+                &[KeyCode::Down, KeyCode::Char('b'), KeyCode::Up],
+                &[
+                    EventState::WorkDone,
+                    EventState::WorkDone,
+                    EventState::WorkDone,
+                ],
+                // cursor fix happen at char input currently
+                // so index out of range won't happen
+                &[Some(2), Some(1), Some(0)],
+                &[0, 0, 0],
+            );
+        let res = popup.collect();
+        assert_eq!(
+            res,
+            Some(PopRes::Input(vec!["a".to_owned(), "b".to_owned()]))
+        );
+    }
+
+    #[test]
+    fn get_select_list() {
+        let mut popup = Popup::default();
+        popup.show_msg(PopMsg::SelectList(
+            "test".to_owned(),
+            vec!["ta".to_owned(), "tb".to_owned()],
+        ));
+        popup
+            .apply_test(
+                &[KeyCode::Char('l'), KeyCode::Right, KeyCode::Down],
+                &[
+                    EventState::WorkDone,
+                    EventState::WorkDone,
+                    EventState::WorkDone,
+                ],
+                &[None, None, Some(0)],
+                &[1, 2, 2],
+            )
+            .apply_test(
+                &[KeyCode::Left, KeyCode::Down, KeyCode::Char('k')],
+                &[
+                    EventState::WorkDone,
+                    EventState::WorkDone,
+                    EventState::WorkDone,
+                ],
+                // cursor fix happen at render
+                // so index out of range here, but fine
+                &[Some(0), Some(1), Some(0)],
+                &[1, 1, 1],
+            )
+            .apply_test(
+                &[KeyCode::Enter, KeyCode::Esc, KeyCode::Char('y')],
+                &[EventState::Yes, EventState::Cancel, EventState::Yes],
+                &[Some(0), Some(0), Some(0)],
+                &[1, 1, 1],
+            );
+        let res = popup.collect();
+        assert_eq!(res, Some(PopRes::Selected_(0)));
     }
 }
