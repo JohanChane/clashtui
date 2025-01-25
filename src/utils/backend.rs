@@ -7,7 +7,7 @@ mod impl_tui;
 pub mod profile;
 
 #[cfg(feature = "tui")]
-#[cfg_attr(debug_assertions, derive(derive_more::Debug))]
+#[derive(derive_more::Debug)]
 pub enum CallBack {
     Error(String),
     State(String),

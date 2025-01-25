@@ -15,7 +15,7 @@ use ratatui::widgets as Raw;
 mod conn;
 use conn::Connection;
 
-#[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(Debug)]
 pub enum BackendOp {
     Terminal(String),
     TerminalAll,

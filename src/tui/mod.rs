@@ -14,7 +14,7 @@ trait Drawable {
     /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState;
 }
-#[cfg_attr(debug_assertions, derive(derive_more::Debug))]
+#[derive(derive_more::Debug)]
 /// Wrap the caller,
 /// the inner ops are defined in their own files.
 pub enum Call {

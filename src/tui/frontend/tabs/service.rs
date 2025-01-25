@@ -11,7 +11,7 @@ use Ra::{Frame, Rect};
 
 use super::{Call, PopMsg, TabCont};
 
-#[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(Debug)]
 pub enum BackendOp {
     SwitchMode(Mode),
     ServiceCTL(ServiceOp),

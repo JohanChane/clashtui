@@ -4,8 +4,7 @@ use ipc::exec;
 use std::io::Error;
 
 crate::define_enum!(
-    #[derive(Clone, Copy)]
-    #[cfg_attr(debug_assertions, derive(Debug))]
+    #[derive(Clone, Copy, Debug)]
     pub enum ServiceOp {
         #[cfg(any(target_os = "linux", target_os = "windows"))]
         StartClashService,

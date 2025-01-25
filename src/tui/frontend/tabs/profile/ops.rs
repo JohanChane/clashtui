@@ -1,10 +1,10 @@
-#[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(Debug)]
 pub enum BackendOp {
     Profile(ProfileOp),
     #[cfg(feature = "template")]
     Template(TemplateOp),
 }
-#[cfg_attr(debug_assertions, derive(Debug))]
+#[derive(Debug)]
 pub enum ProfileOp {
     /// Send after [ProfileOp::Update],[ProfileOp::Add],[ProfileOp::Remove]
     /// and [TemplateOp::Generate] if enable template feature
