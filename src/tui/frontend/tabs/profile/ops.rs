@@ -34,6 +34,7 @@ pub enum ProfileOp {
     Edit(String),
 }
 #[cfg(feature = "template")]
+#[derive(Debug)]
 pub enum TemplateOp {
     /// Send after [TemplateOp::Add],[TemplateOp::Remove]
     GetALL,
