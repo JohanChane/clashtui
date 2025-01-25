@@ -1,5 +1,5 @@
-use crate::clash::webapi::Mode;
 use crate::utils::ServiceOp;
+use crate::{clash::webapi::Mode, tui::widget::PopRes};
 use crossterm::event::KeyEvent;
 
 use crate::{
@@ -87,14 +87,8 @@ impl TabCont for ServiceTab {
         }
     }
     // this tab just display info but don't ask
-    fn apply_popup_result(&mut self, evst: EventState) -> EventState {
-        match evst {
-            EventState::Yes | EventState::Cancel => EventState::WorkDone,
-            EventState::Choice2
-            | EventState::Choice3
-            | EventState::NotConsumed
-            | EventState::WorkDone => EventState::NotConsumed,
-        }
+    fn apply_popup_result(&mut self, _res: PopRes) -> EventState {
+        unreachable!()
     }
 }
 

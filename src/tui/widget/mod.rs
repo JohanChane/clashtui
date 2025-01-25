@@ -3,9 +3,11 @@ mod list;
 mod list_popup;
 pub mod tools;
 
-pub use input_popup::InputPopup;
+// pub use input_popup::InputPopup;
 pub use list::List;
 pub use list_popup::ListPopup;
+
+use super::misc::EventState;
 
 pub enum PopMsg {
     /// the first stand for the `question`,
@@ -22,5 +24,10 @@ pub enum PopMsg {
     /// show infos
     Prompt(Vec<String>),
     // List(String, Vec<String>),
-    // Input(Vec<String>),
+    Input(Vec<String>),
+}
+
+pub enum PopRes {
+    Selected(EventState),
+    Input(Vec<String>),
 }

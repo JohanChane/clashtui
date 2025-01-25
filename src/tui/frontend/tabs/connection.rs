@@ -2,7 +2,7 @@ use super::{Call, PopMsg, TabCont};
 use crate::{
     tui::{
         frontend::consts::TAB_TITLE_CONNECTION,
-        widget::{tools, InputPopup},
+        widget::{tools, PopRes},
         Drawable, EventState, Theme,
     },
     utils::CallBack,
@@ -24,7 +24,6 @@ pub enum BackendOp {
 pub(in crate::tui::frontend) struct ConnctionTab {
     items: Vec<Connection>,
     filter: Option<String>,
-    input: Option<InputPopup>,
     travel_up: u64,
     travel_down: u64,
     state: Raw::TableState,
@@ -102,28 +101,12 @@ impl Drawable for ConnctionTab {
             use Ra::Widget;
             con.render(area, f.buffer_mut());
         }
-        if let Some(input) = self.input.as_mut() {
-            input.render(f, area, true);
-        }
     }
 
     fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState {
         use crossterm::event::KeyCode;
         if ev.kind != crossterm::event::KeyEventKind::Press {
             return EventState::NotConsumed;
-        }
-        if let Some(input) = self.input.as_mut() {
-            return match input.handle_key_event(ev) {
-                EventState::Yes => {
-                    self.filter = Some(self.input.take().unwrap().collect().remove(0));
-                    EventState::Yes
-                }
-                EventState::Cancel => {
-                    self.input.take();
-                    EventState::Cancel
-                }
-                es => es,
-            };
         }
         // doing popup
         if self.selected_con.is_some() {
@@ -168,7 +151,7 @@ impl Drawable for ConnctionTab {
             // KeyCode::PageUp => todo!(),
             // KeyCode::PageDown => todo!(),
             _ if crate::tui::frontend::key_bind::Keys::Search == ev.code.into() => {
-                self.input = Some(InputPopup::with_msg(vec!["Url/Chain/Type".to_owned()]));
+                self.popup_content = Some(PopMsg::Input(vec!["Url/Chain/Type".to_owned()]));
             }
             _ if crate::tui::frontend::key_bind::Keys::ConnKillAll == ev.code.into() => {
                 self.popup_content = Some(PopMsg::Ask(
@@ -232,18 +215,19 @@ impl TabCont for ConnctionTab {
         }
     }
 
-    fn apply_popup_result(&mut self, evst: EventState) -> EventState {
-        match evst {
-            EventState::Yes => {
-                self.backend_content = Some(Call::Connection(BackendOp::TerminalAll));
-                EventState::WorkDone
-            }
-            EventState::Cancel => EventState::WorkDone,
-            EventState::Choice2
-            | EventState::Choice3
-            | EventState::NotConsumed
-            | EventState::WorkDone => EventState::NotConsumed,
+    fn apply_popup_result(&mut self, res: PopRes) -> EventState {
+        match res {
+            PopRes::Selected(selected) => match selected {
+                EventState::Yes => {
+                    self.backend_content = Some(Call::Connection(BackendOp::TerminalAll))
+                }
+                EventState::Cancel => (),
+                EventState::Choice2 | EventState::Choice3 => unreachable!(),
+                EventState::NotConsumed | EventState::WorkDone => unreachable!(),
+            },
+            PopRes::Input(mut vec) => self.filter = Some(vec.swap_remove(0)),
         }
+        EventState::WorkDone
     }
 }
 

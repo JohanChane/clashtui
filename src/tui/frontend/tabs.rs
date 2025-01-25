@@ -4,7 +4,7 @@ pub mod profile;
 pub mod service;
 
 use crate::{
-    tui::{Call, Drawable, EventState, PopMsg},
+    tui::{widget::PopRes, Call, Drawable, EventState, PopMsg},
     utils::CallBack,
 };
 /// A trait that every tab should impl
@@ -14,5 +14,5 @@ pub(super) trait TabCont: Drawable + std::fmt::Display {
     fn get_popup_content(&mut self) -> Option<PopMsg>;
     fn apply_backend_call(&mut self, op: CallBack);
     /// return [`EventState::WorkDone`] only when the msg popup should close
-    fn apply_popup_result(&mut self, evst: EventState) -> EventState;
+    fn apply_popup_result(&mut self, res: PopRes) -> EventState;
 }

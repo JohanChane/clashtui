@@ -1,4 +1,4 @@
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Default, Clone, Copy)]
 pub enum EventState {
     Yes,
     /// In fact [EventState::Yes], but means another choice
@@ -6,6 +6,7 @@ pub enum EventState {
     /// In fact [EventState::Yes], but means the other choice
     Choice3,
     Cancel,
+    #[default]
     NotConsumed,
     WorkDone,
 }

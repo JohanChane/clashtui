@@ -111,13 +111,13 @@ impl FrontEnd {
                         ]));
                     }
                     CallBack::Logs(logs) => {
-                        self.list_popup.set("Log", logs);
+                        self.list_popup.set_msg("Log", logs, false);
                     }
                     CallBack::Infos(infos) => {
-                        self.list_popup.set("Infos", infos);
+                        self.list_popup.set_msg("Infos", infos, false);
                     }
                     CallBack::Preview(content) => {
-                        self.list_popup.set("Preview", content);
+                        self.list_popup.set_msg("Preview", content, false);
                     }
                     CallBack::Edit => {
                         self.list_popup
@@ -182,8 +182,14 @@ impl Drawable for FrontEnd {
         // if there is a popup, other part will be blocked.
         if !self.list_popup.is_empty() {
             evst = self.list_popup.handle_key_event(ev);
-            let tab = self.tabs.get_mut(self.tab_index).unwrap();
-            if EventState::WorkDone == tab.apply_popup_result(evst) {
+            if evst == EventState::Yes {
+                if let Some(res) = self.list_popup.collect() {
+                    self.tabs
+                        .get_mut(self.tab_index)
+                        .unwrap()
+                        .apply_popup_result(res);
+                }
+            } else if evst == EventState::Cancel {
                 self.list_popup.clear();
             }
             return EventState::WorkDone;
@@ -229,9 +235,10 @@ impl Drawable for FrontEnd {
                 Keys::Debug => {}
                 Keys::LogCat => self.backend_content = Some(Call::Logs(0, 20)),
                 Keys::AppHelp => {
-                    self.list_popup.set(
+                    self.list_popup.set_msg(
                         "Help",
                         Keys::ALL_DOC.into_iter().map(|s| s.to_owned()).collect(),
+                        false,
                     );
                 }
                 Keys::AppInfo => self.backend_content = Some(Call::Infos),
@@ -262,7 +269,6 @@ pub fn the_egg(key: KeyCode) -> bool {
         9 if (key == KeyCode::Char('a')) | (key == KeyCode::Char('A')) => (),
         10 if (key == KeyCode::Char('b')) | (key == KeyCode::Char('B')) => (),
         11 if (key == KeyCode::Char('a')) | (key == KeyCode::Char('A')) => (),
-        12 => *current = 0,
         _ => {
             *current = 0;
             return false;

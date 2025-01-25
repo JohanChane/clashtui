@@ -10,11 +10,7 @@ impl ProfileTab {
         match ev.code.into() {
             Keys::ProfileImport => {
                 self.last_focus = self.focus;
-                self.input_popup = Some(InputPopup::with_msg(vec![
-                    "Name".to_owned(),
-                    "Url".to_owned(),
-                ]));
-                self.focus = Focus::Input;
+                self.popup_content = Some(PopMsg::Input(vec!["Name".to_owned(), "Url".to_owned()]));
             }
             #[cfg(feature = "template")]
             Keys::ProfileSwitch => {
@@ -73,8 +69,7 @@ impl ProfileTab {
             }
             Keys::Search => {
                 self.last_focus = self.focus;
-                self.input_popup = Some(InputPopup::with_msg(vec!["Name".to_owned()]));
-                self.focus = Focus::Input;
+                self.popup_content = Some(PopMsg::Input(vec!["Name".to_owned()]));
             }
             _ => return EventState::NotConsumed,
         };

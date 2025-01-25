@@ -7,7 +7,7 @@ pub use ops::*;
 use crate::{
     tui::{
         frontend::{consts::TAB_TITLE_PROFILE, key_bind::Keys},
-        widget::{InputPopup, List},
+        widget::{List, PopRes},
         Drawable, EventState,
     },
     utils::CallBack,
@@ -22,7 +22,6 @@ enum Focus {
     Profile,
     #[cfg(feature = "template")]
     Template,
-    Input,
 }
 pub(in crate::tui::frontend) struct ProfileTab {
     profiles: List,
@@ -38,7 +37,7 @@ pub(in crate::tui::frontend) struct ProfileTab {
     is_profiles_inited: bool,
     #[cfg(feature = "template")]
     is_templates_inited: bool,
-    input_popup: Option<InputPopup>,
+    // input_popup: Option<InputPopup>,
 }
 
 impl ProfileTab {
@@ -62,7 +61,7 @@ impl ProfileTab {
             is_profiles_inited: false,
             #[cfg(feature = "template")]
             is_templates_inited: false,
-            input_popup: None,
+            // input_popup: None,
         }
     }
 }
@@ -135,49 +134,52 @@ impl TabCont for ProfileTab {
         }
     }
 
-    fn apply_popup_result(&mut self, evst: EventState) -> EventState {
-        if let Some(op) = self.temp_content.take() {
-            if let Call::Profile(BackendOp::Profile(ProfileOp::Update(name, _))) = op {
-                let the_choice = match evst {
-                    // if get Yes, we confirm this order and ready to send it
-                    EventState::Yes => Some(true),
-                    EventState::Choice2 => Some(false),
-                    EventState::Choice3 => None,
-                    // if get No, this order is dropped
-                    // as it is already moved out by `take`
-                    EventState::Cancel => return EventState::WorkDone,
-                    // ignore others
-                    EventState::NotConsumed | EventState::WorkDone => {
-                        return EventState::NotConsumed
+    fn apply_popup_result(&mut self, res: PopRes) -> EventState {
+        match res {
+            PopRes::Selected(selected) => {
+                if let Some(op) = self.temp_content.take() {
+                    if let Call::Profile(BackendOp::Profile(ProfileOp::Update(name, _))) = op {
+                        let the_choice = match selected {
+                            // if get Yes, we confirm this order and ready to send it
+                            EventState::Yes => Some(true),
+                            EventState::Choice2 => Some(false),
+                            EventState::Choice3 => None,
+                            // if get No, this order is dropped
+                            // as it is already moved out by `take`
+                            EventState::Cancel => return EventState::WorkDone,
+                            // ignore others
+                            EventState::NotConsumed | EventState::WorkDone => unreachable!(),
+                        };
+                        self.backend_content = Some(Call::Profile(BackendOp::Profile(
+                            ProfileOp::Update(name, the_choice),
+                        )));
+                    } else {
+                        match selected {
+                            // if get Yes, we confirm this order and ready to send it
+                            EventState::Yes => self.backend_content = Some(op),
+                            // if get No, this order is dropped
+                            // as it is already moved out by `take`
+                            EventState::Choice2 | EventState::Choice3 | EventState::Cancel => (),
+                            // ignore others
+                            EventState::NotConsumed | EventState::WorkDone => unreachable!(),
+                        };
                     }
-                };
-                self.backend_content = Some(Call::Profile(BackendOp::Profile(ProfileOp::Update(
-                    name, the_choice,
-                ))));
-            } else {
-                match evst {
-                    // if get Yes, we confirm this order and ready to send it
-                    EventState::Yes => self.backend_content = Some(op),
-                    // if get No, this order is dropped
-                    // as it is already moved out by `take`
-                    EventState::Cancel => (),
-                    // ignore others
-                    EventState::Choice2
-                    | EventState::Choice3
-                    | EventState::NotConsumed
-                    | EventState::WorkDone => return EventState::NotConsumed,
-                };
+                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                }
             }
-            self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
-        } else {
-            // apply for [PopMsg::Prompt]
-            match evst {
-                EventState::Yes | EventState::Cancel => (),
-                EventState::Choice2
-                | EventState::Choice3
-                | EventState::WorkDone
-                | EventState::NotConsumed => return EventState::NotConsumed,
-            };
+            PopRes::Input(mut vec) => {
+                match vec.len() {
+                    2 => {
+                        self.backend_content = Some(Call::Profile(BackendOp::Profile(
+                            // there will only be 2 String, using swap_remove is safe
+                            ProfileOp::Add(vec.swap_remove(0), vec.swap_remove(0)),
+                        )));
+                        self.popup_content = Some(PopMsg::Prompt(vec!["Processing".to_owned()]));
+                    }
+                    1 => self.profiles.set_filter(vec.swap_remove(0)),
+                    _ => unimplemented!(),
+                }
+            }
         }
         EventState::WorkDone
     }
@@ -198,11 +200,6 @@ impl Drawable for ProfileTab {
         }
         #[cfg(not(feature = "template"))]
         self.profiles.render(f, area, self.focus == Focus::Profile);
-        if self.focus == Focus::Input {
-            if let Some(ip) = self.input_popup.as_mut() {
-                ip.render(f, area, true);
-            }
-        }
     }
     // call [`TabCont::apply_popup_result`] first
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
@@ -236,36 +233,6 @@ impl Drawable for ProfileTab {
                         _ => return EventState::NotConsumed,
                     };
                     EventState::WorkDone
-                }
-            }
-            Focus::Input => {
-                if let Some(ip) = self.input_popup.as_mut() {
-                    match ip.handle_key_event(ev) {
-                        EventState::Yes => {
-                            let mut vec = self.input_popup.take().unwrap().collect();
-                            match vec.len() {
-                                2 => {
-                                    self.backend_content = Some(Call::Profile(BackendOp::Profile(
-                                        // there will only be 2 String, using swap_remove is safe
-                                        ProfileOp::Add(vec.swap_remove(0), vec.swap_remove(0)),
-                                    )));
-                                    self.popup_content =
-                                        Some(PopMsg::Prompt(vec!["Processing".to_owned()]));
-                                }
-                                1 => self.profiles.set_filter(vec.swap_remove(0)),
-                                _ => unimplemented!(),
-                            }
-                            self.focus = self.last_focus;
-                            EventState::Yes
-                        }
-                        EventState::Cancel => {
-                            self.focus = self.last_focus;
-                            EventState::Cancel
-                        }
-                        evst => evst,
-                    }
-                } else {
-                    EventState::NotConsumed
                 }
             }
         }

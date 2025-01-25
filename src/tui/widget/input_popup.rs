@@ -49,9 +49,14 @@ impl WidgetRef for Item {
             .render_ref(area, buf);
     }
 }
-impl Item {
-    pub fn handle_key_code(&mut self, code: KeyCode) -> crate::tui::misc::EventState {
-        match code {
+impl Drawable for Item {
+    fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, is_fouced: bool) {
+        self.is_highlight = is_fouced;
+        self.render_ref(area, f.buffer_mut());
+    }
+
+    fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState {
+        match ev.code {
             KeyCode::Char(ch) => self.enter_char(ch),
             KeyCode::Backspace => self.delete_char(),
             KeyCode::Left => self.move_cursor_left(),
@@ -69,6 +74,8 @@ impl Item {
         }
         EventState::WorkDone
     }
+}
+impl Item {
     fn reset_cursor(&mut self) {
         self.cursor = 0
     }
@@ -98,111 +105,101 @@ impl Item {
     }
 }
 
-#[derive(Default)]
-pub struct InputPopup {
-    items: Vec<Item>,
-    focus: usize,
-}
-impl InputPopup {
-    pub fn with_msg(msg: Vec<String>) -> Self {
-        Self {
-            items: msg.into_iter().map(|s| Item::title(&s)).collect(),
-            focus: 0,
-        }
-    }
-    /// collect all contents, in the origin order
-    pub fn collect(self) -> Vec<String> {
-        self.items.into_iter().map(|s| s.content()).collect()
-    }
-}
+// #[derive(Default)]
+// pub struct InputPopup {
+//     items: Vec<Item>,
+//     focus: usize,
+// }
+// impl InputPopup {
+//     pub fn with_msg(msg: Vec<String>) -> Self {
+//         Self {
+//             items: msg.into_iter().map(|s| Item::title(&s)).collect(),
+//             focus: 0,
+//         }
+//     }
+//     /// collect all contents, in the origin order
+//     pub fn collect(self) -> Vec<String> {
+//         self.items.into_iter().map(|s| s.content()).collect()
+//     }
+// }
 
-impl Drawable for InputPopup {
-    /// No need to [Raw::clear], or plan aera
-    fn render(&mut self, f: &mut ratatui::Frame, _: ratatui::layout::Rect, _: bool) {
-        use Ra::{Constraint, Layout};
-        let input_area = Layout::default()
-            .constraints([
-                Constraint::Percentage(25),
-                Constraint::Length(2 + self.items.len() as u16 * 3),
-                Constraint::Min(0),
-            ])
-            .horizontal_margin(10)
-            .vertical_margin(1)
-            .split(f.area())[1];
+// impl Drawable for InputPopup {
+//     /// No need to [Raw::clear], or plan aera
+//     fn render(&mut self, f: &mut ratatui::Frame, _: ratatui::layout::Rect, _: bool) {
+//         use Ra::{Constraint, Layout};
+//         let input_area = Layout::default()
+//             .constraints([
+//                 Constraint::Percentage(25),
+//                 Constraint::Length(2 + self.items.len() as u16 * 3),
+//                 Constraint::Min(0),
+//             ])
+//             .horizontal_margin(10)
+//             .vertical_margin(1)
+//             .split(f.area())[1];
 
-        f.render_widget(Raw::Clear, input_area);
+//         f.render_widget(Raw::Clear, input_area);
 
-        let chunks = Ra::Layout::default()
-            .constraints([Ra::Constraint::Fill(1)].repeat(self.items.len()))
-            .margin(1)
-            .split(input_area);
+//         let chunks = Ra::Layout::default()
+//             .constraints([Ra::Constraint::Fill(1)].repeat(self.items.len()))
+//             .margin(1)
+//             .split(input_area);
 
-        self.items
-            .iter_mut()
-            .enumerate()
-            .map(|(idx, itm)| {
-                itm.is_highlight = idx == self.focus;
-                (idx, itm)
-            })
-            .for_each(|(idx, itm)| itm.render_ref(chunks[idx], f.buffer_mut()));
+//         self.items
+//             .iter_mut()
+//             .enumerate()
+//             .for_each(|(idx, itm)| itm.render(f, chunks[idx], idx == self.focus));
 
-        Raw::Block::new()
-            .borders(Raw::Borders::ALL)
-            .border_style(Ra::Style::default().fg(Ra::Color::Rgb(135, 206, 236)))
-            .title("Input")
-            .render_ref(input_area, f.buffer_mut());
-    }
-    /// this will not catch unrecognized key,
-    /// which means key like `Tab` will still work.
-    fn handle_key_event(
-        &mut self,
-        ev: &crossterm::event::KeyEvent,
-    ) -> crate::tui::misc::EventState {
-        if ev.kind != crossterm::event::KeyEventKind::Press {
-            return EventState::NotConsumed;
-        }
-        match ev.code {
-            KeyCode::Up => self.focus = self.focus.saturating_sub(1).clamp(0, self.items.len() - 1),
-            KeyCode::Down => {
-                self.focus = self.focus.saturating_add(1).clamp(0, self.items.len() - 1)
-            }
-            _ => {
-                return self
-                    .items
-                    .get_mut(self.focus)
-                    .unwrap()
-                    .handle_key_code(ev.code)
-            }
-        }
-        EventState::WorkDone
-    }
-}
+//         Raw::Block::new()
+//             .borders(Raw::Borders::ALL)
+//             .border_style(Ra::Style::default().fg(Ra::Color::Rgb(135, 206, 236)))
+//             .title("Input")
+//             .render_ref(input_area, f.buffer_mut());
+//     }
+//     /// this will not catch unrecognized key,
+//     /// which means key like `Tab` will still work.
+//     fn handle_key_event(
+//         &mut self,
+//         ev: &crossterm::event::KeyEvent,
+//     ) -> crate::tui::misc::EventState {
+//         if ev.kind != crossterm::event::KeyEventKind::Press {
+//             return EventState::NotConsumed;
+//         }
+//         match ev.code {
+//             KeyCode::Up => self.focus = self.focus.saturating_sub(1).clamp(0, self.items.len() - 1),
+//             KeyCode::Down => {
+//                 self.focus = self.focus.saturating_add(1).clamp(0, self.items.len() - 1)
+//             }
+//             _ => return self.items.get_mut(self.focus).unwrap().handle_key_event(ev),
+//         }
+//         EventState::WorkDone
+//     }
+// }
 
-#[test]
-#[cfg(test)]
-#[ignore = "used to preview widget"]
-fn preview() {
-    use crossterm::event::{KeyEvent, KeyModifiers};
+// #[test]
+// #[cfg(test)]
+// #[ignore = "used to preview widget"]
+// fn preview() {
+//     use crossterm::event::{KeyEvent, KeyModifiers};
 
-    Theme::load(None).unwrap();
-    fn df(f: &mut Ra::Frame) {
-        let mut this = InputPopup::with_msg(vec![
-            "test1".to_owned(),
-            "test2".to_owned(),
-            "test3".to_owned(),
-        ]);
-        this.handle_key_event(&KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
-        this.render(f, f.area(), true);
-    }
-    // let o = std::panic::take_hook();
-    // std::panic::set_hook(Box::new(move |i| {
-    //     let _ = setup::restore();
-    //     o(i)
-    // }));
-    // use crate::tui::setup;
-    // setup::setup().unwrap();
-    let mut terminal = Ra::Terminal::new(Ra::CrosstermBackend::new(std::io::stdout())).unwrap();
-    terminal.draw(|f| df(f)).unwrap();
-    // std::thread::sleep(std::time::Duration::new(5, 0));
-    // setup::restore().unwrap();
-}
+//     Theme::load(None).unwrap();
+//     fn df(f: &mut Ra::Frame) {
+//         let mut this = InputPopup::with_msg(vec![
+//             "test1".to_owned(),
+//             "test2".to_owned(),
+//             "test3".to_owned(),
+//         ]);
+//         this.handle_key_event(&KeyEvent::new(KeyCode::Down, KeyModifiers::empty()));
+//         this.render(f, f.area(), true);
+//     }
+//     // let o = std::panic::take_hook();
+//     // std::panic::set_hook(Box::new(move |i| {
+//     //     let _ = setup::restore();
+//     //     o(i)
+//     // }));
+//     // use crate::tui::setup;
+//     // setup::setup().unwrap();
+//     let mut terminal = Ra::Terminal::new(Ra::CrosstermBackend::new(std::io::stdout())).unwrap();
+//     terminal.draw(|f| df(f)).unwrap();
+//     // std::thread::sleep(std::time::Duration::new(5, 0));
+//     // setup::restore().unwrap();
+// }
