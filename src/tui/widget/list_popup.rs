@@ -326,7 +326,10 @@ impl Drawable for ListPopup {
             );
         }
     }
-    /// close this by [EventState::Cancel]
+    /// - ready -> [EventState::Yes]
+    /// - canceled -> [EventState::Cancel]
+    /// - done with input, but no ready -> [EventState::WorkDone]
+    /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(
         &mut self,
         ev: &crossterm::event::KeyEvent,

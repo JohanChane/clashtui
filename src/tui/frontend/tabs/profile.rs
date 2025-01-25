@@ -205,7 +205,8 @@ impl Drawable for ProfileTab {
         #[cfg(not(feature = "template"))]
         self.profiles.render(f, area, self.focus == Focus::Profile);
     }
-    // call [`TabCont::apply_popup_result`] first
+    /// - Catched event -> [EventState::WorkDone]
+    /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
         match self.focus {
             Focus::Profile => {

@@ -92,7 +92,10 @@ impl Drawable for List {
             );
         }
     }
-    /// capture up/down/j/k and `Enter`/`Esc`, with `Enter` return [`EventState::Yes`], `Esc` return [`EventState::Cancel`]
+    /// - Up/Down/j/k -> [EventState::WorkDone]
+    /// - Enter -> [EventState::Yes]
+    /// - Esc -> [EventState::Cancel]
+    /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState {
         if ev.kind != KeyEventKind::Press {
             return EventState::NotConsumed;

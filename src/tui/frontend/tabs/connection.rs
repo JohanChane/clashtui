@@ -103,6 +103,8 @@ impl Drawable for ConnctionTab {
         }
     }
 
+    /// - Catched event -> [EventState::WorkDone]
+    /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState {
         use crossterm::event::KeyCode;
         if ev.kind != crossterm::event::KeyEventKind::Press {

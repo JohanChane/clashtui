@@ -105,7 +105,8 @@ impl Drawable for ServiceTab {
             self.mode_selector.render(f, select_area, true);
         }
     }
-    // call [`TabCont::apply_popup_result`] first
+    /// - Catched event -> [EventState::WorkDone]
+    /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
         let event_state;
         if self.select_mode {

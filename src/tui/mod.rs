@@ -11,6 +11,7 @@ use misc::EventState;
 
 trait Drawable {
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, is_fouced: bool);
+    /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState;
 }
 #[derive(derive_more::Debug)]

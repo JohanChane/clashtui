@@ -1,6 +1,8 @@
 use super::*;
 
 impl ProfileTab {
+    /// - Catched event -> [EventState::WorkDone]
+    /// - unrecognized event -> [EventState::NotConsumed]
     pub(super) fn handle_profile_key_event(&mut self, ev: &KeyEvent) -> EventState {
         let name = self
             .profiles
