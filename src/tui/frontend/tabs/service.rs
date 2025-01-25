@@ -123,10 +123,7 @@ impl Drawable for ServiceTab {
                     self.select_mode = false;
                 }
                 EventState::Cancel => self.select_mode = false,
-                EventState::NotConsumed
-                | EventState::WorkDone
-                | EventState::Choice2
-                | EventState::Choice3 => (),
+                EventState::NotConsumed | EventState::WorkDone => (),
             }
         } else {
             // ## handle inner
@@ -143,11 +140,7 @@ impl Drawable for ServiceTab {
                         }
                     };
                 }
-                EventState::Cancel
-                | EventState::NotConsumed
-                | EventState::WorkDone
-                | EventState::Choice2
-                | EventState::Choice3 => (),
+                EventState::Cancel | EventState::NotConsumed | EventState::WorkDone => (),
             }
         }
         event_state.unify()

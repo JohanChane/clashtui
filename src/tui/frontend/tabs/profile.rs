@@ -140,28 +140,32 @@ impl TabCont for ProfileTab {
                 if let Some(op) = self.temp_content.take() {
                     if let Call::Profile(BackendOp::Profile(ProfileOp::Update(name, _))) = op {
                         let the_choice = match selected {
-                            // if get Yes, we confirm this order and ready to send it
-                            EventState::Yes => Some(true),
-                            EventState::Choice2 => Some(false),
-                            EventState::Choice3 => None,
+                            // regarded as cancel
                             // if get No, this order is dropped
                             // as it is already moved out by `take`
-                            EventState::Cancel => return EventState::WorkDone,
+                            0 => return EventState::WorkDone,
+                            // regarded as yes
+                            // if get Yes, we confirm this order and ready to send it
+                            1 => Some(true),
+                            // regarded as extra-choices
+                            2 => Some(false),
+                            3 => None,
                             // ignore others
-                            EventState::NotConsumed | EventState::WorkDone => unreachable!(),
+                            _ => unreachable!(),
                         };
                         self.backend_content = Some(Call::Profile(BackendOp::Profile(
                             ProfileOp::Update(name, the_choice),
                         )));
                     } else {
                         match selected {
-                            // if get Yes, we confirm this order and ready to send it
-                            EventState::Yes => self.backend_content = Some(op),
                             // if get No, this order is dropped
                             // as it is already moved out by `take`
-                            EventState::Choice2 | EventState::Choice3 | EventState::Cancel => (),
+                            0 => (),
+                            // if get Yes, we confirm this order and ready to send it
+                            1 => self.backend_content = Some(op),
+                            // regarded as extra-choices
                             // ignore others
-                            EventState::NotConsumed | EventState::WorkDone => unreachable!(),
+                            _ => unreachable!(),
                         };
                     }
                     self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));

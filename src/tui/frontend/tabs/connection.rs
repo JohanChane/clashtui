@@ -119,10 +119,6 @@ impl Drawable for ConnctionTab {
                         .id
                         .map(|id| Call::Connection(BackendOp::Terminal(id)))
                 }
-                // KeyCode::Left => todo!(),
-                // KeyCode::Right => todo!(),
-                // KeyCode::Up => todo!(),
-                // KeyCode::Down => todo!(),
                 KeyCode::Esc => self.selected_con = None,
                 _ => {}
             }
@@ -218,12 +214,14 @@ impl TabCont for ConnctionTab {
     fn apply_popup_result(&mut self, res: PopRes) -> EventState {
         match res {
             PopRes::Selected(selected) => match selected {
-                EventState::Yes => {
+                // regarded as cancel
+                0 => (),
+                // regarded as yes
+                1 => {
                     self.backend_content = Some(Call::Connection(BackendOp::TerminalAll))
                 }
-                EventState::Cancel => (),
-                EventState::Choice2 | EventState::Choice3 => unreachable!(),
-                EventState::NotConsumed | EventState::WorkDone => unreachable!(),
+                // regarded as extra-choices
+                _ => unreachable!(),
             },
             PopRes::Input(mut vec) => self.filter = Some(vec.swap_remove(0)),
         }

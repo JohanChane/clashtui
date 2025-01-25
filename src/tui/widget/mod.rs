@@ -1,13 +1,9 @@
-mod input_popup;
 mod list;
 mod list_popup;
 pub mod tools;
 
-// pub use input_popup::InputPopup;
 pub use list::List;
 pub use list_popup::ListPopup;
-
-use super::misc::EventState;
 
 pub enum PopMsg {
     /// the first stand for the `question`,
@@ -28,6 +24,6 @@ pub enum PopMsg {
 }
 
 pub enum PopRes {
-    Selected(EventState),
+    Selected(usize),
     Input(Vec<String>),
 }

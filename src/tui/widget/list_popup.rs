@@ -3,12 +3,102 @@ use crossterm::event::KeyEventKind;
 use ratatui::prelude as Ra;
 use ratatui::widgets as Raw;
 
-use super::input_popup::Item;
 use super::tools;
 use super::PopMsg;
 use super::PopRes;
 use crate::tui::misc::EventState;
 use crate::tui::{Drawable, Theme};
+
+/// A single input widget like
+///```md
+/// ┌title─────────────────────────────┐
+/// │content                           │
+/// └──────────────────────────────────┘
+///```
+pub struct Item {
+    buffer: String,
+    cursor: usize,
+    title: String,
+}
+impl Item {
+    pub fn title(title: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            buffer: Default::default(),
+            cursor: Default::default(),
+        }
+    }
+    /// consume self and get content
+    pub fn content(self) -> String {
+        self.buffer
+    }
+}
+
+impl Drawable for Item {
+    fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, is_fouced: bool) {
+        let page = Raw::Paragraph::new(self.buffer.as_str())
+            .style(Ra::Style::default().fg(if is_fouced {
+                Theme::get().input_text_selected_fg
+            } else {
+                Theme::get().input_text_unselected_fg
+            }))
+            .block(
+                Raw::Block::default()
+                    .borders(Raw::Borders::ALL)
+                    .title(self.title.as_str()),
+            );
+        f.render_widget(page, area);
+    }
+
+    fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState {
+        match ev.code {
+            KeyCode::Char(ch) => self.enter_char(ch),
+            KeyCode::Backspace => self.delete_char(),
+            KeyCode::Left => self.move_cursor_left(),
+            KeyCode::Right => self.move_cursor_right(),
+
+            KeyCode::Enter => {
+                self.reset_cursor();
+                return EventState::Yes;
+            }
+            KeyCode::Esc => {
+                self.reset_cursor();
+                return EventState::Cancel;
+            }
+            _ => return EventState::NotConsumed,
+        }
+        EventState::WorkDone
+    }
+}
+impl Item {
+    fn reset_cursor(&mut self) {
+        self.cursor = 0
+    }
+    fn delete_char(&mut self) {
+        if self.cursor != 0 {
+            // Method "remove" is not used on the saved text for deleting the selected char.
+            // Reason: Using remove on String works on bytes instead of the chars.
+            // Using remove would require special care because of char boundaries.
+            self.buffer = self
+                .buffer
+                .char_indices()
+                .filter_map(|(idx, ch)| (idx != self.cursor - 1).then_some(ch))
+                .collect();
+            self.move_cursor_left();
+        }
+    }
+    fn enter_char(&mut self, ch: char) {
+        self.buffer.insert(self.cursor, ch);
+        self.move_cursor_right();
+    }
+    fn move_cursor_left(&mut self) {
+        self.cursor = self.cursor.saturating_sub(1).clamp(0, self.buffer.len());
+    }
+
+    fn move_cursor_right(&mut self) {
+        self.cursor = self.cursor.saturating_add(1).clamp(0, self.buffer.len());
+    }
+}
 
 enum Items {
     String(Vec<String>),
@@ -52,7 +142,7 @@ pub struct ListPopup {
     state: Raw::ListState,
     scrollbar: Raw::ScrollbarState,
     offset: usize,
-    selected: EventState,
+    selected: usize,
 }
 
 impl ListPopup {
@@ -251,19 +341,19 @@ impl Drawable for ListPopup {
                 KeyCode::Left | KeyCode::Char('h') => self.offset = self.offset.saturating_sub(1),
                 KeyCode::Right | KeyCode::Char('l') => self.offset = self.offset.saturating_add(1),
                 KeyCode::Esc | KeyCode::Char('n') => {
-                    self.selected = EventState::Cancel;
+                    self.selected = 0;
                     return EventState::Cancel;
                 }
                 KeyCode::Enter | KeyCode::Char('y') => {
-                    self.selected = EventState::Yes;
+                    self.selected = 1;
                     return EventState::Yes;
                 }
                 KeyCode::Char('o') => {
-                    self.selected = EventState::Choice2;
+                    self.selected = 2;
                     return EventState::Yes;
                 }
                 KeyCode::Char('t') => {
-                    self.selected = EventState::Choice3;
+                    self.selected = 3;
                     return EventState::Yes;
                 }
                 _ => return EventState::NotConsumed,
