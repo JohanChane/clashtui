@@ -10,10 +10,14 @@ impl BackEnd {
             .insert(name, ProfileType::Url(url.as_ref().to_owned()));
     }
     pub(super) fn remove_profile(&self, pf: Profile) -> anyhow::Result<()> {
-        let name = pf.name.clone();
-        let LocalProfile { path, .. } = self.load_local_profile(pf)?;
-        std::fs::remove_file(path)?;
-        self.pm.remove(name);
+        use crate::{utils::consts::PROFILE_PATH, HOME_DIR};
+        let path = HOME_DIR.join(PROFILE_PATH).join(&pf.name);
+        if let Err(e) = std::fs::remove_file(path) {
+            if e.kind() != std::io::ErrorKind::NotFound {
+                log::warn!("Failed to Remove profile: {e}")
+            }
+        };
+        self.pm.remove(pf.name);
         Ok(())
     }
     pub fn get_profile<S: AsRef<str>>(&self, name: S) -> Option<Profile> {
@@ -62,8 +66,13 @@ impl BackEnd {
                 #[cfg(feature = "template")]
                 ProfileType::Generated(template_name) => {
                     // rebuild from template
-                    self.apply_template(template_name.clone())?;
-                    return Ok(vec![format!("Updated: {}({template_name})", profile.name)]);
+                    if let Err(e) = self.apply_template(template_name.clone()) {
+                        anyhow::bail!("Failed to regenerate from {template_name}: {e}")
+                    };
+                    return Ok(vec![format!(
+                        "Regenerated: {}(From {template_name})",
+                        profile.name
+                    )]);
                 }
                 #[cfg(not(feature = "template"))]
                 ProfileType::Generated(..) => {

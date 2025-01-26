@@ -12,7 +12,10 @@ impl ProfileTab {
         match ev.code.into() {
             Keys::Import => {
                 self.popup_content = Some(PopMsg::Input(vec!["Path".to_owned()]));
-                self.temp_content = Some(Call::Profile(BackendOp::Template(TemplateOp::Add(String::new()))))
+                // helper for apply_popup_result
+                self.temp_content = Some(Call::Profile(BackendOp::Template(TemplateOp::Add(
+                    String::new(),
+                ))))
             }
             Keys::TemplateSwitch => {
                 self.focus = Focus::Profile;
@@ -31,8 +34,9 @@ impl ProfileTab {
             // Keys::ProfileInfo => todo!(),
             Keys::Preview => {
                 if let Some(name) = name {
-                    self.backend_content =
-                        Some(Call::Profile(BackendOp::Template(TemplateOp::Preview(name))));
+                    self.backend_content = Some(Call::Profile(BackendOp::Template(
+                        TemplateOp::Preview(name),
+                    )));
                     self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
                 }
             }

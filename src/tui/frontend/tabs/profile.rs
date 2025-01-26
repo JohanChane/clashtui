@@ -215,7 +215,7 @@ impl TabCont for ProfileTab {
                 PopRes::Input(mut vec) => {
                     match vec.len() {
                         1 => {
-                            if let Some(_) = self.temp_content.take() {
+                            if self.temp_content.take().is_some() {
                                 // we are trying to import a template
                                 self.backend_content = Some(Call::Profile(BackendOp::Template(
                                     TemplateOp::Add(vec.swap_remove(0)),

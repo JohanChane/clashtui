@@ -94,7 +94,8 @@ impl LocalProfile {
     /// sync the content to disk by [`LocalProfile::path`]
     pub fn sync_to_disk(self) -> anyhow::Result<()> {
         let LocalProfile { path, content, .. } = self;
-        let fp = File::create(path)?;
+        let fp = File::create(path)
+            .map_err(|e| anyhow::anyhow!("Failed to write clash config file: {e}"))?;
         Ok(serde_yml::to_writer(fp, &content)?)
     }
     pub fn from_pf(pf: Profile, path: std::path::PathBuf) -> Self {
