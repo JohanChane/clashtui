@@ -109,8 +109,8 @@ async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     let app = tui::FrontEnd::new();
     setup::setup()?;
     // make terminal restorable after panic
-    std::panic::set_hook(Box::new(|panic| {
-        let original_hook = std::panic::take_hook();
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic| {
         let _ = setup::restore();
         original_hook(panic);
     }));
