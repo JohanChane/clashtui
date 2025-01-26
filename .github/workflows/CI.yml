@@ -36,7 +36,6 @@ jobs:
           key: ci-${{ runner.os }}-${{ hashFiles('./Cargo.lock') }}
           restore-keys: |
             ci-${{ runner.os }}-${{ hashFiles('./Cargo.lock') }}
-            ci-${{ runner.os }}-
 
       - name: Docker Cache
         uses: ScribeMD/docker-cache@0.5.0
