@@ -38,6 +38,11 @@ jobs:
             ci-${{ runner.os }}-${{ hashFiles('./Cargo.lock') }}
             ci-${{ runner.os }}-
 
+      - name: Docker Cache
+        uses: ScribeMD/docker-cache@0.5.0
+        with:
+          key: docker-
+
       - uses: taiki-e/install-action@v2
         with:
           tool: cross, cargo-make, cargo-deb
