@@ -52,7 +52,7 @@ impl BackEnd {
         if profile.dtype.is_upgradable() {
             // store (name,url) to be downloaded
             let mut work_vec: Vec<(String, String)> = Vec::with_capacity(2);
-            match &profile.dtype {
+            match profile.dtype {
                 // Imported file won't update, overwrite it if necessary
                 ProfileType::File => unreachable!(),
                 // Update via the given link
@@ -60,9 +60,14 @@ impl BackEnd {
                     work_vec.push((url.clone(), profile.path.to_string_lossy().to_string()))
                 }
                 #[cfg(feature = "template")]
-                ProfileType::Generated(_template_name) => {
+                ProfileType::Generated(template_name) => {
                     // rebuild from template
-                    todo!()
+                    self.apply_template(template_name.clone())?;
+                    return Ok(vec![format!("Updated: {}({template_name})", profile.name)]);
+                }
+                #[cfg(not(feature = "template"))]
+                ProfileType::Generated(..) => {
+                    anyhow::bail!("template feature not enabled in this build!")
                 }
             }
             Ok(work_vec

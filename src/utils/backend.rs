@@ -16,14 +16,16 @@ pub enum CallBack {
     Edit,
     Preview(Vec<String>),
     ServiceCTL(String),
+    ProfileInit(Vec<String>, Vec<Option<core::time::Duration>>),
     ProfileCTL(Vec<String>),
     #[cfg(feature = "connection-tab")]
-    ConnctionCTL(String),
-    #[cfg(feature = "connection-tab")]
     ConnctionInit(#[debug(skip)] crate::clash::webapi::ConnInfo),
-    ProfileInit(Vec<String>, Vec<Option<core::time::Duration>>),
+    #[cfg(feature = "connection-tab")]
+    ConnctionCTL(String),
     #[cfg(feature = "template")]
     TemplateInit(Vec<String>),
+    #[cfg(feature = "template")]
+    TemplateCTL(Vec<String>),
 }
 
 use super::{

@@ -10,8 +10,7 @@ impl ProfileTab {
             .map(|index| self.profiles.get_items()[index].clone());
 
         match ev.code.into() {
-            Keys::ProfileImport => {
-                self.last_focus = self.focus;
+            Keys::Import => {
                 self.popup_content = Some(PopMsg::Input(vec!["Name".to_owned(), "Url".to_owned()]));
             }
             #[cfg(feature = "template")]
@@ -19,7 +18,7 @@ impl ProfileTab {
                 self.focus = Focus::Template;
             }
             // place in temp_content and build msg popup content
-            Keys::ProfileDelete => {
+            Keys::Delete => {
                 if let Some(name) = name {
                     self.temp_content =
                         Some(Call::Profile(BackendOp::Profile(ProfileOp::Remove(name))));
@@ -70,7 +69,6 @@ impl ProfileTab {
                 }
             }
             Keys::Search => {
-                self.last_focus = self.focus;
                 self.popup_content = Some(PopMsg::Input(vec!["Name".to_owned()]));
             }
             _ => return EventState::NotConsumed,

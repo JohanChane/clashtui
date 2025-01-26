@@ -140,6 +140,8 @@ impl FrontEnd {
                     }
                     #[cfg(feature = "connection-tab")]
                     CallBack::ConnctionCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
+                    #[cfg(feature = "template")]
+                    CallBack::TemplateCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
                 },
                 Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
                 Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {

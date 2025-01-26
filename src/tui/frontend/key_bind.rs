@@ -105,24 +105,27 @@ define_keys! {
         // Right(KeyCode::Right["Right"]),
         // Esc(KeyCode::Esc["Esc"]),
         // Tab(KeyCode::Tab["Tab"]),
-        # Profile
+        # Profile_Template
         /// Switch to template sub tab
         #[cfg(feature = "template")]
         ProfileSwitch(KeyCode::Char('t')),
+        /// Switch to profile sub tab
+        #[cfg(feature = "template")]
+        TemplateSwitch(KeyCode::Char('p')),
+        /// Edit this
+        Edit(KeyCode::Char('e')),
+        /// Preview content in program
+        Preview(KeyCode::Char('v')),
         /// Update profile
         ProfileUpdate(KeyCode::Char('u')),
         // ProfileUpdateAll(KeyCode::Char('a')),
-        /// Import new profile
-        ProfileImport(KeyCode::Char('i')),
-        /// Delete this profile
-        ProfileDelete(KeyCode::Char('d')),
+        /// Import new
+        Import(KeyCode::Char('i')),
+        /// Delete this
+        Delete(KeyCode::Char('d')),
         /// Test this profile
         ProfileTestConfig(KeyCode::Char('s')),
         // ProfileInfo(KeyCode::Char('n')),
-        # #[cfg(feature = "template")]
-        # Template
-        /// Switch to profile sub tab
-        TemplateSwitch(KeyCode::Char('p')),
         # #[cfg(feature = "connection-tab")]
         # Connction
         /// Terminate all running connections
@@ -130,10 +133,6 @@ define_keys! {
         /// Search the content
         Search(KeyCode::Char('/')),
         # Global
-        /// Edit this
-        Edit(KeyCode::Char('e')),
-        /// Preview content in program
-        Preview(KeyCode::Char('v')),
         /// Restart clash core
         SoftRestart(KeyCode::Char('R')),
         /// Show recent log

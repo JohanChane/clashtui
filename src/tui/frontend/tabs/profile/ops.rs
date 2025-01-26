@@ -44,4 +44,12 @@ pub enum TemplateOp {
     Add(String),
     /// ask for two option(`Yes/No`)
     Remove(String),
+    /// ask for preview
+    ///
+    /// though this is asked by tab, but it will be handled at frontend
+    Preview(String),
+    /// ask for edit
+    ///
+    /// though this is asked by tab, but it will be handled at frontend
+    Edit(String),
 }

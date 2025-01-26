@@ -1,4 +1,6 @@
 mod impl_profile;
+#[cfg(feature = "template")]
+mod impl_template;
 mod ops;
 
 use crossterm::event::KeyEvent;
@@ -28,8 +30,6 @@ pub(in crate::tui::frontend) struct ProfileTab {
     #[cfg(feature = "template")]
     templates: List,
     focus: Focus,
-    /// only used for return to last focus after the input popup closes
-    last_focus: Focus,
     popup_content: Option<PopMsg>,
     backend_content: Option<Call>,
     /// hold content for msg ask
@@ -53,14 +53,12 @@ impl ProfileTab {
             #[cfg(feature = "template")]
             templates,
             focus: Focus::Profile,
-            last_focus: Focus::Profile,
             popup_content: None,
             backend_content: None,
             temp_content: None,
             is_profiles_inited: false,
             #[cfg(feature = "template")]
             is_templates_inited: false,
-            // input_popup: None,
         }
     }
 }
@@ -123,6 +121,15 @@ impl TabCont for ProfileTab {
                 }
             }
             #[cfg(feature = "template")]
+            CallBack::TemplateCTL(result) => {
+                // require a refresh
+                self.is_templates_inited = false;
+                self.is_profiles_inited = false;
+                self.popup_content.replace(PopMsg::Prompt(
+                    ["Done".to_string()].into_iter().chain(result).collect(),
+                ));
+            }
+            #[cfg(feature = "template")]
             CallBack::TemplateInit(content) => {
                 if !self.is_templates_inited {
                     self.templates.set_items(content);
@@ -134,28 +141,64 @@ impl TabCont for ProfileTab {
     }
 
     fn apply_popup_result(&mut self, res: PopRes) -> EventState {
-        match res {
-            PopRes::Selected(selected) => {
-                if let Some(op) = self.temp_content.take() {
-                    if let Call::Profile(BackendOp::Profile(ProfileOp::Update(name, _))) = op {
-                        let the_choice = match selected {
-                            // regarded as cancel
-                            // if get No, this order is dropped
-                            // as it is already moved out by `take`
-                            0 => return EventState::WorkDone,
-                            // regarded as yes
-                            // if get Yes, we confirm this order and ready to send it
-                            1 => Some(true),
-                            // regarded as extra-choices
-                            2 => Some(false),
-                            3 => None,
-                            // ignore others
-                            _ => unreachable!(),
-                        };
-                        self.backend_content = Some(Call::Profile(BackendOp::Profile(
-                            ProfileOp::Update(name, the_choice),
-                        )));
-                    } else {
+        match self.focus {
+            Focus::Profile => match res {
+                PopRes::Selected(selected) => {
+                    if let Some(op) = self.temp_content.take() {
+                        if let Call::Profile(BackendOp::Profile(ProfileOp::Update(name, _))) = op {
+                            let the_choice = match selected {
+                                // regarded as cancel
+                                // if get No, this order is dropped
+                                // as it is already moved out by `take`
+                                0 => return EventState::WorkDone,
+                                // regarded as yes
+                                // if get Yes, we confirm this order and ready to send it
+                                1 => Some(true),
+                                // regarded as extra-choices
+                                2 => Some(false),
+                                3 => None,
+                                // ignore others
+                                _ => unreachable!(),
+                            };
+                            self.backend_content = Some(Call::Profile(BackendOp::Profile(
+                                ProfileOp::Update(name, the_choice),
+                            )));
+                        } else {
+                            match selected {
+                                // if get No, this order is dropped
+                                // as it is already moved out by `take`
+                                0 => (),
+                                // if get Yes, we confirm this order and ready to send it
+                                1 => self.backend_content = Some(op),
+                                // regarded as extra-choices
+                                // ignore others
+                                _ => unreachable!(),
+                            };
+                        }
+                        self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                    }
+                }
+                PopRes::Input(mut vec) => {
+                    match vec.len() {
+                        2 => {
+                            self.backend_content = Some(Call::Profile(BackendOp::Profile(
+                                // there will only be 2 String, using swap_remove is safe
+                                ProfileOp::Add(vec.swap_remove(0), vec.swap_remove(0)),
+                            )));
+                            self.popup_content =
+                                Some(PopMsg::Prompt(vec!["Processing".to_owned()]));
+                        }
+                        1 => self.profiles.set_filter(vec.swap_remove(0)),
+                        _ => unimplemented!(),
+                    }
+                }
+                PopRes::Selected_(..) => unreachable!(),
+            },
+            #[cfg(feature = "template")]
+            Focus::Template => match res {
+                PopRes::Selected(selected) => {
+                    // Remove request
+                    if let Some(op) = self.temp_content.take() {
                         match selected {
                             // if get No, this order is dropped
                             // as it is already moved out by `take`
@@ -166,24 +209,26 @@ impl TabCont for ProfileTab {
                             // ignore others
                             _ => unreachable!(),
                         };
+                        self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
                     }
-                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
                 }
-            }
-            PopRes::Input(mut vec) => {
-                match vec.len() {
-                    2 => {
-                        self.backend_content = Some(Call::Profile(BackendOp::Profile(
-                            // there will only be 2 String, using swap_remove is safe
-                            ProfileOp::Add(vec.swap_remove(0), vec.swap_remove(0)),
-                        )));
-                        self.popup_content = Some(PopMsg::Prompt(vec!["Processing".to_owned()]));
+                PopRes::Input(mut vec) => {
+                    match vec.len() {
+                        1 => {
+                            if let Some(_) = self.temp_content.take() {
+                                // we are trying to import a template
+                                self.backend_content = Some(Call::Profile(BackendOp::Template(
+                                    TemplateOp::Add(vec.swap_remove(0)),
+                                )));
+                            } else {
+                                self.templates.set_filter(vec.swap_remove(0))
+                            }
+                        }
+                        _ => unimplemented!(),
                     }
-                    1 => self.profiles.set_filter(vec.swap_remove(0)),
-                    _ => unimplemented!(),
                 }
-            }
-            PopRes::Selected_(..) => unreachable!(),
+                PopRes::Selected_(..) => unreachable!(),
+            },
         }
         EventState::WorkDone
     }
@@ -211,15 +256,14 @@ impl Drawable for ProfileTab {
         match self.focus {
             Focus::Profile => {
                 if self.profiles.handle_key_event(ev) == EventState::Yes {
-                    let name = self
+                    self.backend_content = self
                         .profiles
                         .selected()
-                        .map(|index| self.profiles.get_items()[index].clone());
-                    if let Some(name) = name {
-                        let pak = Call::Profile(BackendOp::Profile(ProfileOp::Select(name)));
-                        self.backend_content = Some(pak);
-                        self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
-                    }
+                        .map(|index| self.profiles.get_items()[index].clone())
+                        .map(ProfileOp::Select)
+                        .map(BackendOp::Profile)
+                        .map(Call::Profile);
+                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
                     EventState::WorkDone
                 } else {
                     self.handle_profile_key_event(ev)
@@ -229,15 +273,17 @@ impl Drawable for ProfileTab {
             Focus::Template => {
                 if self.templates.handle_key_event(ev) == EventState::Yes {
                     // Enter means select
-                    todo!("build op")
-                } else {
-                    match ev.code.into() {
-                        Keys::Preview => todo!(),
-                        Keys::TemplateSwitch => self.focus = Focus::Profile,
-                        Keys::Edit => todo!(),
-                        _ => return EventState::NotConsumed,
-                    };
+                    self.backend_content = self
+                        .templates
+                        .selected()
+                        .map(|index| self.templates.get_items()[index].clone())
+                        .map(TemplateOp::Generate)
+                        .map(BackendOp::Template)
+                        .map(Call::Profile);
+                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
                     EventState::WorkDone
+                } else {
+                    self.handle_template_key_event(ev)
                 }
             }
         }

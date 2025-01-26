@@ -19,11 +19,17 @@ exclude = [".github", ".gitignore", "PkgManagers"]
 # maintenance = { status = "passively-maintained" }
 
 [features]
-tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-util", "dep:derive_more"]
+tui = [
+  "dep:ratatui",
+  "dep:crossterm",
+  "dep:tokio",
+  "dep:futures-util",
+  "dep:derive_more",
+]
 customized-theme = ["tui", "ratatui/serde"]
 template = []
 connection-tab = ["tui", "ratatui/unstable-widget-ref"]
-default = ["tui", "connection-tab"]
+default = ["tui", "connection-tab", "template"]
 
 
 [dependencies]
@@ -65,22 +71,22 @@ default-features = false
 features = ["crossterm"]
 optional = true
 
-[target.'cfg(windows)'.dependencies]
-encoding_rs = "0.8.34"
+[dependencies.clap]
+version = "4.5.17"
+default-features = false
+features = ["std", "derive", "help", "usage", "suggestions", "color"]
 
 [dependencies.log4rs]
 version = "1.3.0"
 default-features = false
 features = ["pattern_encoder", "file_appender"]
 
+[target.'cfg(windows)'.dependencies]
+encoding_rs = "0.8.34"
+
 [patch.crates-io]
 log4rs = { git = "https://github.com/Jackhr-arch/log4rs" }
 is-root = { git = "https://github.com/Jackhr-arch/is-root" }
-
-[dependencies.clap]
-version = "4.5.17"
-default-features = false
-features = ["std", "derive", "help", "usage", "suggestions", "color"]
 
 
 [profile.release]

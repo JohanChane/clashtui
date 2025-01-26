@@ -1,6 +1,7 @@
 mod blob_file;
 mod config;
 mod config_struct;
+#[cfg(feature = "connection-tab")]
 mod conn;
 mod control;
 pub mod local_config;
