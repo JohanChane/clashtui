@@ -274,7 +274,7 @@ impl Drawable for ProfileTab {
                         .inspect(|_| {
                             self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]))
                         })
-                        .and_then(|index| self.profiles.get_items().get(index).cloned())
+                        .and_then(|index| self.templates.get_items().get(index).cloned())
                         .map(TemplateOp::Generate)
                         .map(BackendOp::Template)
                         .map(Call::Profile);
