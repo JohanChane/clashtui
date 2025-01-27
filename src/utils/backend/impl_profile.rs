@@ -259,9 +259,7 @@ impl BackEnd {
                     "sh",
                     vec![
                         "-c",
-                        self.edit_cmd
-                            .replace("%s", &path.to_str().unwrap())
-                            .as_str(),
+                        self.edit_cmd.replace("%s", path.to_str().unwrap()).as_str(),
                     ],
                 ) {
                     Ok(()) => CallBack::Edit,
