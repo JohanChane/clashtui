@@ -29,8 +29,24 @@ impl BackEnd {
             .get("clashtui_template_version")
             .and_then(|v| v.as_u64())
         {
+            // regard as version 1
             None => {
-                todo!("fallback")
+                let ver = 1;
+                // file is opened, so file_name should exist
+                let name_maybe_with_ext = path.file_name().unwrap().to_str().unwrap();
+                let name = name_maybe_with_ext
+                    // remove the last one only
+                    // e.g. this.tar.gz => this.tar
+                    .rsplit_once('.')
+                    .map(|(v, _)| v)
+                    .unwrap_or(name_maybe_with_ext);
+                std::fs::copy(&path, HOME_DIR.join(TEMPLATE_PATH).join(name))?;
+                Ok(Some(format!(
+                    "Name:{} Added\nClashtui Template Version {}",
+                    // path from a String, should be UTF-8
+                    name,
+                    ver
+                )))
             }
             Some(ver) if ver <= 1 => {
                 // file is opened, so file_name should exist
@@ -39,8 +55,8 @@ impl BackEnd {
                     // remove the last one only
                     // e.g. this.tar.gz => this.tar
                     .rsplit_once('.')
-                    .unwrap_or((name_maybe_with_ext, ""))
-                    .0;
+                    .map(|(v, _)| v)
+                    .unwrap_or(name_maybe_with_ext);
                 std::fs::copy(&path, HOME_DIR.join(TEMPLATE_PATH).join(name))?;
                 Ok(Some(format!(
                     "Name:{} Added\nClashtui Template Version {}",
@@ -61,10 +77,7 @@ impl BackEnd {
             .get("clashtui_template_version")
             .and_then(|v| v.as_u64())
         {
-            None => {
-                todo!("fallback")
-            }
-            Some(1) => {
+            None | Some(1) => {
                 let gened = template_ver1(map, &name)?;
                 let gened_name = format!("{name}.clashtui_generated");
                 let path = HOME_DIR.join(PROFILE_PATH).join(&gened_name);
@@ -92,21 +105,26 @@ fn template_ver1(
             };
         };
     }
-    let local_urls = vec!["".to_owned()];
+    #[derive(Hash, PartialEq, Eq)]
+    enum PGproxies {
+        FullName(String),
+        Prefix(String),
+    }
+    let local_urls = vec!["1".to_owned()];
     // proxy-providers with proxy-groups
-    let mut relation: std::collections::HashMap<serde_yml::Value, Vec<serde_yml::Value>> =
-        std::collections::HashMap::new();
     // relationship between proxy-providers and proxy-groups
-    {
+    let mut relation = {
+        let mut relation: std::collections::HashMap<serde_yml::Value, Vec<serde_yml::Value>> =
+            std::collections::HashMap::new();
         expand!(
-            Some(serde_yml::Value::Sequence(pg)),
+            Some(serde_yml::Value::Sequence(proxy_groups)),
             tpl.remove("proxy-groups")
         );
         //  - name: "Sl"
         //    tpl_param:
         //      providers: ["pvd"]
         //    type: select
-        for value in pg {
+        for value in proxy_groups {
             if value.get("tpl_param").is_none() {
                 relation
                     .entry(serde_yml::Value::Null)
@@ -130,8 +148,46 @@ fn template_ver1(
                     .push(serde_yml::Value::Mapping(value.clone()));
             }
         }
+        relation
+    };
+    // proxy-groups with proxy-groups's name
+    let mut relation2: std::collections::HashMap<
+        serde_yml::Value,
+        std::collections::HashSet<PGproxies>,
+    > = std::collections::HashMap::new();
+    // relationship between proxy-groups
+    {
+        // - name: "Entry"
+        //   type: select
+        //   proxies:
+        //     - Common
+        //     - <At>
+        //     - <Sl>
+        for (_key, value) in &relation {
+            for value in value {
+                for va in value
+                    .get("proxies")
+                    .and_then(|p| p.as_sequence())
+                    .iter()
+                    .flat_map(|v| v.iter())
+                    .map(|i| i.as_str().unwrap().to_owned())
+                {
+                    if va.starts_with('<') && va.ends_with('>') {
+                        let trimed_str = va.trim_start_matches('<').trim_end_matches('>');
+                        relation2
+                            .entry(value.clone())
+                            .or_default()
+                            .insert(PGproxies::Prefix(trimed_str.to_owned()));
+                    } else {
+                        relation2
+                            .entry(value.clone())
+                            .or_default()
+                            .insert(PGproxies::FullName(va));
+                    }
+                }
+            }
+        }
     }
-
     // proxy-providers
     {
         expand!(
@@ -160,7 +216,7 @@ fn template_ver1(
             for (i, url) in local_urls.iter().enumerate() {
                 use serde_yml::Value::String;
                 let mut spp = content.clone();
-                let proxy_provider_name = format!("{name}-{i}");
+                let proxy_provider_name = format!("{name}{i}");
                 spp.insert(String("url".to_string()), String(url.clone()));
                 spp.insert(
                     String("path".to_string()),
@@ -212,29 +268,24 @@ fn template_ver1(
                         .collect(),
                 );
             }
-            if let Some(serde_yml::Value::Sequence(groups)) = pg.get("proxies") {
-                let mut new_groups = Vec::new();
-                for g in groups {
-                    let g_str = g.as_str().unwrap();
-                    if g_str.starts_with('<') && g_str.ends_with('>') {
-                        let trimmed_p_str = g_str.trim_start_matches('<').trim_end_matches('>');
-                        new_groups.extend(
-                            extended_proxy_providers
-                                .iter()
-                                .map(|(k, _)| k.as_str().unwrap())
-                                .filter(|n| n.starts_with(trimmed_p_str))
-                                .map(|s| s.to_owned()),
-                        );
-                    } else {
-                        new_groups.push(g_str.to_string());
-                    }
+        }
+        for (pg_, name) in relation2 {
+            let mut name_vec: Vec<serde_yml::Value> = vec![];
+            for pg in &extended_proxy_groups {
+                let pg_name = pg.get("name").unwrap().as_str().unwrap();
+                if name.iter().any(|name| match name {
+                    PGproxies::Prefix(name) => pg_name.starts_with(name),
+                    PGproxies::FullName(name) => pg_name == name,
+                }) {
+                    name_vec.push(pg_name.into());
                 }
-                pg["proxies"] = serde_yml::Value::Sequence(
-                    new_groups
-                        .into_iter()
-                        .map(serde_yml::Value::String)
-                        .collect(),
-                );
+            }
+            for pg in &mut extended_proxy_groups {
+                let pg_name = pg.get("name").unwrap();
+                if pg_.get("name").unwrap() == pg_name {
+                    pg["proxies"] = name_vec.into();
+                    break;
+                }
             }
         }
         tpl.insert(
@@ -249,75 +300,6 @@ fn template_ver1(
     Ok(tpl)
 }
 
-#[test]
-fn ets() {
-    let s = r#"proxy-anchor:
-  - delay_test: &pa_dt {url: https://www.gstatic.com/generate_204, interval: 300}
-  - proxy_provider: &pa_pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
-
-proxy-groups:
-  - name: "Entry"
-    type: select
-    proxies:
-      - <At>                    # 使用 proxy-groups 中的 `At` 模板代理组。
-      - <Sl>                    # 与 `<At>` 同理。
-
-  - name: "Sl"                  # 定义名称是 `Sl` (名称可自定义) 的模板代理组。根据模板代理提供者 `pvd`, 会生成 `Sl-pvd0`, `Sl-pvd1`, ...
-    tpl_param:
-      providers: ["pvd"]        # 表示使用名称是 `pvd` 的模板代理提供者。
-    type: select
-
-  - name: "At"                  # 与 `Sl` 同理。
-    tpl_param:
-      providers: ["pvd"]
-    type: url-test
-    <<: *pa_dt
-
-  - name: "Entry-RuleMode"        # 类似于黑白名单模式。用于控制有无代理都可以访问的网站使用代理或直连。
-    type: select
-    proxies:
-      - DIRECT
-      - Entry
-
-  - name: "Entry-LastMatch"       # 设置不匹配规则的连接的入口。
-    type: select
-    proxies:
-      - Entry
-      - DIRECT
-
-proxy-providers:
-  pvd:             # 定义名称是 `pvd` (名称可自定义) 的模板代理提供者。会生成 `pvd0`, `pvd1`, ...
-    tpl_param:
-    type: http    # type 字段要放在此处, 不能放入 pp。原因是要用于更新资源。
-    <<: *pa_pp
-
-rules:
-  #- IN-TYPE,INNER,DIRECT       # 设置 mihomo 内部的网络连接(比如: 更新 proxy-providers, rule-providers 等)是直连。
-  - GEOIP,lan,DIRECT,no-resolve
-  - GEOSITE,biliintl,Entry
-  - GEOSITE,ehentai,Entry
-  - GEOSITE,github,Entry
-  - GEOSITE,twitter,Entry
-  - GEOSITE,youtube,Entry
-  - GEOSITE,google,Entry
-  - GEOSITE,telegram,Entry
-  - GEOSITE,netflix,Entry
-  - GEOSITE,bilibili,Entry-RuleMode
-  - GEOSITE,bahamut,Entry
-  - GEOSITE,spotify,Entry
-  - GEOSITE,geolocation-!cn,Entry
-  - GEOIP,google,Entry
-  - GEOIP,netflix,Entry
-  - GEOIP,telegram,Entry
-  - GEOIP,twitter,Entry
-  - GEOSITE,pixiv,Entry
-  - GEOSITE,CN,Entry-RuleMode
-  - GEOIP,CN,Entry-RuleMode
-  - MATCH,Entry-LastMatch"#;
-    let p = serde_yml::from_str(s).unwrap();
-    let p = template_ver1(p, "tpl_name").unwrap();
-    println!("{}", serde_yml::to_string(&p).unwrap())
-}
 #[cfg(feature = "tui")]
 impl BackEnd {
     pub(super) fn handle_template_op(&self, op: TemplateOp) -> CallBack {
