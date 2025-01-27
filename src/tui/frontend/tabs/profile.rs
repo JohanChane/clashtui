@@ -252,11 +252,13 @@ impl Drawable for ProfileTab {
                     self.backend_content = self
                         .profiles
                         .selected()
-                        .map(|index| self.profiles.get_items()[index].clone())
+                        .inspect(|_| {
+                            self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]))
+                        })
+                        .and_then(|index| self.profiles.get_items().get(index).cloned())
                         .map(ProfileOp::Select)
                         .map(BackendOp::Profile)
                         .map(Call::Profile);
-                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
                     EventState::WorkDone
                 } else {
                     self.handle_profile_key_event(ev)
@@ -269,11 +271,13 @@ impl Drawable for ProfileTab {
                     self.backend_content = self
                         .templates
                         .selected()
-                        .map(|index| self.templates.get_items()[index].clone())
+                        .inspect(|_| {
+                            self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]))
+                        })
+                        .and_then(|index| self.profiles.get_items().get(index).cloned())
                         .map(TemplateOp::Generate)
                         .map(BackendOp::Template)
                         .map(Call::Profile);
-                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
                     EventState::WorkDone
                 } else {
                     self.handle_template_key_event(ev)
