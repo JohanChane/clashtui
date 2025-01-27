@@ -127,8 +127,7 @@ impl List {
     ///
     /// Returns `None` if no item is selected
     pub fn selected(&self) -> Option<usize> {
-        self.state
-            .selected()
+        self.state.selected()
     }
 
     fn next(&mut self) {

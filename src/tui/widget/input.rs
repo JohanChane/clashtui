@@ -125,9 +125,9 @@ mod test {
             {
                 let e = self.handle_key_event(&KeyEvent::new(op, KeyModifiers::empty()));
                 ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 100))
-                .unwrap()
-                .draw(|f| self.render(f, f.area(), true))
-                .unwrap();
+                    .unwrap()
+                    .draw(|f| self.render(f, f.area(), true))
+                    .unwrap();
                 assert_eq!(e, evst, "now running {op} {evst:?} {buffer} {cursor}");
                 assert_eq!(
                     self.cursor, cursor,

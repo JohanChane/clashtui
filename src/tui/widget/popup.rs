@@ -300,7 +300,7 @@ impl Popup {
     fn previous(&mut self) {
         if self.state.selected().is_none() {
             self.scrollbar.last();
-        } else{
+        } else {
             self.scrollbar.prev();
         }
         self.state.select_previous();

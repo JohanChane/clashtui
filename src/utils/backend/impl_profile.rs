@@ -1,8 +1,11 @@
 use profile::ProfileType;
 
 use super::*;
-use crate::clash::util::extract_domain;
+#[cfg(feature = "tui")]
+use crate::tui::tabs::profile::ProfileOp;
 use std::fs::File;
+
+use crate::{clash::util::extract_domain, utils::consts::PROFILE_PATH, HOME_DIR};
 
 impl BackEnd {
     pub(super) fn create_profile<S: AsRef<str>, S2: AsRef<str>>(&self, name: S, url: S2) {
@@ -10,7 +13,6 @@ impl BackEnd {
             .insert(name, ProfileType::Url(url.as_ref().to_owned()));
     }
     pub(super) fn remove_profile(&self, pf: Profile) -> anyhow::Result<()> {
-        use crate::{utils::consts::PROFILE_PATH, HOME_DIR};
         let path = HOME_DIR.join(PROFILE_PATH).join(&pf.name);
         if let Err(e) = std::fs::remove_file(path) {
             if e.kind() != std::io::ErrorKind::NotFound {
@@ -149,5 +151,123 @@ impl BackEnd {
         return ipc::exec("cmd", vec!["/C", cmd.as_str()]);
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         ipc::exec("sh", vec!["-c", cmd.as_str()])
+    }
+}
+#[cfg(feature = "tui")]
+impl BackEnd {
+    pub(super) fn handle_profile_op(&self, op: ProfileOp) -> CallBack {
+        match op {
+            ProfileOp::GetALL => {
+                let mut composed: Vec<(String, Option<std::time::Duration>)> = self
+                    .get_all_profiles()
+                    .into_iter()
+                    .map(|pf| {
+                        (
+                            pf.name.clone(),
+                            self.load_local_profile(pf).ok().and_then(|lp| lp.atime()),
+                        )
+                    })
+                    .collect();
+                composed.sort();
+                let (name, atime) = composed.into_iter().collect();
+                CallBack::ProfileInit(name, atime)
+            }
+            ProfileOp::Add(name, url) => {
+                self.create_profile(&name, url);
+                match self.update_profile(
+                    self.get_profile(name)
+                        .expect("Cannot find selected profile"),
+                    None,
+                ) {
+                    Ok(v) => CallBack::ProfileCTL(v),
+                    Err(e) => CallBack::Error(e.to_string()),
+                }
+            }
+            ProfileOp::Remove(name) => {
+                if let Err(e) = self.remove_profile(
+                    self.get_profile(name)
+                        .expect("Cannot find selected profile"),
+                ) {
+                    CallBack::Error(e.to_string())
+                } else {
+                    CallBack::ProfileCTL(vec!["Profile is now removed".to_owned()])
+                }
+            }
+            ProfileOp::Update(name, with_proxy) => {
+                match self.update_profile(
+                    self.get_profile(name)
+                        .expect("Cannot find selected profile"),
+                    with_proxy,
+                ) {
+                    Ok(v) => CallBack::ProfileCTL(v),
+                    Err(e) => CallBack::Error(e.to_string()),
+                }
+            }
+            ProfileOp::Select(name) => {
+                if let Err(e) = self.select_profile(
+                    self.get_profile(name)
+                        .expect("Cannot find selected profile"),
+                ) {
+                    CallBack::Error(e.to_string())
+                } else {
+                    CallBack::ProfileCTL(vec!["Profile is now loaded".to_owned()])
+                }
+            }
+            ProfileOp::Test(name, geodata_mode) => {
+                let pf = self
+                    .get_profile(name)
+                    .expect("Cannot find selected profile");
+                match self.load_local_profile(pf).and_then(|pf| {
+                    self.test_profile_config(&pf.path.to_string_lossy(), geodata_mode)
+                        .map_err(|e| e.into())
+                }) {
+                    Ok(v) => CallBack::ProfileCTL(v.lines().map(|s| s.to_owned()).collect()),
+                    Err(e) => CallBack::Error(e.to_string()),
+                }
+            }
+            ProfileOp::Preview(name) => {
+                let mut lines = Vec::with_capacity(1024);
+                let pf = self
+                    .get_profile(name)
+                    .expect("Cannot find selected profile");
+                let path = HOME_DIR.join(PROFILE_PATH).join(&pf.name);
+                lines.push(
+                    pf.dtype
+                        .get_domain()
+                        .unwrap_or("Imported local file".to_owned()),
+                );
+                lines.push(Default::default());
+                match std::fs::read_to_string(path) {
+                    Ok(content) => CallBack::Preview({
+                        if content.is_empty() {
+                            lines.push("yaml file is empty. Please update it.".to_owned());
+                        } else {
+                            lines.extend(content.lines().map(|s| s.to_owned()));
+                        }
+                        lines
+                    }),
+                    Err(e) => CallBack::Error(e.to_string()),
+                }
+            }
+            ProfileOp::Edit(name) => {
+                let pf = self
+                    .get_profile(name)
+                    .expect("Cannot find selected profile");
+                let path = HOME_DIR.join(PROFILE_PATH).join(&pf.name);
+
+                match ipc::spawn(
+                    "sh",
+                    vec![
+                        "-c",
+                        self.edit_cmd
+                            .replace("%s", &path.to_str().unwrap())
+                            .as_str(),
+                    ],
+                ) {
+                    Ok(()) => CallBack::Edit,
+                    Err(e) => CallBack::Error(e.to_string()),
+                }
+            }
+        }
     }
 }
