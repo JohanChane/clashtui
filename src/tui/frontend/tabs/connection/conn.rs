@@ -22,9 +22,8 @@ impl Connection {
         ])
     }
     /// once lose track, this [Connection] will never be tracked again
-    pub fn lose_track(mut self) -> Box<Self> {
+    pub fn lose_track(&mut self) {
         self.id = None;
-        Box::new(self)
     }
     pub fn match_keyword(&self, pat: &str) -> bool {
         self.chains.contains(pat) || self.domain.contains(pat) || self.rule_type.contains(pat)

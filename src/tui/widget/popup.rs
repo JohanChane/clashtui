@@ -59,7 +59,7 @@ impl Popup {
     /// When call [collect](Self::collect), an enum will be produced
     /// to show which section are selected
     pub fn set_msg(&mut self, title: &str, items: Vec<String>) {
-        self.state = Default::default();
+        self.state = Raw::ListState::default();
         self.offset = 0;
         self.title = title.to_owned();
         self.scrollbar = Raw::ScrollbarState::new(items.len());
@@ -75,6 +75,7 @@ impl Popup {
     /// When call [collect](Self::collect), an Vec will be produced
     /// to show user's answer.
     pub fn set_input(&mut self, items: Vec<String>) {
+        debug_assert!(!items.is_empty());
         self.state = Raw::ListState::default().with_selected(Some(0));
         self.offset = 0;
         self.title = "Input".to_owned();
@@ -98,7 +99,7 @@ impl Popup {
             }
             Items::AskChoices(..) => {
                 self.clear();
-                Some(PopRes::Selected(self.selected))
+                Some(PopRes::Choices(self.selected))
             }
             Items::Input(vec) => {
                 let vec = std::mem::take(vec)
@@ -110,14 +111,14 @@ impl Popup {
             }
             Items::SelectList(..) => {
                 self.clear();
-                self.state.selected().map(PopRes::Selected_)
+                self.state.selected().map(PopRes::Selected)
             }
         }
     }
     pub fn show_msg(&mut self, msg: PopMsg) {
         macro_rules! expending {
             ($title:expr, $items:expr, $adp:expr) => {
-                self.state = Default::default();
+                self.state = Raw::ListState::default();
                 self.offset = 0;
                 self.title = $title;
                 self.__max_item_width = $items.iter().map(|i| i.len()).max().unwrap_or(0);
@@ -206,6 +207,12 @@ impl Drawable for Popup {
                     .margin(1)
                     .split(area);
 
+                // If the selected index is out of bounds, set it to the last item
+                // this is done when rendering List, but there is no list in this branch
+                if self.state.selected().is_some_and(|s| s >= vec.len()) {
+                    self.state.select(Some(vec.len().saturating_sub(1)));
+                }
+
                 vec.iter_mut().enumerate().for_each(|(idx, itm)| {
                     itm.render(
                         f,
@@ -273,11 +280,6 @@ impl Drawable for Popup {
                 KeyCode::Down => self.next(),
                 KeyCode::Up => self.previous(),
                 _ => {
-                    // If the selected index is out of bounds, set it to the last item
-                    // this is done when rendering List, but there is no list in this branch
-                    if self.state.selected().is_some_and(|s| s >= vec.len()) {
-                        self.state.select(Some(vec.len().saturating_sub(1)));
-                    }
                     return vec
                         .get_mut(self.state.selected().unwrap_or_default())
                         .unwrap()
@@ -291,18 +293,16 @@ impl Drawable for Popup {
 
 impl Popup {
     fn next(&mut self) {
-        if self.items.is_empty() {
-            return;
-        }
         self.scrollbar.next();
         self.state.select_next();
     }
 
     fn previous(&mut self) {
-        if self.items.is_empty() {
-            return;
+        if self.state.selected().is_none() {
+            self.scrollbar.last();
+        } else{
+            self.scrollbar.prev();
         }
-        self.scrollbar.prev();
         self.state.select_previous();
     }
 }
@@ -311,7 +311,7 @@ impl Popup {
 #[cfg(test)]
 mod test {
     use super::Popup;
-    use crate::tui::{misc::EventState, widget::PopRes, Drawable, PopMsg};
+    use crate::tui::{misc::EventState, widget::PopRes, Drawable, PopMsg, Theme};
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     trait Test {
         fn apply_test(
@@ -330,6 +330,8 @@ mod test {
             check_cursors: &[Option<usize>],
             check_offsets: &[usize],
         ) -> &mut Self {
+            let _ = Theme::load(None);
+
             for (((&op, &evst), &cursor), &offset) in ops
                 .into_iter()
                 .zip(check_evsts)
@@ -337,6 +339,10 @@ mod test {
                 .zip(check_offsets)
             {
                 let e = self.handle_key_event(&KeyEvent::new(op, KeyModifiers::empty()));
+                ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 100))
+                    .unwrap()
+                    .draw(|f| self.render(f, f.area(), true))
+                    .unwrap();
                 assert_eq!(e, evst, "now running {op} {evst:?} {cursor:?} {offset}");
                 assert_eq!(
                     self.state.selected(),
@@ -368,7 +374,7 @@ mod test {
                 &[0, 0, 0],
             )
             .apply_test(
-                &[KeyCode::Down, KeyCode::Char('b'), KeyCode::Up],
+                &[KeyCode::Char('b'), KeyCode::Down, KeyCode::Up],
                 &[
                     EventState::WorkDone,
                     EventState::WorkDone,
@@ -376,7 +382,7 @@ mod test {
                 ],
                 // cursor fix happen at char input currently
                 // so index out of range won't happen
-                &[Some(2), Some(1), Some(0)],
+                &[Some(1), Some(1), Some(0)],
                 &[0, 0, 0],
             );
         let res = popup.collect();
@@ -423,6 +429,6 @@ mod test {
                 &[1, 1, 1],
             );
         let res = popup.collect();
-        assert_eq!(res, Some(PopRes::Selected_(0)));
+        assert_eq!(res, Some(PopRes::Selected(0)));
     }
 }

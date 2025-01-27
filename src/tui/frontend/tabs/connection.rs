@@ -34,13 +34,6 @@ pub(in crate::tui::frontend) struct ConnctionTab {
     backend_content: Option<Call>,
 }
 
-impl ConnctionTab {
-    /// Creates a new [`ConnctionTab`].
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
 impl std::fmt::Display for ConnctionTab {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", crate::tui::frontend::consts::TAB_TITLE_CONNECTION)
@@ -187,26 +180,21 @@ impl TabCont for ConnctionTab {
                     upload_total,
                     connections,
                 } = items;
-                self.items = if let Some(pat) = &self.filter {
-                    connections.map(|v| {
-                        v.into_iter()
-                            .map(|c| c.into())
-                            .filter(|c: &Connection| c.match_keyword(pat))
-                            .collect()
+                self.items = connections
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|c| c.into())
+                    .filter(|c: &Connection| {
+                        self.filter.as_ref().is_none_or(|pat| c.match_keyword(pat))
                     })
-                } else {
-                    connections.map(|v| v.into_iter().map(|c| c.into()).collect())
-                }
-                .unwrap_or_default();
+                    .collect();
                 self.travel_up = upload_total;
                 self.travel_down = download_total;
                 // try update track here
-                if let Some(con) = self.selected_con.as_ref() {
+                if let Some(con) = self.selected_con.as_mut() {
                     // cannot match this id in list
                     if !self.items.iter().any(|c| c.id == con.id) {
-                        let con = self.selected_con.take().unwrap();
-                        let con = con.lose_track();
-                        self.selected_con = Some(con);
+                        con.lose_track();
                     };
                 }
             }
@@ -216,7 +204,8 @@ impl TabCont for ConnctionTab {
 
     fn apply_popup_result(&mut self, res: PopRes) -> EventState {
         match res {
-            PopRes::Selected(selected) => match selected {
+            // if we should terminal all connections
+            PopRes::Choices(selected) => match selected {
                 // regarded as cancel
                 0 => (),
                 // regarded as yes
@@ -224,8 +213,9 @@ impl TabCont for ConnctionTab {
                 // regarded as extra-choices
                 _ => unreachable!(),
             },
+            // get filter content
             PopRes::Input(mut vec) => self.filter = Some(vec.swap_remove(0)),
-            PopRes::Selected_(..) => unreachable!(),
+            PopRes::Selected(..) => unreachable!(),
         }
         EventState::WorkDone
     }
@@ -236,55 +226,20 @@ impl ConnctionTab {
     ///
     /// Returns `None` if no item is selected
     pub fn selected(&self) -> Option<usize> {
-        if self.items.is_empty() {
-            return None;
-        }
         self.state.selected()
     }
 
     fn next(&mut self) {
-        if self.items.is_empty() {
-            return;
-        }
-
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.items.len() - 1 {
-                    self.scrollbar.first();
-                    0
-                } else {
-                    self.scrollbar.next();
-                    i + 1
-                }
-            }
-            None => {
-                self.scrollbar.first();
-                0
-            }
-        };
-        self.state.select(Some(i));
+        self.scrollbar.next();
+        self.state.select_next();
     }
 
     fn previous(&mut self) {
-        if self.items.is_empty() {
-            return;
+        if self.state.selected().is_none() {
+            self.scrollbar.last();
+        } else {
+            self.scrollbar.prev();
         }
-
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.scrollbar.last();
-                    self.items.len() - 1
-                } else {
-                    self.scrollbar.prev();
-                    i - 1
-                }
-            }
-            None => {
-                self.scrollbar.last();
-                0
-            }
-        };
-        self.state.select(Some(i));
+        self.state.select_previous();
     }
 }

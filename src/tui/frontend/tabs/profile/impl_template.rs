@@ -7,7 +7,7 @@ impl ProfileTab {
         let name = self
             .templates
             .selected()
-            .map(|index| self.templates.get_items()[index].clone());
+            .and_then(|index| self.templates.get_items().get(index).cloned());
 
         match ev.code.into() {
             Keys::Import => {

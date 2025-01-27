@@ -28,10 +28,10 @@ pub struct FrontEnd {
 impl FrontEnd {
     pub fn new() -> Self {
         let tabs: Vec<Box<dyn TabCont + Send>> = vec![
-            Box::new(tabs::profile::ProfileTab::new()),
-            Box::new(tabs::service::ServiceTab::new()),
+            Box::new(tabs::profile::ProfileTab::default()),
+            Box::new(tabs::service::ServiceTab::default()),
             #[cfg(feature = "connection-tab")]
-            Box::new(tabs::connection::ConnctionTab::new()),
+            Box::new(tabs::connection::ConnctionTab::default()),
         ];
         Self {
             tabs,
@@ -75,7 +75,7 @@ impl FrontEnd {
                         };
                         self.handle_key_event(&key_event);
                     }
-                    event::Event::Resize(_, _) => terminal.autoresize()?,
+                    event::Event::Resize(..) => terminal.autoresize()?,
                 }
             }
         }
@@ -130,18 +130,18 @@ impl FrontEnd {
                     }
                     // assume ProfileTab is the first tab
                     CallBack::ProfileInit(..) => self.tabs[0].apply_backend_call(op),
-                    #[cfg(feature = "template")]
-                    CallBack::TemplateInit(_) => self.tabs[0].apply_backend_call(op),
-                    // assume ConnctionTab is the third tab
-                    #[cfg(feature = "connection-tab")]
-                    CallBack::ConnctionInit(..) => self.tabs[2].apply_backend_call(op),
                     CallBack::ProfileCTL(_) | CallBack::ServiceCTL(_) => {
                         self.tabs[self.tab_index].apply_backend_call(op)
                     }
-                    #[cfg(feature = "connection-tab")]
-                    CallBack::ConnctionCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
+                    #[cfg(feature = "template")]
+                    CallBack::TemplateInit(_) => self.tabs[0].apply_backend_call(op),
                     #[cfg(feature = "template")]
                     CallBack::TemplateCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
+                    // assume ConnctionTab is the third tab
+                    #[cfg(feature = "connection-tab")]
+                    CallBack::ConnctionInit(..) => self.tabs[2].apply_backend_call(op),
+                    #[cfg(feature = "connection-tab")]
+                    CallBack::ConnctionCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
                 },
                 Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
                 Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
@@ -177,7 +177,7 @@ impl Drawable for FrontEnd {
     }
 
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
-        let mut evst;
+        let evst;
         // handle popups first
         // handle them only in app to avoid complexity.
         //
@@ -202,19 +202,17 @@ impl Drawable for FrontEnd {
         evst = tab.handle_key_event(ev);
 
         // handle tabbar and app owned last
-        if evst == EventState::NotConsumed {
+        if evst.is_notconsumed() {
             if ev.kind != crossterm::event::KeyEventKind::Press {
                 return EventState::NotConsumed;
             }
-            // if work is not done, this will be reset
-            evst = EventState::WorkDone;
             match ev.code {
                 // ## the tabbar
                 // 1..=9
                 // need to kown the range
                 KeyCode::Char(c) if c.is_ascii_digit() && c != '0' => {
                     if let Some(d) = c.to_digit(10) {
-                        if d <= self.tabs.len() as u32 {
+                        if d as usize <= self.tabs.len() {
                             // select target tab
                             self.tab_index = (d - 1) as usize;
                         }
@@ -246,15 +244,15 @@ impl Drawable for FrontEnd {
                 Keys::AppQuit => {
                     self.should_quit = true;
                 }
-                _ => evst = EventState::NotConsumed,
+                _ => return EventState::NotConsumed,
             }
         }
-        evst
+        EventState::WorkDone
     }
 }
 
 #[cfg(debug_assertions)]
-pub fn the_egg(key: KeyCode) -> bool {
+fn the_egg(key: KeyCode) -> bool {
     static INSTANCE: std::sync::RwLock<u8> = std::sync::RwLock::new(0);
     let mut current = INSTANCE.write().unwrap();
     match *current {

@@ -13,7 +13,7 @@ pub struct List {
     filter: Option<String>,
     items: Vec<String>,
     extra: Option<Vec<String>>,
-    list_state: Raw::ListState,
+    state: Raw::ListState,
     scrollbar: Raw::ScrollbarState,
 }
 impl Drawable for List {
@@ -78,7 +78,7 @@ impl Drawable for List {
                     .add_modifier(Ra::Modifier::BOLD),
             ),
             area,
-            &mut self.list_state,
+            &mut self.state,
         );
 
         if self.items.len() + 2 > area.height as usize {
@@ -118,7 +118,7 @@ impl List {
             filter: None,
             items: vec![],
             extra: None,
-            list_state: Raw::ListState::default(),
+            state: Raw::ListState::default(),
             scrollbar: Raw::ScrollbarState::default(),
         }
     }
@@ -127,97 +127,46 @@ impl List {
     ///
     /// Returns `None` if no item is selected
     pub fn selected(&self) -> Option<usize> {
-        if self.items.is_empty() {
-            return None;
-        }
-        self.list_state.selected()
+        self.state
+            .selected()
     }
 
     fn next(&mut self) {
-        if self.items.is_empty() {
-            return;
-        }
-
-        let i = match self.list_state.selected() {
-            Some(i) => {
-                if i >= self.items.len() - 1 {
-                    self.scrollbar.first();
-                    0
-                } else {
-                    self.scrollbar.next();
-                    i + 1
-                }
-            }
-            None => {
-                self.scrollbar.first();
-                0
-            }
-        };
-        self.list_state.select(Some(i));
+        self.scrollbar.next();
+        self.state.select_next();
     }
 
     fn previous(&mut self) {
-        if self.items.is_empty() {
-            return;
+        if self.state.selected().is_none() {
+            self.scrollbar.last();
+        } else {
+            self.scrollbar.prev();
         }
-
-        let i = match self.list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.scrollbar.last();
-                    self.items.len() - 1
-                } else {
-                    self.scrollbar.prev();
-                    i - 1
-                }
-            }
-            None => {
-                self.scrollbar.last();
-                0
-            }
-        };
-        self.list_state.select(Some(i));
+        self.state.select_previous();
     }
 
     pub fn set_items(&mut self, items: Vec<String>) {
-        match self.list_state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.list_state.select(None);
-                } else if i >= items.len() {
-                    self.list_state.select(Some(items.len() - 1));
-                }
-            }
-            None => self.list_state.select(None),
-        }
+        // list state will be corret automatically at render
         self.items = items;
         self.scrollbar = self.scrollbar.content_length(self.items.len());
-
-        if self.list_state.selected().is_none() && !self.items.is_empty() {
-            self.list_state.select(Some(0));
-            self.scrollbar.first();
-        }
     }
 
     pub fn set_extras<I>(&mut self, extra: I)
     where
         I: Iterator<Item = String> + ExactSizeIterator,
     {
-        assert_eq!(self.items.len(), extra.len());
+        debug_assert_eq!(self.items.len(), extra.len());
         self.extra.replace(Vec::from_iter(extra));
     }
 
     pub fn get_items(&self) -> &Vec<String> {
         &self.items
     }
+    pub fn get_items_mut(&mut self) -> &mut Vec<String> {
+        &mut self.items
+    }
 
     pub fn set_filter(&mut self, filter: String) {
         self.filter = filter.into();
     }
-
-    // pub fn select(&mut self, name: &str) {
-    //     if let Some(index) = self.items.iter().position(|item| item == name) {
-    //         self.list_state.select(Some(index));
-    //     }
-    // }
 }

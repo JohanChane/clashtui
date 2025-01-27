@@ -25,25 +25,18 @@ pub(in crate::tui::frontend) struct ServiceTab {
 
 const MODE: [Mode; 3] = [Mode::Rule, Mode::Direct, Mode::Global];
 
-impl ServiceTab {
-    /// Creates a new [`ServiceTab`].
-    pub fn new() -> Self {
-        let mut operations = List::new(TAB_TITLE_SERVICE.to_string());
-        let mut inner_items = vec!["SwitchMode".to_owned()];
-        inner_items.extend(ServiceOp::ALL.into_iter().map(|v| v.into()));
-        operations.set_items(inner_items);
+impl Default for ServiceTab {
+    fn default() -> Self {
+        let mut inner = List::new(TAB_TITLE_SERVICE.to_string());
+        let items = inner.get_items_mut();
+        items.push("SwitchMode".to_owned());
+        items.extend(ServiceOp::ALL.into_iter().map(|v| v.into()));
 
         Self {
-            inner: operations,
+            inner,
             popup_content: None,
             backend_content: None,
         }
-    }
-}
-
-impl Default for ServiceTab {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -77,14 +70,14 @@ impl TabCont for ServiceTab {
     // this tab just display info but don't ask
     fn apply_popup_result(&mut self, res: PopRes) -> EventState {
         match res {
-            PopRes::Selected_(idx) => {
+            PopRes::Selected(idx) => {
                 let mode = MODE[idx];
                 let pak = Call::Service(BackendOp::SwitchMode(mode));
                 self.backend_content.replace(pak);
                 let msg = PopMsg::Prompt(vec!["Working".to_owned()]);
                 self.popup_content.replace(msg);
             }
-            PopRes::Selected(_) | PopRes::Input(_) => unreachable!(),
+            PopRes::Choices(_) | PopRes::Input(_) => unreachable!(),
         }
         EventState::WorkDone
     }

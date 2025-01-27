@@ -86,18 +86,18 @@ impl Item {
         self.move_cursor_right();
     }
     fn move_cursor_left(&mut self) {
-        self.cursor = self.cursor.saturating_sub(1).clamp(0, self.buffer.len());
+        self.cursor = self.cursor.saturating_sub(1);
     }
 
     fn move_cursor_right(&mut self) {
-        self.cursor = self.cursor.saturating_add(1).clamp(0, self.buffer.len());
+        self.cursor = self.cursor.saturating_add(1).min(self.buffer.len());
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::Item;
-    use crate::tui::{misc::EventState, Drawable};
+    use crate::tui::{misc::EventState, Drawable, Theme};
     use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
     trait Test {
         fn apply_test(
@@ -116,6 +116,7 @@ mod test {
             check_buffers: &[&str],
             check_cusors: &[usize],
         ) -> Self {
+            let _ = Theme::load(None);
             for (((&op, &evst), &buffer), &cursor) in ops
                 .into_iter()
                 .zip(check_evsts)
@@ -123,6 +124,10 @@ mod test {
                 .zip(check_cusors)
             {
                 let e = self.handle_key_event(&KeyEvent::new(op, KeyModifiers::empty()));
+                ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 100))
+                .unwrap()
+                .draw(|f| self.render(f, f.area(), true))
+                .unwrap();
                 assert_eq!(e, evst, "now running {op} {evst:?} {buffer} {cursor}");
                 assert_eq!(
                     self.cursor, cursor,

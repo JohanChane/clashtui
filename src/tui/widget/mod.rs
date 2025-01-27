@@ -25,7 +25,10 @@ pub enum PopMsg {
 }
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum PopRes {
+    /// result of [PopMsg::AskChoices]
+    Choices(usize),
+    /// result of [PopMsg::SelectList]
     Selected(usize),
-    Selected_(usize),
+    /// result of [PopMsg::Input]
     Input(Vec<String>),
 }

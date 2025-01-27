@@ -34,14 +34,13 @@ pub(in crate::tui::frontend) struct ProfileTab {
     backend_content: Option<Call>,
     /// hold content for msg ask
     temp_content: Option<Call>,
-    is_profiles_inited: bool,
+    is_profiles_outdated: bool,
     #[cfg(feature = "template")]
-    is_templates_inited: bool,
+    is_templates_outdated: bool,
 }
 
-impl ProfileTab {
-    /// Creates a new [`ProfileTab`].
-    pub fn new() -> Self {
+impl Default for ProfileTab {
+    fn default() -> Self {
         #[cfg(feature = "template")]
         use crate::tui::frontend::consts::TAB_TITLE_TEMPLATE;
         let profiles = List::new(TAB_TITLE_PROFILE.to_string());
@@ -56,16 +55,10 @@ impl ProfileTab {
             popup_content: None,
             backend_content: None,
             temp_content: None,
-            is_profiles_inited: false,
+            is_profiles_outdated: true,
             #[cfg(feature = "template")]
-            is_templates_inited: false,
+            is_templates_outdated: true,
         }
-    }
-}
-
-impl Default for ProfileTab {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -82,17 +75,17 @@ impl TabCont for ProfileTab {
         //
         // since default content is to init templates
         // every thing should have inited
-        if self.is_profiles_inited {
+        if self.is_profiles_outdated {
+            Some(Call::Profile(BackendOp::Profile(ProfileOp::GetALL)))
+        } else {
             #[cfg(feature = "template")]
-            if self.is_templates_inited {
-                self.backend_content.take()
-            } else {
+            if self.is_templates_outdated {
                 Some(Call::Profile(BackendOp::Template(TemplateOp::GetALL)))
+            } else {
+                self.backend_content.take()
             }
             #[cfg(not(feature = "template"))]
             self.backend_content.take()
-        } else {
-            Some(Call::Profile(BackendOp::Profile(ProfileOp::GetALL)))
         }
     }
 
@@ -104,36 +97,36 @@ impl TabCont for ProfileTab {
         match op {
             CallBack::ProfileCTL(result) => {
                 // require a refresh
-                self.is_profiles_inited = false;
+                self.is_profiles_outdated = true;
                 self.popup_content.replace(PopMsg::Prompt(
                     ["Done".to_string()].into_iter().chain(result).collect(),
                 ));
             }
             CallBack::ProfileInit(content, times) => {
-                if !self.is_profiles_inited {
+                if self.is_profiles_outdated {
                     self.profiles.set_items(content);
                     self.profiles.set_extras(
                         times
                             .into_iter()
                             .map(|t| t.map(display_duration).unwrap_or("Never/Err".to_string())),
                     );
-                    self.is_profiles_inited = true;
+                    self.is_profiles_outdated = false;
                 }
             }
             #[cfg(feature = "template")]
             CallBack::TemplateCTL(result) => {
                 // require a refresh
-                self.is_templates_inited = false;
-                self.is_profiles_inited = false;
+                self.is_templates_outdated = true;
+                self.is_profiles_outdated = true;
                 self.popup_content.replace(PopMsg::Prompt(
                     ["Done".to_string()].into_iter().chain(result).collect(),
                 ));
             }
             #[cfg(feature = "template")]
             CallBack::TemplateInit(content) => {
-                if !self.is_templates_inited {
+                if self.is_templates_outdated {
                     self.templates.set_items(content);
-                    self.is_templates_inited = true;
+                    self.is_templates_outdated = false;
                 }
             }
             _ => unreachable!("{} get unexpected op: {:?}", TAB_TITLE_PROFILE, op),
@@ -143,7 +136,7 @@ impl TabCont for ProfileTab {
     fn apply_popup_result(&mut self, res: PopRes) -> EventState {
         match self.focus {
             Focus::Profile => match res {
-                PopRes::Selected(selected) => {
+                PopRes::Choices(selected) => {
                     if let Some(op) = self.temp_content.take() {
                         if let Call::Profile(BackendOp::Profile(ProfileOp::Update(name, _))) = op {
                             let the_choice = match selected {
@@ -192,11 +185,11 @@ impl TabCont for ProfileTab {
                         _ => unimplemented!(),
                     }
                 }
-                PopRes::Selected_(..) => unreachable!(),
+                PopRes::Selected(..) => unreachable!(),
             },
             #[cfg(feature = "template")]
             Focus::Template => match res {
-                PopRes::Selected(selected) => {
+                PopRes::Choices(selected) => {
                     // Remove request
                     if let Some(op) = self.temp_content.take() {
                         match selected {
@@ -227,7 +220,7 @@ impl TabCont for ProfileTab {
                         _ => unimplemented!(),
                     }
                 }
-                PopRes::Selected_(..) => unreachable!(),
+                PopRes::Selected(..) => unreachable!(),
             },
         }
         EventState::WorkDone
