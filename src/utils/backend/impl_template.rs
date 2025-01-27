@@ -78,7 +78,22 @@ impl BackEnd {
             .and_then(|v| v.as_u64())
         {
             None | Some(1) => {
-                let gened = template_ver1(map, &name, vec![])?;
+                let gened = template_ver1(
+                    map,
+                    &name,
+                    self.pm
+                        .all()
+                        .into_iter()
+                        .map(|name| self.pm.get(name).unwrap())
+                        .flat_map(|pf| {
+                            if let ProfileType::Url(url) = pf.dtype {
+                                Some(url)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect(),
+                )?;
                 let gened_name = format!("{name}.clashtui_generated");
                 let path = HOME_DIR.join(PROFILE_PATH).join(&gened_name);
                 serde_yml::to_writer(std::fs::File::create(path)?, &gened)?;
