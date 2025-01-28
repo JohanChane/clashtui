@@ -11,6 +11,7 @@ impl ProfileTab {
 
         match ev.code.into() {
             Keys::Import => {
+                self.temp_content = Some(TmpOps::Import);
                 self.popup_content = Some(PopMsg::Input(vec!["Name".to_owned(), "Url".to_owned()]));
             }
             #[cfg(feature = "template")]
@@ -20,8 +21,7 @@ impl ProfileTab {
             // place in temp_content and build msg popup content
             Keys::Delete => {
                 if let Some(name) = name {
-                    self.temp_content =
-                        Some(Call::Profile(BackendOp::Profile(ProfileOp::Remove(name))));
+                    self.temp_content = Some(TmpOps::Remove(name));
                     self.popup_content = Some(PopMsg::AskChoices(
                         vec!["Are you sure to delete this?".to_owned()],
                         vec![],
@@ -31,9 +31,7 @@ impl ProfileTab {
             // place in temp_content and build msg popup content
             Keys::ProfileUpdate => {
                 if let Some(name) = name {
-                    self.temp_content = Some(Call::Profile(BackendOp::Profile(ProfileOp::Update(
-                        name, None,
-                    ))));
+                    self.temp_content = Some(TmpOps::UpdateWithProxy(name));
                     self.popup_content = Some(PopMsg::AskChoices(
                         vec![
                             "Update Options".to_owned(),
@@ -69,6 +67,7 @@ impl ProfileTab {
                 }
             }
             Keys::Search => {
+                self.temp_content = Some(TmpOps::SetFilter);
                 self.popup_content = Some(PopMsg::Input(vec!["Name".to_owned()]));
             }
             _ => return EventState::NotConsumed,

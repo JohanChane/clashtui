@@ -184,7 +184,7 @@ impl Drawable for FrontEnd {
         // if there is a popup, other part will be blocked.
         if !self.popup.is_empty() {
             evst = self.popup.handle_key_event(ev);
-            if evst == EventState::Yes {
+            if evst == EventState::Yes || evst == EventState::Cancel {
                 if let Some(res) = self.popup.collect() {
                     self.tabs
                         .get_mut(self.tab_index)

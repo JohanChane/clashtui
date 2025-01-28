@@ -42,7 +42,7 @@ pub enum Call {
     Connection(tabs::connection::BackendOp),
     #[debug("Logs")]
     /// Reads a range of lines from a file.
-    /// 
+    ///
     /// From `total_len-start-length` to `total_len-start`
     Logs(usize, usize),
     /// Requests information from the backend.

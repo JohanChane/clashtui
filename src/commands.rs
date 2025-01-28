@@ -108,6 +108,9 @@ enum ProfileCommand {
         /// update profile with proxy
         #[arg(long)]
         with_proxy: Option<bool>,
+        /// update profile with proxyprovider removed
+        #[arg(long)]
+        without_proxyprovider: bool,
     },
     /// select profile
     Select {

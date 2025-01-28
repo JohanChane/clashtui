@@ -51,6 +51,7 @@ impl BackEnd {
         &self,
         profile: Profile,
         with_proxy: Option<bool>,
+        remove_proxy_provider: bool,
     ) -> anyhow::Result<Vec<String>> {
         let profile = self.load_local_profile(profile)?;
         let with_proxy = with_proxy
@@ -77,8 +78,11 @@ impl BackEnd {
                         path,
                         content,
                     } = profile;
-                    let content =
-                        self.update_profile_without_pp(content.unwrap_or_default(), with_proxy)?;
+                    let content = if remove_proxy_provider {
+                        self.update_profile_without_pp(content.unwrap_or_default(), with_proxy)?
+                    } else {
+                        content.unwrap_or_default()
+                    };
                     serde_yml::to_writer(std::fs::File::create(path)?, &content)?;
                     return Ok(vec![format!("Regenerated: {}(From {template_name})", name)]);
                 }
@@ -184,6 +188,7 @@ impl BackEnd {
                     self.get_profile(name)
                         .expect("Cannot find selected profile"),
                     None,
+                    false,
                 ) {
                     Ok(v) => CallBack::ProfileCTL(v),
                     Err(e) => CallBack::Error(e.to_string()),
@@ -199,11 +204,12 @@ impl BackEnd {
                     CallBack::ProfileCTL(vec!["Profile is now removed".to_owned()])
                 }
             }
-            ProfileOp::Update(name, with_proxy) => {
+            ProfileOp::Update(name, with_proxy, with_pp) => {
                 match self.update_profile(
                     self.get_profile(name)
                         .expect("Cannot find selected profile"),
                     with_proxy,
+                    with_pp,
                 ) {
                     Ok(v) => CallBack::ProfileCTL(v),
                     Err(e) => CallBack::Error(e.to_string()),

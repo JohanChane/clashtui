@@ -18,7 +18,7 @@ pub enum ProfileOp {
     /// ask for three option(`Yes/No/Auto`)
     ///
     /// Currently, `Auto` is treated as `No` in the BackEnd
-    Update(String, Option<bool>),
+    Update(String, Option<bool>, bool),
     /// test the profile content
     ///
     /// > I don't really know what `geodata_mode` can do,
@@ -52,4 +52,13 @@ pub enum TemplateOp {
     ///
     /// though this is asked by tab, but it will be handled at frontend
     Edit(String),
+}
+
+#[derive(PartialEq, Debug)]
+pub enum TmpOps {
+    UpdateWithProxy(String),
+    UpdateWithProxyProvider(String, Option<bool>),
+    Remove(String),
+    SetFilter,
+    Import,
 }
