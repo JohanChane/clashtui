@@ -1,5 +1,11 @@
 use std::collections::HashMap;
 
+use crate::BackEnd;
+
+const PROXY_PROVIDERS: &str = "proxy-providers";
+const PROXY_GROUPS: &str = "proxy-groups";
+const PROXIES: &str = "proxies";
+
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 struct PGparam {
     /// create one [PGitem] for each related providers,
@@ -26,10 +32,10 @@ struct PGitem {
     tpl_param: Option<PGparam>,
     #[serde(rename = "type")]
     /// not cared, just keep this
-    typ_: String,
+    __type: String,
     /// not cared, just keep this
     #[serde(flatten)]
-    others: serde_yml::Value,
+    __others: serde_yml::Value,
 }
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 struct PPitem {
@@ -43,7 +49,7 @@ struct PPitem {
     others: serde_yml::Mapping,
     #[serde(rename = "type")]
     /// not cared, just keep this
-    typ_: String,
+    __type: String,
 }
 
 pub(super) fn gen_template(
@@ -53,13 +59,13 @@ pub(super) fn gen_template(
 ) -> anyhow::Result<serde_yml::Mapping> {
     // proxy-groups
     let pgs = tpl
-        .remove("proxy-groups")
-        .ok_or(anyhow::anyhow!("proxy-groups not found"))?;
+        .remove(PROXY_GROUPS)
+        .ok_or(anyhow::anyhow!("{PROXY_GROUPS} not found"))?;
     let pgs: Vec<PGitem> = serde_yml::from_value(pgs)?;
     // proxy-providers
     let pps = tpl
-        .remove("proxy-providers")
-        .ok_or(anyhow::anyhow!("proxy-providers not found"))?;
+        .remove(PROXY_PROVIDERS)
+        .ok_or(anyhow::anyhow!("{PROXY_PROVIDERS} not found"))?;
     let pps: HashMap<String, PPitem> = serde_yml::from_value(pps)?;
     // proxy-providers name as key, proxy-providers as value
     let mut extended_proxy_providers = HashMap::new();
@@ -158,12 +164,94 @@ pub(super) fn gen_template(
     }
 
     tpl.insert(
-        "proxy-providers".into(),
+        PROXY_PROVIDERS.into(),
         serde_yml::to_value(&extended_proxy_providers)?,
     );
     tpl.insert(
-        "proxy-groups".into(),
+        PROXY_GROUPS.into(),
         serde_yml::to_value(extended_proxy_groups)?,
     );
     Ok(tpl)
+}
+
+impl BackEnd {
+    /// Remove `proxy-providers` and combine their contents into one file
+    ///
+    /// Return combined file content
+    pub fn update_profile_without_pp(
+        &self,
+        mut tpl: serde_yml::Mapping,
+        with_proxy: bool,
+    ) -> anyhow::Result<serde_yml::Mapping> {
+        let Some(pps) = tpl.remove(PROXY_PROVIDERS) else {
+            // if there is not proxy-providers in file, just return
+            return Ok(tpl);
+        };
+        let pps: HashMap<String, PPitem> = serde_yml::from_value(pps)?;
+        // pp_name with proxies
+        let mut pp_proxies: HashMap<String, Vec<serde_yml::Value>> = HashMap::new();
+        for (pp_name, pp) in pps {
+            let Some(url) = pp.url else {
+                continue;
+            };
+            let mut loaded: serde_yml::Mapping = match self.api.mock_clash_core(url, with_proxy) {
+                Ok(rdr) => serde_yml::from_reader(rdr)?,
+                Err(e) => {
+                    log::error!("Failed to download remote profile: {e}");
+                    continue;
+                }
+            };
+
+            let loaded_proxies: Vec<serde_yml::Value> = loaded
+                .remove(PROXIES)
+                .and_then(|v| serde_yml::from_value(v).unwrap())
+                .unwrap_or_default();
+            log::warn!("{:?}", loaded_proxies);
+            let renamed_proxies = loaded_proxies
+                .into_iter()
+                .map(|mut proxy| {
+                    if let Some(serde_yml::Value::String(name)) = proxy.get_mut("name") {
+                        name.insert_str(0, pp_name.as_str());
+                    }
+                    proxy
+                })
+                .collect();
+            pp_proxies.insert(pp_name, renamed_proxies);
+        }
+
+        let pgs = tpl
+            .remove(PROXY_GROUPS)
+            .ok_or(anyhow::anyhow!("{PROXY_GROUPS} not found"))?;
+        let mut pgs: Vec<PGitem> = serde_yml::from_value(pgs)?;
+        for pg in &mut pgs {
+            let mut proxies = pg.proxies.take().unwrap_or_default();
+            if let Some(uses) = pg.us_.take() {
+                for pp_name in uses {
+                    proxies.extend(
+                        pp_proxies
+                            .get(&pp_name)
+                            .iter()
+                            .flat_map(|v| v.iter())
+                            .filter_map(|proxy| proxy.get("name"))
+                            .map(|name| name.as_str().unwrap().to_owned()),
+                    );
+                }
+            }
+            if proxies.is_empty() {
+                pg.proxies = Some(vec!["COMPATIBLE".to_owned()]);
+            } else {
+                pg.proxies = Some(proxies);
+            }
+        }
+        tpl.insert(PROXY_GROUPS.into(), serde_yml::to_value(pgs)?);
+
+        let mut tpl_proxies: Vec<serde_yml::Value> = tpl
+            .remove(PROXIES)
+            .and_then(|v| serde_yml::from_value(v).ok())
+            .unwrap_or_default();
+        tpl_proxies.extend(pp_proxies.into_values().flatten());
+        tpl.insert(PROXIES.into(), tpl_proxies.into());
+
+        Ok(tpl)
+    }
 }

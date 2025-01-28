@@ -71,10 +71,16 @@ impl BackEnd {
                     if let Err(e) = self.apply_template(template_name.clone()) {
                         anyhow::bail!("Failed to regenerate from {template_name}: {e}")
                     };
-                    return Ok(vec![format!(
-                        "Regenerated: {}(From {template_name})",
-                        profile.name
-                    )]);
+                    let LocalProfile {
+                        name,
+                        dtype: _,
+                        path,
+                        content,
+                    } = profile;
+                    let content =
+                        self.update_profile_without_pp(content.unwrap_or_default(), with_proxy)?;
+                    serde_yml::to_writer(std::fs::File::create(path)?, &content)?;
+                    return Ok(vec![format!("Regenerated: {}(From {template_name})", name)]);
                 }
                 #[cfg(not(feature = "template"))]
                 ProfileType::Generated(..) => {
