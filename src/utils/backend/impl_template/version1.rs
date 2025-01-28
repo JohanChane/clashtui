@@ -204,7 +204,7 @@ impl BackEnd {
 
             let loaded_proxies: Vec<serde_yml::Value> = loaded
                 .remove(PROXIES)
-                .and_then(|v| serde_yml::from_value(v).unwrap())
+                .and_then(|v| serde_yml::from_value(v).ok())
                 .unwrap_or_default();
             log::warn!("{:?}", loaded_proxies);
             let renamed_proxies = loaded_proxies

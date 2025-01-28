@@ -33,8 +33,8 @@ use super::{
     ipc,
     state::State,
 };
-use crate::clash::webapi::{local_config::LibConfig, ClashConfig, ClashUtil};
-use profile::{map::ProfileManager, LocalProfile, Profile};
+use crate::clash::webapi::{local_config::LibConfig, ClashUtil};
+use profile::{map::ProfileManager, LocalProfile};
 
 pub use impl_service::ServiceOp;
 

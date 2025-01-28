@@ -285,6 +285,7 @@ impl BackEnd {
         new_pf: Option<String>,
         new_mode: Option<String>,
     ) -> anyhow::Result<State> {
+        use crate::clash::webapi::ClashConfig;
         if let Some(mode) = new_mode {
             self.update_mode(mode)?;
         }
