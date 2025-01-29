@@ -101,8 +101,8 @@ impl Drawable for ServiceTab {
                         ));
                     } else {
                         let op = ServiceOp::ALL[index - 1];
-                        let pak = Call::Service(BackendOp::ServiceCTL(op));
-                        self.backend_content.replace(pak);
+                        self.backend_content = Some(Call::Service(BackendOp::ServiceCTL(op)));
+                        self.popup_content = Some(PopMsg::Prompt(vec!["working".to_owned()]));
                     }
                 };
             }

@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::io::Write;
 
 #[derive(Default)]
 pub struct Confirm {
@@ -9,35 +10,43 @@ impl Confirm {
         self.prompts.push(prompt.to_string());
         self
     }
-    pub fn interact(mut self) -> std::io::Result<bool> {
-        assert_ne!(self.prompts.len(), 0);
-        use std::io::{Read, Write};
+    pub fn interact(self) -> std::io::Result<bool> {
+        let Self { mut prompts } = self;
+        debug_assert!(
+            !prompts.is_empty(),
+            "Empty prompt for Confirm, why it's here?"
+        );
         let mut out = std::io::stderr().lock();
-        let prompt = self.prompts.pop().unwrap();
-        for p in self.prompts {
+        let prompt = prompts.pop().unwrap();
+        for p in prompts {
             writeln!(out, "{}", p)?;
         }
-        write!(out, "{prompt} [y/n] ")?;
-        let mut buf = [0];
-        std::io::stdin().read_exact(&mut buf)?;
-        match buf[0] {
-            b'y' | b'Y' => Ok(true),
-            b'n' | b'N' => Ok(false),
-            _ => Err(std::io::Error::other("Not a valid input")),
+        loop {
+            write!(out, "{prompt} [y/n] ")?;
+            let mut buf = String::new();
+            std::io::stdin().read_line(&mut buf)?;
+            return match buf.chars().nth(0) {
+                Some('y') | Some('Y') => Ok(true),
+                Some('n') | Some('N') => Ok(false),
+                _ => {
+                    eprintln!("Not a valid input");
+                    continue;
+                }
+            };
         }
     }
 }
 
 pub struct Select<It> {
     start_prompts: Vec<String>,
-    end_prompts: Vec<String>,
+    end_prompt: Option<String>,
     items: Vec<It>,
 }
 impl<It: Display> Default for Select<It> {
     fn default() -> Self {
         Self {
             start_prompts: Default::default(),
-            end_prompts: Default::default(),
+            end_prompt: None,
             items: Default::default(),
         }
     }
@@ -51,22 +60,22 @@ impl<It: Display> Select<It> {
         self.start_prompts.push(prompt.to_string());
         self
     }
-    pub fn append_end_prompt<S: ToString>(mut self, prompt: S) -> Self {
-        self.end_prompts.push(prompt.to_string());
+    pub fn set_end_prompt<S: ToString>(mut self, prompt: S) -> Self {
+        assert_eq!(
+            self.end_prompt.replace(prompt.to_string()),
+            None,
+            "set_end_prompt is called twice"
+        );
         self
     }
     pub fn interact(self) -> std::io::Result<It> {
-        use std::io::{Read, Write};
         let Self {
             start_prompts,
-            mut end_prompts,
+            end_prompt,
             mut items,
         } = self;
-        if items.is_empty() {
-            return Err(std::io::Error::other("No item"));
-        }
+        debug_assert!(!items.is_empty(), "Empty list for Select, why it's here?");
         let mut out = std::io::stderr().lock();
-        let end_prompt = end_prompts.pop();
         loop {
             start_prompts
                 .iter()
@@ -76,30 +85,21 @@ impl<It: Display> Select<It> {
                 .enumerate()
                 .try_for_each(|(i, item)| writeln!(out, "{i} {}", item))?;
             if let Some(end_prompt) = &end_prompt {
-                end_prompts
-                    .iter()
-                    .try_for_each(|prompt| writeln!(out, "{}", prompt))?;
                 write!(out, "{}", end_prompt)?;
             };
 
-            let mut buf = [0, 0];
-            std::io::stdin().read_exact(&mut buf)?;
-            let mut cur: usize = 0;
-            for byte in buf {
-                if byte == 10 {
-                    break;
+            let mut buf = String::new();
+            std::io::stdin().read_line(&mut buf)?;
+            match buf.trim().parse() {
+                Ok(cur) => {
+                    if items.len() > cur {
+                        return Ok(items.remove(cur));
+                    }
                 }
-                assert!(
-                    byte > 47 && byte < 58,
-                    "This({}) is not a valid ascii number",
-                    byte
-                );
-                let num = byte - 48;
-                cur = cur * 10 + num as usize;
-            }
-            if items.len() > cur {
-                return Ok(items.remove(cur));
-            }
+                Err(e) => {
+                    eprintln!("Not a valid input: {e}");
+                }
+            };
         }
     }
 }
@@ -122,8 +122,7 @@ mod test {
         let that = Select::default()
             .append_start_prompt("p1:")
             .append_start_prompt("p2")
-            .append_end_prompt("p3")
-            .append_end_prompt("p4:")
+            .set_end_prompt("p3:")
             .append_items([D1 { name: 1 }, D1 { name: 3 }].into_iter())
             .interact()?;
         println!("Select {:?}", that);
