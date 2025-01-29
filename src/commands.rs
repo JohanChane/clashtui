@@ -139,10 +139,10 @@ enum ServiceCommand {
     Stop,
 }
 
-impl Into<crate::clash::webapi::Mode> for ModeCommand {
-    fn into(self) -> crate::clash::webapi::Mode {
+impl From<ModeCommand> for crate::clash::webapi::Mode {
+    fn from(value: ModeCommand) -> Self {
         use crate::clash::webapi::Mode;
-        match self {
+        match value {
             ModeCommand::Rule => Mode::Rule,
             ModeCommand::Direct => Mode::Direct,
             ModeCommand::Global => Mode::Global,

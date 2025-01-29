@@ -91,39 +91,42 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
             }
             ServiceCommand::Stop => Ok(backend.clash_srv_ctl(ServiceOp::StopClashService)?),
         },
-        ArgCommand::Mode { mode } => Ok(backend
-            .update_state(None, Some(mode.into()))?
-            .to_string()),
+        ArgCommand::Mode { mode } => Ok(backend.update_state(None, Some(mode.into()))?.to_string()),
         ArgCommand::CheckUpdate {
             without_ask,
             check_ci,
         } => {
+            use crate::utils::self_update::{download_to_file, CheckUpdate};
             for (info, current_version) in backend
                 .check_update(check_ci)
                 .map_err(|e| anyhow::anyhow!("failed to fetch github release due to {e}"))?
             {
                 println!("\n{}", info.as_info(current_version));
-                if !without_ask {
+                if let Some(asset) = if !without_ask {
                     if !Confirm::default()
-                        .append_prompt("Do you want to download one now?")
+                        .append_prompt("Do you want to download now?")
                         .interact()?
                     {
                         continue;
                     }
-                    let asset = Select::default()
+                    println!();
+                    Select::default()
                         .append_start_prompt("Avaliable asserts:")
-                        .set_end_prompt("Type the num:")
+                        .set_end_prompt("Type the num")
                         .append_items(info.assets.iter())
-                        .interact()?;
-                    println!("\nDownload start for {}", asset);
-                    let path =
-                        backend.download_to_file(&asset.name, &asset.browser_download_url)?;
-                    println!("\nDownloaded to {}", path.display());
-                } else if let Some(asset) = info.assets.first() {
-                    println!("\nDownload start for {}", asset);
-                    let path =
-                        backend.download_to_file(&asset.name, &asset.browser_download_url)?;
-                    println!("\nDownloaded to {}", path.display());
+                        .interact()?
+                } else {
+                    info.assets.first()
+                } {
+                    println!();
+                    println!(
+                        "Download start for {} {}",
+                        asset.name, asset.browser_download_url
+                    );
+                    let path = std::env::current_dir()?.join(&asset.name);
+                    download_to_file(&path, &asset.browser_download_url)?;
+                    println!("Downloaded to {}", path.display());
+                    println!();
                 }
             }
             Ok("Done".to_owned())

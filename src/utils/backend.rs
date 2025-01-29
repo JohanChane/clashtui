@@ -39,7 +39,7 @@ use profile::{map::ProfileManager, LocalProfile};
 pub use impl_service::ServiceOp;
 
 pub struct BackEnd {
-    api: ClashUtil,
+    pub(super) api: ClashUtil,
     cfg: LibConfig,
     pm: ProfileManager,
     edit_cmd: String,

@@ -2,6 +2,7 @@ mod backend;
 mod config;
 pub mod ipc;
 mod macros;
+pub mod self_update;
 mod state;
 
 #[cfg(feature = "tui")]

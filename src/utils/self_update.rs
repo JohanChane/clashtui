@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::CResult;
+use crate::clash::{headers, net_file::get_blob};
 
 #[cfg_attr(test, derive(Deserialize, Debug, PartialEq))]
 /// Describe target repo and tag
@@ -20,10 +20,9 @@ impl Request<'_> {
     /// Fetch info from given input
     ///
     /// support Github only
-    pub fn get_info(&self) -> CResult<Response> {
-        use super::headers;
-        super::get_blob(self.as_url(), None, Some(headers::DEFAULT_USER_AGENT))
-            .and_then(|r| serde_json::from_reader(r).map_err(|e| e.into()))
+    pub fn get_info(self) -> anyhow::Result<Response> {
+        let rdr = get_blob(self.as_url(), None, Some(headers::DEFAULT_USER_AGENT))?;
+        Ok(serde_json::from_reader(rdr)?)
     }
 }
 impl Request<'static> {
@@ -92,12 +91,27 @@ impl Response {
             .collect();
         self
     }
+    pub fn rename(self, name: &str) -> Self {
+        Self {
+            name: name.to_owned(),
+            ..self
+        }
+    }
     pub fn as_info(&self, version: String) -> String {
         format!(
-            "There is a new update for `{}`\nCurrent installed version is {version}\nPublished at {}\n\n---\n\nCHANGELOG:\n{}",
+            r#"----------------------
+There is a new update for `{}`
+Target version is '{}'
+> Current version is '{version}'
+Published at {}
+
+CHANGELOG:
+{}
+"#,
             self.name,
+            self.tag_name,
             self.published_at,
-            self.body.trim_end().trim_start()
+            self.body.trim()
         )
     }
 }
@@ -108,12 +122,103 @@ pub struct Asset {
 }
 impl std::fmt::Display for Asset {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.name, self.browser_download_url)
+        write!(f, "{}", self.name)
     }
 }
-/// actually match `v0.12.432-`,
-/// return a [Vec] of [u16], len = 3
-fn get_triple_code(tag: &str) -> Option<Vec<u16>> {
+pub trait CheckUpdate {
+    fn check_update(&self, check_ci: bool) -> anyhow::Result<Vec<(Response, String)>>;
+}
+impl CheckUpdate for super::BackEnd {
+    /// check self and clash(current:`mihomo`)
+    fn check_update(&self, check_ci: bool) -> anyhow::Result<Vec<(Response, String)>> {
+        let clash_core_version = match self.api.version().ok() {
+            Some(v) => {
+                let mut map: std::collections::HashMap<String, String> = serde_json::from_str(&v)?;
+                map.remove("version").unwrap_or("v0.0.0".to_owned())
+            }
+            // assume there is no clash core installed/running
+            None => "v0.0.0".to_owned(),
+        };
+
+        let mut vec = Vec::with_capacity(3);
+        if check_ci {
+            vec.push((
+                Request::s_clashtui_ci()
+                    .get_info()?
+                    .filter_asserts()
+                    .rename("ClashTUI"),
+                crate::consts::VERSION.to_owned(),
+            ));
+            vec.push((
+                Request::s_mihomo_ci()
+                    .get_info()?
+                    .filter_asserts()
+                    .rename("Clash Core"),
+                clash_core_version,
+            ));
+        } else {
+            let clashtui = Request::s_clashtui().get_info()?;
+            let mihomo = Request::s_mihomo().get_info()?;
+            if clashtui.is_newer_than(crate::consts::VERSION) {
+                vec.push((
+                    clashtui.filter_asserts().rename("ClashTUI"),
+                    crate::consts::VERSION.to_owned(),
+                ));
+            }
+            if mihomo.is_newer_than(&clash_core_version) {
+                vec.push((
+                    mihomo.filter_asserts().rename("Clash Core"),
+                    clash_core_version,
+                ))
+            }
+        }
+        Ok(vec)
+    }
+}
+
+pub fn download_to_file(path: &std::path::Path, url: &str) -> anyhow::Result<()> {
+    match get_blob(url, None, Some(headers::DEFAULT_USER_AGENT)) {
+        Ok(mut rp) => {
+            let mut fp = std::fs::File::create(path)?;
+            std::io::copy(&mut rp, &mut fp)
+                .map_err(|e| anyhow::anyhow!("{e}, increase timeout might help"))?;
+        }
+        Err(e) => {
+            eprintln!("{e}, try to download with `curl/wget`");
+            use std::process::{Command, Stdio};
+            fn have_this_and_exec(this: &str, args: &[&str]) -> anyhow::Result<bool> {
+                if Command::new("which")
+                    .arg(this)
+                    .output()
+                    .is_ok_and(|r| r.status.success())
+                {
+                    println!("using {this}");
+                    if Command::new(this)
+                        .args(args)
+                        .stdin(Stdio::null())
+                        .status()?
+                        .success()
+                    {
+                        Ok(true)
+                    } else {
+                        Err(anyhow::anyhow!("Failed to download with {this}"))
+                    }
+                } else {
+                    Ok(false)
+                }
+            }
+            if !have_this_and_exec("curl", &["-o", &path.to_string_lossy(), "-L", url])?
+                && !have_this_and_exec("wget", &["-O", &path.to_string_lossy(), url])?
+            {
+                anyhow::bail!("Unable to find curl/wget")
+            }
+        }
+    }
+    Ok(())
+}
+
+/// actually match `v0.12.432-`
+fn get_triple_code(tag: &str) -> Option<[u16; 3]> {
     let triple_code: Vec<u16> = tag
         .trim_start_matches('v')
         .split('-')
@@ -123,7 +228,8 @@ fn get_triple_code(tag: &str) -> Option<Vec<u16>> {
         .map(|s| s.parse().unwrap_or(0))
         .collect();
     if triple_code.len() == 3 {
-        Some(triple_code)
+        // Some(triple_code)
+        Some([triple_code[0], triple_code[1], triple_code[2]])
     } else {
         log::error!("Failed to decode tag: {}", tag);
         None
@@ -138,6 +244,7 @@ fn get_arch() -> &'static str {
         _ => "",
     }
 }
+
 #[cfg(test)]
 mod test {
     use super::*;

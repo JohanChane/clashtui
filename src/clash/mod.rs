@@ -8,7 +8,7 @@ type CResult<T> = Result<T, error::Error>;
 const DEFAULT_PAYLOAD: &str = r#"'{"path": "", "payload": ""}'"#;
 const DEFAULT_TIMEOUT: u64 = 5;
 static TIMEOUT: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
-mod headers {
+pub mod headers {
     pub const USER_AGENT: &str = "user-agent";
     pub const AUTHORIZATION: &str = "authorization";
     // TODO: change this
