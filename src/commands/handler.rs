@@ -15,38 +15,30 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                 with_proxy,
                 without_proxyprovider,
             } => {
-                if all {
-                    backend
-                        .get_all_profiles()
-                        .into_iter()
-                        .inspect(|s| println!("Profile: {}", s.name))
-                        .filter_map(|v| {
-                            backend
-                                .update_profile(v, with_proxy, without_proxyprovider)
-                                .map_err(|e| println!("- Error! {e}"))
-                                .ok()
-                        })
-                        .flatten()
-                        .for_each(|s| println!("- {s}"));
-                    if let Err(e) = backend.select_profile(backend.get_current_profile()) {
-                        eprintln!("Select Profile: {e}")
-                    };
-                } else if let Some(name) = name {
-                    println!("Target Profile: {name}");
-                    let Some(pf) = backend.get_profile(name) else {
-                        anyhow::bail!("Not found in database!");
-                    };
-                    match backend.update_profile(pf, with_proxy, without_proxyprovider) {
-                        Ok(v) => {
-                            v.into_iter().for_each(|s| println!("- {s}"));
-                        }
-                        Err(e) => {
-                            println!("- Error! {e}")
-                        }
+                fn unify_to_iter(
+                    backend: &BackEnd,
+                    all: bool,
+                    name: Option<String>,
+                ) -> Box<dyn Iterator<Item = crate::utils::Profile>> {
+                    if all {
+                        Box::new(backend.get_all_profiles().into_iter())
+                    } else if let Some(name) = name {
+                        Box::new(backend.get_profile(name).into_iter())
+                    } else {
+                        eprintln!("No profile selected!");
+                        Box::new(std::iter::empty())
                     }
-                } else {
-                    anyhow::bail!("Not providing Profile");
                 }
+                unify_to_iter(&backend, all, name)
+                    .inspect(|s| println!("### Profile: {}", s.name))
+                    .filter_map(|v| {
+                        backend
+                            .update_profile(v, with_proxy, without_proxyprovider)
+                            .map_err(|e| println!("- Error! {e}"))
+                            .ok()
+                    })
+                    .flatten()
+                    .for_each(|s| println!("- {s}"));
                 Ok("Done".to_owned())
             }
             ProfileCommand::Select { name } => {

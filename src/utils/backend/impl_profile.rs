@@ -1,6 +1,6 @@
-use profile::ProfileType;
+use crate::utils::profile::{Profile, ProfileType};
 
-use super::{profile::Profile, *};
+use super::*;
 #[cfg(feature = "tui")]
 use crate::tui::tabs::profile::ProfileOp;
 use std::fs::File;

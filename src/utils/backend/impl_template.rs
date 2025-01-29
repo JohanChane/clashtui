@@ -1,10 +1,11 @@
-use profile::ProfileType;
-
 use super::*;
 #[cfg(feature = "tui")]
 use crate::tui::tabs::profile::TemplateOp;
 use crate::{
-    utils::consts::{PROFILE_PATH, TEMPLATE_PATH},
+    utils::{
+        consts::{PROFILE_PATH, TEMPLATE_PATH},
+        profile::ProfileType,
+    },
     HOME_DIR,
 };
 
