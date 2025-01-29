@@ -35,7 +35,21 @@ fn get_version() -> String {
         ""
     };
 
-    format!("v{cargo_pkg_version}-{branch_name}-{git_describe}{build_type}")
+    let git_status = match Command::new("git").args(["status", "--short"]).output() {
+        Ok(v) => {
+            if v.stdout.is_empty() {
+                "".to_owned()
+            } else {
+                "-dirty".to_owned()
+            }
+        }
+        Err(e) => {
+            eprintln!("`git status --short` err: {e}");
+            "".to_owned()
+        }
+    };
+
+    format!("v{cargo_pkg_version}-{branch_name}-{git_describe}{build_type}{git_status}")
 }
 
 fn main() {
