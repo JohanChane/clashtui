@@ -115,7 +115,7 @@ impl BackEnd {
         }
         Ok(path)
     }
-    pub fn update_mode(&self, mode: String) -> anyhow::Result<()> {
+    pub fn update_mode(&self, mode: crate::clash::webapi::Mode) -> anyhow::Result<()> {
         let load = format!(r#"{{"mode": "{mode}"}}"#);
         self.api.config_patch(load)?;
         Ok(())
@@ -283,7 +283,7 @@ impl BackEnd {
     pub fn update_state(
         &self,
         new_pf: Option<String>,
-        new_mode: Option<String>,
+        new_mode: Option<crate::clash::webapi::Mode>,
     ) -> anyhow::Result<State> {
         use crate::clash::webapi::ClashConfig;
         if let Some(mode) = new_mode {

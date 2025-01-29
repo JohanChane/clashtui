@@ -94,7 +94,7 @@ impl BackEnd {
                         match op {
                             tabs::service::BackendOp::SwitchMode(mode) => {
                                 // tick will refresh state
-                                match self.update_state(None, Some(mode.to_string())) {
+                                match self.update_state(None, Some(mode)) {
                                     Ok(_) => CallBack::ServiceCTL(format!(
                                         "Mode is switched to {}",
                                         mode

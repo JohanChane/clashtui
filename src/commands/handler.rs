@@ -1,5 +1,3 @@
-use crate::clash::webapi::Mode as cMode;
-
 use crate::utils::{BackEnd, ServiceOp};
 
 use super::*;
@@ -34,10 +32,8 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                         eprintln!("Select Profile: {e}")
                     };
                 } else if let Some(name) = name {
-                    println!("Profile: {name}");
-                    let pf = if let Some(v) = backend.get_profile(name) {
-                        v
-                    } else {
+                    println!("Target Profile: {name}");
+                    let Some(pf) = backend.get_profile(name) else {
                         anyhow::bail!("Not found in database!");
                     };
                     match backend.update_profile(pf, with_proxy, without_proxyprovider) {
@@ -54,9 +50,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                 Ok("Done".to_owned())
             }
             ProfileCommand::Select { name } => {
-                let pf = if let Some(v) = backend.get_profile(&name) {
-                    v
-                } else {
+                let Some(pf) = backend.get_profile(&name) else {
                     anyhow::bail!("Not found in database!");
                 };
                 if let Err(e) = backend.select_profile(pf) {
@@ -90,22 +84,16 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                 if soft {
                     backend.restart_clash().map_err(|e| anyhow::anyhow!(e))
                 } else {
-                    Ok(backend.clash_srv_ctl(ServiceOp::StartClashService)?)
+                    backend
+                        .clash_srv_ctl(ServiceOp::StartClashService)
+                        .map_err(|e| anyhow::anyhow!(e))
                 }
             }
             ServiceCommand::Stop => Ok(backend.clash_srv_ctl(ServiceOp::StopClashService)?),
         },
-        ArgCommand::Mode { mode } => match mode {
-            ModeCommand::Rule => Ok(backend
-                .update_state(None, Some(cMode::Rule.into()))?
-                .to_string()),
-            ModeCommand::Direct => Ok(backend
-                .update_state(None, Some(cMode::Direct.into()))?
-                .to_string()),
-            ModeCommand::Global => Ok(backend
-                .update_state(None, Some(cMode::Global.into()))?
-                .to_string()),
-        },
+        ArgCommand::Mode { mode } => Ok(backend
+            .update_state(None, Some(mode.into()))?
+            .to_string()),
         ArgCommand::CheckUpdate {
             without_ask,
             check_ci,

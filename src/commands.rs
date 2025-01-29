@@ -138,3 +138,14 @@ enum ServiceCommand {
     /// stop service
     Stop,
 }
+
+impl Into<crate::clash::webapi::Mode> for ModeCommand {
+    fn into(self) -> crate::clash::webapi::Mode {
+        use crate::clash::webapi::Mode;
+        match self {
+            ModeCommand::Rule => Mode::Rule,
+            ModeCommand::Direct => Mode::Direct,
+            ModeCommand::Global => Mode::Global,
+        }
+    }
+}
