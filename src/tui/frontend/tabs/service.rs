@@ -1,15 +1,12 @@
-use crate::utils::ServiceOp;
+use crate::backend::ServiceOp;
 use crate::{clash::webapi::Mode, tui::widget::PopRes};
 use crossterm::event::KeyEvent;
 
-use crate::{
-    tui::{frontend::consts::TAB_TITLE_SERVICE, widget::List, Drawable, EventState},
-    utils::CallBack,
-};
+use crate::tui::{frontend::consts::TAB_TITLE_SERVICE, widget::List, Drawable, EventState};
 use ratatui::prelude as Ra;
 use Ra::{Frame, Rect};
 
-use super::{Call, PopMsg, TabCont};
+use super::{Call, CallBack, PopMsg, TabCont};
 
 #[derive(Debug)]
 pub enum BackendOp {

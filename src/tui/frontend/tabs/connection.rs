@@ -1,11 +1,8 @@
-use super::{Call, PopMsg, TabCont};
-use crate::{
-    tui::{
-        frontend::consts::TAB_TITLE_CONNECTION,
-        widget::{tools, PopRes},
-        Drawable, EventState, Theme,
-    },
-    utils::CallBack,
+use super::{Call, CallBack, PopMsg, TabCont};
+use crate::tui::{
+    frontend::consts::TAB_TITLE_CONNECTION,
+    widget::{tools, PopRes},
+    Drawable, EventState, Theme,
 };
 
 use crate::clash::webapi::{Conn, ConnInfo, ConnMetaData};

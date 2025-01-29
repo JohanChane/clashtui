@@ -1,6 +1,9 @@
 use serde::Deserialize;
 
-use crate::clash::{headers, net_file::get_blob};
+use crate::{
+    backend::BackEnd,
+    clash::{headers, net_file::get_blob},
+};
 
 #[cfg_attr(test, derive(Deserialize, Debug, PartialEq))]
 /// Describe target repo and tag
@@ -128,7 +131,7 @@ impl std::fmt::Display for Asset {
 pub trait CheckUpdate {
     fn check_update(&self, check_ci: bool) -> anyhow::Result<Vec<(Response, String)>>;
 }
-impl CheckUpdate for super::BackEnd {
+impl CheckUpdate for BackEnd {
     /// check self and clash(current:`mihomo`)
     fn check_update(&self, check_ci: bool) -> anyhow::Result<Vec<(Response, String)>> {
         let clash_core_version = match self.api.version().ok() {

@@ -6,18 +6,15 @@ mod ops;
 use crossterm::event::KeyEvent;
 pub use ops::*;
 
-use crate::{
-    tui::{
-        frontend::{consts::TAB_TITLE_PROFILE, key_bind::Keys},
-        widget::{List, PopRes},
-        Drawable, EventState,
-    },
-    utils::CallBack,
+use crate::tui::{
+    frontend::{consts::TAB_TITLE_PROFILE, key_bind::Keys},
+    widget::{List, PopRes},
+    Drawable, EventState,
 };
 use ratatui::prelude as Ra;
 use Ra::{Frame, Rect};
 
-use super::{Call, PopMsg, TabCont};
+use super::{Call, CallBack, PopMsg, TabCont};
 
 #[derive(PartialEq, Clone, Copy)]
 enum Focus {

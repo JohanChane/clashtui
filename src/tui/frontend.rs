@@ -5,7 +5,8 @@ pub mod tabs;
 
 use super::widget::Popup;
 use super::{Call, Drawable, EventState, Theme};
-use crate::utils::{consts::err as consts_err, CallBack};
+use crate::backend::CallBack;
+use crate::utils::consts::err as consts_err;
 use key_bind::Keys;
 use tabs::TabCont;
 

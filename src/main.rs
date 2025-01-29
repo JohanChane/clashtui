@@ -1,13 +1,15 @@
 #![warn(clippy::all)]
 #![deny(unsafe_code)]
 #![warn(keyword_idents_2024)]
+mod backend;
 mod clash;
 mod commands;
 #[cfg(feature = "tui")]
 mod tui;
 mod utils;
 
-use utils::{consts, BackEnd, BuildConfig};
+use backend::BackEnd;
+use utils::{consts, BuildConfig};
 
 static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::new(|| {
     if let Some(data_dir) = PREFIX_HOME_DIR.get() {
