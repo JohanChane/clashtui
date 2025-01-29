@@ -1,18 +1,10 @@
-use super::*;
+use super::{BackEnd, CallBack, DataFile, State};
 
 use crate::tui::Call;
 use crate::utils::consts::err as consts_err;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 impl BackEnd {
-    /// Save all in-memory data to file
-    fn save(self) -> DataFile {
-        let (current_profile, profiles) = self.pm.into_inner();
-        DataFile {
-            profiles,
-            current_profile,
-        }
-    }
     /// read file by lines, from `total_len-start-length` to `total_len-start`
     pub fn logcat(&self, start: usize, length: usize) -> anyhow::Result<Vec<String>> {
         use crate::{utils::consts::LOG_FILE, HOME_DIR};

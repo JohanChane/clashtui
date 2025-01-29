@@ -1,7 +1,12 @@
-use super::*;
+use super::{ipc, BackEnd};
+
 #[allow(unused_imports)] // currently, only [`SwitchMode`] is impl on macOS
 use ipc::exec;
 use std::io::Error;
+
+mod state;
+
+pub(super) use state::State;
 
 crate::define_enum!(
     #[derive(Clone, Copy, Debug)]

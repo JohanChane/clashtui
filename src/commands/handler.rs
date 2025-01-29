@@ -1,4 +1,4 @@
-use crate::backend::{BackEnd, ServiceOp};
+use crate::backend::{BackEnd, Profile, ServiceOp};
 
 use super::*;
 
@@ -19,7 +19,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                     backend: &BackEnd,
                     all: bool,
                     name: Option<String>,
-                ) -> Box<dyn Iterator<Item = crate::utils::Profile>> {
+                ) -> Box<dyn Iterator<Item = Profile>> {
                     if all {
                         Box::new(backend.get_all_profiles().into_iter())
                     } else if let Some(name) = name {

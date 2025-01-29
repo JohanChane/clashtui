@@ -1,11 +1,11 @@
-use super::*;
+use super::{ipc, BackEnd, ProfileType};
+
+#[cfg(feature = "tui")]
+use super::CallBack;
 #[cfg(feature = "tui")]
 use crate::tui::tabs::profile::TemplateOp;
 use crate::{
-    utils::{
-        consts::{PROFILE_PATH, TEMPLATE_PATH},
-        profile::ProfileType,
-    },
+    utils::consts::{PROFILE_PATH, TEMPLATE_PATH},
     HOME_DIR,
 };
 

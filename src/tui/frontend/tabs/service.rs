@@ -27,7 +27,7 @@ impl Default for ServiceTab {
         let mut inner = List::new(TAB_TITLE_SERVICE.to_string());
         let items = inner.get_items_mut();
         items.push("SwitchMode".to_owned());
-        items.extend(ServiceOp::ALL.into_iter().map(|v| v.into()));
+        items.extend(ServiceOp::ALL.into_iter().map(|v| v.to_string()));
 
         Self {
             inner,

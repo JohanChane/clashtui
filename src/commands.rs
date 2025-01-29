@@ -1,10 +1,11 @@
-mod complete;
-mod handler;
-mod interactive;
 use crate::utils::consts::VERSION;
 
+mod complete;
+mod handler;
+mod widgets;
+
 pub(crate) use handler::handle_cli;
-pub use interactive::{Confirm, Select};
+pub(crate) use widgets::{Confirm, Select};
 
 pub(crate) struct PackedArgs(ArgCommand);
 

@@ -1,11 +1,17 @@
-use crate::utils::profile::{Profile, ProfileType};
-
-use super::*;
-#[cfg(feature = "tui")]
-use crate::tui::tabs::profile::ProfileOp;
-use std::fs::File;
+use super::{ipc, BackEnd};
 
 use crate::{clash::util::extract_domain, utils::consts::PROFILE_PATH, HOME_DIR};
+use std::fs::File;
+
+#[cfg(feature = "tui")]
+use super::CallBack;
+#[cfg(feature = "tui")]
+use crate::tui::tabs::profile::ProfileOp;
+
+pub(super) mod database;
+mod profile;
+
+pub use profile::{LocalProfile, Profile, ProfileType};
 
 impl BackEnd {
     pub(super) fn create_profile<S: AsRef<str>, S2: AsRef<str>>(&self, name: S, url: S2) {

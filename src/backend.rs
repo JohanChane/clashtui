@@ -5,6 +5,19 @@ mod impl_template;
 #[cfg(feature = "tui")]
 mod impl_tui;
 
+use crate::clash::webapi::ClashUtil;
+// configs
+use crate::clash::webapi::local_config::LibConfig;
+use crate::utils::config::{BuildConfig, ConfigFile, DataFile};
+// ipc
+use crate::utils::ipc;
+// profile
+pub use impl_profile::{database::ProfileDataBase, Profile};
+use impl_profile::{database::ProfileManager, LocalProfile, ProfileType};
+// service
+pub use impl_service::ServiceOp;
+use impl_service::State;
+
 #[cfg(feature = "tui")]
 #[derive(derive_more::Debug)]
 pub enum CallBack {
@@ -26,16 +39,6 @@ pub enum CallBack {
     #[cfg(feature = "template")]
     TemplateCTL(Vec<String>),
 }
-
-use crate::clash::webapi::{local_config::LibConfig, ClashUtil};
-use crate::utils::profile::{map::ProfileManager, LocalProfile};
-use crate::utils::{
-    config::{BuildConfig, ConfigFile, DataFile},
-    ipc,
-    state::State,
-};
-
-pub use impl_service::ServiceOp;
 
 pub struct BackEnd {
     pub(super) api: ClashUtil,
@@ -79,5 +82,13 @@ impl BackEnd {
             edit_cmd,
             base_profile,
         })
+    }
+    /// Save all in-memory data to file
+    fn save(self) -> DataFile {
+        let (current_profile, profiles) = self.pm.into_inner();
+        DataFile {
+            profiles,
+            current_profile,
+        }
     }
 }

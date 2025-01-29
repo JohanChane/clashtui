@@ -5,7 +5,7 @@ use std::path::Path;
 use crate::clash::webapi::local_config::{Basic, Service};
 use serde::{Deserialize, Serialize};
 
-use crate::utils::profile::map::ProfileDataBase;
+use crate::backend::ProfileDataBase;
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
