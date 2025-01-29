@@ -12,7 +12,14 @@ use utils::{consts, BackEnd, BuildConfig};
 static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::new(|| {
     if let Some(data_dir) = PREFIX_HOME_DIR.get() {
         if data_dir.exists() && data_dir.is_dir() {
-            return data_dir.clone();
+            match std::path::absolute(data_dir) {
+                Ok(dir) => return dir,
+                Err(e) => {
+                    log::error!("Cannot locate absolute path:{e}");
+                    log::error!("Update profile may not work");
+                    return data_dir.clone();
+                }
+            }
         }
     };
     load_home_dir()
