@@ -1,9 +1,6 @@
 use serde::Deserialize;
 
-use crate::{
-    backend::BackEnd,
-    clash::{headers, net_file::get_blob},
-};
+use crate::clash::{headers, net_file::get_blob};
 
 #[cfg_attr(test, derive(Deserialize, Debug, PartialEq))]
 /// Describe target repo and tag
@@ -80,6 +77,13 @@ impl Response {
             false
         }
     }
+    pub fn check(self, version: &str, skip_check: bool) -> Option<Self> {
+        if skip_check || self.is_newer_than(&version) {
+            Some(self)
+        } else {
+            None
+        }
+    }
     /// filter by name contains `os` and `arch`
     ///
     /// if fail to get `arch`, then apply `os` only
@@ -103,7 +107,7 @@ impl Response {
     pub fn as_info(&self, version: String) -> String {
         format!(
             r#"----------------------
-There is a new update for `{}`
+There is a new update for '{}'
 Target version is '{}'
 > Current version is '{version}'
 Published at {}
@@ -126,56 +130,6 @@ pub struct Asset {
 impl std::fmt::Display for Asset {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.name)
-    }
-}
-pub trait CheckUpdate {
-    fn check_update(&self, check_ci: bool) -> anyhow::Result<Vec<(Response, String)>>;
-}
-impl CheckUpdate for BackEnd {
-    /// check self and clash(current:`mihomo`)
-    fn check_update(&self, check_ci: bool) -> anyhow::Result<Vec<(Response, String)>> {
-        let clash_core_version = match self.api.version().ok() {
-            Some(v) => {
-                let mut map: std::collections::HashMap<String, String> = serde_json::from_str(&v)?;
-                map.remove("version").unwrap_or("v0.0.0".to_owned())
-            }
-            // assume there is no clash core installed/running
-            None => "v0.0.0".to_owned(),
-        };
-
-        let mut vec = Vec::with_capacity(3);
-        if check_ci {
-            vec.push((
-                Request::s_clashtui_ci()
-                    .get_info()?
-                    .filter_asserts()
-                    .rename("ClashTUI"),
-                crate::consts::VERSION.to_owned(),
-            ));
-            vec.push((
-                Request::s_mihomo_ci()
-                    .get_info()?
-                    .filter_asserts()
-                    .rename("Clash Core"),
-                clash_core_version,
-            ));
-        } else {
-            let clashtui = Request::s_clashtui().get_info()?;
-            let mihomo = Request::s_mihomo().get_info()?;
-            if clashtui.is_newer_than(crate::consts::VERSION) {
-                vec.push((
-                    clashtui.filter_asserts().rename("ClashTUI"),
-                    crate::consts::VERSION.to_owned(),
-                ));
-            }
-            if mihomo.is_newer_than(&clash_core_version) {
-                vec.push((
-                    mihomo.filter_asserts().rename("Clash Core"),
-                    clash_core_version,
-                ))
-            }
-        }
-        Ok(vec)
     }
 }
 

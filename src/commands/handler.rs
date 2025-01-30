@@ -88,37 +88,55 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
             without_ask,
             check_ci,
         } => {
-            use crate::utils::self_update::{download_to_file, CheckUpdate};
-            for (info, current_version) in backend
-                .check_update(check_ci)
-                .map_err(|e| anyhow::anyhow!("failed to fetch github release due to {e}"))?
-            {
-                println!("\n{}", info.as_info(current_version));
-                if let Some(asset) = if !without_ask {
-                    if !Confirm::default()
-                        .append_prompt("Do you want to download now?")
-                        .interact()?
-                    {
-                        continue;
+            use crate::utils::self_update::{download_to_file, Request};
+            let vec = if check_ci {
+                [Request::s_clashtui_ci(), Request::s_mihomo_ci()]
+            } else {
+                [Request::s_clashtui(), Request::s_mihomo()]
+            };
+            let ver = [
+                VERSION.to_owned(),
+                backend.api.version().ok().map_or("v0.0.0".to_owned(), |v| {
+                    let mut map: std::collections::HashMap<String, String> =
+                        serde_json::from_str(&v).unwrap();
+                    map.remove("version").unwrap_or("v0.0.0".to_owned())
+                }),
+            ];
+            let name = ["ClashTUI", "Clash Core"];
+            for ((info, current_version), name) in vec.into_iter().zip(ver).zip(name) {
+                if let Some(info) = info
+                    .get_info()
+                    .map_err(|e| anyhow::anyhow!("failed to fetch github release due to {e}"))?
+                    .check(&current_version, check_ci)
+                {
+                    let info = info.rename(name).filter_asserts();
+                    println!("\n{}", info.as_info(current_version));
+                    if let Some(asset) = if !without_ask {
+                        if !Confirm::default()
+                            .append_prompt("Do you want to download now?")
+                            .interact()?
+                        {
+                            continue;
+                        }
+                        println!();
+                        Select::default()
+                            .append_start_prompt("Avaliable asserts:")
+                            .set_end_prompt("Type the num")
+                            .append_items(info.assets.iter())
+                            .interact()?
+                    } else {
+                        info.assets.first()
+                    } {
+                        println!();
+                        println!(
+                            "Download start for {} {}",
+                            asset.name, asset.browser_download_url
+                        );
+                        let path = std::env::current_dir()?.join(&asset.name);
+                        download_to_file(&path, &asset.browser_download_url)?;
+                        println!("Downloaded to {}", path.display());
+                        println!();
                     }
-                    println!();
-                    Select::default()
-                        .append_start_prompt("Avaliable asserts:")
-                        .set_end_prompt("Type the num")
-                        .append_items(info.assets.iter())
-                        .interact()?
-                } else {
-                    info.assets.first()
-                } {
-                    println!();
-                    println!(
-                        "Download start for {} {}",
-                        asset.name, asset.browser_download_url
-                    );
-                    let path = std::env::current_dir()?.join(&asset.name);
-                    download_to_file(&path, &asset.browser_download_url)?;
-                    println!("Downloaded to {}", path.display());
-                    println!();
                 }
             }
             Ok("Done".to_owned())
