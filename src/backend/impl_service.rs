@@ -71,13 +71,16 @@ impl BackEnd {
                     exec("systemctl", args)
                 }
             }
-            ServiceOp::SetPermission => ipc::exec_with_sbin(
-                "setcap",
-                vec![
-                    "'cap_net_admin,cap_net_bind_service=+ep'",
-                    self.cfg.basic.clash_bin_pth.as_str(),
-                ],
-            ),
+            ServiceOp::SetPermission => {
+                exec("chmod", vec!["+x", self.cfg.basic.clash_bin_pth.as_str()])?;
+                ipc::exec_with_sbin(
+                    "setcap",
+                    vec![
+                        "'cap_net_admin,cap_net_bind_service=+ep'",
+                        self.cfg.basic.clash_bin_pth.as_str(),
+                    ],
+                )
+            }
             #[allow(unreachable_patterns)]
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
