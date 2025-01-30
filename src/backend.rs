@@ -7,13 +7,12 @@ mod impl_tui;
 
 use crate::clash::webapi::ClashUtil;
 // configs
-use crate::clash::webapi::local_config::LibConfig;
-use crate::utils::config::{BuildConfig, ConfigFile, DataFile};
+use crate::utils::config::{BuildConfig, LibConfig};
 // ipc
 use crate::utils::ipc;
 // profile
-pub use impl_profile::{database::ProfileDataBase, Profile};
-use impl_profile::{database::ProfileManager, LocalProfile, ProfileType};
+use impl_profile::ProfileType;
+pub use impl_profile::{database::ProfileManager, Profile};
 // service
 pub use impl_service::ServiceOp;
 use impl_service::State;
@@ -40,55 +39,49 @@ pub enum CallBack {
     TemplateCTL(Vec<String>),
 }
 
+impl From<anyhow::Result<CallBack>> for CallBack {
+    fn from(value: anyhow::Result<CallBack>) -> Self {
+        match value {
+            Ok(v) => v,
+            Err(e) => CallBack::Error(e.to_string()),
+        }
+    }
+}
+
 pub struct BackEnd {
     pub(super) api: ClashUtil,
     cfg: LibConfig,
     pm: ProfileManager,
     edit_cmd: String,
-    /// just clone and merge, DO NEVER sync_to_disk/sync_from_disk
-    base_profile: LocalProfile,
+    /// This is `basic_clash_config.yaml` in memory
+    base_profile: serde_yml::Mapping,
 }
 
 impl BackEnd {
-    pub fn build(value: BuildConfig) -> Result<Self, anyhow::Error> {
+    pub fn build(value: BuildConfig) -> anyhow::Result<Self> {
         let BuildConfig {
-            cfg:
-                ConfigFile {
-                    basic,
-                    service,
-                    timeout,
-                    edit_cmd,
-                },
-            basic: info,
-            data:
-                DataFile {
-                    profiles,
-                    current_profile,
-                },
-            base_raw,
+            cfg,
+            data,
+            base_profile: base_raw,
+            edit_cmd,
+            timeout,
+            external_controller,
+            proxy_addr,
+            secret,
+            global_ua,
         } = value;
-        let cfg = LibConfig { basic, service };
-        let (external_controller, proxy_addr, secret, global_ua) = info.build()?;
-        let api = ClashUtil::new(external_controller, secret, proxy_addr, global_ua, timeout);
-        let pm = ProfileManager::new(current_profile, profiles);
-        let base_profile = LocalProfile {
-            content: Some(base_raw),
-            ..LocalProfile::default()
-        };
+        crate::clash::webapi::set_timeout(timeout);
+        let api = ClashUtil::new(external_controller, secret, proxy_addr, global_ua);
         Ok(Self {
             api,
             cfg,
-            pm,
+            pm: data,
             edit_cmd,
-            base_profile,
+            base_profile: base_raw,
         })
     }
     /// Save all in-memory data to file
-    fn save(self) -> DataFile {
-        let (current_profile, profiles) = self.pm.into_inner();
-        DataFile {
-            profiles,
-            current_profile,
-        }
+    fn save(self) -> ProfileManager {
+        self.pm
     }
 }

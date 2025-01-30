@@ -1,6 +1,6 @@
 use super::{ipc, BackEnd};
 
-use crate::{clash::util::extract_domain, utils::consts::PROFILE_PATH, HOME_DIR};
+use crate::{utils::consts::PROFILE_PATH, HOME_DIR};
 use std::fs::File;
 
 #[cfg(feature = "tui")]
@@ -22,7 +22,7 @@ impl BackEnd {
         let path = HOME_DIR.join(PROFILE_PATH).join(&pf.name);
         if let Err(e) = std::fs::remove_file(path) {
             if e.kind() != std::io::ErrorKind::NotFound {
-                log::warn!("Failed to Remove profile: {e}")
+                log::warn!("Failed to Remove profile file: {e}")
             }
         };
         self.pm.remove(pf.name);
@@ -142,13 +142,12 @@ impl BackEnd {
 
     pub fn select_profile(&self, profile: Profile) -> anyhow::Result<()> {
         // load selected profile
-        let lprofile = self.load_local_profile(profile.clone())?;
+        let mut lprofile = self.load_local_profile(profile.clone())?;
         // merge that into basic profile
-        let mut new_profile = self.base_profile.clone();
-        new_profile.merge(&lprofile)?;
+        lprofile.merge(&self.base_profile)?;
         // set path to clash config file path and sync to disk
-        new_profile.path = self.cfg.basic.clash_cfg_pth.clone().into();
-        new_profile.sync_to_disk()?;
+        lprofile.path = self.cfg.basic.clash_cfg_pth.clone().into();
+        lprofile.sync_to_disk()?;
         // after, change current profile
         self.set_current_profile(profile);
         // ask clash to reload config
@@ -171,7 +170,7 @@ impl BackEnd {
 }
 #[cfg(feature = "tui")]
 impl BackEnd {
-    pub(super) fn handle_profile_op(&self, op: ProfileOp) -> CallBack {
+    pub(super) fn handle_profile_op(&self, op: ProfileOp) -> anyhow::Result<CallBack> {
         match op {
             ProfileOp::GetALL => {
                 let mut composed: Vec<(String, Option<std::time::Duration>)> = self
@@ -186,65 +185,55 @@ impl BackEnd {
                     .collect();
                 composed.sort();
                 let (name, atime) = composed.into_iter().collect();
-                CallBack::ProfileInit(name, atime)
+                Ok(CallBack::ProfileInit(name, atime))
             }
             ProfileOp::Add(name, url) => {
                 self.create_profile(&name, url);
-                match self.update_profile(
+                let res = self.update_profile(
                     self.get_profile(name)
                         .expect("Cannot find selected profile"),
                     None,
                     false,
-                ) {
-                    Ok(v) => CallBack::ProfileCTL(v),
-                    Err(e) => CallBack::Error(e.to_string()),
-                }
+                )?;
+                Ok(CallBack::ProfileCTL(res))
             }
             ProfileOp::Remove(name) => {
-                if let Err(e) = self.remove_profile(
-                    self.get_profile(name)
+                self.remove_profile(
+                    self.get_profile(&name)
                         .expect("Cannot find selected profile"),
-                ) {
-                    CallBack::Error(e.to_string())
-                } else {
-                    CallBack::ProfileCTL(vec!["Profile is now removed".to_owned()])
-                }
+                )?;
+                Ok(CallBack::ProfileCTL(vec![format!("{name} Removed")]))
             }
             ProfileOp::Update(name, with_proxy, with_pp) => {
-                match self.update_profile(
+                let res = self.update_profile(
                     self.get_profile(name)
                         .expect("Cannot find selected profile"),
                     with_proxy,
                     with_pp,
-                ) {
-                    Ok(v) => CallBack::ProfileCTL(v),
-                    Err(e) => CallBack::Error(e.to_string()),
-                }
+                )?;
+                Ok(CallBack::ProfileCTL(res))
             }
             ProfileOp::Select(name) => {
-                if let Err(e) = self.select_profile(
+                self.select_profile(
                     self.get_profile(name)
                         .expect("Cannot find selected profile"),
-                ) {
-                    CallBack::Error(e.to_string())
-                } else {
-                    CallBack::ProfileCTL(vec!["Profile is now loaded".to_owned()])
-                }
+                )?;
+                Ok(CallBack::ProfileCTL(vec![
+                    "Profile is now loaded".to_owned()
+                ]))
             }
             ProfileOp::Test(name, geodata_mode) => {
                 let pf = self
                     .get_profile(name)
                     .expect("Cannot find selected profile");
-                match self.load_local_profile(pf).and_then(|pf| {
-                    self.test_profile_config(&pf.path.to_string_lossy(), geodata_mode)
-                        .map_err(|e| e.into())
-                }) {
-                    Ok(v) => CallBack::ProfileCTL(v.lines().map(|s| s.to_owned()).collect()),
-                    Err(e) => CallBack::Error(e.to_string()),
-                }
+                let pf = self.load_local_profile(pf)?;
+                let res = self.test_profile_config(pf.path.to_str().unwrap(), geodata_mode)?;
+                Ok(CallBack::ProfileCTL(
+                    res.lines().map(|s| s.to_owned()).collect(),
+                ))
             }
             ProfileOp::Preview(name) => {
-                let mut lines = Vec::with_capacity(1024);
+                let mut lines = Vec::with_capacity(512);
                 let pf = self
                     .get_profile(name)
                     .expect("Cannot find selected profile");
@@ -255,17 +244,14 @@ impl BackEnd {
                         .unwrap_or("Imported local file".to_owned()),
                 );
                 lines.push(Default::default());
-                match std::fs::read_to_string(path) {
-                    Ok(content) => CallBack::Preview({
-                        if content.is_empty() {
-                            lines.push("yaml file is empty. Please update it.".to_owned());
-                        } else {
-                            lines.extend(content.lines().map(|s| s.to_owned()));
-                        }
-                        lines
-                    }),
-                    Err(e) => CallBack::Error(e.to_string()),
+
+                let content = std::fs::read_to_string(path)?;
+                if content.is_empty() {
+                    lines.push("yaml file is empty. Please update it.".to_owned());
+                } else {
+                    lines.extend(content.lines().map(|s| s.to_owned()));
                 }
+                Ok(CallBack::Preview(lines))
             }
             ProfileOp::Edit(name) => {
                 let pf = self
@@ -273,17 +259,36 @@ impl BackEnd {
                     .expect("Cannot find selected profile");
                 let path = HOME_DIR.join(PROFILE_PATH).join(&pf.name);
 
-                match ipc::spawn(
+                ipc::spawn(
                     "sh",
                     vec![
                         "-c",
                         self.edit_cmd.replace("%s", path.to_str().unwrap()).as_str(),
                     ],
-                ) {
-                    Ok(()) => CallBack::Edit,
-                    Err(e) => CallBack::Error(e.to_string()),
-                }
+                )?;
+                Ok(CallBack::Edit)
             }
         }
     }
 }
+
+pub fn extract_domain(url: &str) -> Option<&str> {
+    if let Some(protocol_end) = url.find("://") {
+        let rest = &url[(protocol_end + 3)..];
+        return if let Some(path_start) = rest.find('/') {
+            Some(&rest[..path_start])
+        } else {
+            Some(rest)
+        };
+    }
+    None
+}
+
+/*
+pub fn timestamp_to_readable(timestamp: u64) -> String {
+    let duration = std::time::Duration::from_secs(timestamp);
+    let datetime = std::time::UNIX_EPOCH + duration;
+    let datetime: chrono::DateTime<chrono::Utc> = datetime.into();
+    datetime.format("%Y-%m-%d %H:%M:%S").to_string()
+}
+*/

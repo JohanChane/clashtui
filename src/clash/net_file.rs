@@ -12,7 +12,5 @@ pub fn get_blob<U: Into<minreq::URL>, S: Into<String>>(
     if let Some(ua) = ua {
         req = req.with_header(headers::USER_AGENT, ua)
     }
-    req.with_timeout(*TIMEOUT.get().unwrap())
-        .send_lazy()
-        .map_err(|e| e.into())
+    req.with_timeout(*TIMEOUT).send_lazy().map_err(|e| e.into())
 }

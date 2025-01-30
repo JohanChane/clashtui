@@ -1,3 +1,5 @@
+use crate::clash::TIMEOUT;
+
 use super::{CResult, ClashUtil, DEFAULT_PAYLOAD};
 use minreq::Method;
 
@@ -27,7 +29,7 @@ impl ClashUtil {
     /// return nothing on success
     pub fn check_connectivity(&self) -> CResult<()> {
         minreq::get("https://www.gstatic.com/generate_204")
-            .with_timeout(Self::timeout())
+            .with_timeout(*TIMEOUT)
             .with_proxy(minreq::Proxy::new(self.proxy_addr.clone())?)
             .send()
             .map(|_| ())

@@ -1,4 +1,4 @@
-use super::{BackEnd, CallBack, DataFile, State};
+use super::{BackEnd, CallBack, ProfileManager, State};
 
 use crate::tui::Call;
 use crate::utils::consts::err as consts_err;
@@ -34,7 +34,7 @@ impl BackEnd {
         self,
         tx: Sender<CallBack>,
         mut rx: Receiver<Call>,
-    ) -> anyhow::Result<DataFile> {
+    ) -> anyhow::Result<ProfileManager> {
         use crate::tui::tabs;
         let mut errs = vec![];
         loop {
@@ -78,9 +78,9 @@ impl BackEnd {
                 log::debug!("Backend got:{op:?}");
                 let cb = match op {
                     Call::Profile(op) => match op {
-                        tabs::profile::BackendOp::Profile(op) => self.handle_profile_op(op),
+                        tabs::profile::BackendOp::Profile(op) => self.handle_profile_op(op).into(),
                         #[cfg(feature = "template")]
-                        tabs::profile::BackendOp::Template(op) => self.handle_template_op(op),
+                        tabs::profile::BackendOp::Template(op) => self.handle_template_op(op).into(),
                     },
                     Call::Service(op) => {
                         match op {
@@ -152,8 +152,8 @@ impl BackEnd {
                             }
                         }
                     }
-                    // unfortunately, this might(in fact almost always) block by
-                    // thousand of [Call::Tick],
+                    // unfortunately, this might(in fact almost always) blocked by
+                    // thousand of Call::Tick,
                     //
                     // another match might help
                     Call::Stop => return Ok(self.save()),

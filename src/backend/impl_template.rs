@@ -32,9 +32,7 @@ impl BackEnd {
             .get("clashtui_template_version")
             .and_then(|v| v.as_u64())
         {
-            // regard as version 1
             None => {
-                let ver = 1;
                 // file is opened, so file_name should exist
                 let name_maybe_with_ext = path.file_name().unwrap().to_str().unwrap();
                 let name = name_maybe_with_ext
@@ -44,12 +42,7 @@ impl BackEnd {
                     .map(|(v, _)| v)
                     .unwrap_or(name_maybe_with_ext);
                 std::fs::copy(&path, HOME_DIR.join(TEMPLATE_PATH).join(name))?;
-                Ok(Some(format!(
-                    "Name:{} Added\nClashtui Template Version {}",
-                    // path from a String, should be UTF-8
-                    name,
-                    ver
-                )))
+                Ok(None)
             }
             Some(ver) if ver <= 1 => {
                 // file is opened, so file_name should exist
@@ -106,51 +99,41 @@ impl BackEnd {
 
 #[cfg(feature = "tui")]
 impl BackEnd {
-    pub(super) fn handle_template_op(&self, op: TemplateOp) -> CallBack {
+    pub(super) fn handle_template_op(&self, op: TemplateOp) -> anyhow::Result<CallBack> {
         match op {
-            TemplateOp::GetALL => match self.get_all_templates() {
-                Ok(v) => CallBack::TemplateInit(v),
-                Err(e) => CallBack::Error(e.to_string()),
-            },
-            TemplateOp::Add(path) => match self.create_template(path) {
-                Ok(Some(str)) => CallBack::TemplateCTL(vec![str]),
-                Ok(None) => {
-                    CallBack::TemplateCTL(vec!["Not a valid clashtui template".to_string()])
-                }
-                Err(e) => CallBack::Error(e.to_string()),
+            TemplateOp::GetALL => Ok(CallBack::TemplateInit(self.get_all_templates()?)),
+            TemplateOp::Add(path) => match self.create_template(path)? {
+                Some(str) => Ok(CallBack::TemplateCTL(vec![str])),
+                None => Ok(CallBack::TemplateCTL(vec![
+                    "clashtui_template_version not found".to_string()
+                ])),
             },
             TemplateOp::Remove(name) => {
                 let path = HOME_DIR.join(TEMPLATE_PATH).join(&name);
-                match std::fs::remove_file(path) {
-                    Ok(()) => CallBack::TemplateCTL(vec![format!("{name} Removed")]),
-                    Err(e) => CallBack::Error(e.to_string()),
-                }
+                std::fs::remove_file(path)?;
+                Ok(CallBack::TemplateCTL(vec![format!("{name} Removed")]))
             }
-            TemplateOp::Generate(name) => match self.apply_template(name) {
-                Ok(()) => CallBack::TemplateCTL(vec![]),
-                Err(e) => CallBack::Error(e.to_string()),
-            },
+            TemplateOp::Generate(name) => {
+                self.apply_template(name)?;
+                Ok(CallBack::TemplateCTL(vec!["Done".to_owned()]))
+            }
             TemplateOp::Preview(name) => {
                 let path = HOME_DIR.join(TEMPLATE_PATH).join(name);
-                match std::fs::read_to_string(path) {
-                    Ok(content) => {
-                        CallBack::Preview(content.lines().map(|s| s.to_owned()).collect())
-                    }
-                    Err(e) => CallBack::Error(e.to_string()),
-                }
+                let content = std::fs::read_to_string(path)?;
+                Ok(CallBack::Preview(
+                    content.lines().map(|s| s.to_owned()).collect(),
+                ))
             }
             TemplateOp::Edit(name) => {
                 let path = HOME_DIR.join(TEMPLATE_PATH).join(name);
-                match ipc::spawn(
+                ipc::spawn(
                     "sh",
                     vec![
                         "-c",
                         self.edit_cmd.replace("%s", path.to_str().unwrap()).as_str(),
                     ],
-                ) {
-                    Ok(()) => CallBack::Edit,
-                    Err(e) => CallBack::Error(e.to_string()),
-                }
+                )?;
+                Ok(CallBack::Edit)
             }
         }
     }

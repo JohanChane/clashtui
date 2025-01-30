@@ -1,3 +1,4 @@
+use super::extract_domain;
 use std::{fs::File, path::PathBuf};
 
 #[derive(Clone)]
@@ -33,14 +34,6 @@ impl Default for LocalProfile {
 }
 
 impl LocalProfile {
-    const FILTER: [&str; 6] = [
-        "proxy-groups",
-        "proxy-providers",
-        "proxies",
-        "sub-rules",
-        "rules",
-        "rule-providers",
-    ];
     /// Returns the atime of this [`LocalProfile`].
     ///
     /// Errors are ignored and return will be replaced with [None]
@@ -64,27 +57,21 @@ impl LocalProfile {
             .ok()
             .and_then(|file| now.duration_since(file).ok())
     }
-    /// merge `base` into [`LocalProfile::content`],
-    /// using [`FILTER`](Self::FILTER)
+    /// merge `basic_clash_config` to `self::content`,
+    /// all items in `basic_clash_config` will be overwrited to `self::content`
     ///
     /// Note: need to call [`LocalProfile::sync_from_disk`] before call this
-    pub fn merge(&mut self, base: &LocalProfile) -> anyhow::Result<()> {
-        if self.content.is_none() || base.content.is_none() {
+    pub fn merge(&mut self, basic_clash_config: &serde_yml::Mapping) -> anyhow::Result<()> {
+        if self.content.is_none() || basic_clash_config.is_empty() {
             anyhow::bail!("failed to merge: one of the input content is none");
         }
 
-        Self::FILTER
-            .into_iter()
-            .filter(|s| {
-                base.content
-                    .as_ref()
-                    .expect("need to call sync from disk")
-                    .contains_key(s)
-            })
-            .map(|key| (key, base.content.as_ref().unwrap().get(key).unwrap()))
-            .for_each(|(k, v)| {
-                self.content.as_mut().unwrap().insert(k.into(), v.clone());
-            });
+        basic_clash_config.iter().for_each(|(key, value)| {
+            self.content
+                .as_mut()
+                .unwrap()
+                .insert(key.clone(), value.clone());
+        });
         Ok(())
     }
     /// sync the content to disk by [`LocalProfile::path`]
@@ -133,7 +120,7 @@ impl ProfileType {
     pub fn get_domain(&self) -> Option<String> {
         match self {
             ProfileType::File => None,
-            ProfileType::Url(url) => crate::clash::util::extract_domain(url).map(|s| s.to_owned()),
+            ProfileType::Url(url) => extract_domain(url).map(|s| s.to_owned()),
             ProfileType::Generated(name) => Some(format!("From template {name}")),
         }
     }

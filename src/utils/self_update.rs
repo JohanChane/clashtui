@@ -183,8 +183,7 @@ pub fn download_to_file(path: &std::path::Path, url: &str) -> anyhow::Result<()>
     match get_blob(url, None, Some(headers::DEFAULT_USER_AGENT)) {
         Ok(mut rp) => {
             let mut fp = std::fs::File::create(path)?;
-            std::io::copy(&mut rp, &mut fp)
-                .map_err(|e| anyhow::anyhow!("{e}, increase timeout might help"))?;
+            std::io::copy(&mut rp, &mut fp)?;
         }
         Err(e) => {
             eprintln!("{e}, try to download with `curl/wget`");
