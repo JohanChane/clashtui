@@ -80,7 +80,9 @@ impl BackEnd {
                     Call::Profile(op) => match op {
                         tabs::profile::BackendOp::Profile(op) => self.handle_profile_op(op).into(),
                         #[cfg(feature = "template")]
-                        tabs::profile::BackendOp::Template(op) => self.handle_template_op(op).into(),
+                        tabs::profile::BackendOp::Template(op) => {
+                            self.handle_template_op(op).into()
+                        }
                     },
                     Call::Service(op) => {
                         match op {

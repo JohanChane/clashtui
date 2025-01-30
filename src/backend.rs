@@ -49,8 +49,8 @@ impl From<anyhow::Result<CallBack>> for CallBack {
 }
 
 pub struct BackEnd {
-    pub(super) api: ClashUtil,
-    cfg: LibConfig,
+    pub api: ClashUtil,
+    pub cfg: LibConfig,
     pm: ProfileManager,
     edit_cmd: String,
     /// This is `basic_clash_config.yaml` in memory

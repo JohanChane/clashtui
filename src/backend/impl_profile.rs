@@ -70,7 +70,7 @@ impl BackEnd {
                 ProfileType::File => unreachable!(),
                 // Update via the given link
                 ProfileType::Url(url) => {
-                    work_vec.push((url.clone(), profile.path.to_string_lossy().to_string()))
+                    work_vec.push((url.clone(), profile.path.to_str().unwrap().to_string()))
                 }
                 #[cfg(feature = "template")]
                 ProfileType::Generated(template_name) => {

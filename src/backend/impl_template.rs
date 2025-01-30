@@ -105,7 +105,7 @@ impl BackEnd {
             TemplateOp::Add(path) => match self.create_template(path)? {
                 Some(str) => Ok(CallBack::TemplateCTL(vec![str])),
                 None => Ok(CallBack::TemplateCTL(vec![
-                    "clashtui_template_version not found".to_string()
+                    "clashtui_template_version not found".to_string(),
                 ])),
             },
             TemplateOp::Remove(name) => {

@@ -88,8 +88,8 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
             without_ask,
             check_ci,
         } => {
-            use crate::utils::self_update::{download_to_file, Request};
-            let vec = if check_ci {
+            use crate::utils::self_update::Request;
+            let request = if check_ci {
                 [Request::s_clashtui_ci(), Request::s_mihomo_ci()]
             } else {
                 [Request::s_clashtui(), Request::s_mihomo()]
@@ -103,8 +103,14 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                 }),
             ];
             let name = ["ClashTUI", "Clash Core"];
-            for ((info, current_version), name) in vec.into_iter().zip(ver).zip(name) {
-                if let Some(info) = info
+            let path = [
+                std::env::current_exe()?,
+                backend.cfg.basic.clash_bin_pth.into(),
+            ];
+            for (((request, current_version), name), mut path) in
+                request.into_iter().zip(ver).zip(name).zip(path)
+            {
+                if let Some(info) = request
                     .get_info()
                     .map_err(|e| anyhow::anyhow!("failed to fetch github release due to {e}"))?
                     .check(&current_version, check_ci)
@@ -132,8 +138,14 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                             "Download start for {} {}",
                             asset.name, asset.browser_download_url
                         );
-                        let path = std::env::current_dir()?.join(&asset.name);
-                        download_to_file(&path, &asset.browser_download_url)?;
+                        // add '.new' to the file name if the file already exists
+                        // else, use the original name
+                        if path.file_name() == Some(std::ffi::OsStr::new(&asset.name)) {
+                            path.set_file_name(format!("{}.new", asset.name));
+                        } else {
+                            path.set_file_name(&asset.name);
+                        }
+                        asset.download(&path)?;
                         println!("Downloaded to {}", path.display());
                         println!();
                     }

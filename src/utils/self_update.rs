@@ -78,7 +78,7 @@ impl Response {
         }
     }
     pub fn check(self, version: &str, skip_check: bool) -> Option<Self> {
-        if skip_check || self.is_newer_than(&version) {
+        if skip_check || self.is_newer_than(version) {
             Some(self)
         } else {
             None
@@ -132,6 +132,11 @@ impl std::fmt::Display for Asset {
         write!(f, "{}", self.name)
     }
 }
+impl Asset {
+    pub fn download(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        download_to_file(path, &self.browser_download_url)
+    }
+}
 
 pub fn download_to_file(path: &std::path::Path, url: &str) -> anyhow::Result<()> {
     match get_blob(url, None, Some(headers::DEFAULT_USER_AGENT)) {
@@ -163,8 +168,8 @@ pub fn download_to_file(path: &std::path::Path, url: &str) -> anyhow::Result<()>
                     Ok(false)
                 }
             }
-            if !have_this_and_exec("curl", &["-o", &path.to_string_lossy(), "-L", url])?
-                && !have_this_and_exec("wget", &["-O", &path.to_string_lossy(), url])?
+            if !have_this_and_exec("curl", &["-o", path.to_str().unwrap(), "-L", url])?
+                && !have_this_and_exec("wget", &["-O", path.to_str().unwrap(), url])?
             {
                 anyhow::bail!("Unable to find curl/wget")
             }
