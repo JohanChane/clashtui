@@ -16,7 +16,10 @@ fn get_version() -> String {
         }
     };
 
-    let git_describe = match Command::new("git").args(["describe", "--always"]).output() {
+    let git_describe = match Command::new("git")
+        .args(["describe", "--always", "--tags"])
+        .output()
+    {
         Ok(v) => String::from_utf8(v.stdout)
             .expect("failed to read stdout")
             .trim_end()
