@@ -136,11 +136,11 @@ impl BackEnd {
                             "# CLASHTUI".to_owned(),
                             format!("version:{}", crate::utils::consts::VERSION),
                         ];
+                        infos.push("# CLASH".to_owned());
                         match self.api.version().map_err(|e| e.into()).and_then(|ver| {
                             self.api.config_get().map(|cfg| {
                                 let mut cfg = cfg.build();
-                                cfg.insert(2, "# CLASH".to_owned());
-                                cfg.insert(3, format!("version:{ver}"));
+                                cfg.insert(2, format!("version:{ver}"));
                                 cfg
                             })
                         }) {
@@ -149,7 +149,7 @@ impl BackEnd {
                                 CallBack::Infos(infos)
                             }
                             Err(e) => {
-                                infos.extend(["# CLASH".to_owned(), format!("{e}")]);
+                                infos.push(format!("{e}"));
                                 CallBack::Infos(infos)
                             }
                         }

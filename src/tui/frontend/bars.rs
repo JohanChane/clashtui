@@ -21,12 +21,8 @@ impl FrontEnd {
 
     pub(super) fn render_statusbar(&self, f: &mut Frame, area: Rect) {
         // load from local cache
-        let state = self
-            .state
-            .as_deref()
-            .unwrap_or("Waiting State Cache Update");
         let this = Raw::Paragraph::new(Ra::Span::styled(
-            state,
+            &self.state,
             Ra::Style::default().fg(Theme::get().statusbar_text_fg),
         ))
         //.alignment(ratatui::prelude::Alignment::Right)

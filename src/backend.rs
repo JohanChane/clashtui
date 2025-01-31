@@ -27,12 +27,15 @@ pub enum CallBack {
     Edit,
     Preview(Vec<String>),
     ServiceCTL(String),
+
     ProfileInit(Vec<String>, Vec<Option<core::time::Duration>>),
     ProfileCTL(Vec<String>),
+
     #[cfg(feature = "connection-tab")]
     ConnctionInit(#[debug(skip)] crate::clash::webapi::ConnInfo),
     #[cfg(feature = "connection-tab")]
     ConnctionCTL(String),
+
     #[cfg(feature = "template")]
     TemplateInit(Vec<String>),
     #[cfg(feature = "template")]
@@ -49,8 +52,8 @@ impl From<anyhow::Result<CallBack>> for CallBack {
 }
 
 pub struct BackEnd {
-    pub api: ClashUtil,
-    pub cfg: LibConfig,
+    api: ClashUtil,
+    cfg: LibConfig,
     pm: ProfileManager,
     edit_cmd: String,
     /// This is `basic_clash_config.yaml` in memory
@@ -79,6 +82,9 @@ impl BackEnd {
             edit_cmd,
             base_profile: base_raw,
         })
+    }
+    pub fn get_config(&self) -> &LibConfig {
+        &self.cfg
     }
     /// Save all in-memory data to file
     fn save(self) -> ProfileManager {

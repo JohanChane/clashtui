@@ -22,7 +22,7 @@ pub struct FrontEnd {
     popup: Box<Popup>,
     should_quit: bool,
     /// StateBar
-    state: Option<String>,
+    state: String,
     backend_content: Option<Call>,
 }
 
@@ -39,7 +39,7 @@ impl FrontEnd {
             tab_index: 0,
             popup: Default::default(),
             should_quit: false,
-            state: None,
+            state: "Waiting State Cache Update".to_owned(),
             backend_content: None,
         }
     }
@@ -124,25 +124,25 @@ impl FrontEnd {
                         self.popup
                             .show_msg(super::PopMsg::Prompt(vec!["OK".to_owned()]));
                     }
-                    // `SwitchMode` goes here
                     // Just update StateBar
                     CallBack::State(state) => {
-                        self.state.replace(state);
+                        self.state = state;
                     }
                     // assume ProfileTab is the first tab
-                    CallBack::ProfileInit(..) => self.tabs[0].apply_backend_call(op),
-                    CallBack::ProfileCTL(_) | CallBack::ServiceCTL(_) => {
-                        self.tabs[self.tab_index].apply_backend_call(op)
+                    CallBack::ProfileInit(..) | CallBack::ProfileCTL(_) => {
+                        self.tabs[0].apply_backend_call(op)
                     }
                     #[cfg(feature = "template")]
-                    CallBack::TemplateInit(_) => self.tabs[0].apply_backend_call(op),
-                    #[cfg(feature = "template")]
-                    CallBack::TemplateCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
+                    CallBack::TemplateInit(_) | CallBack::TemplateCTL(_) => {
+                        self.tabs[0].apply_backend_call(op)
+                    }
+                    // assume ServiceTab is the first tab
+                    CallBack::ServiceCTL(_) => self.tabs[1].apply_backend_call(op),
                     // assume ConnctionTab is the third tab
                     #[cfg(feature = "connection-tab")]
-                    CallBack::ConnctionInit(..) => self.tabs[2].apply_backend_call(op),
-                    #[cfg(feature = "connection-tab")]
-                    CallBack::ConnctionCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
+                    CallBack::ConnctionInit(..) | CallBack::ConnctionCTL(_) => {
+                        self.tabs[2].apply_backend_call(op)
+                    }
                 },
                 Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
                 Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {

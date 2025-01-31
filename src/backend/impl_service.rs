@@ -230,4 +230,9 @@ impl BackEnd {
             sysproxy: sysp,
         })
     }
+    pub fn get_clash_version(&self) -> Result<String, String> {
+        let v = self.api.version().map_err(|e| e.to_string())?;
+        let mut map: std::collections::HashMap<String, String> = serde_json::from_str(&v).unwrap();
+        Ok(map.remove("version").unwrap_or("v0.0.0".to_owned()))
+    }
 }

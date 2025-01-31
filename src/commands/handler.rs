@@ -96,16 +96,15 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
             };
             let ver = [
                 VERSION.to_owned(),
-                backend.api.version().ok().map_or("v0.0.0".to_owned(), |v| {
-                    let mut map: std::collections::HashMap<String, String> =
-                        serde_json::from_str(&v).unwrap();
-                    map.remove("version").unwrap_or("v0.0.0".to_owned())
-                }),
+                backend
+                    .get_clash_version()
+                    .ok()
+                    .unwrap_or("v0.0.0".to_owned()),
             ];
             let name = ["ClashTUI", "Clash Core"];
             let path = [
                 std::env::current_exe()?,
-                backend.cfg.basic.clash_bin_pth.into(),
+                std::path::PathBuf::from(&backend.get_config().basic.clash_bin_pth),
             ];
             for (((request, current_version), name), mut path) in
                 request.into_iter().zip(ver).zip(name).zip(path)
