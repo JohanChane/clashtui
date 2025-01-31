@@ -102,6 +102,44 @@ impl BackEnd {
                                     Err(e) => CallBack::Error(e.to_string()),
                                 }
                             }
+                            tabs::service::BackendOp::TuiExtend(extend_op) => match extend_op {
+                                tabs::service::ExtendOp::OpenClashtuiConfig => {
+                                    if let Err(e) = crate::utils::ipc::spawn(
+                                        if cfg!(windows) { "start" } else { "open" },
+                                        vec![crate::HOME_DIR.to_str().unwrap()],
+                                    ) {
+                                        CallBack::TuiExtend(vec![
+                                            "Failed".to_owned(),
+                                            e.to_string(),
+                                        ])
+                                    } else {
+                                        CallBack::TuiExtend(vec!["Success".to_owned()])
+                                    }
+                                }
+                                tabs::service::ExtendOp::GenerateInfoList => {
+                                    let mut infos = vec![
+                                        "# CLASHTUI".to_owned(),
+                                        format!("version:{}", crate::utils::consts::VERSION),
+                                    ];
+                                    infos.push("# CLASH".to_owned());
+                                    match self.api.version().map_err(|e| e.into()).and_then(|ver| {
+                                        self.api.config_get().map(|cfg| {
+                                            let mut cfg = cfg.build();
+                                            cfg.insert(2, format!("version:{ver}"));
+                                            cfg
+                                        })
+                                    }) {
+                                        Ok(info) => {
+                                            infos.extend(info);
+                                            CallBack::TuiExtend(infos)
+                                        }
+                                        Err(e) => {
+                                            infos.push(format!("{e}"));
+                                            CallBack::TuiExtend(infos)
+                                        }
+                                    }
+                                }
+                            },
                         }
                     }
                     #[cfg(feature = "connection-tab")]
@@ -131,29 +169,6 @@ impl BackEnd {
                         Ok(v) => CallBack::Logs(v),
                         Err(e) => CallBack::Error(e.to_string()),
                     },
-                    Call::Infos => {
-                        let mut infos = vec![
-                            "# CLASHTUI".to_owned(),
-                            format!("version:{}", crate::utils::consts::VERSION),
-                        ];
-                        infos.push("# CLASH".to_owned());
-                        match self.api.version().map_err(|e| e.into()).and_then(|ver| {
-                            self.api.config_get().map(|cfg| {
-                                let mut cfg = cfg.build();
-                                cfg.insert(2, format!("version:{ver}"));
-                                cfg
-                            })
-                        }) {
-                            Ok(info) => {
-                                infos.extend(info);
-                                CallBack::Infos(infos)
-                            }
-                            Err(e) => {
-                                infos.push(format!("{e}"));
-                                CallBack::Infos(infos)
-                            }
-                        }
-                    }
                     // unfortunately, this might(in fact almost always) blocked by
                     // thousand of Call::Tick,
                     //

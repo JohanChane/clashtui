@@ -141,8 +141,6 @@ define_keys! {
         // ClashConfig(KeyCode::Char('G')),
         /// Get help
         AppHelp(KeyCode::Char('?')),
-        /// Show informations about program and mihomo
-        AppInfo(KeyCode::Char('I')),
         /// Quit program
         AppQuit(KeyCode::Char('q')),
     }

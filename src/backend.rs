@@ -23,7 +23,7 @@ pub enum CallBack {
     Error(String),
     State(String),
     Logs(Vec<String>),
-    Infos(Vec<String>),
+    TuiExtend(Vec<String>),
     Edit,
     Preview(Vec<String>),
     ServiceCTL(String),

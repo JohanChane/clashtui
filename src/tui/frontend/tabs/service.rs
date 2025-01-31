@@ -1,4 +1,5 @@
 use crate::backend::ServiceOp;
+use crate::define_enum;
 use crate::{clash::webapi::Mode, tui::widget::PopRes};
 use crossterm::event::KeyEvent;
 
@@ -12,7 +13,18 @@ use super::{Call, CallBack, PopMsg, TabCont};
 pub enum BackendOp {
     SwitchMode(Mode),
     ServiceCTL(ServiceOp),
+    TuiExtend(ExtendOp),
 }
+
+define_enum!(
+    #[derive(Clone, Copy, Debug)]
+    pub enum ExtendOp {
+        OpenClashtuiConfig,
+        // Generate a list of information
+        // about the application and clash core
+        GenerateInfoList,
+    }
+);
 
 pub(in crate::tui::frontend) struct ServiceTab {
     inner: List,
@@ -28,6 +40,9 @@ impl Default for ServiceTab {
         let items = inner.get_items_mut();
         items.push("SwitchMode".to_owned());
         items.extend(ServiceOp::ALL.into_iter().map(|v| v.to_string()));
+
+        items.push("-----".to_owned());
+        items.extend(ExtendOp::ALL.into_iter().map(|v| v.to_string()));
 
         Self {
             inner,
@@ -60,6 +75,8 @@ impl TabCont for ServiceTab {
                 .map(|s| s.to_owned())
                 .collect();
             self.popup_content.replace(PopMsg::Prompt(result));
+        } else if let CallBack::TuiExtend(result) = op {
+            self.popup_content.replace(PopMsg::Prompt(result));
         } else {
             unreachable!("{} get unexpected op", TAB_TITLE_SERVICE)
         }
@@ -91,15 +108,25 @@ impl Drawable for ServiceTab {
         match event_state {
             EventState::Yes => {
                 if let Some(index) = self.inner.selected() {
-                    if index == 0 {
-                        self.popup_content = Some(PopMsg::SelectList(
-                            "Mode".to_owned(),
-                            Vec::from_iter(MODE.into_iter().map(|v| v.into())),
-                        ));
-                    } else {
-                        let op = ServiceOp::ALL[index - 1];
-                        self.backend_content = Some(Call::Service(BackendOp::ServiceCTL(op)));
-                        self.popup_content = Some(PopMsg::Prompt(vec!["working".to_owned()]));
+                    match index {
+                        0 => {
+                            self.popup_content = Some(PopMsg::SelectList(
+                                "Mode".to_owned(),
+                                Vec::from_iter(MODE.into_iter().map(|v| v.into())),
+                            ));
+                        }
+                        idx if idx < ServiceOp::const_len() + 1 => {
+                            let op = ServiceOp::ALL[index - 1];
+                            self.backend_content = Some(Call::Service(BackendOp::ServiceCTL(op)));
+                            self.popup_content = Some(PopMsg::Prompt(vec!["working".to_owned()]));
+                        }
+                        idx if idx == ServiceOp::const_len() + 1 => (),
+                        idx if idx < ServiceOp::const_len() + 2 + ExtendOp::const_len() => {
+                            let op = ExtendOp::ALL[index - 2 - ServiceOp::const_len()];
+                            self.backend_content = Some(Call::Service(BackendOp::TuiExtend(op)));
+                            self.popup_content = Some(PopMsg::Prompt(vec!["working".to_owned()]));
+                        }
+                        _ => unreachable!(),
                     }
                 };
             }

@@ -45,8 +45,6 @@ pub enum Call {
     ///
     /// From `total_len-start-length` to `total_len-start`
     Logs(usize, usize),
-    /// Requests information from the backend.
-    Infos,
     /// Requests a refresh.
     Tick,
     /// Requests a shutdown.

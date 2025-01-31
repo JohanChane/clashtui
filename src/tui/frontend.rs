@@ -114,9 +114,6 @@ impl FrontEnd {
                     CallBack::Logs(logs) => {
                         self.popup.set_msg("Log", logs);
                     }
-                    CallBack::Infos(infos) => {
-                        self.popup.set_msg("Infos", infos);
-                    }
                     CallBack::Preview(content) => {
                         self.popup.set_msg("Preview", content);
                     }
@@ -137,7 +134,9 @@ impl FrontEnd {
                         self.tabs[0].apply_backend_call(op)
                     }
                     // assume ServiceTab is the first tab
-                    CallBack::ServiceCTL(_) => self.tabs[1].apply_backend_call(op),
+                    CallBack::TuiExtend(_) | CallBack::ServiceCTL(_) => {
+                        self.tabs[1].apply_backend_call(op)
+                    }
                     // assume ConnctionTab is the third tab
                     #[cfg(feature = "connection-tab")]
                     CallBack::ConnctionInit(..) | CallBack::ConnctionCTL(_) => {
@@ -241,7 +240,6 @@ impl Drawable for FrontEnd {
                         Keys::ALL_DOC.into_iter().map(|s| s.to_owned()).collect(),
                     );
                 }
-                Keys::AppInfo => self.backend_content = Some(Call::Infos),
                 Keys::AppQuit => {
                     self.should_quit = true;
                 }
