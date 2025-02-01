@@ -30,19 +30,20 @@ impl Request<'static> {
     const MIHOMO_CI: &str = "Prerelease-Alpha";
     const CLASHTUI: &str = "JohanChane/clashtui";
     const CLASHTUI_CI: &str = "Continuous_Integration";
-    pub fn s_mihomo() -> Self {
-        Self::Latest(Self::MIHOMO)
+    pub fn s_mihomo(is_ci: bool) -> Self {
+        if is_ci {
+            Self::WithTag(Self::MIHOMO, Self::MIHOMO_CI)
+        } else {
+            Self::Latest(Self::MIHOMO)
+        }
     }
-    pub fn s_clashtui() -> Self {
-        Self::Latest(Self::CLASHTUI)
-    }
-    pub fn s_clashtui_ci() -> Self {
-        // main repo hasn't start CI release yet
-        Self::WithTag("Jackhr-arch/clashtui", Self::CLASHTUI_CI)
-    }
-    /// Alpha version
-    pub fn s_mihomo_ci() -> Self {
-        Self::WithTag(Self::MIHOMO, Self::MIHOMO_CI)
+    pub fn s_clashtui(is_ci: bool) -> Self {
+        if is_ci {
+            // main repo hasn't start CI release yet
+            Self::WithTag("Jackhr-arch/clashtui", Self::CLASHTUI_CI)
+        } else {
+            Self::Latest(Self::CLASHTUI)
+        }
     }
 }
 
@@ -77,6 +78,7 @@ impl Response {
             false
         }
     }
+    /// wrapper for `is_newer_than`
     pub fn check(self, version: &str, skip_check: bool) -> Option<Self> {
         if skip_check || self.is_newer_than(version) {
             Some(self)
@@ -221,15 +223,15 @@ mod test {
     }
     #[test]
     fn load_request() {
-        let raw = "!Latest JohanChane/clashtui";
+        let raw = "!Latest MetaCubeX/mihomo";
         assert_eq!(
             serde_yml::from_str::<Request>(raw).unwrap(),
-            Request::s_clashtui()
+            Request::s_mihomo(false)
         );
-        let raw = "!WithTag\n- Jackhr-arch/clashtui\n- Continuous_Integration";
+        let raw = "!WithTag\n- MetaCubeX/mihomo\n- Prerelease-Alpha";
         assert_eq!(
             serde_yml::from_str::<Request>(raw).unwrap(),
-            Request::s_clashtui_ci()
+            Request::s_mihomo(true)
         );
         let raw = r#"
 - !WithTag
@@ -239,7 +241,7 @@ mod test {
 "#;
         assert_eq!(
             serde_yml::from_str::<Vec<Request>>(raw).unwrap(),
-            vec![Request::s_clashtui_ci(), Request::s_clashtui()]
+            vec![Request::s_clashtui(true), Request::s_clashtui(false)]
         );
     }
 }

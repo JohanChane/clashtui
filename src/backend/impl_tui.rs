@@ -103,12 +103,10 @@ impl BackEnd {
                                 }
                             }
                             tabs::service::BackendOp::TuiExtend(extend_op) => match extend_op {
-                                tabs::service::ExtendOp::FullLog => {
-                                    match self.logcat(0, 1024) {
-                                        Ok(v) => CallBack::TuiExtend(v),
-                                        Err(e) => CallBack::Error(e.to_string()),
-                                    }
-                                },                                
+                                tabs::service::ExtendOp::FullLog => match self.logcat(0, 1024) {
+                                    Ok(v) => CallBack::TuiExtend(v),
+                                    Err(e) => CallBack::Error(e.to_string()),
+                                },
                                 tabs::service::ExtendOp::OpenClashtuiConfig => {
                                     if let Err(e) = crate::utils::ipc::spawn(
                                         if cfg!(windows) { "start" } else { "open" },

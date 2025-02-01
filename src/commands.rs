@@ -79,7 +79,18 @@ enum ArgCommand {
         /// check ci/alpha release instead
         #[arg(long, short = 'c')]
         check_ci: bool,
+        /// target to check
+        #[command(subcommand)]
+        target: Target,
     },
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum Target {
+    /// check for ClashTUI
+    Clashtui,
+    /// check for Mihomo
+    Mihomo,
 }
 
 #[derive(clap::Subcommand)]

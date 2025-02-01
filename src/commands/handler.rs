@@ -15,22 +15,15 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                 with_proxy,
                 without_proxyprovider,
             } => {
-                fn unify_to_iter(
-                    backend: &BackEnd,
-                    all: bool,
-                    name: Option<String>,
-                ) -> Box<dyn Iterator<Item = Profile>> {
-                    if all {
-                        Box::new(backend.get_all_profiles().into_iter())
-                    } else if let Some(name) = name {
-                        Box::new(backend.get_profile(name).into_iter())
-                    } else {
-                        eprintln!("No profile selected!");
-                        Box::new(std::iter::empty())
-                    }
-                }
-                unify_to_iter(&backend, all, name)
-                    .inspect(|s| println!("### Profile: {}", s.name))
+                let iter: Box<dyn Iterator<Item = Profile>> = if all {
+                    Box::new(backend.get_all_profiles().into_iter())
+                } else if let Some(name) = name {
+                    Box::new(backend.get_profile(name).into_iter())
+                } else {
+                    eprintln!("No profile selected!");
+                    Box::new(std::iter::empty())
+                };
+                iter.inspect(|s| println!("### Profile: {}", s.name))
                     .filter_map(|v| {
                         backend
                             .update_profile(v, with_proxy, without_proxyprovider)
@@ -87,67 +80,77 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
         ArgCommand::CheckUpdate {
             without_ask,
             check_ci,
+            target,
         } => {
             use crate::utils::self_update::Request;
-            let request = if check_ci {
-                [Request::s_clashtui_ci(), Request::s_mihomo_ci()]
-            } else {
-                [Request::s_clashtui(), Request::s_mihomo()]
+            macro_rules! expand {
+                ($request:expr, $name:literal, $version:expr) => {
+                    $request
+                        .get_info()
+                        .map_err(|e| anyhow::anyhow!("failed to fetch github release due to {e}"))?
+                        .check($version, check_ci)
+                        .map(|info| info.rename($name).filter_asserts())
+                };
+                () => {};
+            }
+            let (info, current_version, mut path) = match target {
+                Target::Clashtui => {
+                    let current_version = VERSION.to_owned();
+                    let path = std::env::current_exe()?;
+                    let info = expand!(Request::s_clashtui(check_ci), "ClashTUI", VERSION);
+                    (info, current_version, path)
+                }
+                Target::Mihomo => {
+                    let current_version = backend
+                        .get_clash_version()
+                        .ok()
+                        .unwrap_or("v0.0.0".to_owned());
+                    let path = std::path::PathBuf::from(&backend.get_config().basic.clash_bin_pth);
+                    let info = expand!(
+                        Request::s_mihomo(check_ci),
+                        "Mihomo",
+                        backend
+                            .get_clash_version()
+                            .ok()
+                            .as_deref()
+                            .unwrap_or("v0.0.0")
+                    );
+                    (info, current_version, path)
+                }
             };
-            let ver = [
-                VERSION.to_owned(),
-                backend
-                    .get_clash_version()
-                    .ok()
-                    .unwrap_or("v0.0.0".to_owned()),
-            ];
-            let name = ["ClashTUI", "Clash Core"];
-            let path = [
-                std::env::current_exe()?,
-                std::path::PathBuf::from(&backend.get_config().basic.clash_bin_pth),
-            ];
-            for (((request, current_version), name), mut path) in
-                request.into_iter().zip(ver).zip(name).zip(path)
-            {
-                if let Some(info) = request
-                    .get_info()
-                    .map_err(|e| anyhow::anyhow!("failed to fetch github release due to {e}"))?
-                    .check(&current_version, check_ci)
-                {
-                    let info = info.rename(name).filter_asserts();
-                    println!("\n{}", info.as_info(current_version));
-                    if let Some(asset) = if !without_ask {
-                        if !Confirm::default()
-                            .append_prompt("Do you want to download now?")
-                            .interact()?
-                        {
-                            continue;
-                        }
-                        println!();
-                        Select::default()
-                            .append_start_prompt("Avaliable asserts:")
-                            .set_end_prompt("Type the num")
-                            .append_items(info.assets.iter())
-                            .interact()?
-                    } else {
-                        info.assets.first()
-                    } {
-                        println!();
-                        println!(
-                            "Download start for {} {}",
-                            asset.name, asset.browser_download_url
-                        );
-                        // add '.new' to the file name if the file already exists
-                        // else, use the original name
-                        if path.file_name() == Some(std::ffi::OsStr::new(&asset.name)) {
-                            path.set_file_name(format!("{}.new", asset.name));
-                        } else {
-                            path.set_file_name(&asset.name);
-                        }
-                        asset.download(&path)?;
-                        println!("Downloaded to {}", path.display());
-                        println!();
+            if let Some(info) = info {
+                println!("\n{}", info.as_info(current_version));
+                if let Some(asset) = if !without_ask {
+                    if !Confirm::default()
+                        .append_prompt("Do you want to download now?")
+                        .interact()?
+                    {
+                        return Ok("Abort".to_owned());
                     }
+                    println!();
+                    Select::default()
+                        .append_start_prompt("Avaliable asserts:")
+                        .set_end_prompt("Type the num")
+                        .append_items(info.assets.iter())
+                        .interact()?
+                } else {
+                    info.assets.first()
+                } {
+                    println!();
+                    println!(
+                        "Download start for {} {}",
+                        asset.name, asset.browser_download_url
+                    );
+                    // add '.new' to the file name if the file already exists
+                    // else, use the original name
+                    if path.file_name() == Some(std::ffi::OsStr::new(&asset.name)) {
+                        path.set_file_name(format!("{}.new", asset.name));
+                    } else {
+                        path.set_file_name(&asset.name);
+                    }
+                    asset.download(&path)?;
+                    println!("Downloaded to {}", path.display());
+                    println!();
                 }
             }
             Ok("Done".to_owned())

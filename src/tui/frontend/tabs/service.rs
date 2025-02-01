@@ -23,7 +23,7 @@ define_enum!(
         // Generate a list of information
         // about the application and clash core
         GenerateInfoList,
-        FullLog
+        FullLog,
     }
 );
 
