@@ -195,8 +195,9 @@ fn setup_logging(log_file: &std::path::Path) {
 
     log4rs::init_config(config).expect("Err initing log service");
 
+    log::info!("{}", "-".repeat(20));
     log::info!("Start Log, level: {}", log_level);
     if flag {
-        log::info!("Log file too large, clear")
+        log::info!("Log file too large, cleared")
     }
 }
