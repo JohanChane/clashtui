@@ -59,19 +59,24 @@ impl LocalProfile {
     }
     /// merge `basic_clash_config` to `self::content`,
     /// all items in `basic_clash_config` will be overwrited to `self::content`
+    /// except for the value is a sequence, it will be appended to the original value
     ///
     /// Note: need to call [`LocalProfile::sync_from_disk`] before call this
     pub fn merge(&mut self, basic_clash_config: &serde_yml::Mapping) -> anyhow::Result<()> {
         if self.content.is_none() || basic_clash_config.is_empty() {
             anyhow::bail!("failed to merge: one of the input content is none");
         }
-
-        basic_clash_config.iter().for_each(|(key, value)| {
-            self.content
-                .as_mut()
-                .unwrap()
-                .insert(key.clone(), value.clone());
-        });
+        let map = self.content.as_mut().unwrap();
+        for (key, value) in basic_clash_config.iter() {
+            if let Some(serde_yml::Value::Sequence(mut old_value)) = map.swap_remove(key) {
+                value
+                    .as_sequence()
+                    .map(|v| old_value.extend(v.iter().cloned()));
+                map.insert(key.clone(), serde_yml::Value::Sequence(old_value));
+            } else {
+                map.insert(key.clone(), value.clone());
+            }
+        }
         Ok(())
     }
     /// sync the content to disk by [`LocalProfile::path`]
