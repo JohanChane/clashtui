@@ -69,9 +69,9 @@ impl LocalProfile {
         let map = self.content.as_mut().unwrap();
         for (key, value) in basic_clash_config.iter() {
             if let Some(serde_yml::Value::Sequence(mut old_value)) = map.swap_remove(key) {
-                value
-                    .as_sequence()
-                    .map(|v| old_value.extend(v.iter().cloned()));
+                if let Some(v) = value.as_sequence() {
+                    old_value.extend(v.iter().cloned())
+                }
                 map.insert(key.clone(), serde_yml::Value::Sequence(old_value));
             } else {
                 map.insert(key.clone(), value.clone());

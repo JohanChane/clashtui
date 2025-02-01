@@ -21,7 +21,7 @@ pub struct ClashUtil {
     secret: Option<String>,
     ua: Option<String>,
     // timeout: u64,
-    proxy_addr: String,
+    pub proxy_addr: String,
 }
 
 impl ClashUtil {
