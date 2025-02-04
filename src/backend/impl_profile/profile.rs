@@ -99,7 +99,7 @@ impl LocalProfile {
     pub fn sync_from_disk(&mut self) -> anyhow::Result<()> {
         if self.path.is_file() {
             let fp = File::open(&self.path)?;
-            self.content = serde_yml::from_reader(fp)?;
+            self.content = serde_yml::from_reader(fp).ok();
         }
         Ok(())
     }
