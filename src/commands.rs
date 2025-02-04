@@ -7,6 +7,15 @@ mod widgets;
 pub(crate) use handler::handle_cli;
 pub(crate) use widgets::{Confirm, Select};
 
+/// used to support '--config'
+///
+/// since LazyLock does not accept arg,
+/// and using OnceLock can cause code being complex
+///
+/// e.g. `_HOME_DIR.get().unwarp()`,
+/// which equal to `HOME_DIR`
+pub static _HOME_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
 pub(crate) struct PackedArgs(ArgCommand);
 
 /// collect args and parse
@@ -15,30 +24,31 @@ pub(crate) struct PackedArgs(ArgCommand);
 ///
 /// This function will return an error only if `--generate_shell_completion`
 /// is provided. The content will written to StdOut
-pub(crate) fn parse_args() -> Result<Option<PackedArgs>, ()> {
+pub(crate) fn parse_args() -> Result<(Option<PackedArgs>, u8), ()> {
     use clap::Parser;
     let CliCmds {
         command,
         generate_shell_completion,
         config_dir,
+        verbose,
     } = CliCmds::parse();
     if let Some(generate_shell_completion) = generate_shell_completion {
         complete::gen_complete(generate_shell_completion);
         return Err(());
     }
     if let Some(config_dir) = config_dir {
-        super::PREFIX_HOME_DIR.set(config_dir).unwrap();
+        _HOME_DIR.set(config_dir).unwrap();
     }
     // Pack the content to avoid visibility warning
-    Ok(command.map(PackedArgs))
+    Ok((command.map(PackedArgs), verbose))
 }
 
-/// Mihomo (Clash.Meta) Control Client
+/// Mihomo (Clash.Meta) TUI Client
 ///
-/// A tool for mihomo
+/// A tool for mihomo, also support other Clash API
 #[derive(clap::Parser)]
 #[cfg_attr(debug_assertions, derive(Debug))]
-#[command(version=VERSION, about, long_about)]
+#[command(version=VERSION, about, after_help="If you have any question or suggestion, please visit https://github.com/JohanChane/clashtui")]
 pub(crate) struct CliCmds {
     #[command(subcommand)]
     command: Option<ArgCommand>,
@@ -50,6 +60,9 @@ pub(crate) struct CliCmds {
     /// specify the ClashTUI config directory
     #[arg(long, short)]
     pub config_dir: Option<std::path::PathBuf>,
+    /// increase log level, default is Warning
+    #[arg(long, short, action=clap::ArgAction::Count)]
+    verbose: u8,
 }
 
 #[derive(clap::Subcommand)]
@@ -66,10 +79,11 @@ enum ArgCommand {
         #[command(subcommand)]
         command: ServiceCommand,
     },
-    /// proxy mode related
+    /// set proxy mode,
+    /// leave empty to get current mode
     Mode {
         #[command(subcommand)]
-        mode: ModeCommand,
+        mode: Option<ModeCommand>,
     },
     /// check for update
     CheckUpdate {

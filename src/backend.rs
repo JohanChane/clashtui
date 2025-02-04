@@ -42,6 +42,7 @@ pub enum CallBack {
     TemplateCTL(Vec<String>),
 }
 
+#[cfg(feature = "tui")]
 impl From<anyhow::Result<CallBack>> for CallBack {
     fn from(value: anyhow::Result<CallBack>) -> Self {
         match value {
@@ -61,7 +62,7 @@ pub struct BackEnd {
 }
 
 impl BackEnd {
-    pub fn build(value: BuildConfig) -> anyhow::Result<Self> {
+    pub fn build(value: BuildConfig) -> Self {
         let BuildConfig {
             cfg,
             data,
@@ -75,13 +76,13 @@ impl BackEnd {
         } = value;
         crate::clash::webapi::set_timeout(timeout);
         let api = ClashUtil::new(external_controller, secret, proxy_addr, global_ua);
-        Ok(Self {
+        Self {
             api,
             cfg,
             pm: data,
             edit_cmd,
             base_profile: base_raw,
-        })
+        }
     }
     pub fn get_config(&self) -> &LibConfig {
         &self.cfg

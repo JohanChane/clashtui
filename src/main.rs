@@ -12,7 +12,7 @@ use backend::BackEnd;
 use utils::{consts, BuildConfig};
 
 static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::new(|| {
-    if let Some(data_dir) = PREFIX_HOME_DIR.get() {
+    if let Some(data_dir) = commands::_HOME_DIR.get() {
         if data_dir.exists() && data_dir.is_dir() {
             match std::path::absolute(data_dir) {
                 Ok(dir) => return dir,
@@ -24,99 +24,56 @@ static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::
             }
         }
     };
-    load_home_dir()
+    utils::load_home_dir()
 });
-/// used to support '--config'
-///
-/// since LazyLock does not accept arg,
-/// and using OnceLock can cause code being complex
-///
-/// e.g. `PREFIX_HOME_DIR.get().unwarp()`,
-/// which equal to `HOME_DIR`
-static PREFIX_HOME_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
 
 fn main() {
     if is_root::is_root() {
         println!("{}", consts::ROOT_WARNING)
     }
     // Err here means to generate completion
-    // that will be written to StdOut
-    if let Ok(infos) = commands::parse_args() {
-        // home dir is inited here with LazyLock
-        let log_file = HOME_DIR.join(consts::LOG_FILE);
-        setup_logging(&log_file);
-        let buildconfig = match BuildConfig::load_config(HOME_DIR.as_path()) {
-            Ok(v) => v,
-            Err(e) => {
-                // we don't really do so, as it can be dangerous
-                if commands::Confirm::default()
-                    .append_prompt(format!("failed to load config: {e}"))
-                    .append_prompt("program will try to init default config")
-                    .append_prompt(format!(
-                        "WARNING! THIS WILL DELETE ALL FILE UNDER {}",
-                        HOME_DIR.display()
-                    ))
-                    .append_prompt("Are you sure to continue?")
-                    .interact()
-                    .expect("Unable write/read from stdio")
-                {
-                    // accept 'y' only
-                    if let Err(e) = BuildConfig::init_config(HOME_DIR.as_path()) {
-                        eprint!("init config failed: {e}");
-                        std::process::exit(-1);
-                    } else {
-                        println!(
-                            "Config Inited, please modify them to have clashtui work properly"
-                        );
-                    };
-                } else {
-                    println!("Abort");
-                }
-                std::process::exit(0);
-            }
-        };
-        // build backend
-        let backend = BackEnd::build(buildconfig).expect("failed to build Backend");
-        // handle args
-        if let Some(command) = infos {
-            match commands::handle_cli(command, backend) {
-                Ok(v) => {
-                    println!("{v}")
-                }
-                Err(e) => {
-                    eprintln!("clashtui encounter some error:{e}");
-                    log::error!("Cli:{e:?}");
-                    std::process::exit(-1)
-                }
-            }
-        } else {
-            // if comes without args
+    // which will be written to Stdout
+    let Ok((infos, verbose)) = commands::parse_args() else {
+        eprint!("generate completion success");
+        return;
+    };
+    let backend = match BuildConfig::load_config(&HOME_DIR) {
+        Ok(v) => BackEnd::build(v),
+        Err(e) => reinit_config_dir(e),
+    };
+    utils::setup_logging(&HOME_DIR.join(consts::LOG_FILE), verbose);
+    // handle commands
+    if let Err(e) = match infos {
+        Some(command) => commands::handle_cli(command, backend),
+        None => {
             #[cfg(feature = "tui")]
             {
                 println!("Entering TUI...");
-                if let Err(e) = start_tui(backend) {
-                    eprintln!("clashtui encounter some error:{e}");
-                    log::error!("Tui:{e:?}");
-                    std::process::exit(-1)
-                }
+                start_tui(backend)
             }
             #[cfg(not(feature = "tui"))]
-            eprintln!("use `--help/-h` for help")
+            {
+                eprintln!("use `--help/-h` for help");
+                Ok(())
+            }
         }
-    } else {
-        eprint!("generate completion success");
+    } {
+        eprintln!("clashtui encounter some error: {e}");
+        log::error!("Err: {e}");
+        std::process::exit(-1)
     };
 }
-#[cfg(feature = "tui")]
+
 /// running in single thread, since there is no high-cpu-usage task
+#[cfg(feature = "tui")]
 #[tokio::main(flavor = "current_thread")]
 async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     use tui::setup;
     if let Err(e) = tui::Theme::load(None) {
         anyhow::bail!("Theme loading: {e}")
     };
-    let app = tui::FrontEnd::new();
     setup::setup()?;
+    let app = tui::FrontEnd::new();
     // make terminal restorable after panic
     let original_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic| {
@@ -134,70 +91,35 @@ async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn load_home_dir() -> std::path::PathBuf {
-    use std::{env, path};
-    let data_dir = env::current_exe()
-        .expect("Err loading exe_file_path")
-        .parent()
-        .expect("Err finding exe_dir")
-        .join("data");
-    if data_dir.exists() && data_dir.is_dir() {
-        // portable mode
-        data_dir
-    } else {
-        if cfg!(target_os = "linux") {
-            env::var_os("XDG_CONFIG_HOME")
-                .map(path::PathBuf::from)
-                .or(env::var_os("HOME").map(|h| path::PathBuf::from(h).join(".config")))
-        } else if cfg!(target_os = "windows") {
-            env::var_os("APPDATA").map(path::PathBuf::from)
-        } else if cfg!(target_os = "macos") {
-            env::var_os("HOME").map(|h| path::PathBuf::from(h).join(".config"))
-        } else {
-            unimplemented!("Not supported platform")
-        }
-        .map(|c| c.join("clashtui"))
-        .expect("failed to load home dir")
-    }
-}
-
-fn setup_logging(log_file: &std::path::Path) {
-    use log4rs::append::file::FileAppender;
-    use log4rs::config::{Appender, Config, Root};
-    use log4rs::encode::pattern::PatternEncoder;
-    #[cfg(debug_assertions)]
-    let _ = std::fs::remove_file(log_file); // auto rm old log for debug
-    let flag = if std::fs::File::open(log_file)
-        .and_then(|f| f.metadata())
-        .is_ok_and(|m| m.len() > 1024 * 1024)
+/// function to handle error when loading config
+/// and init default config
+///
+/// it never returns
+///
+/// # Panics
+/// if unable to write/read from stdio
+fn reinit_config_dir(err: impl std::fmt::Display) -> ! {
+    // we don't really do so, as it can be dangerous
+    if commands::Confirm::default()
+        .append_prompt(format!("failed to load config: {err}"))
+        .append_prompt("program will try to init default config")
+        .append_prompt(format!(
+            "WARNING! THIS WILL DELETE ALL FILE UNDER {}",
+            HOME_DIR.display()
+        ))
+        .append_prompt("Are you sure to continue?")
+        .interact()
+        .expect("Unable write/read from stdio")
     {
-        let _ = std::fs::remove_file(log_file);
-        true
+        // accept 'y' only
+        if let Err(e) = BuildConfig::init_config(HOME_DIR.as_path()) {
+            eprint!("init config failed: {e}");
+            std::process::exit(-1);
+        } else {
+            println!("Config Inited, please modify them to have clashtui work properly");
+        };
     } else {
-        false
-    };
-    let log_level = if cfg!(debug_assertions) {
-        log::LevelFilter::Debug
-    } else {
-        log::LevelFilter::Info
-    };
-    let file_appender = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new(
-            "{d(%H:%M:%S)} [{l}] {t} - {m}{n}",
-        ))) // Having a timestamp would be better.
-        .build(log_file)
-        .expect("Err opening log file");
-
-    let config = Config::builder()
-        .appender(Appender::builder().build("file", Box::new(file_appender)))
-        .build(Root::builder().appender("file").build(log_level))
-        .expect("Err building log config");
-
-    log4rs::init_config(config).expect("Err initing log service");
-
-    log::info!("{}", "-".repeat(20));
-    log::info!("Start Log, level: {}", log_level);
-    if flag {
-        log::info!("Log file too large, cleared")
+        println!("Abort");
     }
+    std::process::exit(0);
 }

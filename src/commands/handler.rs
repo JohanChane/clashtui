@@ -2,7 +2,7 @@ use crate::backend::{BackEnd, Profile, ServiceOp};
 
 use super::*;
 
-pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<String> {
+pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
     // let var: Option<bool> = std::env::var("CLASHTUI_")
     //     .ok()
     //     .and_then(|s| s.parse().ok());
@@ -32,7 +32,8 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                     })
                     .flatten()
                     .for_each(|s| println!("- {s}"));
-                Ok("Done".to_owned())
+                println!("Done");
+                Ok(())
             }
             ProfileCommand::Select { name } => {
                 let Some(pf) = backend.get_profile(&name) else {
@@ -42,7 +43,8 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                     eprint!("Cannot select {name} due to {e}");
                     return Err(e);
                 };
-                Ok("Done".to_owned())
+                println!("Done");
+                Ok(())
             }
             ProfileCommand::List { name_only } => {
                 let mut pfs = backend.get_all_profiles();
@@ -60,21 +62,26 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                         }
                     })
                     .for_each(|pf| println!("{}", pf));
-                Ok("Done".to_owned())
+                println!("Done");
+                Ok(())
             }
         },
         #[cfg(any(target_os = "linux", target_os = "windows"))]
-        ArgCommand::Service { command } => match command {
-            ServiceCommand::Restart { soft } => backend
-                .clash_srv_ctl(if soft {
-                    ServiceOp::ReStartClashCore
-                } else {
-                    ServiceOp::ReStartClashService
-                })
-                .map_err(|e| anyhow::anyhow!(e)),
-            ServiceCommand::Stop => Ok(backend.clash_srv_ctl(ServiceOp::StopClashService)?),
-        },
-        ArgCommand::Mode { mode } => Ok(backend.update_state(None, Some(mode.into()))?.to_string()),
+        ArgCommand::Service { command } => {
+            let op = match command {
+                ServiceCommand::Restart { soft: true } => ServiceOp::RestartClashCore,
+                ServiceCommand::Restart { soft: false } => ServiceOp::RestartClashService,
+                ServiceCommand::Stop => ServiceOp::StopClashService,
+            };
+            let res = backend.clash_srv_ctl(op)?;
+            println!("{res}");
+            Ok(())
+        }
+        ArgCommand::Mode { mode } => {
+            let state = backend.update_state(None, mode.map(Into::into))?;
+            println!("{state}");
+            Ok(())
+        }
         ArgCommand::CheckUpdate {
             without_ask,
             check_ci,
@@ -123,7 +130,8 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                         .append_prompt("Do you want to download now?")
                         .interact()?
                     {
-                        return Ok("Abort".to_owned());
+                        println!("Abort");
+                        return Ok(());
                     }
                     println!();
                     Select::default()
@@ -151,7 +159,8 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
                     println!();
                 }
             }
-            Ok("Done".to_owned())
+            println!("Done");
+            Ok(())
         }
     }
 }
