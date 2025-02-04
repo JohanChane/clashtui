@@ -19,6 +19,9 @@ pub static _HOME_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceL
 pub(crate) struct PackedArgs(ArgCommand);
 
 /// collect args and parse
+/// 
+/// also handle `--generate_shell_completion` and `migrate`
+/// and then exit early by returning `Err`
 ///
 /// ### Errors
 ///
@@ -34,10 +37,20 @@ pub(crate) fn parse_args() -> Result<(Option<PackedArgs>, u8), ()> {
     } = CliCmds::parse();
     if let Some(generate_shell_completion) = generate_shell_completion {
         complete::gen_complete(generate_shell_completion);
+        eprint!("generate completion success");
         return Err(());
     }
     if let Some(config_dir) = config_dir {
         _HOME_DIR.set(config_dir).unwrap();
+    }
+    #[cfg(feature = "migration")]
+    if let Some(ArgCommand::Migrate { version }) = &command {
+        if let Err(e) = match version {
+            OldVersion::V0_2_3 => crate::utils::config::v0_2_3::migrate(&crate::HOME_DIR),
+        } {
+            eprintln!("migrate error: {e}");
+        }
+        return Err(());
     }
     // Pack the content to avoid visibility warning
     Ok((command.map(PackedArgs), verbose))
@@ -58,7 +71,7 @@ pub(crate) struct CliCmds {
     #[arg(long, require_equals=true, num_args=0..=1, default_missing_value=None)]
     generate_shell_completion: Option<Option<clap_complete::Shell>>,
     /// specify the ClashTUI config directory
-    #[arg(long, short)]
+    #[arg(long, require_equals=true)]
     pub config_dir: Option<std::path::PathBuf>,
     /// increase log level, default is Warning
     #[arg(long, short, action=clap::ArgAction::Count)]
@@ -97,6 +110,20 @@ enum ArgCommand {
         #[command(subcommand)]
         target: Target,
     },
+    #[cfg(feature = "migration")]
+    /// migrate config from old version
+    Migrate {
+        /// the old version
+        #[command(subcommand)]
+        version: OldVersion,
+    },
+}
+
+#[cfg(feature = "migration")]
+#[derive(Debug, clap::Subcommand)]
+enum OldVersion {
+    /// v0.2.3
+    V0_2_3,
 }
 
 #[derive(Debug, clap::Subcommand)]

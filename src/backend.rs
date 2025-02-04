@@ -11,7 +11,7 @@ use crate::utils::config::{BuildConfig, LibConfig};
 // ipc
 use crate::utils::ipc;
 // profile
-use impl_profile::ProfileType;
+pub use impl_profile::ProfileType;
 pub use impl_profile::{database::ProfileManager, Profile};
 // service
 pub use impl_service::ServiceOp;

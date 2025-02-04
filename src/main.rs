@@ -31,10 +31,7 @@ fn main() {
     if is_root::is_root() {
         println!("{}", consts::ROOT_WARNING)
     }
-    // Err here means to generate completion
-    // which will be written to Stdout
     let Ok((infos, verbose)) = commands::parse_args() else {
-        eprint!("generate completion success");
         return;
     };
     let backend = match BuildConfig::load_config(&HOME_DIR) {
@@ -102,6 +99,11 @@ fn reinit_config_dir(err: impl std::fmt::Display) -> ! {
     // we don't really do so, as it can be dangerous
     if commands::Confirm::default()
         .append_prompt(format!("failed to load config: {err}"))
+        .append_prompt(if cfg!(feature = "migration") {
+            "if you are upgrading from old version, please run `clashtui migrate`"
+        } else {
+            ""
+        })
         .append_prompt("program will try to init default config")
         .append_prompt(format!(
             "WARNING! THIS WILL DELETE ALL FILE UNDER {}",
