@@ -159,6 +159,8 @@ impl TabCont for ProfileTab {
                                 vec![
                                     "Should we merge all file into one?".to_owned(),
                                     "Which is 'no_pp'".to_owned(),
+                                    "Note: For convenience, 'Y' for NO while 'N' for YES"
+                                        .to_owned(),
                                 ],
                                 vec![],
                             ));
@@ -171,10 +173,10 @@ impl TabCont for ProfileTab {
                                 // regarded as cancel
                                 // if get No, this order is dropped
                                 // as it is already moved out by `take`
-                                0 => false,
+                                0 => true,
                                 // regarded as yes
                                 // if get Yes, we confirm this order and ready to send it
-                                1 => true,
+                                1 => false,
                                 // regarded as extra-choices
                                 // ignore others
                                 _ => unreachable!(),
