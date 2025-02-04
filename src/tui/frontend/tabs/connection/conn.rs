@@ -63,8 +63,8 @@ impl From<Conn> for Connection {
             process_path: _,
             source_ip: _,
             source_port: _,
-            remote_destination: _,
-            destinatio_port: _,
+            remote_destination,
+            destinatio_port,
         } = metadata;
         let mut chain = String::with_capacity(1024);
         if let Some(c) = chains.pop() {
@@ -76,7 +76,11 @@ impl From<Conn> for Connection {
         }
         Self {
             chains: chain,
-            domain: host,
+            domain: if host.is_empty() {
+                format!("{}:{}", remote_destination, destinatio_port)
+            } else {
+                host
+            },
             rule_type: ctype,
             start,
             upload,
