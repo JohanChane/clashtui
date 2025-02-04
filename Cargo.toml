@@ -29,6 +29,7 @@ tui = [
 customized-theme = ["tui", "ratatui/serde"]
 template = []
 connection-tab = ["tui", "ratatui/unstable-widget-ref"]
+migration_v0_2_3 = []
 default = ["tui", "connection-tab", "template"]
 
 

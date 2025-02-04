@@ -5,6 +5,9 @@ use std::path::Path;
 use crate::backend::ProfileManager;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "migration_v0_2_3")]
+pub mod v0_2_3;
+
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Basic {

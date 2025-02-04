@@ -162,5 +162,6 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
             println!("Done");
             Ok(())
         }
+        ArgCommand::Migrate { .. } => unreachable!(),
     }
 }
