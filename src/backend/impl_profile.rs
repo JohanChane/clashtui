@@ -1,6 +1,5 @@
 use super::{ipc, BackEnd};
 
-use crate::{utils::consts::PROFILE_PATH, HOME_DIR};
 use std::fs::File;
 
 #[cfg(feature = "tui")]
@@ -19,8 +18,8 @@ impl BackEnd {
             .insert(name, ProfileType::Url(url.as_ref().to_owned()));
     }
     pub(super) fn remove_profile(&self, pf: Profile) -> anyhow::Result<()> {
-        let path = HOME_DIR.join(PROFILE_PATH).join(&pf.name);
-        if let Err(e) = std::fs::remove_file(path) {
+        let pf = self.load_local_profile(pf)?;
+        if let Err(e) = std::fs::remove_file(pf.path) {
             if e.kind() != std::io::ErrorKind::NotFound {
                 log::warn!("Failed to Remove profile file: {e}")
             }
@@ -237,7 +236,7 @@ impl BackEnd {
                 let pf = self
                     .get_profile(name)
                     .expect("Cannot find selected profile");
-                let path = HOME_DIR.join(PROFILE_PATH).join(&pf.name);
+                let pf = self.load_local_profile(pf)?;
                 lines.push(
                     pf.dtype
                         .get_domain()
@@ -245,7 +244,7 @@ impl BackEnd {
                 );
                 lines.push(Default::default());
 
-                let content = std::fs::read_to_string(path)?;
+                let content = std::fs::read_to_string(pf.path)?;
                 if content.is_empty() {
                     lines.push("yaml file is empty. Please update it.".to_owned());
                 } else {
@@ -257,13 +256,15 @@ impl BackEnd {
                 let pf = self
                     .get_profile(name)
                     .expect("Cannot find selected profile");
-                let path = HOME_DIR.join(PROFILE_PATH).join(&pf.name);
+                let pf = self.load_local_profile(pf)?;
 
                 ipc::spawn(
                     "sh",
                     vec![
                         "-c",
-                        self.edit_cmd.replace("%s", path.to_str().unwrap()).as_str(),
+                        self.edit_cmd
+                            .replace("%s", pf.path.to_str().unwrap())
+                            .as_str(),
                     ],
                 )?;
                 Ok(CallBack::Edit)

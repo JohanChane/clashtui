@@ -237,7 +237,12 @@ impl Drawable for FrontEnd {
                 Keys::AppHelp => {
                     self.popup.set_msg(
                         "Help",
-                        Keys::ALL_DOC.into_iter().map(|s| s.to_owned()).collect(),
+                        Keys::ALL_DOC
+                            .into_iter()
+                            // skip a white line
+                            .skip(1)
+                            .map(|s| s.to_owned())
+                            .collect(),
                     );
                 }
                 Keys::AppQuit => {

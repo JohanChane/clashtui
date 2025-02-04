@@ -19,7 +19,7 @@ pub enum BackendOp {
 define_enum!(
     #[derive(Clone, Copy, Debug)]
     pub enum ExtendOp {
-        OpenClashtuiConfig,
+        OpenClashtuiConfigDir,
         // Generate a list of information
         // about the application and clash core
         GenerateInfoList,

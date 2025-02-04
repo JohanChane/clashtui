@@ -31,6 +31,7 @@ pub fn migrate(config_dir: &std::path::Path) -> anyhow::Result<()> {
         service,
         timeout,
         edit_cmd,
+        open_dir_cmd,
     };
     let pm =
         collect_profiles(config_dir).map_err(|e| anyhow::anyhow!("Collecting profiles: {e}"))?;

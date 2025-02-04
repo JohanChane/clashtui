@@ -71,6 +71,7 @@ macro_rules! define_keys {
                 <[()]>::len(&[$(
                     $(#[cfg($prompt_cfg_attr)])*
                     replace_expr!($prompt, ()),
+                    (),
                     $(#[cfg($prompt_cfg_attr)])*
                     $(
                         $(#[cfg($cfg_attr)])*
@@ -79,6 +80,7 @@ macro_rules! define_keys {
                 )*])
             }
             pub const ALL_DOC: [&'static str; Self::doc_len()] = [$(
+                            "",
                             $(#[cfg($prompt_cfg_attr)])*
                             concat!("# ",stringify!($prompt)),
                             $(#[cfg($prompt_cfg_attr)])*

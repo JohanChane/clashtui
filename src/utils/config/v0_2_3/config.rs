@@ -154,7 +154,7 @@ impl CtCfg {
             service,
             extra,
         };
-        conf.save(&conf_path.as_ref())?;
+        conf.save(conf_path.as_ref())?;
         Ok(())
     }
 

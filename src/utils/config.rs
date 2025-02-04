@@ -39,6 +39,7 @@ struct ConfigFile {
     pub service: Service,
     pub timeout: Option<u64>,
     pub edit_cmd: String,
+    pub open_dir_cmd: String,
 }
 impl ConfigFile {
     fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
@@ -67,6 +68,7 @@ impl ProfileManager {
 pub struct BuildConfig {
     pub cfg: LibConfig,
     pub edit_cmd: String,
+    pub open_dir_cmd: String,
     pub timeout: Option<u64>,
     /// This is `basic_clash_config.yaml` in memory
     pub base_profile: serde_yml::Mapping,
@@ -111,6 +113,7 @@ impl BuildConfig {
             service,
             timeout,
             edit_cmd,
+            open_dir_cmd,
         } = ConfigFile::from_file(config_path)?;
         let data = ProfileManager::from_file(data_path)?;
         let base_profile = BasicInfo::get_raw(basic_path)?;
@@ -123,6 +126,7 @@ impl BuildConfig {
             base_profile,
             data,
             edit_cmd,
+            open_dir_cmd,
             timeout,
             external_controller,
             proxy_addr,

@@ -107,10 +107,15 @@ impl BackEnd {
                                     Ok(v) => CallBack::TuiExtend(v),
                                     Err(e) => CallBack::Error(e.to_string()),
                                 },
-                                tabs::service::ExtendOp::OpenClashtuiConfig => {
+                                tabs::service::ExtendOp::OpenClashtuiConfigDir => {
                                     if let Err(e) = crate::utils::ipc::spawn(
-                                        if cfg!(windows) { "start" } else { "open" },
-                                        vec![crate::HOME_DIR.to_str().unwrap()],
+                                        "sh",
+                                        vec![
+                                            "-c",
+                                            self.open_dir_cmd
+                                                .replace("%s", crate::HOME_DIR.to_str().unwrap())
+                                                .as_str(),
+                                        ],
                                     ) {
                                         CallBack::TuiExtend(vec![
                                             "Failed".to_owned(),

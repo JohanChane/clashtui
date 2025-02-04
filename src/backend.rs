@@ -57,6 +57,7 @@ pub struct BackEnd {
     cfg: LibConfig,
     pm: ProfileManager,
     edit_cmd: String,
+    open_dir_cmd: String,
     /// This is `basic_clash_config.yaml` in memory
     base_profile: serde_yml::Mapping,
 }
@@ -68,6 +69,7 @@ impl BackEnd {
             data,
             base_profile: base_raw,
             edit_cmd,
+            open_dir_cmd,
             timeout,
             external_controller,
             proxy_addr,
@@ -82,6 +84,7 @@ impl BackEnd {
             pm: data,
             edit_cmd,
             base_profile: base_raw,
+            open_dir_cmd,
         }
     }
     pub fn get_config(&self) -> &LibConfig {
