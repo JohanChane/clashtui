@@ -65,15 +65,13 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<Strin
         },
         #[cfg(any(target_os = "linux", target_os = "windows"))]
         ArgCommand::Service { command } => match command {
-            ServiceCommand::Restart { soft } => {
-                if soft {
-                    backend.restart_clash().map_err(|e| anyhow::anyhow!(e))
+            ServiceCommand::Restart { soft } => backend
+                .clash_srv_ctl(if soft {
+                    ServiceOp::ReStartClashCore
                 } else {
-                    backend
-                        .clash_srv_ctl(ServiceOp::StartClashService)
-                        .map_err(|e| anyhow::anyhow!(e))
-                }
-            }
+                    ServiceOp::ReStartClashService
+                })
+                .map_err(|e| anyhow::anyhow!(e)),
             ServiceCommand::Stop => Ok(backend.clash_srv_ctl(ServiceOp::StopClashService)?),
         },
         ArgCommand::Mode { mode } => Ok(backend.update_state(None, Some(mode.into()))?.to_string()),

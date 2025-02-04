@@ -133,8 +133,6 @@ define_keys! {
         /// Search the content
         Search(KeyCode::Char('/')),
         # Global
-        /// Restart clash core
-        SoftRestart(KeyCode::Char('R')),
         /// Show recent log
         LogCat(KeyCode::Char('L')),
         // AppConfig(KeyCode::Char('H')),

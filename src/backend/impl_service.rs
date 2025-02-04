@@ -12,7 +12,8 @@ crate::define_enum!(
     #[derive(Clone, Copy, Debug)]
     pub enum ServiceOp {
         #[cfg(any(target_os = "linux", target_os = "windows"))]
-        StartClashService,
+        ReStartClashService,
+        ReStartClashCore,
         #[cfg(any(target_os = "linux", target_os = "windows"))]
         StopClashService,
         #[cfg(target_os = "linux")]
@@ -37,7 +38,7 @@ impl BackEnd {
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ServiceOp) -> Result<String, Error> {
         match op {
-            ServiceOp::StartClashService => {
+            ServiceOp::ReStartClashService => {
                 let arg = if self.cfg.service.is_user {
                     vec!["--user", self.cfg.service.clash_srv_nam.as_str()]
                 } else {
@@ -54,6 +55,7 @@ impl BackEnd {
                     exec("systemctl", args)
                 }
             }
+            ServiceOp::ReStartClashCore => self.restart_clash(),
             ServiceOp::StopClashService => {
                 let arg = if self.cfg.service.is_user {
                     vec!["--user", self.cfg.service.clash_srv_nam.as_str()]
@@ -91,6 +93,7 @@ impl BackEnd {
     #[cfg(target_os = "macos")]
     pub fn clash_srv_ctl(&self, op: ServiceOp) -> Result<String, Error> {
         match op {
+            ServiceOp::ReStartClashCore => self.restart_clash(),
             #[allow(unreachable_patterns)]
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
@@ -105,7 +108,7 @@ impl BackEnd {
         use ipc::start_process_as_admin;
 
         match op {
-            ServiceOp::StartClashService => {
+            ServiceOp::ReStartClashService => {
                 start_process_as_admin(
                     NSSM_PGM,
                     format!("restart {}", self.cfg.service.clash_srv_nam).as_str(),
@@ -116,6 +119,8 @@ impl BackEnd {
                     vec!["status", self.cfg.service.clash_srv_nam.as_str()],
                 )
             }
+
+            ServiceOp::ReStartClashCore => self.restart_clash(),
 
             ServiceOp::StopClashService => {
                 start_process_as_admin(
@@ -194,8 +199,8 @@ impl BackEnd {
 }
 
 impl BackEnd {
-    pub fn restart_clash(&self) -> Result<String, String> {
-        self.api.restart(None).map_err(|e| e.to_string())
+    pub fn restart_clash(&self) -> std::io::Result<String> {
+        self.api.restart(None).map_err(Error::other)
     }
     pub fn update_state(
         &self,
