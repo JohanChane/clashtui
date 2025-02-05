@@ -32,14 +32,26 @@ pub struct LibConfig {
     pub service: Service,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(default)]
 struct ConfigFile {
-    pub basic: Basic,
-    pub service: Service,
-    pub timeout: Option<u64>,
-    pub edit_cmd: String,
-    pub open_dir_cmd: String,
+    basic: Basic,
+    service: Service,
+    timeout: Option<u64>,
+    edit_cmd: String,
+    open_dir_cmd: String,
+}
+impl Default for ConfigFile {
+    fn default() -> Self {
+        let common_cmd = if cfg!(windows) { "start %s" } else { "open %s" };
+        Self {
+            basic: Default::default(),
+            service: Default::default(),
+            timeout: Default::default(),
+            edit_cmd: common_cmd.to_owned(),
+            open_dir_cmd: common_cmd.to_owned(),
+        }
+    }
 }
 impl ConfigFile {
     fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
