@@ -46,7 +46,7 @@ pub(crate) fn parse_args() -> Result<(Option<PackedArgs>, u8), ()> {
     if let Some(ArgCommand::Migrate { version }) = &command {
         if let Err(e) = match version {
             #[cfg(feature = "migration_v0_2_3")]
-            OldVersion::V0_2_3 => crate::utils::config::v0_2_3::migrate(&crate::HOME_DIR),
+            OldVersion::V0_2_3 => crate::utils::config::v0_2_3::migrate(),
             #[cfg(not(any(feature = "migration_v0_2_3")))]
             OldVersion::NotSupported => {
                 Err::<(), anyhow::Error>(anyhow::anyhow!("unsupported version"))

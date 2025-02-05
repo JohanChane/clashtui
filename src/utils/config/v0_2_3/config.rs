@@ -55,7 +55,7 @@ impl Default for CtCfgForUser {
 }
 
 impl CtCfgForUser {
-    pub fn load(config_path: &str) -> Result<Self> {
+    pub fn load(config_path: &std::path::Path) -> Result<Self> {
         let f = File::open(config_path)?;
         Ok(serde_yml::from_reader(f)?)
     }
@@ -92,12 +92,12 @@ pub struct CtCfg {
 }
 
 impl CtCfg {
-    pub fn load<P: AsRef<str>>(conf_path: P) -> Result<Self> {
+    pub fn load(conf_path: &std::path::Path) -> Result<Self> {
         let CtCfgForUser {
             basic,
             service,
             extra,
-        } = CtCfgForUser::load(conf_path.as_ref())?;
+        } = CtCfgForUser::load(conf_path)?;
         let Basic {
             clash_cfg_dir,
             clash_bin_path,
@@ -205,22 +205,4 @@ impl From<serde_yml::Error> for CfgError {
             reason: value.to_string(),
         }
     }
-}
-pub fn init_config(
-    clashtui_config_dir: &std::path::PathBuf,
-    default_basic_clash_cfg_content: &str,
-) -> Result<()> {
-    use std::fs;
-    fs::create_dir_all(clashtui_config_dir)?;
-
-    CtCfg::default().save(clashtui_config_dir.join("config.yaml").to_str().unwrap())?;
-
-    fs::create_dir(clashtui_config_dir.join("profiles"))?;
-    fs::create_dir(clashtui_config_dir.join("templates"))?;
-
-    fs::write(
-        clashtui_config_dir.join("basic_clash_config.yaml"),
-        default_basic_clash_cfg_content,
-    )?;
-    Ok(())
 }

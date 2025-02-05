@@ -7,10 +7,11 @@ use tokio::sync::mpsc::{Receiver, Sender};
 impl BackEnd {
     /// read file by lines, from `total_len-start-length` to `total_len-start`
     pub fn logcat(&self, start: usize, length: usize) -> anyhow::Result<Vec<String>> {
-        use crate::{utils::consts::LOG_FILE, HOME_DIR};
+        use crate::utils::consts::LOG_PATH;
         use std::io::BufRead as _;
         use std::io::Seek as _;
-        let mut fp = std::fs::File::open(HOME_DIR.join(LOG_FILE))?;
+
+        let mut fp = std::fs::File::open(LOG_PATH.as_path())?;
         let size = {
             let fp = fp.try_clone()?;
             std::io::BufReader::new(fp).lines().count()

@@ -5,7 +5,8 @@ use config::CtCfg;
 
 use crate::backend::ProfileType;
 
-pub fn migrate(config_dir: &std::path::Path) -> anyhow::Result<()> {
+pub fn migrate() -> anyhow::Result<()> {
+    use crate::HOME_DIR;
     let CtCfg {
         clash_cfg_dir,
         clash_bin_path,
@@ -15,7 +16,7 @@ pub fn migrate(config_dir: &std::path::Path) -> anyhow::Result<()> {
         timeout,
         edit_cmd,
         open_dir_cmd,
-    } = CtCfg::load(config_dir.join("config.yaml").to_str().unwrap())
+    } = CtCfg::load(&HOME_DIR.join("config.yaml"))
         .map_err(|e| anyhow::anyhow!("Loading v0.2.3 config file: {e}"))?;
     let basic = super::Basic {
         clash_cfg_dir,
@@ -34,21 +35,21 @@ pub fn migrate(config_dir: &std::path::Path) -> anyhow::Result<()> {
         open_dir_cmd,
     };
     let pm =
-        collect_profiles(config_dir).map_err(|e| anyhow::anyhow!("Collecting profiles: {e}"))?;
-    let basic_map = std::fs::read_to_string(config_dir.join("basic_clash_config.yaml"))
+        collect_profiles(&HOME_DIR).map_err(|e| anyhow::anyhow!("Collecting profiles: {e}"))?;
+    let basic_map = std::fs::read_to_string(HOME_DIR.join("basic_clash_config.yaml"))
         .map_err(|e| anyhow::anyhow!("Loading basic clash config: {e}"))?;
 
-    std::fs::remove_dir_all(config_dir).map_err(|e| anyhow::anyhow!("Removing config dir: {e}"))?;
-    super::BuildConfig::init_config(config_dir)
-        .map_err(|e| anyhow::anyhow!("Initing config file: {e}"))?;
+    std::fs::remove_dir_all(HOME_DIR.as_path())
+        .map_err(|e| anyhow::anyhow!("Removing config dir: {e}"))?;
+    super::BuildConfig::init_config().map_err(|e| anyhow::anyhow!("Initing config file: {e}"))?;
 
-    use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE};
+    use crate::consts::BASIC_PATH;
     config
-        .to_file(config_dir.join(CONFIG_FILE).to_str().unwrap())
+        .to_file()
         .map_err(|e| anyhow::anyhow!("Saving new config file: {e}"))?;
-    pm.to_file(config_dir.join(DATA_FILE).to_str().unwrap())
+    pm.to_file()
         .map_err(|e| anyhow::anyhow!("Saving new profiles database: {e}"))?;
-    std::fs::write(config_dir.join(BASIC_FILE), basic_map)
+    std::fs::write(BASIC_PATH.as_path(), basic_map)
         .map_err(|e| anyhow::anyhow!("Saving basic clash config: {e}"))?;
     Ok(())
 }
@@ -65,9 +66,9 @@ fn collect_profiles(config_dir: &std::path::Path) -> anyhow::Result<super::Profi
         let entry = entry?;
         if entry.file_type()?.is_file() {
             let path = entry.path();
-            let name = entry.file_name().to_str().unwrap().to_owned();
+            let name = entry.file_name();
             let content = std::fs::read_to_string(&path)?;
-            profiles.insert(name, ProfileType::Url(content));
+            profiles.insert(name.to_str().unwrap(), ProfileType::Url(content));
         }
     }
     let data_yml = std::fs::read_to_string(config_dir.join("data.yaml"))?;

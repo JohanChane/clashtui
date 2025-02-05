@@ -34,10 +34,12 @@ pub fn load_home_dir() -> std::path::PathBuf {
     }
 }
 
-pub fn setup_logging(log_file: &std::path::Path, verbose: u8) {
+pub fn setup_logging(verbose: u8) {
     use log4rs::append::file::FileAppender;
     use log4rs::config::{Appender, Config, Root};
     use log4rs::encode::pattern::PatternEncoder;
+
+    let log_file = consts::LOG_PATH.as_path();
     #[cfg(debug_assertions)]
     let _ = std::fs::remove_file(log_file); // auto rm old log for debug
     let flag = if std::fs::File::open(log_file)

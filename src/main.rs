@@ -12,17 +12,19 @@ use backend::BackEnd;
 use utils::{consts, BuildConfig};
 
 static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::new(|| {
-    if let Some(data_dir) = commands::_HOME_DIR.get() {
-        if data_dir.exists() && data_dir.is_dir() {
-            match std::path::absolute(data_dir) {
-                Ok(dir) => return dir,
-                Err(e) => {
-                    log::error!("Cannot locate absolute path:{e}");
-                    log::error!("Update profile may not work");
-                    return data_dir.clone();
-                }
+    if let Some(data_dir) = commands::_HOME_DIR
+        .get()
+        .filter(|dir| dir.exists() && dir.is_dir())
+        .and_then(|dir| dir.canonicalize().ok())
+    {
+        return match std::path::absolute(&data_dir) {
+            Ok(dir) => dir,
+            Err(e) => {
+                log::error!("Cannot locate absolute path:{e}");
+                log::error!("Update profile may not work");
+                data_dir
             }
-        }
+        };
     };
     utils::load_home_dir()
 });
@@ -31,14 +33,14 @@ fn main() {
     if is_root::is_root() {
         println!("{}", consts::ROOT_WARNING)
     }
-    let Ok((infos, verbose)) = commands::parse_args() else {
+    let Ok((infos, verbose_level)) = commands::parse_args() else {
         return;
     };
-    let backend = match BuildConfig::load_config(&HOME_DIR) {
+    let backend = match BuildConfig::load_config() {
         Ok(v) => BackEnd::build(v),
         Err(e) => reinit_config_dir(e),
     };
-    utils::setup_logging(&HOME_DIR.join(consts::LOG_FILE), verbose);
+    utils::setup_logging(verbose_level);
     // handle commands
     if let Err(e) = match infos {
         Some(command) => commands::handle_cli(command, backend),
@@ -84,7 +86,7 @@ async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     let (a, b) = tokio::try_join!(app, backend)?;
     setup::restore()?;
     a?;
-    b?.to_file(HOME_DIR.join(consts::DATA_FILE))?;
+    b?.to_file()?;
     Ok(())
 }
 
@@ -110,7 +112,7 @@ fn reinit_config_dir(err: impl std::fmt::Display) -> ! {
         .expect("Unable write/read from stdio")
     {
         // accept 'y' only
-        if let Err(e) = BuildConfig::init_config(HOME_DIR.as_path()) {
+        if let Err(e) = BuildConfig::init_config() {
             eprint!("init config failed: {e}");
             std::process::exit(-1);
         } else {

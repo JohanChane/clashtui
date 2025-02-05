@@ -1,6 +1,5 @@
 use anyhow::Result;
 use std::fs::File;
-use std::path::Path;
 
 use crate::backend::ProfileManager;
 use serde::{Deserialize, Serialize};
@@ -54,25 +53,25 @@ impl Default for ConfigFile {
     }
 }
 impl ConfigFile {
-    fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let fp = File::create(path)?;
+    fn to_file(&self) -> Result<()> {
+        let fp = File::create(crate::consts::CONFIG_PATH.as_path())?;
         serde_yml::to_writer(fp, &self)?;
         Ok(())
     }
-    fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let fp = File::open(path)?;
+    fn from_file() -> Result<Self> {
+        let fp = File::open(crate::consts::CONFIG_PATH.as_path())?;
         Ok(serde_yml::from_reader(fp)?)
     }
 }
 
 impl ProfileManager {
-    pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let fp = File::create(path)?;
+    pub fn to_file(&self) -> Result<()> {
+        let fp = File::create(crate::consts::DATA_PATH.as_path())?;
         serde_yml::to_writer(fp, &self)?;
         Ok(())
     }
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let fp = File::open(path)?;
+    pub fn from_file() -> Result<Self> {
+        let fp = File::open(crate::consts::DATA_PATH.as_path())?;
         Ok(serde_yml::from_reader(fp)?)
     }
 }
@@ -91,44 +90,33 @@ pub struct BuildConfig {
     pub global_ua: Option<String>,
 }
 impl BuildConfig {
-    pub fn init_config(config_dir: &Path) -> Result<()> {
-        use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE, PROFILE_PATH, TEMPLATE_PATH};
+    pub fn init_config() -> Result<()> {
+        use crate::consts::{PROFILE_PATH, TEMPLATE_PATH};
+        use crate::HOME_DIR;
         use std::fs;
 
-        let template_dir = config_dir.join(TEMPLATE_PATH);
-        let profile_dir = config_dir.join(PROFILE_PATH);
-        let basic_path = config_dir.join(BASIC_FILE);
-        let config_path = config_dir.join(CONFIG_FILE);
-        let data_path = config_dir.join(DATA_FILE);
+        fs::create_dir_all(HOME_DIR.as_path())?;
 
-        fs::create_dir_all(config_dir)?;
+        BasicInfo::default().to_file()?;
+        ConfigFile::default().to_file()?;
+        ProfileManager::default().to_file()?;
 
-        BasicInfo::default().to_file(basic_path)?;
-        ConfigFile::default().to_file(config_path)?;
-        ProfileManager::default().to_file(data_path)?;
-
-        fs::create_dir(template_dir)?;
-        fs::create_dir(profile_dir)?;
+        fs::create_dir(TEMPLATE_PATH.as_path())?;
+        fs::create_dir(PROFILE_PATH.as_path())?;
 
         Ok(())
     }
-
-    pub fn load_config(config_dir: &Path) -> Result<BuildConfig> {
-        use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE};
-
-        let basic_path = config_dir.join(BASIC_FILE);
-        let config_path = config_dir.join(CONFIG_FILE);
-        let data_path = config_dir.join(DATA_FILE);
-
+    /// Load config under [crate::HOME_DIR]
+    pub fn load_config() -> Result<BuildConfig> {
         let ConfigFile {
             basic,
             service,
             timeout,
             edit_cmd,
             open_dir_cmd,
-        } = ConfigFile::from_file(config_path)?;
-        let data = ProfileManager::from_file(data_path)?;
-        let base_profile = BasicInfo::get_raw(basic_path)?;
+        } = ConfigFile::from_file()?;
+        let data = ProfileManager::from_file()?;
+        let base_profile = BasicInfo::get_raw()?;
         let (external_controller, proxy_addr, secret, global_ua) =
             BasicInfo::from_raw(base_profile.clone())?.build()?;
         let cfg = LibConfig { basic, service };
@@ -179,16 +167,16 @@ impl Default for BasicInfo {
     }
 }
 impl BasicInfo {
-    fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let fp = File::create(path)?;
+    fn to_file(&self) -> Result<()> {
+        let fp = File::create(crate::consts::BASIC_PATH.as_path())?;
         Ok(serde_yml::to_writer(fp, &self)?)
     }
     // pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
     //     let fp = File::open(path)?;
     //     Ok(serde_yml::from_reader(fp)?)
     // }
-    fn get_raw<P: AsRef<Path>>(path: P) -> Result<serde_yml::Mapping> {
-        let fp = File::open(path)?;
+    fn get_raw() -> Result<serde_yml::Mapping> {
+        let fp = File::open(crate::consts::BASIC_PATH.as_path())?;
         Ok(serde_yml::from_reader(fp)?)
     }
     fn from_raw(raw: serde_yml::Mapping) -> Result<Self> {
@@ -198,7 +186,7 @@ impl BasicInfo {
 impl BasicInfo {
     const LOCALHOST: &str = "127.0.0.1";
     fn build(self) -> Result<(String, String, Option<String>, Option<String>)> {
-        use crate::consts::BASIC_FILE;
+        use crate::consts::BASIC_PATH;
         let BasicInfo {
             mut external_controller,
             mixed_port,
@@ -223,7 +211,8 @@ impl BasicInfo {
             None => socks_port
                 .map(|p| format!("socks5://{}:{p}", Self::LOCALHOST))
                 .ok_or(anyhow::anyhow!(
-                    "failed to load proxy_addr from {BASIC_FILE}"
+                    "failed to load proxy_addr from {}",
+                    BASIC_PATH.display()
                 ))?,
         };
         Ok((external_controller, proxy_addr, secret, global_ua))

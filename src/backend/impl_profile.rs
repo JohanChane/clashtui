@@ -45,8 +45,8 @@ impl BackEnd {
     }
 
     pub(super) fn load_local_profile(&self, pf: Profile) -> anyhow::Result<LocalProfile> {
-        use crate::{utils::consts, HOME_DIR};
-        let path = HOME_DIR.join(consts::PROFILE_PATH).join(&pf.name);
+        use crate::utils::consts::PROFILE_PATH;
+        let path = PROFILE_PATH.join(&pf.name);
         let mut lpf = LocalProfile::from_pf(pf, path);
         lpf.sync_from_disk()?;
         Ok(lpf)
@@ -63,14 +63,12 @@ impl BackEnd {
             .unwrap_or(self.api.check_connectivity().is_ok() && self.api.version().is_ok());
         if profile.dtype.is_upgradable() {
             // store (name,url) to be downloaded
-            let mut work_vec: Vec<(String, String)> = Vec::with_capacity(2);
+            let mut work_vec: Vec<(String, std::path::PathBuf)> = Vec::with_capacity(2);
             match profile.dtype {
                 // Imported file won't update, overwrite it if necessary
                 ProfileType::File => unreachable!(),
                 // Update via the given link
-                ProfileType::Url(url) => {
-                    work_vec.push((url.clone(), profile.path.to_str().unwrap().to_string()))
-                }
+                ProfileType::Url(url) => work_vec.push((url.clone(), profile.path)),
                 #[cfg(feature = "template")]
                 ProfileType::Generated(template_name) => {
                     // rebuild from template
