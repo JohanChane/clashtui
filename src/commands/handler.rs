@@ -158,6 +158,9 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                     println!("Downloaded to {}", path.display());
                     println!();
                 }
+            } else {
+                println!("Up to date");
+                println!("current version is {}", current_version)
             }
             println!("Done");
             Ok(())

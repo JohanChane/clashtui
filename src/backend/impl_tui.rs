@@ -78,78 +78,69 @@ impl BackEnd {
             } else {
                 log::debug!("Backend got:{op:?}");
                 let cb = match op {
-                    Call::Profile(op) => match op {
-                        tabs::profile::BackendOp::Profile(op) => self.handle_profile_op(op).into(),
-                        #[cfg(feature = "template")]
-                        tabs::profile::BackendOp::Template(op) => {
-                            self.handle_template_op(op).into()
+                    Call::Profile(tabs::profile::BackendOp::Profile(op)) => {
+                        self.handle_profile_op(op).into()
+                    }
+                    #[cfg(feature = "template")]
+                    Call::Profile(tabs::profile::BackendOp::Template(op)) => {
+                        self.handle_template_op(op).into()
+                    }
+                    Call::Service(tabs::service::BackendOp::SwitchMode(mode)) => {
+                        // tick will refresh state
+                        match self.update_state(None, Some(mode)) {
+                            Ok(_) => CallBack::ServiceCTL(format!("Mode is switched to {}", mode)),
+                            Err(e) => CallBack::Error(e.to_string()),
                         }
-                    },
-                    Call::Service(op) => {
-                        match op {
-                            tabs::service::BackendOp::SwitchMode(mode) => {
-                                // tick will refresh state
-                                match self.update_state(None, Some(mode)) {
-                                    Ok(_) => CallBack::ServiceCTL(format!(
-                                        "Mode is switched to {}",
-                                        mode
-                                    )),
-                                    Err(e) => CallBack::Error(e.to_string()),
-                                }
-                            }
-                            tabs::service::BackendOp::ServiceCTL(op) => {
-                                match self.clash_srv_ctl(op) {
-                                    Ok(v) => CallBack::ServiceCTL(v),
-                                    Err(e) => CallBack::Error(e.to_string()),
-                                }
-                            }
-                            tabs::service::BackendOp::TuiExtend(extend_op) => match extend_op {
-                                tabs::service::ExtendOp::FullLog => match self.logcat(0, 1024) {
-                                    Ok(v) => CallBack::TuiExtend(v),
-                                    Err(e) => CallBack::Error(e.to_string()),
-                                },
-                                tabs::service::ExtendOp::OpenClashtuiConfigDir => {
-                                    if let Err(e) = crate::utils::ipc::spawn(
-                                        "sh",
-                                        vec![
-                                            "-c",
-                                            self.open_dir_cmd
-                                                .replace("%s", crate::HOME_DIR.to_str().unwrap())
-                                                .as_str(),
-                                        ],
-                                    ) {
-                                        CallBack::TuiExtend(vec![
-                                            "Failed".to_owned(),
-                                            e.to_string(),
-                                        ])
-                                    } else {
-                                        CallBack::TuiExtend(vec!["Success".to_owned()])
-                                    }
-                                }
-                                tabs::service::ExtendOp::GenerateInfoList => {
-                                    let mut infos = vec![
-                                        "# CLASHTUI".to_owned(),
-                                        format!("version:{}", crate::utils::consts::VERSION),
-                                    ];
-                                    infos.push("# CLASH".to_owned());
-                                    match self.api.version().map_err(|e| e.into()).and_then(|ver| {
-                                        self.api.config_get().map(|cfg| {
-                                            let mut cfg = cfg.build();
-                                            cfg.insert(2, format!("version:{ver}"));
-                                            cfg
-                                        })
-                                    }) {
-                                        Ok(info) => {
-                                            infos.extend(info);
-                                            CallBack::TuiExtend(infos)
-                                        }
-                                        Err(e) => {
-                                            infos.push(format!("{e}"));
-                                            CallBack::TuiExtend(infos)
-                                        }
-                                    }
-                                }
+                    }
+                    Call::Service(tabs::service::BackendOp::ServiceCTL(op)) => {
+                        match self.clash_srv_ctl(op) {
+                            Ok(v) => CallBack::ServiceCTL(v),
+                            Err(e) => CallBack::Error(e.to_string()),
+                        }
+                    }
+                    Call::Service(tabs::service::BackendOp::TuiExtend(extend_op)) => {
+                        match extend_op {
+                            tabs::service::ExtendOp::FullLog => match self.logcat(0, 1024) {
+                                Ok(v) => CallBack::TuiExtend(v),
+                                Err(e) => CallBack::Error(e.to_string()),
                             },
+                            tabs::service::ExtendOp::OpenClashtuiConfigDir => {
+                                if let Err(e) = crate::utils::ipc::spawn(
+                                    "sh",
+                                    vec![
+                                        "-c",
+                                        self.open_dir_cmd
+                                            .replace("%s", crate::HOME_DIR.to_str().unwrap())
+                                            .as_str(),
+                                    ],
+                                ) {
+                                    CallBack::TuiExtend(vec!["Failed".to_owned(), e.to_string()])
+                                } else {
+                                    CallBack::TuiExtend(vec!["Success".to_owned()])
+                                }
+                            }
+                            tabs::service::ExtendOp::GenerateInfoList => {
+                                let mut infos = vec![
+                                    "# CLASHTUI".to_owned(),
+                                    format!("version:{}", crate::utils::consts::VERSION),
+                                ];
+                                infos.push("# CLASH".to_owned());
+                                match self.api.version().map_err(|e| e.into()).and_then(|ver| {
+                                    self.api.config_get().map(|cfg| {
+                                        let mut cfg = cfg.build();
+                                        cfg.insert(2, format!("version:{ver}"));
+                                        cfg
+                                    })
+                                }) {
+                                    Ok(info) => {
+                                        infos.extend(info);
+                                    }
+                                    Err(e) => {
+                                        infos.push(format!("{e}"));
+                                    }
+                                };
+                                CallBack::TuiExtend(infos)
+                            }
                         }
                     }
                     #[cfg(feature = "connection-tab")]
