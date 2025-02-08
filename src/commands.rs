@@ -175,7 +175,7 @@ enum ProfileCommand {
     Select {
         /// the profile name
         #[arg(short, long)]
-        name: String,
+        name: Option<String>,
     },
     /// list all profile
     List {

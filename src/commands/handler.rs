@@ -36,7 +36,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                 println!("Done");
                 Ok(())
             }
-            ProfileCommand::Select { name } => {
+            ProfileCommand::Select { name: Some(name) } => {
                 let Some(pf) = backend.get_profile(&name) else {
                     anyhow::bail!("Not found in database!");
                 };
@@ -45,6 +45,10 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                     return Err(e);
                 };
                 println!("Done");
+                Ok(())
+            }
+            ProfileCommand::Select { name: None } => {
+                println!("Current Profile: {}", backend.get_current_profile().name);
                 Ok(())
             }
             ProfileCommand::List { name_only } => {
