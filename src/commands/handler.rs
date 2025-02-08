@@ -32,6 +32,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                     })
                     .flatten()
                     .for_each(|s| println!("- {s}"));
+                backend.select_profile(backend.get_current_profile())?;
                 println!("Done");
                 Ok(())
             }
@@ -57,7 +58,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                             format!(
                                 "{} : {}",
                                 pf.name,
-                                pf.dtype.get_domain().as_ref().map_or("Unknown", |v| v)
+                                pf.dtype.get_domain().as_deref().unwrap_or("Unknown")
                             )
                         }
                     })
