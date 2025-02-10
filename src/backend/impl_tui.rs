@@ -98,27 +98,32 @@ impl BackEnd {
                             Err(e) => CallBack::Error(e.to_string()),
                         }
                     }
+                    Call::Service(tabs::service::BackendOp::OpenThis(path)) => {
+                        if let Err(e) = crate::utils::ipc::spawn(
+                            "sh",
+                            vec![
+                                "-c",
+                                if path.is_dir() {
+                                    &self.open_dir_cmd
+                                } else {
+                                    &self.edit_cmd
+                                }
+                                .replace("%s", path.to_str().unwrap())
+                                .as_str(),
+                            ],
+                        ) {
+                            CallBack::TuiExtend(vec!["Failed".to_owned(), e.to_string()])
+                        } else {
+                            CallBack::TuiExtend(vec!["Success".to_owned()])
+                        }
+                    }
                     Call::Service(tabs::service::BackendOp::TuiExtend(extend_op)) => {
                         match extend_op {
                             tabs::service::ExtendOp::FullLog => match self.logcat(0, 1024) {
                                 Ok(v) => CallBack::TuiExtend(v),
                                 Err(e) => CallBack::Error(e.to_string()),
                             },
-                            tabs::service::ExtendOp::OpenClashtuiConfigDir => {
-                                if let Err(e) = crate::utils::ipc::spawn(
-                                    "sh",
-                                    vec![
-                                        "-c",
-                                        self.open_dir_cmd
-                                            .replace("%s", crate::HOME_DIR.to_str().unwrap())
-                                            .as_str(),
-                                    ],
-                                ) {
-                                    CallBack::TuiExtend(vec!["Failed".to_owned(), e.to_string()])
-                                } else {
-                                    CallBack::TuiExtend(vec!["Success".to_owned()])
-                                }
-                            }
+                            tabs::service::ExtendOp::ViewClashtuiConfigDir => unreachable!(),
                             tabs::service::ExtendOp::GenerateInfoList => {
                                 let mut infos = vec![
                                     "# CLASHTUI".to_owned(),

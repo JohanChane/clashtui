@@ -1,5 +1,6 @@
 use crate::backend::ServiceOp;
 use crate::define_enum;
+use crate::tui::widget::Browser;
 use crate::{clash::webapi::Mode, tui::widget::PopRes};
 use crossterm::event::KeyEvent;
 
@@ -14,12 +15,13 @@ pub enum BackendOp {
     SwitchMode(Mode),
     ServiceCTL(ServiceOp),
     TuiExtend(ExtendOp),
+    OpenThis(std::path::PathBuf),
 }
 
 define_enum!(
     #[derive(Clone, Copy, Debug)]
     pub enum ExtendOp {
-        OpenClashtuiConfigDir,
+        ViewClashtuiConfigDir,
         // Generate a list of information
         // about the application and clash core
         GenerateInfoList,
@@ -31,6 +33,7 @@ pub(in crate::tui::frontend) struct ServiceTab {
     inner: List,
     popup_content: Option<PopMsg>,
     backend_content: Option<Call>,
+    file_browser: Option<Browser>,
 }
 
 const MODE: [Mode; 3] = [Mode::Rule, Mode::Direct, Mode::Global];
@@ -49,6 +52,7 @@ impl Default for ServiceTab {
             inner,
             popup_content: None,
             backend_content: None,
+            file_browser: None,
         }
     }
 }
@@ -100,11 +104,26 @@ impl TabCont for ServiceTab {
 
 impl Drawable for ServiceTab {
     fn render(&mut self, f: &mut Frame, area: Rect, _: bool) {
-        self.inner.render(f, area, true);
+        self.inner.render(f, area, self.file_browser.is_none());
+        if let Some(instance) = self.file_browser.as_mut() {
+            instance.render(f, area, true);
+        }
     }
     /// - Catched event -> [EventState::WorkDone]
     /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
+        if let Some(instance) = self.file_browser.as_mut() {
+            match instance.handle_key_event(ev) {
+                EventState::Yes => {
+                    self.backend_content = Some(Call::Service(BackendOp::OpenThis(
+                        self.file_browser.take().unwrap().path(),
+                    )))
+                }
+                EventState::Cancel => self.file_browser = None,
+                EventState::NotConsumed | EventState::WorkDone => (),
+            }
+            return EventState::WorkDone;
+        };
         let event_state = self.inner.handle_key_event(ev);
         match event_state {
             EventState::Yes => {
@@ -124,8 +143,14 @@ impl Drawable for ServiceTab {
                         idx if idx == ServiceOp::const_len() + 1 => (),
                         idx if idx < ServiceOp::const_len() + 2 + ExtendOp::const_len() => {
                             let op = ExtendOp::ALL[index - 2 - ServiceOp::const_len()];
-                            self.backend_content = Some(Call::Service(BackendOp::TuiExtend(op)));
-                            self.popup_content = Some(PopMsg::Prompt(vec!["working".to_owned()]));
+                            if let ExtendOp::ViewClashtuiConfigDir = op {
+                                self.file_browser = Some(Browser::new(&crate::HOME_DIR))
+                            } else {
+                                self.backend_content =
+                                    Some(Call::Service(BackendOp::TuiExtend(op)));
+                                self.popup_content =
+                                    Some(PopMsg::Prompt(vec!["working".to_owned()]));
+                            }
                         }
                         _ => unreachable!(),
                     }
