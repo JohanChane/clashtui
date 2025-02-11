@@ -7,10 +7,16 @@ use super::tools;
 use crate::tui::misc::EventState;
 use crate::tui::{Drawable, Theme};
 
+pub enum Path {
+    Open(PathBuf),
+    Preview(PathBuf),
+}
+
 pub struct Browser {
     cwd: PathBuf,
     items: Vec<Box<dyn Fp>>,
     selected: usize,
+    is_preview: bool,
 }
 
 impl Drawable for Browser {
@@ -18,6 +24,13 @@ impl Drawable for Browser {
         let area = tools::centered_rect(Ra::Constraint::Fill(2), Ra::Constraint::Fill(2), f.area());
 
         let mut state = Raw::ListState::default().with_selected(Some(self.selected));
+
+        let s = vec![
+            Ra::Span::raw("o").style(Ra::Style::default().fg(Ra::Color::Magenta)),
+            Ra::Span::raw("pen/pre"),
+            Ra::Span::raw("v").style(Ra::Style::default().fg(Ra::Color::Magenta)),
+            Ra::Span::raw("iew selected dir/file"),
+        ];
 
         let list = Raw::List::new(self.items.iter().map(|file| {
             Ra::Text::raw(file.name()).style(Ra::Style::default().fg(if file.is_dir() {
@@ -36,7 +49,7 @@ impl Drawable for Browser {
             Raw::Block::bordered()
                 .border_style(Ra::Style::default().fg(Theme::get().list_block_fouced_fg))
                 .title_top(format!("Browser: {}", self.cwd.display()))
-                .title_bottom(Ra::Line::raw("Press 'O' to open selected dir/file").right_aligned()),
+                .title_bottom(Ra::Line::from(s).right_aligned()),
         );
 
         f.render_widget(Raw::Clear, area);
@@ -69,7 +82,19 @@ impl Drawable for Browser {
             KeyCode::Home => self.selected = 0,
             KeyCode::End => self.selected = self.items.len() - 1,
 
-            KeyCode::Char('O') | KeyCode::Char('o') => return EventState::Yes,
+            KeyCode::Char('o') => {
+                self.is_preview = false;
+                return EventState::Yes;
+            }
+            KeyCode::Char('v') => {
+                if self.items[self.selected].is_dir() {
+                    self.cwd = self.items.swap_remove(self.selected).path();
+                    self.update();
+                } else {
+                    self.is_preview = true;
+                    return EventState::Yes;
+                }
+            }
             KeyCode::Esc => return EventState::Cancel,
             _ => (),
         };
@@ -83,12 +108,18 @@ impl Browser {
             cwd: path.to_path_buf(),
             items: vec![],
             selected: 0,
+            is_preview: false,
         };
         instance.update();
         instance
     }
-    pub fn path(mut self) -> std::path::PathBuf {
-        self.items.swap_remove(self.selected).path()
+    pub fn path(mut self) -> Path {
+        let path = self.items.swap_remove(self.selected).path();
+        if self.is_preview {
+            Path::Preview(path)
+        } else {
+            Path::Open(path)
+        }
     }
     fn update(&mut self) {
         if let Err(e) = self.get_and_set_files() {

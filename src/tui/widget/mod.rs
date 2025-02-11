@@ -4,7 +4,7 @@ mod list;
 mod popup;
 pub mod tools;
 
-pub use browser::Browser;
+pub use browser::{Browser, Path};
 pub use list::List;
 pub use popup::Popup;
 

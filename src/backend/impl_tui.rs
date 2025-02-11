@@ -117,6 +117,14 @@ impl BackEnd {
                             CallBack::TuiExtend(vec!["Success".to_owned()])
                         }
                     }
+                    Call::Service(tabs::service::BackendOp::Preview(path)) => {
+                        match std::fs::read_to_string(path) {
+                            Ok(string) => {
+                                CallBack::Preview(string.lines().map(|s| s.to_owned()).collect())
+                            }
+                            Err(err) => CallBack::Error(err.to_string()),
+                        }
+                    }
                     Call::Service(tabs::service::BackendOp::TuiExtend(extend_op)) => {
                         match extend_op {
                             tabs::service::ExtendOp::FullLog => match self.logcat(0, 1024) {

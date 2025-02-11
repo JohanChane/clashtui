@@ -1,6 +1,6 @@
 use crate::backend::ServiceOp;
 use crate::define_enum;
-use crate::tui::widget::Browser;
+use crate::tui::widget::{Browser, Path};
 use crate::{clash::webapi::Mode, tui::widget::PopRes};
 use crossterm::event::KeyEvent;
 
@@ -16,6 +16,7 @@ pub enum BackendOp {
     ServiceCTL(ServiceOp),
     TuiExtend(ExtendOp),
     OpenThis(std::path::PathBuf),
+    Preview(std::path::PathBuf),
 }
 
 define_enum!(
@@ -115,9 +116,12 @@ impl Drawable for ServiceTab {
         if let Some(instance) = self.file_browser.as_mut() {
             match instance.handle_key_event(ev) {
                 EventState::Yes => {
-                    self.backend_content = Some(Call::Service(BackendOp::OpenThis(
-                        self.file_browser.take().unwrap().path(),
-                    )))
+                    self.backend_content = Some(Call::Service(
+                        match self.file_browser.take().unwrap().path() {
+                            Path::Open(path) => BackendOp::OpenThis(path),
+                            Path::Preview(path) => BackendOp::Preview(path),
+                        },
+                    ))
                 }
                 EventState::Cancel => self.file_browser = None,
                 EventState::NotConsumed | EventState::WorkDone => (),
