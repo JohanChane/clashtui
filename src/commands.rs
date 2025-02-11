@@ -7,15 +7,6 @@ mod widgets;
 pub(crate) use handler::handle_cli;
 pub(crate) use widgets::{Confirm, Select};
 
-/// used to support '--config'
-///
-/// since LazyLock does not accept arg,
-/// and using OnceLock can cause code being complex
-///
-/// e.g. `_HOME_DIR.get().unwarp()`,
-/// which equal to `HOME_DIR`
-pub static _HOME_DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
-
 pub(crate) struct PackedArgs(ArgCommand);
 
 /// collect args and parse
@@ -41,7 +32,7 @@ pub(crate) fn parse_args() -> Result<(Option<PackedArgs>, u8), ()> {
         return Err(());
     }
     if let Some(config_dir) = config_dir {
-        _HOME_DIR.set(config_dir).unwrap();
+        super::DataDir::set(config_dir);
     }
     if let Some(ArgCommand::Migrate { version }) = &command {
         if let Err(e) = match version {

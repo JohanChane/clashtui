@@ -92,10 +92,10 @@ pub struct BuildConfig {
 impl BuildConfig {
     pub fn init_config() -> Result<()> {
         use crate::consts::{PROFILE_PATH, TEMPLATE_PATH};
-        use crate::HOME_DIR;
+        use crate::DataDir;
         use std::fs;
 
-        fs::create_dir_all(HOME_DIR.as_path())?;
+        fs::create_dir_all(DataDir::get())?;
 
         BasicInfo::default().to_file()?;
         ConfigFile::default().to_file()?;

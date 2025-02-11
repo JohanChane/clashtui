@@ -14,30 +14,26 @@ impl ClashUtil {
         &self,
         url: U,
         with_proxy: bool,
-        token: Option<String>,
+        token: String,
     ) -> MinreqResult {
         let mut req = minreq::get(url);
         if with_proxy {
             req = req.with_proxy(minreq::Proxy::new(&self.proxy_addr)?);
         }
-        if let Some(token) = token {
-            req = req.with_header(headers::AUTHORIZATION, format!("Bearer {token}"))
-        }
+        req = req.with_header(headers::AUTHORIZATION, format!("Bearer {token}"));
         req.with_timeout(*TIMEOUT).send_lazy()
     }
     pub fn dl_gitlab<U: Into<minreq::URL>>(
         &self,
         url: U,
         with_proxy: bool,
-        token: Option<String>,
+        token: String,
     ) -> MinreqResult {
         let mut req = minreq::get(url);
         if with_proxy {
             req = req.with_proxy(minreq::Proxy::new(&self.proxy_addr)?);
         }
-        if let Some(token) = token {
-            req = req.with_header("PRIVATE-TOKEN", token)
-        }
+        req = req.with_header("PRIVATE-TOKEN", token);
         req.with_timeout(*TIMEOUT).send_lazy()
     }
 }

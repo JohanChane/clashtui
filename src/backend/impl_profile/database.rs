@@ -49,7 +49,7 @@ impl ProfileManager {
     pub fn set_current(&self, pf: Profile) {
         assert!(
             self.get(&pf.name).is_some(),
-            "Selected profile not in database"
+            "Selected profile not found in database"
         );
         *self.current_profile.borrow_mut() = pf.name;
     }

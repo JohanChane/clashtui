@@ -6,7 +6,7 @@ use config::CtCfg;
 use crate::backend::ProfileType;
 
 pub fn migrate() -> anyhow::Result<()> {
-    use crate::HOME_DIR;
+    use crate::DataDir;
     let CtCfg {
         clash_cfg_dir,
         clash_bin_path,
@@ -16,7 +16,7 @@ pub fn migrate() -> anyhow::Result<()> {
         timeout,
         edit_cmd,
         open_dir_cmd,
-    } = CtCfg::load(&HOME_DIR.join("config.yaml"))
+    } = CtCfg::load(&DataDir::get().join("config.yaml"))
         .map_err(|e| anyhow::anyhow!("Loading v0.2.3 config file: {e}"))?;
     let basic = super::Basic {
         clash_cfg_dir,
@@ -34,12 +34,12 @@ pub fn migrate() -> anyhow::Result<()> {
         edit_cmd,
         open_dir_cmd,
     };
-    let pm =
-        collect_profiles(&HOME_DIR).map_err(|e| anyhow::anyhow!("Collecting profiles: {e}"))?;
-    let basic_map = std::fs::read_to_string(HOME_DIR.join("basic_clash_config.yaml"))
+    let pm = collect_profiles(DataDir::get())
+        .map_err(|e| anyhow::anyhow!("Collecting profiles: {e}"))?;
+    let basic_map = std::fs::read_to_string(DataDir::get().join("basic_clash_config.yaml"))
         .map_err(|e| anyhow::anyhow!("Loading basic clash config: {e}"))?;
 
-    std::fs::remove_dir_all(HOME_DIR.as_path())
+    std::fs::remove_dir_all(DataDir::get())
         .map_err(|e| anyhow::anyhow!("Removing config dir: {e}"))?;
     super::BuildConfig::init_config().map_err(|e| anyhow::anyhow!("Initing config file: {e}"))?;
 

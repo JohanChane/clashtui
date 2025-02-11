@@ -148,7 +148,7 @@ impl Drawable for ServiceTab {
                         idx if idx < ServiceOp::const_len() + 2 + ExtendOp::const_len() => {
                             let op = ExtendOp::ALL[index - 2 - ServiceOp::const_len()];
                             if let ExtendOp::ViewClashtuiConfigDir = op {
-                                self.file_browser = Some(Browser::new(&crate::HOME_DIR))
+                                self.file_browser = Some(Browser::new(crate::DataDir::get()))
                             } else {
                                 self.backend_content =
                                     Some(Call::Service(BackendOp::TuiExtend(op)));

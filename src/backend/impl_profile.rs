@@ -131,13 +131,13 @@ impl BackEnd {
             }
             ProfileType::Github { url, token } => {
                 let res = update_with(url, name, path, with_proxy, |url, with_proxy| {
-                    self.api.dl_github(url, with_proxy, Some(token))
+                    self.api.dl_github(url, with_proxy, token)
                 });
                 Ok(vec![res])
             }
             ProfileType::GitLab { url, token } => {
                 let res = update_with(url, name, path, with_proxy, |url, with_proxy| {
-                    self.api.dl_gitlab(url, with_proxy, Some(token))
+                    self.api.dl_gitlab(url, with_proxy, token)
                 });
                 Ok(vec![res])
             }
@@ -187,49 +187,32 @@ impl BackEnd {
                         )
                     })
                     .collect();
-                composed.sort();
+                composed.sort_unstable();
                 let (name, atime) = composed.into_iter().collect();
                 Ok(CallBack::ProfileInit(name, atime))
             }
             ProfileOp::Add(name, url) => {
                 self.create_profile(&name, url);
-                let res = self.update_profile(
-                    self.get_profile(name)
-                        .expect("Cannot find selected profile"),
-                    None,
-                    false,
-                )?;
+                let res = self.update_profile(self.get_profile(name).unwrap(), None, false)?;
                 Ok(CallBack::ProfileCTL(res))
             }
             ProfileOp::Remove(name) => {
-                self.remove_profile(
-                    self.get_profile(&name)
-                        .expect("Cannot find selected profile"),
-                )?;
+                self.remove_profile(self.get_profile(&name).unwrap())?;
                 Ok(CallBack::ProfileCTL(vec![format!("{name} Removed")]))
             }
-            ProfileOp::Update(name, with_proxy, with_pp) => {
-                let res = self.update_profile(
-                    self.get_profile(name)
-                        .expect("Cannot find selected profile"),
-                    with_proxy,
-                    with_pp,
-                )?;
+            ProfileOp::Update(name, with_proxy, without_pp) => {
+                let res =
+                    self.update_profile(self.get_profile(name).unwrap(), with_proxy, without_pp)?;
                 Ok(CallBack::ProfileCTL(res))
             }
             ProfileOp::Select(name) => {
-                self.select_profile(
-                    self.get_profile(name)
-                        .expect("Cannot find selected profile"),
-                )?;
+                self.select_profile(self.get_profile(name).unwrap())?;
                 Ok(CallBack::ProfileCTL(vec![
                     "Profile is now loaded".to_owned()
                 ]))
             }
             ProfileOp::Test(name, geodata_mode) => {
-                let pf = self
-                    .get_profile(name)
-                    .expect("Cannot find selected profile");
+                let pf = self.get_profile(name).unwrap();
                 let pf = self.load_local_profile(pf)?;
                 let res = self.test_profile_config(pf.path.to_str().unwrap(), geodata_mode)?;
                 Ok(CallBack::ProfileCTL(
@@ -238,9 +221,7 @@ impl BackEnd {
             }
             ProfileOp::Preview(name) => {
                 let mut lines = Vec::with_capacity(512);
-                let pf = self
-                    .get_profile(name)
-                    .expect("Cannot find selected profile");
+                let pf = self.get_profile(name).unwrap();
                 let pf = self.load_local_profile(pf)?;
                 lines.push(
                     pf.dtype
@@ -258,9 +239,7 @@ impl BackEnd {
                 Ok(CallBack::Preview(lines))
             }
             ProfileOp::Edit(name) => {
-                let pf = self
-                    .get_profile(name)
-                    .expect("Cannot find selected profile");
+                let pf = self.get_profile(name).unwrap();
                 let pf = self.load_local_profile(pf)?;
 
                 ipc::spawn(

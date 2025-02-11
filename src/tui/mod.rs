@@ -76,4 +76,13 @@ pub mod setup {
             cursor::Show
         )
     }
+
+    /// make terminal restorable after panic
+    pub fn set_hook() {
+        let original_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |panic| {
+            let _ = restore();
+            original_hook(panic);
+        }));
+    }
 }

@@ -11,23 +11,8 @@ mod utils;
 use backend::BackEnd;
 use utils::{consts, BuildConfig};
 
-static HOME_DIR: std::sync::LazyLock<std::path::PathBuf> = std::sync::LazyLock::new(|| {
-    if let Some(data_dir) = commands::_HOME_DIR
-        .get()
-        .filter(|dir| dir.exists() && dir.is_dir())
-        .and_then(|dir| dir.canonicalize().ok())
-    {
-        return match std::path::absolute(&data_dir) {
-            Ok(dir) => dir,
-            Err(e) => {
-                log::error!("Cannot locate absolute path:{e}");
-                log::error!("Update profile may not work");
-                data_dir
-            }
-        };
-    };
-    utils::load_home_dir()
-});
+/// The clashtui config dir
+struct DataDir;
 
 fn main() {
     if is_root::is_root() {
@@ -73,12 +58,7 @@ async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     };
     setup::setup()?;
     let app = tui::FrontEnd::new();
-    // make terminal restorable after panic
-    let original_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |panic| {
-        let _ = setup::restore();
-        original_hook(panic);
-    }));
+    setup::set_hook();
     let (backend_tx, app_rx) = tokio::sync::mpsc::channel(5);
     let (app_tx, backend_rx) = tokio::sync::mpsc::channel(5);
     let backend = tokio::spawn(backend.run(backend_tx, backend_rx));
@@ -105,7 +85,7 @@ fn reinit_config_dir(err: impl std::fmt::Display) -> ! {
         .append_prompt("program will try to init default config")
         .append_prompt(format!(
             "WARNING! THIS WILL DELETE ALL FILE UNDER {}",
-            HOME_DIR.display()
+            DataDir::get().display()
         ))
         .append_prompt("Are you sure to continue?")
         .interact()
