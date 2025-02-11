@@ -8,13 +8,13 @@ impl FrontEnd {
             .map(|tab| {
                 Ra::text::Line::from(Ra::Span::styled(
                     tab.to_string(),
-                    Ra::Style::default().fg(Theme::get().tabbar_text_fg),
+                    Theme::get().bars.tabbar_text,
                 ))
             })
             .collect();
         let this = Raw::Tabs::new(tab_titles)
             .block(Raw::Block::default().borders(Raw::Borders::ALL))
-            .highlight_style(Ra::Style::default().fg(Theme::get().tabbar_hl_fg))
+            .highlight_style(Theme::get().bars.tabbar_highlight)
             .select(self.tab_index);
         f.render_widget(this, area);
     }
@@ -23,7 +23,7 @@ impl FrontEnd {
         // load from local cache
         let this = Raw::Paragraph::new(Ra::Span::styled(
             &self.state,
-            Ra::Style::default().fg(Theme::get().statusbar_text_fg),
+            Theme::get().bars.statusbar_text,
         ))
         //.alignment(ratatui::prelude::Alignment::Right)
         .wrap(Raw::Wrap { trim: true })

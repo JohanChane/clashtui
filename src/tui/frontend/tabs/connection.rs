@@ -39,7 +39,7 @@ impl std::fmt::Display for ConnctionTab {
 
 impl Drawable for ConnctionTab {
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, _: bool) {
-        use Ra::{Constraint, Stylize};
+        use Ra::Constraint;
         use Raw::{Block, Borders, Table};
         let tabs = Table::new(
             self.items
@@ -54,20 +54,15 @@ impl Drawable for ConnctionTab {
                 Constraint::Max(10),
             ],
         )
-        .header(
-            Connection::build_header()
-                .gray()
-                .bg(Theme::get().table_static_bg),
-        )
+        .header(Connection::build_header().style(Theme::get().connection_tab.table_static))
         .footer(
             Connection::build_footer(self.travel_up, self.travel_down)
-                .gray()
-                .bg(Theme::get().table_static_bg),
+                .style(Theme::get().connection_tab.table_static),
         )
-        .fg(if self.selected_con.is_none() {
-            Theme::get().list_block_fouced_fg
+        .style(if self.selected_con.is_none() {
+            Theme::get().list.block_selected
         } else {
-            Theme::get().list_block_unfouced_fg
+            Theme::get().list.block_unselected
         });
 
         f.render_stateful_widget(
@@ -76,15 +71,7 @@ impl Drawable for ConnctionTab {
                     .borders(Borders::ALL)
                     .title(TAB_TITLE_CONNECTION),
             )
-            .row_highlight_style(
-                Ra::Style::default()
-                    .bg(if true {
-                        Theme::get().list_hl_bg_fouced
-                    } else {
-                        Ra::Color::default()
-                    })
-                    .add_modifier(Ra::Modifier::BOLD),
-            ),
+            .row_highlight_style(Theme::get().list.highlight),
             area,
             &mut self.state,
         );

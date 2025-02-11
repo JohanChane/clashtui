@@ -182,7 +182,7 @@ impl Drawable for Popup {
 
         let block = Raw::Block::default()
             .borders(Raw::Borders::ALL)
-            .border_style(Ra::Style::default().fg(Theme::get().popup_block_fg))
+            .border_style(Theme::get().popup.block)
             .title(self.title.as_str());
         match &mut self.items {
             Items::SelectList(vec) | Items::NoFeedback(vec) | Items::AskChoices(vec) => {
@@ -191,12 +191,8 @@ impl Drawable for Popup {
                         .style(Ra::Style::default())
                 }));
                 f.render_stateful_widget(
-                    list.highlight_style(
-                        Ra::Style::default()
-                            .bg(Theme::get().list_hl_bg_fouced)
-                            .add_modifier(Ra::Modifier::BOLD),
-                    )
-                    .block(block),
+                    list.highlight_style(Theme::get().list.highlight)
+                        .block(block),
                     area,
                     &mut self.state,
                 );

@@ -40,14 +40,10 @@ impl Drawable for Browser {
             }))
         }))
         .scroll_padding((area.height - 3).div_ceil(2) as usize)
-        .highlight_style(
-            Ra::Style::default()
-                .bg(Theme::get().list_hl_bg_fouced)
-                .add_modifier(Ra::Modifier::BOLD),
-        )
+        .highlight_style(Theme::get().list.highlight)
         .block(
             Raw::Block::bordered()
-                .border_style(Ra::Style::default().fg(Theme::get().list_block_fouced_fg))
+                .border_style(Theme::get().list.block_selected)
                 .title_top(format!("Browser: {}", self.cwd.display()))
                 .title_bottom(Ra::Line::from(s).right_aligned()),
         );
