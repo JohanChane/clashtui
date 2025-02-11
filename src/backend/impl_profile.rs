@@ -58,83 +58,90 @@ impl BackEnd {
         with_proxy: Option<bool>,
         remove_proxy_provider: bool,
     ) -> anyhow::Result<Vec<String>> {
-        let profile = self.load_local_profile(profile)?;
-        let with_proxy = with_proxy
-            .unwrap_or(self.api.check_connectivity().is_ok() && self.api.version().is_ok());
-        if profile.dtype.is_upgradable() {
-            // store (name,url) to be downloaded
-            let mut work_vec: Vec<(String, std::path::PathBuf)> = Vec::with_capacity(2);
-            match profile.dtype {
-                // Imported file won't update, overwrite it if necessary
-                ProfileType::File => unreachable!(),
-                // Update via the given link
-                ProfileType::Url(url) => work_vec.push((url.clone(), profile.path)),
-                #[cfg(feature = "template")]
-                ProfileType::Generated(template_name) => {
-                    // rebuild from template
-                    if let Err(e) = self.apply_template(template_name.clone()) {
-                        anyhow::bail!("Failed to regenerate from {template_name}: {e}")
-                    };
-                    let LocalProfile {
-                        name,
-                        dtype: _,
-                        path,
-                        content,
-                    } = profile;
-                    let content = if remove_proxy_provider {
-                        self.update_profile_without_pp(content.unwrap_or_default(), with_proxy)?
-                    } else {
-                        content.unwrap_or_default()
-                    };
-                    serde_yml::to_writer(std::fs::File::create(path)?, &content)?;
-                    return Ok(vec![format!("Regenerated: {}(From {template_name})", name)]);
-                }
-                #[cfg(not(feature = "template"))]
-                ProfileType::Generated(..) => {
-                    anyhow::bail!("template feature not enabled in this build!")
-                }
-            }
-            Ok(work_vec
-                .into_iter()
-                .map(|(url, path)| {
-                    // pretty output
-                    let url_domain = extract_domain(url.as_str()).unwrap_or("No domain");
-                    let profile_name = &profile.name;
-                    match self.download_blob(&url, path, with_proxy) {
-                        Ok(_) => format!("Updated: {profile_name}({url_domain})"),
-                        Err(err) => {
-                            log::error!("Update profile {profile_name}:{err}");
-                            format!("Not Updated: {profile_name}({url_domain})")
-                        }
-                    }
-                })
-                .collect::<Vec<String>>())
-        } else {
-            anyhow::bail!("Not upgradable");
-        }
-    }
-
-    fn download_blob<U: Into<minreq::URL>, P: AsRef<std::path::Path>>(
-        &self,
-        url: U,
-        path: P,
-        with_proxy: bool,
-    ) -> anyhow::Result<()> {
+        let LocalProfile {
+            name,
+            dtype,
+            path,
+            content,
+        } = self.load_local_profile(profile)?;
+        // ensure path is valid
         anyhow::ensure!(
-            path.as_ref().is_absolute(),
+            path.is_absolute(),
             "trying to call `download_blob` without absolute path"
         );
         let directory = path
-            .as_ref()
             .parent()
             .ok_or(anyhow::anyhow!("trying to download to '/' is not allowed"))?;
         if !directory.exists() {
             std::fs::create_dir_all(directory)?;
         }
-        let mut response = self.api.mock_clash_core(url, with_proxy)?;
-        let mut output_file = File::create(path)?;
-        std::io::copy(&mut response, &mut output_file)?;
-        Ok(())
+        // do update
+        #[inline]
+        fn update_with<F: FnOnce(&str, bool) -> crate::clash::MinreqResult>(
+            url: String,
+            name: String,
+            path: std::path::PathBuf,
+            with_proxy: bool,
+            apply: F,
+        ) -> String {
+            let url_domain = extract_domain(&url).unwrap_or("No domain");
+            match (|| -> anyhow::Result<()> {
+                let mut response = apply(&url, with_proxy)?;
+                let mut output_file = File::create(path)?;
+                std::io::copy(&mut response, &mut output_file)?;
+                Ok(())
+            })() {
+                // pretty output
+                Ok(_) => format!("Updated: {name}({url_domain})"),
+                Err(err) => {
+                    log::error!("Update profile {name}:{err}");
+                    format!("Not Updated: {name}({url_domain})")
+                }
+            }
+        }
+        let with_proxy = with_proxy
+            .unwrap_or(self.api.check_connectivity().is_ok() && self.api.version().is_ok());
+        match dtype {
+            // Imported file won't update, re-import and overwrite it if necessary
+            ProfileType::File => anyhow::bail!("Not upgradable"),
+            // Update via the given link
+            ProfileType::Url(url) => {
+                let res = update_with(url, name, path, with_proxy, |url, with_proxy| {
+                    self.api.mock_clash_core(url, with_proxy)
+                });
+                Ok(vec![res])
+            }
+            #[cfg(feature = "template")]
+            ProfileType::Generated(template_name) => {
+                // rebuild from template
+                if let Err(e) = self.apply_template(template_name.clone()) {
+                    anyhow::bail!("Failed to regenerate from {template_name}: {e}")
+                };
+                let content = if remove_proxy_provider {
+                    self.update_profile_without_pp(content.unwrap_or_default(), with_proxy)?
+                } else {
+                    content.unwrap_or_default()
+                };
+                serde_yml::to_writer(std::fs::File::create(path)?, &content)?;
+                Ok(vec![format!("Regenerated: {}(From {template_name})", name)])
+            }
+            #[cfg(not(feature = "template"))]
+            ProfileType::Generated(..) => {
+                anyhow::bail!("template feature not enabled in this build!")
+            }
+            ProfileType::Github { url, token } => {
+                let res = update_with(url, name, path, with_proxy, |url, with_proxy| {
+                    self.api.dl_github(url, with_proxy, Some(token))
+                });
+                Ok(vec![res])
+            }
+            ProfileType::GitLab { url, token } => {
+                let res = update_with(url, name, path, with_proxy, |url, with_proxy| {
+                    self.api.dl_gitlab(url, with_proxy, Some(token))
+                });
+                Ok(vec![res])
+            }
+        }
     }
 
     pub fn select_profile(&self, profile: Profile) -> anyhow::Result<()> {

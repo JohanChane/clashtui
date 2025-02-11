@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use crate::clash::{headers, net_file::get_blob};
+use crate::clash::{get_blob, headers};
 
 #[cfg_attr(test, derive(Deserialize, Debug, PartialEq))]
 /// Describe target repo and tag
