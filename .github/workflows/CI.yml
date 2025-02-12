@@ -51,7 +51,6 @@ jobs:
           tool: cross, cargo-make, cargo-deb
 
       - name: Test
-        if: ${{ matrix.arch == 'amd64' }}
         run: |
           cargo make ci
 

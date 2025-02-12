@@ -17,6 +17,15 @@ macro_rules! define_enum {
             $($(#[$item_attr])* $variant),*
         }
 
+        impl From<&str> for $name {
+            fn from(value: &str) -> Self {
+                match value {
+                    $($(#[$item_attr])* stringify!($variant) => $name::$variant,)*
+                    _ => panic!("Invalid value for conversion"),
+                }
+            }
+        }
+
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(f, "{}",
@@ -24,6 +33,12 @@ macro_rules! define_enum {
                         $($(#[$item_attr])* $name::$variant => stringify!($variant)),*
                     }
                 )
+            }
+        }
+
+        impl From<$name> for String {
+            fn from(value: $name) -> Self {
+                value.to_string()
             }
         }
 
@@ -66,6 +81,7 @@ mod test {
     #[test]
     fn test() {
         assert_eq!(Test::Test1.to_string(), String::from("Test1"));
+        assert_eq!(Into::<String>::into(Test::Test1), String::from("Test1"));
 
         assert_eq!(Test::ALL, [Test::Test1, Test::Test2]);
     }

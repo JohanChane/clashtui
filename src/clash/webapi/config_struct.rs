@@ -72,9 +72,10 @@ impl ClashConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
+    #[default]
     Rule,
     Global,
     Direct,

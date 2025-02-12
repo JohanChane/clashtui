@@ -16,10 +16,7 @@ fn get_version() -> String {
         }
     };
 
-    let git_describe = match Command::new("git")
-        .args(["describe", "--always", "--tags"])
-        .output()
-    {
+    let git_describe = match Command::new("git").args(["describe", "--always"]).output() {
         Ok(v) => String::from_utf8(v.stdout)
             .expect("failed to read stdout")
             .trim_end()
@@ -38,21 +35,7 @@ fn get_version() -> String {
         ""
     };
 
-    let git_status = match Command::new("git").args(["status", "--short"]).output() {
-        Ok(v) => {
-            if v.stdout.is_empty() {
-                "".to_owned()
-            } else {
-                "-dirty".to_owned()
-            }
-        }
-        Err(e) => {
-            eprintln!("`git status --short` err: {e}");
-            "".to_owned()
-        }
-    };
-
-    format!("v{cargo_pkg_version}-{branch_name}-{git_describe}{build_type}{git_status}")
+    format!("v{cargo_pkg_version}-{branch_name}-{git_describe}{build_type}")
 }
 
 fn main() {

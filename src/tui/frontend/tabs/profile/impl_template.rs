@@ -13,7 +13,9 @@ impl ProfileTab {
             Keys::Import => {
                 self.popup_content = Some(PopMsg::Input(vec!["Path".to_owned()]));
                 // helper for apply_popup_result
-                self.temp_content = Some(TmpOps::Import)
+                self.temp_content = Some(Call::Profile(BackendOp::Template(TemplateOp::Add(
+                    String::new(),
+                ))))
             }
             Keys::TemplateSwitch => {
                 self.focus = Focus::Profile;
@@ -21,7 +23,8 @@ impl ProfileTab {
             // place in temp_content and build msg popup content
             Keys::Delete => {
                 if let Some(name) = name {
-                    self.temp_content = Some(TmpOps::Remove(name));
+                    self.temp_content =
+                        Some(Call::Profile(BackendOp::Template(TemplateOp::Remove(name))));
                     self.popup_content = Some(PopMsg::AskChoices(
                         vec!["Are you sure to delete this?".to_owned()],
                         vec![],
@@ -45,7 +48,6 @@ impl ProfileTab {
                 }
             }
             Keys::Search => {
-                self.temp_content = Some(TmpOps::SetFilter);
                 self.popup_content = Some(PopMsg::Input(vec!["Name".to_owned()]));
             }
             _ => return EventState::NotConsumed,

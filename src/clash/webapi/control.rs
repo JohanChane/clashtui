@@ -26,13 +26,12 @@ impl ClashUtil {
     ///
     /// return nothing on success
     pub fn check_connectivity(&self) -> CResult<()> {
-        super::get_blob(
-            "https://www.gstatic.com/generate_204",
-            Some(&self.proxy_addr),
-            None,
-        )
-        .map(|_| ())
-        .map_err(|e| e.into())
+        minreq::get("https://www.gstatic.com/generate_204")
+            .with_timeout(Self::timeout())
+            .with_proxy(minreq::Proxy::new(self.proxy_addr.clone())?)
+            .send()
+            .map(|_| ())
+            .map_err(|e| e.into())
     }
 }
 

@@ -5,8 +5,7 @@ pub mod tabs;
 
 use super::widget::Popup;
 use super::{Call, Drawable, EventState, Theme};
-use crate::backend::CallBack;
-use crate::utils::consts::err as consts_err;
+use crate::utils::{consts::err as consts_err, CallBack};
 use key_bind::Keys;
 use tabs::TabCont;
 
@@ -22,7 +21,7 @@ pub struct FrontEnd {
     popup: Box<Popup>,
     should_quit: bool,
     /// StateBar
-    state: String,
+    state: Option<String>,
     backend_content: Option<Call>,
 }
 
@@ -39,7 +38,7 @@ impl FrontEnd {
             tab_index: 0,
             popup: Default::default(),
             should_quit: false,
-            state: "Waiting State Cache Update".to_owned(),
+            state: None,
             backend_content: None,
         }
     }
@@ -114,6 +113,9 @@ impl FrontEnd {
                     CallBack::Logs(logs) => {
                         self.popup.set_msg("Log", logs);
                     }
+                    CallBack::Infos(infos) => {
+                        self.popup.set_msg("Infos", infos);
+                    }
                     CallBack::Preview(content) => {
                         self.popup.set_msg("Preview", content);
                     }
@@ -121,27 +123,25 @@ impl FrontEnd {
                         self.popup
                             .show_msg(super::PopMsg::Prompt(vec!["OK".to_owned()]));
                     }
+                    // `SwitchMode` goes here
                     // Just update StateBar
                     CallBack::State(state) => {
-                        self.state = state;
+                        self.state.replace(state);
                     }
                     // assume ProfileTab is the first tab
-                    CallBack::ProfileInit(..) | CallBack::ProfileCTL(_) => {
-                        self.tabs[0].apply_backend_call(op)
+                    CallBack::ProfileInit(..) => self.tabs[0].apply_backend_call(op),
+                    CallBack::ProfileCTL(_) | CallBack::ServiceCTL(_) => {
+                        self.tabs[self.tab_index].apply_backend_call(op)
                     }
                     #[cfg(feature = "template")]
-                    CallBack::TemplateInit(_) | CallBack::TemplateCTL(_) => {
-                        self.tabs[0].apply_backend_call(op)
-                    }
-                    // assume ServiceTab is the first tab
-                    CallBack::TuiExtend(_) | CallBack::ServiceCTL(_) => {
-                        self.tabs[1].apply_backend_call(op)
-                    }
+                    CallBack::TemplateInit(_) => self.tabs[0].apply_backend_call(op),
+                    #[cfg(feature = "template")]
+                    CallBack::TemplateCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
                     // assume ConnctionTab is the third tab
                     #[cfg(feature = "connection-tab")]
-                    CallBack::ConnctionInit(..) | CallBack::ConnctionCTL(_) => {
-                        self.tabs[2].apply_backend_call(op)
-                    }
+                    CallBack::ConnctionInit(..) => self.tabs[2].apply_backend_call(op),
+                    #[cfg(feature = "connection-tab")]
+                    CallBack::ConnctionCTL(_) => self.tabs[self.tab_index].apply_backend_call(op),
                 },
                 Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
                 Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
@@ -184,7 +184,7 @@ impl Drawable for FrontEnd {
         // if there is a popup, other part will be blocked.
         if !self.popup.is_empty() {
             evst = self.popup.handle_key_event(ev);
-            if evst == EventState::Yes || evst == EventState::Cancel {
+            if evst == EventState::Yes {
                 if let Some(res) = self.popup.collect() {
                     self.tabs
                         .get_mut(self.tab_index)
@@ -237,14 +237,10 @@ impl Drawable for FrontEnd {
                 Keys::AppHelp => {
                     self.popup.set_msg(
                         "Help",
-                        Keys::ALL_DOC
-                            .into_iter()
-                            // skip a white line
-                            .skip(1)
-                            .map(|s| s.to_owned())
-                            .collect(),
+                        Keys::ALL_DOC.into_iter().map(|s| s.to_owned()).collect(),
                     );
                 }
+                Keys::AppInfo => self.backend_content = Some(Call::Infos),
                 Keys::AppQuit => {
                     self.should_quit = true;
                 }

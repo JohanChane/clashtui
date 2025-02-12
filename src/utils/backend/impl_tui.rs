@@ -1,17 +1,24 @@
-use super::{BackEnd, CallBack, ProfileManager, State};
+use super::*;
 
 use crate::tui::Call;
 use crate::utils::consts::err as consts_err;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 impl BackEnd {
+    /// Save all in-memory data to file
+    fn save(self) -> DataFile {
+        let (current_profile, profiles) = self.pm.into_inner();
+        DataFile {
+            profiles,
+            current_profile,
+        }
+    }
     /// read file by lines, from `total_len-start-length` to `total_len-start`
     pub fn logcat(&self, start: usize, length: usize) -> anyhow::Result<Vec<String>> {
-        use crate::utils::consts::LOG_PATH;
+        use crate::{utils::consts::LOG_FILE, HOME_DIR};
         use std::io::BufRead as _;
         use std::io::Seek as _;
-
-        let mut fp = std::fs::File::open(LOG_PATH.as_path())?;
+        let mut fp = std::fs::File::open(HOME_DIR.join(LOG_FILE))?;
         let size = {
             let fp = fp.try_clone()?;
             std::io::BufReader::new(fp).lines().count()
@@ -35,7 +42,7 @@ impl BackEnd {
         self,
         tx: Sender<CallBack>,
         mut rx: Receiver<Call>,
-    ) -> anyhow::Result<ProfileManager> {
+    ) -> anyhow::Result<DataFile> {
         use crate::tui::tabs;
         let mut errs = vec![];
         loop {
@@ -78,81 +85,28 @@ impl BackEnd {
             } else {
                 log::debug!("Backend got:{op:?}");
                 let cb = match op {
-                    Call::Profile(tabs::profile::BackendOp::Profile(op)) => {
-                        self.handle_profile_op(op).into()
-                    }
-                    #[cfg(feature = "template")]
-                    Call::Profile(tabs::profile::BackendOp::Template(op)) => {
-                        self.handle_template_op(op).into()
-                    }
-                    Call::Service(tabs::service::BackendOp::SwitchMode(mode)) => {
-                        // tick will refresh state
-                        match self.update_state(None, Some(mode)) {
-                            Ok(_) => CallBack::ServiceCTL(format!("Mode is switched to {}", mode)),
-                            Err(e) => CallBack::Error(e.to_string()),
-                        }
-                    }
-                    Call::Service(tabs::service::BackendOp::ServiceCTL(op)) => {
-                        match self.clash_srv_ctl(op) {
-                            Ok(v) => CallBack::ServiceCTL(v),
-                            Err(e) => CallBack::Error(e.to_string()),
-                        }
-                    }
-                    Call::Service(tabs::service::BackendOp::OpenThis(path)) => {
-                        if let Err(e) = crate::utils::ipc::spawn(
-                            "sh",
-                            vec![
-                                "-c",
-                                if path.is_dir() {
-                                    &self.open_dir_cmd
-                                } else {
-                                    &self.edit_cmd
+                    Call::Profile(op) => match op {
+                        tabs::profile::BackendOp::Profile(op) => self.handle_profile_op(op),
+                        #[cfg(feature = "template")]
+                        tabs::profile::BackendOp::Template(op) => self.handle_template_op(op),
+                    },
+                    Call::Service(op) => {
+                        match op {
+                            tabs::service::BackendOp::SwitchMode(mode) => {
+                                // tick will refresh state
+                                match self.update_state(None, Some(mode.to_string())) {
+                                    Ok(_) => CallBack::ServiceCTL(format!(
+                                        "Mode is switched to {}",
+                                        mode
+                                    )),
+                                    Err(e) => CallBack::Error(e.to_string()),
                                 }
-                                .replace("%s", path.to_str().unwrap())
-                                .as_str(),
-                            ],
-                        ) {
-                            CallBack::TuiExtend(vec!["Failed".to_owned(), e.to_string()])
-                        } else {
-                            CallBack::TuiExtend(vec!["Success".to_owned()])
-                        }
-                    }
-                    Call::Service(tabs::service::BackendOp::Preview(path)) => {
-                        match std::fs::read_to_string(path) {
-                            Ok(string) => {
-                                CallBack::Preview(string.lines().map(|s| s.to_owned()).collect())
                             }
-                            Err(err) => CallBack::Error(err.to_string()),
-                        }
-                    }
-                    Call::Service(tabs::service::BackendOp::TuiExtend(extend_op)) => {
-                        match extend_op {
-                            tabs::service::ExtendOp::FullLog => match self.logcat(0, 1024) {
-                                Ok(v) => CallBack::TuiExtend(v),
-                                Err(e) => CallBack::Error(e.to_string()),
-                            },
-                            tabs::service::ExtendOp::ViewClashtuiConfigDir => unreachable!(),
-                            tabs::service::ExtendOp::GenerateInfoList => {
-                                let mut infos = vec![
-                                    "# CLASHTUI".to_owned(),
-                                    format!("version:{}", crate::utils::consts::VERSION),
-                                ];
-                                infos.push("# CLASH".to_owned());
-                                match self.api.version().map_err(|e| e.into()).and_then(|ver| {
-                                    self.api.config_get().map(|cfg| {
-                                        let mut cfg = cfg.build();
-                                        cfg.insert(2, format!("version:{ver}"));
-                                        cfg
-                                    })
-                                }) {
-                                    Ok(info) => {
-                                        infos.extend(info);
-                                    }
-                                    Err(e) => {
-                                        infos.push(format!("{e}"));
-                                    }
-                                };
-                                CallBack::TuiExtend(infos)
+                            tabs::service::BackendOp::ServiceCTL(op) => {
+                                match self.clash_srv_ctl(op) {
+                                    Ok(v) => CallBack::ServiceCTL(v),
+                                    Err(e) => CallBack::Error(e.to_string()),
+                                }
                             }
                         }
                     }
@@ -183,8 +137,31 @@ impl BackEnd {
                         Ok(v) => CallBack::Logs(v),
                         Err(e) => CallBack::Error(e.to_string()),
                     },
-                    // unfortunately, this might(in fact almost always) blocked by
-                    // thousand of Call::Tick,
+                    Call::Infos => {
+                        let mut infos = vec![
+                            "# CLASHTUI".to_owned(),
+                            format!("version:{}", crate::utils::consts::VERSION),
+                        ];
+                        match self.api.version().map_err(|e| e.into()).and_then(|ver| {
+                            self.api.config_get().map(|cfg| {
+                                let mut cfg = cfg.build();
+                                cfg.insert(2, "# CLASH".to_owned());
+                                cfg.insert(3, format!("version:{ver}"));
+                                cfg
+                            })
+                        }) {
+                            Ok(info) => {
+                                infos.extend(info);
+                                CallBack::Infos(infos)
+                            }
+                            Err(e) => {
+                                infos.extend(["# CLASH".to_owned(), format!("{e}")]);
+                                CallBack::Infos(infos)
+                            }
+                        }
+                    }
+                    // unfortunately, this might(in fact almost always) block by
+                    // thousand of [Call::Tick],
                     //
                     // another match might help
                     Call::Stop => return Ok(self.save()),

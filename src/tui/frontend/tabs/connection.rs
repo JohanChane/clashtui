@@ -1,8 +1,11 @@
-use super::{Call, CallBack, PopMsg, TabCont};
-use crate::tui::{
-    frontend::consts::TAB_TITLE_CONNECTION,
-    widget::{tools, PopRes},
-    Drawable, EventState, Theme,
+use super::{Call, PopMsg, TabCont};
+use crate::{
+    tui::{
+        frontend::consts::TAB_TITLE_CONNECTION,
+        widget::{tools, PopRes},
+        Drawable, EventState, Theme,
+    },
+    utils::CallBack,
 };
 
 use crate::clash::webapi::{Conn, ConnInfo, ConnMetaData};
@@ -39,7 +42,7 @@ impl std::fmt::Display for ConnctionTab {
 
 impl Drawable for ConnctionTab {
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, _: bool) {
-        use Ra::Constraint;
+        use Ra::{Constraint, Stylize};
         use Raw::{Block, Borders, Table};
         let tabs = Table::new(
             self.items
@@ -54,15 +57,20 @@ impl Drawable for ConnctionTab {
                 Constraint::Max(10),
             ],
         )
-        .header(Connection::build_header().style(Theme::get().connection_tab.table_static))
+        .header(
+            Connection::build_header()
+                .gray()
+                .bg(Theme::get().table_static_bg),
+        )
         .footer(
             Connection::build_footer(self.travel_up, self.travel_down)
-                .style(Theme::get().connection_tab.table_static),
+                .gray()
+                .bg(Theme::get().table_static_bg),
         )
-        .style(if self.selected_con.is_none() {
-            Theme::get().list.block_selected
+        .fg(if self.selected_con.is_none() {
+            Theme::get().list_block_fouced_fg
         } else {
-            Theme::get().list.block_unselected
+            Theme::get().list_block_unfouced_fg
         });
 
         f.render_stateful_widget(
@@ -71,7 +79,15 @@ impl Drawable for ConnctionTab {
                     .borders(Borders::ALL)
                     .title(TAB_TITLE_CONNECTION),
             )
-            .row_highlight_style(Theme::get().list.highlight),
+            .row_highlight_style(
+                Ra::Style::default()
+                    .bg(if true {
+                        Theme::get().list_hl_bg_fouced
+                    } else {
+                        Ra::Color::default()
+                    })
+                    .add_modifier(Ra::Modifier::BOLD),
+            ),
             area,
             &mut self.state,
         );

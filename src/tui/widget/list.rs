@@ -34,7 +34,10 @@ impl Drawable for List {
                         Raw::ListItem::new(Ra::Line::from(vec![
                             Ra::Span::styled(value.to_owned(), Ra::Style::default()),
                             Ra::Span::styled("(".to_owned(), Ra::Style::default()),
-                            Ra::Span::styled(extra, Theme::get().profile_tab.update_interval),
+                            Ra::Span::styled(
+                                extra,
+                                Ra::Style::default().fg(Theme::get().profile_update_interval_fg),
+                            ),
                             Ra::Span::styled(")".to_owned(), Ra::Style::default()),
                         ]))
                     }),
@@ -58,18 +61,22 @@ impl Drawable for List {
             list.block(
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
-                    .border_style(if is_fouced {
-                        Theme::get().list.block_selected
+                    .border_style(Ra::Style::default().fg(if is_fouced {
+                        Theme::get().list_block_fouced_fg
                     } else {
-                        Theme::get().list.block_unselected
-                    })
+                        Theme::get().list_block_unfouced_fg
+                    }))
                     .title(self.title.as_str()),
             )
-            .highlight_style(if is_fouced {
-                Theme::get().list.highlight
-            } else {
+            .highlight_style(
                 Ra::Style::default()
-            }),
+                    .bg(if is_fouced {
+                        Theme::get().list_hl_bg_fouced
+                    } else {
+                        Ra::Color::default()
+                    })
+                    .add_modifier(Ra::Modifier::BOLD),
+            ),
             area,
             &mut self.state,
         );

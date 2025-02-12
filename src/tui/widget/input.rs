@@ -1,4 +1,5 @@
 use crossterm::event::KeyCode;
+use ratatui::prelude as Ra;
 use ratatui::widgets as Raw;
 
 use crate::tui::misc::EventState;
@@ -32,11 +33,11 @@ impl Item {
 impl Drawable for Item {
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, is_fouced: bool) {
         let page = Raw::Paragraph::new(self.buffer.as_str())
-            .style(if is_fouced {
-                Theme::get().input.selected
+            .style(Ra::Style::default().fg(if is_fouced {
+                Theme::get().input_text_selected_fg
             } else {
-                Theme::get().input.unselected
-            })
+                Theme::get().input_text_unselected_fg
+            }))
             .block(
                 Raw::Block::default()
                     .borders(Raw::Borders::ALL)
