@@ -1,104 +1,144 @@
 use anyhow::Result;
 use std::fs::File;
-use std::path::Path;
 
-use crate::clash::webapi::local_config::{Basic, Service};
+use crate::backend::ProfileManager;
 use serde::{Deserialize, Serialize};
 
-use super::backend::profile::map::ProfileDataBase;
+#[cfg(feature = "migration_v0_2_3")]
+pub mod v0_2_3;
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
-pub struct ConfigFile {
+pub struct Basic {
+    #[serde(rename = "clash_config_dir")]
+    pub clash_cfg_dir: String,
+    #[serde(rename = "clash_bin_path")]
+    pub clash_bin_pth: String,
+    #[serde(rename = "clash_config_path")]
+    pub clash_cfg_pth: String,
+}
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Service {
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    pub clash_srv_nam: String,
+    #[cfg(target_os = "linux")]
+    pub is_user: bool,
+}
+
+pub struct LibConfig {
     pub basic: Basic,
     pub service: Service,
-    pub timeout: Option<u64>,
-    pub edit_cmd: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(default)]
+struct ConfigFile {
+    basic: Basic,
+    service: Service,
+    timeout: Option<u64>,
+    edit_cmd: String,
+    open_dir_cmd: String,
+}
+impl Default for ConfigFile {
+    fn default() -> Self {
+        let common_cmd = if cfg!(windows) { "start %s" } else { "open %s" };
+        Self {
+            basic: Default::default(),
+            service: Default::default(),
+            timeout: Default::default(),
+            edit_cmd: common_cmd.to_owned(),
+            open_dir_cmd: common_cmd.to_owned(),
+        }
+    }
 }
 impl ConfigFile {
-    pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let fp = File::create(path)?;
+    fn to_file(&self) -> Result<()> {
+        let fp = File::create(crate::consts::CONFIG_PATH.as_path())?;
         serde_yml::to_writer(fp, &self)?;
         Ok(())
     }
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let fp = File::open(path)?;
+    fn from_file() -> Result<Self> {
+        let fp = File::open(crate::consts::CONFIG_PATH.as_path())?;
         Ok(serde_yml::from_reader(fp)?)
     }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-#[serde(default)]
-pub struct DataFile {
-    pub profiles: ProfileDataBase,
-    pub current_profile: String,
-}
-impl DataFile {
-    pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let fp = File::create(path)?;
+impl ProfileManager {
+    pub fn to_file(&self) -> Result<()> {
+        let fp = File::create(crate::consts::DATA_PATH.as_path())?;
         serde_yml::to_writer(fp, &self)?;
         Ok(())
     }
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let fp = File::open(path)?;
+    pub fn from_file() -> Result<Self> {
+        let fp = File::open(crate::consts::DATA_PATH.as_path())?;
         Ok(serde_yml::from_reader(fp)?)
     }
 }
 
 pub struct BuildConfig {
-    pub cfg: ConfigFile,
-    pub basic: BasicInfo,
-    pub base_raw: serde_yml::Mapping,
-    pub data: DataFile,
+    pub cfg: LibConfig,
+    pub edit_cmd: String,
+    pub open_dir_cmd: String,
+    pub timeout: Option<u64>,
+    /// This is `basic_clash_config.yaml` in memory
+    pub base_profile: serde_yml::Mapping,
+    pub data: ProfileManager,
+    pub external_controller: String,
+    pub proxy_addr: String,
+    pub secret: Option<String>,
+    pub global_ua: Option<String>,
 }
 impl BuildConfig {
-    pub fn init_config(config_dir: &Path) -> Result<()> {
-        use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE, PROFILE_PATH, TEMPLATE_PATH};
+    pub fn init_config() -> Result<()> {
+        use crate::consts::{PROFILE_PATH, TEMPLATE_PATH};
+        use crate::DataDir;
         use std::fs;
 
-        let template_dir = config_dir.join(TEMPLATE_PATH);
-        let profile_dir = config_dir.join(PROFILE_PATH);
-        let basic_path = config_dir.join(BASIC_FILE);
-        let config_path = config_dir.join(CONFIG_FILE);
-        let data_path = config_dir.join(DATA_FILE);
+        fs::create_dir_all(DataDir::get())?;
 
-        fs::create_dir_all(config_dir)?;
+        BasicInfo::default().to_file()?;
+        ConfigFile::default().to_file()?;
+        ProfileManager::default().to_file()?;
 
-        BasicInfo::default().to_file(basic_path)?;
-        ConfigFile::default().to_file(config_path)?;
-        DataFile::default().to_file(data_path)?;
+        fs::create_dir(TEMPLATE_PATH.as_path())?;
+        fs::create_dir(PROFILE_PATH.as_path())?;
 
-        fs::create_dir(template_dir)?;
-        fs::create_dir(profile_dir)?;
-
-        // fs::write(config_dir.join(BASIC_FILE), DEFAULT_BASIC_CLASH_CFG_CONTENT)?;
         Ok(())
     }
-
-    pub fn load_config(config_dir: &Path) -> Result<BuildConfig> {
-        use crate::consts::{BASIC_FILE, CONFIG_FILE, DATA_FILE};
-
-        let basic_path = config_dir.join(BASIC_FILE);
-        let config_path = config_dir.join(CONFIG_FILE);
-        let data_path = config_dir.join(DATA_FILE);
-
-        let cfg = ConfigFile::from_file(config_path)?;
-        let data = DataFile::from_file(data_path)?;
-        let raw = BasicInfo::get_raw(basic_path)?;
-        let base = BasicInfo::from_raw(raw.clone())?;
+    /// Load config under [crate::HOME_DIR]
+    pub fn load_config() -> Result<BuildConfig> {
+        let ConfigFile {
+            basic,
+            service,
+            timeout,
+            edit_cmd,
+            open_dir_cmd,
+        } = ConfigFile::from_file()?;
+        let data = ProfileManager::from_file()?;
+        let base_profile = BasicInfo::get_raw()?;
+        let (external_controller, proxy_addr, secret, global_ua) =
+            BasicInfo::from_raw(base_profile.clone())?.build()?;
+        let cfg = LibConfig { basic, service };
 
         Ok(BuildConfig {
             cfg,
-            basic: base,
-            base_raw: raw,
+            base_profile,
             data,
+            edit_cmd,
+            open_dir_cmd,
+            timeout,
+            external_controller,
+            proxy_addr,
+            secret,
+            global_ua,
         })
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 /// Get necessary info
-pub struct BasicInfo {
+struct BasicInfo {
     #[serde(rename = "external-controller")]
     pub external_controller: String,
     #[serde(rename = "mixed-port")]
@@ -127,26 +167,26 @@ impl Default for BasicInfo {
     }
 }
 impl BasicInfo {
-    pub fn to_file<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let fp = File::create(path)?;
+    fn to_file(&self) -> Result<()> {
+        let fp = File::create(crate::consts::BASIC_PATH.as_path())?;
         Ok(serde_yml::to_writer(fp, &self)?)
     }
     // pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
     //     let fp = File::open(path)?;
     //     Ok(serde_yml::from_reader(fp)?)
     // }
-    pub fn get_raw<P: AsRef<Path>>(path: P) -> Result<serde_yml::Mapping> {
-        let fp = File::open(path)?;
+    fn get_raw() -> Result<serde_yml::Mapping> {
+        let fp = File::open(crate::consts::BASIC_PATH.as_path())?;
         Ok(serde_yml::from_reader(fp)?)
     }
-    pub fn from_raw(raw: serde_yml::Mapping) -> Result<Self> {
+    fn from_raw(raw: serde_yml::Mapping) -> Result<Self> {
         Ok(serde_yml::from_value(serde_yml::Value::Mapping(raw))?)
     }
 }
 impl BasicInfo {
     const LOCALHOST: &str = "127.0.0.1";
-    pub fn build(self) -> Result<(String, String, Option<String>, Option<String>)> {
-        use crate::consts::BASIC_FILE;
+    fn build(self) -> Result<(String, String, Option<String>, Option<String>)> {
+        use crate::consts::BASIC_PATH;
         let BasicInfo {
             mut external_controller,
             mixed_port,
@@ -156,19 +196,23 @@ impl BasicInfo {
             global_ua,
         } = self;
 
-        if external_controller.starts_with("0.0.0.0") {
-            external_controller = format!(
-                "127.0.0.1{}",
-                external_controller.strip_prefix("0.0.0.0").unwrap()
-            );
+        let str = match external_controller.strip_prefix("http://") {
+            Some(str) => str,
+            None => external_controller.as_str(),
+        };
+        if let Some(after) = str.strip_prefix("0.0.0.0") {
+            external_controller = format!("http://{}{}", Self::LOCALHOST, after);
+        } else {
+            external_controller = format!("http://{}", str);
         }
-        external_controller = format!("http://{external_controller}");
+
         let proxy_addr = match mixed_port.or(port) {
             Some(p) => format!("http://{}:{p}", Self::LOCALHOST),
             None => socks_port
                 .map(|p| format!("socks5://{}:{p}", Self::LOCALHOST))
                 .ok_or(anyhow::anyhow!(
-                    "failed to load proxy_addr from {BASIC_FILE}"
+                    "failed to load proxy_addr from {}",
+                    BASIC_PATH.display()
                 ))?,
         };
         Ok((external_controller, proxy_addr, secret, global_ua))

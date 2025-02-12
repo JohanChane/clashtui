@@ -63,8 +63,8 @@ impl From<Conn> for Connection {
             process_path: _,
             source_ip: _,
             source_port: _,
-            remote_destination: _,
-            destinatio_port: _,
+            remote_destination,
+            destinatio_port,
         } = metadata;
         let mut chain = String::with_capacity(1024);
         if let Some(c) = chains.pop() {
@@ -76,7 +76,11 @@ impl From<Conn> for Connection {
         }
         Self {
             chains: chain,
-            domain: host,
+            domain: if host.is_empty() {
+                format!("{}:{}", remote_destination, destinatio_port)
+            } else {
+                host
+            },
             rule_type: ctype,
             start,
             upload,
@@ -138,7 +142,7 @@ impl Raw::WidgetRef for Connection {
             symbols::{border, line::NORMAL},
             Constraint,
             Constraint::Length,
-            Layout, Stylize,
+            Layout,
         };
         use Raw::{Block, Borders, Paragraph};
 
@@ -245,40 +249,40 @@ impl Raw::WidgetRef for Connection {
             });
         use Ra::Widget;
         Paragraph::new(self.domain.as_str())
-            .block(b_domain.fg(Theme::get().popup_block_fg))
-            .fg(Theme::get().popup_text_fg)
+            .block(b_domain.border_style(Theme::get().popup.block))
+            .style(Theme::get().popup.text)
             .render(a_domain, buf);
         Paragraph::new(self.rule_type.as_str())
-            .block(b_type.fg(Theme::get().popup_block_fg))
-            .fg(Theme::get().popup_text_fg)
+            .block(b_type.border_style(Theme::get().popup.block))
+            .style(Theme::get().popup.text)
             .render(a_type, buf);
         Paragraph::new(self.chains.as_str())
-            .block(b_chain.fg(Theme::get().popup_block_fg))
-            .fg(Theme::get().popup_text_fg)
+            .block(b_chain.border_style(Theme::get().popup.block))
+            .style(Theme::get().popup.text)
             .render(a_chain, buf);
         Paragraph::new(self.start.chars().take(14).collect::<String>())
-            .block(b_startime_0.fg(Theme::get().popup_block_fg))
-            .fg(Theme::get().popup_text_fg)
+            .block(b_startime_0.border_style(Theme::get().popup.block))
+            .style(Theme::get().popup.text)
             .render(a_startime_0, buf);
         Paragraph::new(self.start.chars().skip(14).collect::<String>())
-            .block(b_startime_1.fg(Theme::get().popup_block_fg))
-            .fg(Theme::get().popup_text_fg)
+            .block(b_startime_1.border_style(Theme::get().popup.block))
+            .style(Theme::get().popup.text)
             .render(a_startime_1, buf);
         Paragraph::new(bytes_to_readable(self.upload, Some("↑")))
-            .block(b_upload.fg(Theme::get().popup_block_fg))
-            .fg(Theme::get().popup_text_fg)
+            .block(b_upload.border_style(Theme::get().popup.block))
+            .style(Theme::get().popup.text)
             .render(a_upload, buf);
         Paragraph::new(bytes_to_readable(self.download, Some("↓")))
-            .block(b_download.fg(Theme::get().popup_block_fg))
-            .fg(Theme::get().popup_text_fg)
+            .block(b_download.border_style(Theme::get().popup.block))
+            .style(Theme::get().popup.text)
             .render(a_download, buf);
         Paragraph::new(self.id.as_deref().unwrap_or("Lose Track, Maybe Closed"))
-            .block(b_id.fg(Theme::get().popup_block_fg))
-            .fg(Theme::get().popup_text_fg)
+            .block(b_id.border_style(Theme::get().popup.block))
+            .style(Theme::get().popup.text)
             .render(a_id, buf);
         Paragraph::new("Press Enter to terminate this connection, Esc to close")
-            .block(b_promopt.fg(Theme::get().popup_block_fg))
-            .fg(Theme::get().popup_text_fg)
+            .block(b_promopt.border_style(Theme::get().popup.block))
+            .style(Theme::get().popup.text)
             .render(a_promopt, buf);
     }
 }

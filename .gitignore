@@ -2,3 +2,4 @@ target
 artifacts
 .vscode
 .local
+.cargo

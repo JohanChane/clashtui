@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use super::CResult;
+use crate::clash::{get_blob, headers};
 
 #[cfg_attr(test, derive(Deserialize, Debug, PartialEq))]
 /// Describe target repo and tag
@@ -20,10 +20,9 @@ impl Request<'_> {
     /// Fetch info from given input
     ///
     /// support Github only
-    pub fn get_info(&self) -> CResult<Response> {
-        use super::headers;
-        super::get_blob(self.as_url(), None, Some(headers::DEFAULT_USER_AGENT))
-            .and_then(|r| serde_json::from_reader(r).map_err(|e| e.into()))
+    pub fn get_info(self) -> anyhow::Result<Response> {
+        let rdr = get_blob(self.as_url(), None, Some(headers::DEFAULT_USER_AGENT))?;
+        Ok(serde_json::from_reader(rdr)?)
     }
 }
 impl Request<'static> {
@@ -31,19 +30,20 @@ impl Request<'static> {
     const MIHOMO_CI: &str = "Prerelease-Alpha";
     const CLASHTUI: &str = "JohanChane/clashtui";
     const CLASHTUI_CI: &str = "Continuous_Integration";
-    pub fn s_mihomo() -> Self {
-        Self::Latest(Self::MIHOMO)
+    pub fn s_mihomo(is_ci: bool) -> Self {
+        if is_ci {
+            Self::WithTag(Self::MIHOMO, Self::MIHOMO_CI)
+        } else {
+            Self::Latest(Self::MIHOMO)
+        }
     }
-    pub fn s_clashtui() -> Self {
-        Self::Latest(Self::CLASHTUI)
-    }
-    pub fn s_clashtui_ci() -> Self {
-        // main repo hasn't start CI release yet
-        Self::WithTag("Jackhr-arch/clashtui", Self::CLASHTUI_CI)
-    }
-    /// Alpha version
-    pub fn s_mihomo_ci() -> Self {
-        Self::WithTag(Self::MIHOMO, Self::MIHOMO_CI)
+    pub fn s_clashtui(is_ci: bool) -> Self {
+        if is_ci {
+            // main repo hasn't start CI release yet
+            Self::WithTag("Jackhr-arch/clashtui", Self::CLASHTUI_CI)
+        } else {
+            Self::Latest(Self::CLASHTUI)
+        }
     }
 }
 
@@ -78,6 +78,14 @@ impl Response {
             false
         }
     }
+    /// wrapper for `is_newer_than`
+    pub fn check(self, version: &str, skip_check: bool) -> Option<Self> {
+        if skip_check || self.is_newer_than(version) {
+            Some(self)
+        } else {
+            None
+        }
+    }
     /// filter by name contains `os` and `arch`
     ///
     /// if fail to get `arch`, then apply `os` only
@@ -92,12 +100,27 @@ impl Response {
             .collect();
         self
     }
+    pub fn rename(self, name: &str) -> Self {
+        Self {
+            name: name.to_owned(),
+            ..self
+        }
+    }
     pub fn as_info(&self, version: String) -> String {
         format!(
-            "There is a new update for `{}`\nCurrent installed version is {version}\nPublished at {}\n\n---\n\nCHANGELOG:\n{}",
+            r#"----------------------
+There is a new update for '{}'
+Target version is '{}'
+> Current version is '{version}'
+Published at {}
+
+CHANGELOG:
+{}
+"#,
             self.name,
+            self.tag_name,
             self.published_at,
-            self.body.trim_end().trim_start()
+            self.body.trim()
         )
     }
 }
@@ -108,12 +131,57 @@ pub struct Asset {
 }
 impl std::fmt::Display for Asset {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.name, self.browser_download_url)
+        write!(f, "{}", self.name)
     }
 }
-/// actually match `v0.12.432-`,
-/// return a [Vec] of [u16], len = 3
-fn get_triple_code(tag: &str) -> Option<Vec<u16>> {
+impl Asset {
+    pub fn download(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        download_to_file(path, &self.browser_download_url)
+    }
+}
+
+pub fn download_to_file(path: &std::path::Path, url: &str) -> anyhow::Result<()> {
+    match get_blob(url, None, Some(headers::DEFAULT_USER_AGENT)) {
+        Ok(mut rp) => {
+            let mut fp = std::fs::File::create(path)?;
+            std::io::copy(&mut rp, &mut fp)?;
+        }
+        Err(e) => {
+            eprintln!("{e}, try to download with `curl/wget`");
+            use std::process::{Command, Stdio};
+            fn have_this_and_exec(this: &str, args: &[&str]) -> anyhow::Result<bool> {
+                if Command::new("which")
+                    .arg(this)
+                    .output()
+                    .is_ok_and(|r| r.status.success())
+                {
+                    println!("using {this}");
+                    if Command::new(this)
+                        .args(args)
+                        .stdin(Stdio::null())
+                        .status()?
+                        .success()
+                    {
+                        Ok(true)
+                    } else {
+                        Err(anyhow::anyhow!("Failed to download with {this}"))
+                    }
+                } else {
+                    Ok(false)
+                }
+            }
+            if !have_this_and_exec("curl", &["-o", path.to_str().unwrap(), "-L", url])?
+                && !have_this_and_exec("wget", &["-O", path.to_str().unwrap(), url])?
+            {
+                anyhow::bail!("Unable to find curl/wget")
+            }
+        }
+    }
+    Ok(())
+}
+
+/// actually match `v0.12.432-`
+fn get_triple_code(tag: &str) -> Option<[u16; 3]> {
     let triple_code: Vec<u16> = tag
         .trim_start_matches('v')
         .split('-')
@@ -123,7 +191,8 @@ fn get_triple_code(tag: &str) -> Option<Vec<u16>> {
         .map(|s| s.parse().unwrap_or(0))
         .collect();
     if triple_code.len() == 3 {
-        Some(triple_code)
+        // Some(triple_code)
+        Some([triple_code[0], triple_code[1], triple_code[2]])
     } else {
         log::error!("Failed to decode tag: {}", tag);
         None
@@ -138,6 +207,7 @@ fn get_arch() -> &'static str {
         _ => "",
     }
 }
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -153,15 +223,15 @@ mod test {
     }
     #[test]
     fn load_request() {
-        let raw = "!Latest JohanChane/clashtui";
+        let raw = "!Latest MetaCubeX/mihomo";
         assert_eq!(
             serde_yml::from_str::<Request>(raw).unwrap(),
-            Request::s_clashtui()
+            Request::s_mihomo(false)
         );
-        let raw = "!WithTag\n- Jackhr-arch/clashtui\n- Continuous_Integration";
+        let raw = "!WithTag\n- MetaCubeX/mihomo\n- Prerelease-Alpha";
         assert_eq!(
             serde_yml::from_str::<Request>(raw).unwrap(),
-            Request::s_clashtui_ci()
+            Request::s_mihomo(true)
         );
         let raw = r#"
 - !WithTag
@@ -171,7 +241,7 @@ mod test {
 "#;
         assert_eq!(
             serde_yml::from_str::<Vec<Request>>(raw).unwrap(),
-            vec![Request::s_clashtui_ci(), Request::s_clashtui()]
+            vec![Request::s_clashtui(true), Request::s_clashtui(false)]
         );
     }
 }

@@ -1,3 +1,4 @@
+/// This module contains the user interface components for the Clash TUI application.
 mod frontend;
 mod misc;
 mod theme;
@@ -9,31 +10,48 @@ pub use widget::PopMsg;
 
 use misc::EventState;
 
+/// A trait for objects that can be drawn on the screen.
 trait Drawable {
-    fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, is_fouced: bool);
-    /// - unrecognized event -> [EventState::NotConsumed]
+    /// Renders the object on the given frame within the specified area.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - The frame to render on.
+    /// * `area` - The area within the frame to render the object.
+    /// * `is_focused` - Indicates whether the object is currently focused.
+    fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, is_focused: bool);
+
+    /// Handles a key event for the object.
+    ///
+    /// # Arguments
+    ///
+    /// * `ev` - The key event to handle.
+    ///
+    /// # Returns
+    ///
+    /// The state of the event after handling.
     fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState;
 }
+
 #[derive(derive_more::Debug)]
-/// Wrap the caller,
-/// the inner ops are defined in their own files.
+/// Represents different types of calls that can be made to the backend.
 pub enum Call {
     Profile(tabs::profile::BackendOp),
     Service(tabs::service::BackendOp),
     #[cfg(feature = "connection-tab")]
     Connection(tabs::connection::BackendOp),
     #[debug("Logs")]
-    /// read file by lines, from `total_len-start-length` to `total_len-start`
+    /// Reads a range of lines from a file.
+    ///
+    /// From `total_len-start-length` to `total_len-start`
     Logs(usize, usize),
-    /// ask backend for clash infos
-    Infos,
-    /// ask to refresh
+    /// Requests a refresh.
     Tick,
-    /// ask to shutdown
+    /// Requests a shutdown.
     Stop,
 }
 
-/// turn terminal from/into Raw mode
+/// Provides functions for setting up and restoring the terminal.
 pub mod setup {
     use crossterm::{
         cursor,
@@ -41,12 +59,14 @@ pub mod setup {
         execute,
         terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     };
-    /// Enable raw mode.
+
+    /// Enables raw mode and sets up the terminal for the application.
     pub fn setup() -> Result<(), std::io::Error> {
         enable_raw_mode()?;
         execute!(std::io::stdout(), EnterAlternateScreen, EnableMouseCapture)
     }
-    /// Disable raw mode.
+
+    /// Disables raw mode and restores the terminal to its original state.
     pub fn restore() -> Result<(), std::io::Error> {
         disable_raw_mode()?;
         execute!(
@@ -55,5 +75,14 @@ pub mod setup {
             DisableMouseCapture,
             cursor::Show
         )
+    }
+
+    /// make terminal restorable after panic
+    pub fn set_hook() {
+        let original_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |panic| {
+            let _ = restore();
+            original_hook(panic);
+        }));
     }
 }

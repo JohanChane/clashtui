@@ -4,8 +4,8 @@ pub mod profile;
 pub mod service;
 
 use crate::{
+    backend::CallBack,
     tui::{widget::PopRes, Call, Drawable, EventState, PopMsg},
-    utils::CallBack,
 };
 /// A trait that every tab should impl
 pub(super) trait TabCont: Drawable + std::fmt::Display {

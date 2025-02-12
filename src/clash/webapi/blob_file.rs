@@ -1,16 +1,40 @@
-use super::{CResult, ClashUtil};
+use crate::clash::{headers, MinreqResult};
+
+use super::{ClashUtil, TIMEOUT};
 
 impl ClashUtil {
-    pub fn mock_clash_core<U: Into<minreq::URL>>(
-        &self,
-        url: U,
-        with_proxy: bool,
-    ) -> CResult<minreq::ResponseLazy> {
-        super::net_file::get_blob(
+    pub fn mock_clash_core<U: Into<minreq::URL>>(&self, url: U, with_proxy: bool) -> MinreqResult {
+        super::get_blob(
             url,
             with_proxy.then_some(self.proxy_addr.as_str()),
             Some(self.ua.as_deref().unwrap_or("clash.meta")),
         )
+    }
+    pub fn dl_github<U: Into<minreq::URL>>(
+        &self,
+        url: U,
+        with_proxy: bool,
+        token: String,
+    ) -> MinreqResult {
+        let mut req = minreq::get(url);
+        if with_proxy {
+            req = req.with_proxy(minreq::Proxy::new(&self.proxy_addr)?);
+        }
+        req = req.with_header(headers::AUTHORIZATION, format!("Bearer {token}"));
+        req.with_timeout(*TIMEOUT).send_lazy()
+    }
+    pub fn dl_gitlab<U: Into<minreq::URL>>(
+        &self,
+        url: U,
+        with_proxy: bool,
+        token: String,
+    ) -> MinreqResult {
+        let mut req = minreq::get(url);
+        if with_proxy {
+            req = req.with_proxy(minreq::Proxy::new(&self.proxy_addr)?);
+        }
+        req = req.with_header("PRIVATE-TOKEN", token);
+        req.with_timeout(*TIMEOUT).send_lazy()
     }
 }
 

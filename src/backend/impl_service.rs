@@ -1,13 +1,19 @@
-use super::*;
+use super::{ipc, BackEnd};
+
 #[allow(unused_imports)] // currently, only [`SwitchMode`] is impl on macOS
 use ipc::exec;
 use std::io::Error;
+
+mod state;
+
+pub(super) use state::State;
 
 crate::define_enum!(
     #[derive(Clone, Copy, Debug)]
     pub enum ServiceOp {
         #[cfg(any(target_os = "linux", target_os = "windows"))]
-        StartClashService,
+        RestartClashService,
+        RestartClashCore,
         #[cfg(any(target_os = "linux", target_os = "windows"))]
         StopClashService,
         #[cfg(target_os = "linux")]
@@ -24,98 +30,7 @@ crate::define_enum!(
 );
 
 impl BackEnd {
-    /// check self and clash(current:`mihomo`)
-    pub fn check_update(
-        &self,
-        check_ci: bool,
-    ) -> anyhow::Result<Vec<(crate::clash::net_file::self_update::Response, String)>> {
-        use crate::clash::net_file::self_update::Request;
-        let clash_core_version = match self.api.version() {
-            Ok(v) => {
-                let v: serde_json::Value = serde_json::from_str(&v)?;
-                // test mihomo
-                let mihomo = v.get("version").and_then(|v| v.as_str());
-                // try to get any
-                None.or(mihomo).map(|s| s.to_owned())
-            }
-            Err(_) => None,
-        }
-        // if None is get, assume there is no clash core installed/running
-        .unwrap_or("v0.0.0".to_owned());
-
-        if check_ci {
-            return Ok(vec![
-                (
-                    Request::s_clashtui_ci().get_info()?.filter_asserts(),
-                    crate::consts::VERSION.to_owned(),
-                ),
-                (
-                    Request::s_mihomo_ci().get_info()?.filter_asserts(),
-                    clash_core_version,
-                ),
-            ]);
-        };
-
-        let mut clashtui = Request::s_clashtui().get_info()?;
-        let mut mihomo = Request::s_mihomo().get_info()?;
-        let mut vec = Vec::with_capacity(2);
-        if clashtui.is_newer_than(crate::consts::VERSION) {
-            clashtui.name = "ClashTUI".to_string();
-            vec.push((clashtui.filter_asserts(), crate::consts::VERSION.to_owned()));
-        }
-        if mihomo.is_newer_than(&clash_core_version) {
-            mihomo.name = "Clash Core".to_string();
-            vec.push((mihomo.filter_asserts(), clash_core_version))
-        }
-        Ok(vec)
-    }
-    pub fn download_to_file(
-        &self,
-        filename: &str,
-        url: &str,
-    ) -> anyhow::Result<std::path::PathBuf> {
-        use crate::clash::net_file::get_file;
-        let path = std::env::current_dir()?.join(filename);
-        match get_file(url) {
-            Ok(mut rp) => {
-                let mut fp = std::fs::File::create(&path)?;
-                std::io::copy(&mut rp, &mut fp)
-                    .map_err(|e| anyhow::anyhow!("{e}, increase timeout might help"))?;
-            }
-            Err(e) => {
-                eprintln!("{e}, try to download with `curl/wget`");
-                use std::process::{Command, Stdio};
-                fn have_this_and_exec(this: &str, args: &[&str]) -> anyhow::Result<bool> {
-                    if Command::new("which")
-                        .arg(this)
-                        .output()
-                        .is_ok_and(|r| r.status.success())
-                    {
-                        println!("using {this}");
-                        if Command::new(this)
-                            .args(args)
-                            .stdin(Stdio::null())
-                            .status()?
-                            .success()
-                        {
-                            Ok(true)
-                        } else {
-                            Err(anyhow::anyhow!("Failed to download with {this}"))
-                        }
-                    } else {
-                        Ok(false)
-                    }
-                }
-                if !have_this_and_exec("curl", &["-o", &path.to_string_lossy(), "-L", url])?
-                    && !have_this_and_exec("wget", &["-O", &path.to_string_lossy(), url])?
-                {
-                    anyhow::bail!("Unable to find curl/wget")
-                }
-            }
-        }
-        Ok(path)
-    }
-    pub fn update_mode(&self, mode: String) -> anyhow::Result<()> {
+    pub fn update_mode(&self, mode: crate::clash::webapi::Mode) -> anyhow::Result<()> {
         let load = format!(r#"{{"mode": "{mode}"}}"#);
         self.api.config_patch(load)?;
         Ok(())
@@ -123,7 +38,7 @@ impl BackEnd {
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ServiceOp) -> Result<String, Error> {
         match op {
-            ServiceOp::StartClashService => {
+            ServiceOp::RestartClashService => {
                 let arg = if self.cfg.service.is_user {
                     vec!["--user", self.cfg.service.clash_srv_nam.as_str()]
                 } else {
@@ -140,6 +55,7 @@ impl BackEnd {
                     exec("systemctl", args)
                 }
             }
+            ServiceOp::RestartClashCore => self.restart_clash(),
             ServiceOp::StopClashService => {
                 let arg = if self.cfg.service.is_user {
                     vec!["--user", self.cfg.service.clash_srv_nam.as_str()]
@@ -157,13 +73,16 @@ impl BackEnd {
                     exec("systemctl", args)
                 }
             }
-            ServiceOp::SetPermission => ipc::exec_with_sbin(
-                "setcap",
-                vec![
-                    "'cap_net_admin,cap_net_bind_service=+ep'",
-                    self.cfg.basic.clash_bin_pth.as_str(),
-                ],
-            ),
+            ServiceOp::SetPermission => {
+                exec("chmod", vec!["+x", self.cfg.basic.clash_bin_pth.as_str()])?;
+                ipc::exec_with_sbin(
+                    "setcap",
+                    vec![
+                        "'cap_net_admin,cap_net_bind_service=+ep'",
+                        self.cfg.basic.clash_bin_pth.as_str(),
+                    ],
+                )
+            }
             #[allow(unreachable_patterns)]
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
@@ -174,6 +93,7 @@ impl BackEnd {
     #[cfg(target_os = "macos")]
     pub fn clash_srv_ctl(&self, op: ServiceOp) -> Result<String, Error> {
         match op {
+            ServiceOp::RestartClashCore => self.restart_clash(),
             #[allow(unreachable_patterns)]
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
@@ -188,7 +108,7 @@ impl BackEnd {
         use ipc::start_process_as_admin;
 
         match op {
-            ServiceOp::StartClashService => {
+            ServiceOp::RestartClashService => {
                 start_process_as_admin(
                     NSSM_PGM,
                     format!("restart {}", self.cfg.service.clash_srv_nam).as_str(),
@@ -199,6 +119,8 @@ impl BackEnd {
                     vec!["status", self.cfg.service.clash_srv_nam.as_str()],
                 )
             }
+
+            ServiceOp::RestartClashCore => self.restart_clash(),
 
             ServiceOp::StopClashService => {
                 start_process_as_admin(
@@ -277,14 +199,15 @@ impl BackEnd {
 }
 
 impl BackEnd {
-    pub fn restart_clash(&self) -> Result<String, String> {
-        self.api.restart(None).map_err(|e| e.to_string())
+    pub fn restart_clash(&self) -> std::io::Result<String> {
+        self.api.restart(None).map_err(Error::other)
     }
     pub fn update_state(
         &self,
         new_pf: Option<String>,
-        new_mode: Option<String>,
+        new_mode: Option<crate::clash::webapi::Mode>,
     ) -> anyhow::Result<State> {
+        use crate::clash::webapi::ClashConfig;
         if let Some(mode) = new_mode {
             self.update_mode(mode)?;
         }
@@ -311,5 +234,14 @@ impl BackEnd {
             #[cfg(target_os = "windows")]
             sysproxy: sysp,
         })
+    }
+    pub fn get_clash_version(&self) -> Result<String, String> {
+        let v = self.api.version().map_err(|e| e.to_string())?;
+        let map: serde_json::Value = serde_json::from_str(&v).unwrap();
+        Ok(map
+            .get("version")
+            .and_then(|v| v.as_str())
+            .unwrap_or("v0.0.0")
+            .to_owned())
     }
 }

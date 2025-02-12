@@ -1,6 +1,6 @@
 [package]
 name = "clashtui"
-version = "0.3.0-reborn"
+version = "0.3.0"
 edition = "2021"
 
 authors = ["Johan Chane <johanchanex at gmail dot com>"]
@@ -29,7 +29,8 @@ tui = [
 customized-theme = ["tui", "ratatui/serde"]
 template = []
 connection-tab = ["tui", "ratatui/unstable-widget-ref"]
-default = ["tui", "connection-tab", "template"]
+migration_v0_2_3 = []
+default = ["tui", "connection-tab", "template", "migration_v0_2_3"]
 
 
 [dependencies]
@@ -49,7 +50,7 @@ futures-util = { version = "0.3.30", default-features = false, optional = true }
 thiserror = "2"
 
 [dependencies.derive_more]
-version = "1.0.0"
+version = "2"
 optional = true
 default-features = false
 features = ["debug"]
