@@ -326,7 +326,7 @@ mod test {
             check_cursors: &[Option<usize>],
             check_offsets: &[usize],
         ) -> &mut Self {
-            let _ = Theme::load(None);
+            let _ = Theme::load();
 
             for (((&op, &evst), &cursor), &offset) in ops
                 .into_iter()

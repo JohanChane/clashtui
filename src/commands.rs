@@ -25,6 +25,8 @@ pub(crate) fn parse_args() -> Result<(Option<PackedArgs>, u8), ()> {
         generate_shell_completion,
         config_dir,
         verbose,
+        #[cfg(feature = "customized-theme")]
+        load_theme_realtime,
     } = CliCmds::parse();
     if let Some(generate_shell_completion) = generate_shell_completion {
         complete::gen_complete(generate_shell_completion);
@@ -33,6 +35,10 @@ pub(crate) fn parse_args() -> Result<(Option<PackedArgs>, u8), ()> {
     }
     if let Some(config_dir) = config_dir {
         super::DataDir::set(config_dir);
+    }
+    #[cfg(feature = "customized-theme")]
+    if load_theme_realtime {
+        crate::tui::Theme::enable_realtime();
     }
     if let Some(ArgCommand::Migrate { version }) = &command {
         if let Err(e) = match version {
@@ -60,17 +66,21 @@ pub(crate) fn parse_args() -> Result<(Option<PackedArgs>, u8), ()> {
 pub(crate) struct CliCmds {
     #[command(subcommand)]
     command: Option<ArgCommand>,
+    #[arg(long, require_equals=true, num_args=0..=1, default_missing_value=None)]
     // `clashtui --generate-shell-completion` in fact get `Some(None)`
     // while `clashtui` get `None`
     /// generate shell completion
-    #[arg(long, require_equals=true, num_args=0..=1, default_missing_value=None)]
     generate_shell_completion: Option<Option<clap_complete::Shell>>,
-    /// specify the ClashTUI config directory
     #[arg(long, require_equals = true)]
+    /// specify the ClashTUI config directory
     pub config_dir: Option<std::path::PathBuf>,
-    /// increase log level, default is Warning
     #[arg(long, short, action=clap::ArgAction::Count)]
+    /// increase log level, default is Warning
     verbose: u8,
+    #[cfg(feature = "customized-theme")]
+    #[arg(long)]
+    /// allow theme change without restart
+    load_theme_realtime: bool,
 }
 
 #[derive(clap::Subcommand)]

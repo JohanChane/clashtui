@@ -115,7 +115,7 @@ mod test {
             check_buffers: &[&str],
             check_cusors: &[usize],
         ) -> Self {
-            let _ = Theme::load(None);
+            let _ = Theme::load();
             for (((&op, &evst), &buffer), &cursor) in ops
                 .into_iter()
                 .zip(check_evsts)

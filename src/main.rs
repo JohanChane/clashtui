@@ -53,9 +53,7 @@ fn main() {
 #[tokio::main(flavor = "current_thread")]
 async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     use tui::setup;
-    if let Err(e) = tui::Theme::load(None) {
-        anyhow::bail!("Theme loading: {e}")
-    };
+    tui::Theme::load();
     setup::setup()?;
     let app = tui::FrontEnd::new();
     setup::set_hook();
