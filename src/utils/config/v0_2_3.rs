@@ -24,7 +24,9 @@ pub fn migrate() -> anyhow::Result<()> {
         clash_cfg_pth: clash_cfg_path,
     };
     let service = super::Service {
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
         clash_srv_nam: clash_srv_name,
+        #[cfg(target_os = "linux")]
         is_user,
     };
     let config = super::ConfigFile {
