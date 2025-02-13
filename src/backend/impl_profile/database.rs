@@ -4,8 +4,9 @@ use super::{Profile, ProfileType};
 
 type ProfileDataBase = std::collections::HashMap<String, ProfileType>;
 
-/// manage profiles
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
+/// manage profiles
 pub struct ProfileManager {
     current_profile: RefCell<String>,
     profiles: RefCell<ProfileDataBase>,
@@ -52,5 +53,48 @@ impl ProfileManager {
             "Selected profile not found in database"
         );
         *self.current_profile.borrow_mut() = pf.name;
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn serde() {
+        let db = ProfileManager {
+            current_profile: "".to_string().into(),
+            profiles: ProfileDataBase::new().into(),
+        };
+        db.insert("pf1", ProfileType::File);
+        db.insert("pf2", ProfileType::Generated("template1".to_string()));
+        db.insert(
+            "pf3",
+            ProfileType::GitLab {
+                url: "https://github.com".to_string(),
+                token: "Token".to_string(),
+            },
+        );
+        db.insert(
+            "pf4",
+            ProfileType::GitLab {
+                url: "https://gitlab.com".to_string(),
+                token: "Token".to_string(),
+            },
+        );
+        db.insert("pf5", ProfileType::Url("https://raw.com".to_string()));
+        let std = r#"current_profile: ''
+profiles:
+  pf5: !Url https://raw.com
+  pf2: !Generated template1
+  pf4: !GitLab
+    url: https://gitlab.com
+    token: Token
+  pf1: File
+  pf3: !GitLab
+    url: https://github.com
+    token: Token
+"#;
+        let std: ProfileManager = serde_yml::from_str(&std).unwrap();
+        assert_eq!(db, std);
     }
 }

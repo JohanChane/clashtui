@@ -112,6 +112,7 @@ impl LocalProfile {
     }
 }
 
+#[cfg_attr(test, derive(PartialEq))]
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum ProfileType {
     /// local import
