@@ -73,7 +73,6 @@ impl Theme {
                 set(theme)
             }
         }
-        Ok(())
     }
     #[cfg(feature = "customized-theme")]
     pub fn enable_realtime() {
