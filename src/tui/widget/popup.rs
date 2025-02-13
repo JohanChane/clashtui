@@ -186,10 +186,10 @@ impl Drawable for Popup {
             .title(self.title.as_str());
         match &mut self.items {
             Items::SelectList(vec) | Items::NoFeedback(vec) | Items::AskChoices(vec) => {
-                let list = Raw::List::from_iter(vec.iter().map(|i| {
-                    Raw::ListItem::new(i.chars().skip(self.offset).collect::<String>())
-                        .style(Ra::Style::default())
-                }));
+                let list =
+                    Raw::List::from_iter(vec.iter().map(|i| {
+                        Raw::ListItem::new(i.chars().skip(self.offset).collect::<String>())
+                    }));
                 f.render_stateful_widget(
                     list.highlight_style(Theme::get().list.highlight)
                         .block(block),

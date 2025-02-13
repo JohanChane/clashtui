@@ -32,10 +32,10 @@ impl Drawable for List {
                     })
                     .map(|(value, extra)| {
                         Raw::ListItem::new(Ra::Line::from(vec![
-                            Ra::Span::styled(value.to_owned(), Ra::Style::default()),
-                            Ra::Span::styled("(".to_owned(), Ra::Style::default()),
-                            Ra::Span::styled(extra, Theme::get().profile_tab.update_interval),
-                            Ra::Span::styled(")".to_owned(), Ra::Style::default()),
+                            Ra::Span::raw(value),
+                            Ra::Span::raw("("),
+                            Ra::Span::raw(extra).style(Theme::get().profile_tab.update_interval),
+                            Ra::Span::raw(")"),
                         ]))
                     }),
             )
@@ -49,9 +49,7 @@ impl Drawable for List {
                             .is_none_or(|pat| value.contains(pat))
                             .then_some(value)
                     })
-                    .map(|i| {
-                        Raw::ListItem::new(Ra::Line::from(i.as_str())).style(Ra::Style::default())
-                    }),
+                    .map(|i| Raw::ListItem::new(Ra::Line::from(i.as_str()))),
             )
         };
         f.render_stateful_widget(
@@ -68,7 +66,7 @@ impl Drawable for List {
             .highlight_style(if is_fouced {
                 Theme::get().list.highlight
             } else {
-                Ra::Style::default()
+                Theme::get().list.unhighlight
             }),
             area,
             &mut self.state,

@@ -18,10 +18,11 @@ static RELOAD_ON_GET: Once = Once::new();
 pub struct Theme {
     pub popup: Popup,
     pub input: Input,
-    pub connection_tab: ConnctionTab,
     pub list: List,
     pub bars: Bars,
+    pub connection_tab: ConnctionTab,
     pub profile_tab: ProfileTab,
+    pub browser: Browser,
 }
 
 impl Theme {
@@ -85,10 +86,11 @@ impl Theme {
         Self {
             popup: Popup::new(),
             input: Input::new(),
-            connection_tab: ConnctionTab::new(),
             list: List::new(),
             bars: Bars::new(),
+            connection_tab: ConnctionTab::new(),
             profile_tab: ProfileTab::new(),
+            browser: Browser::new(),
         }
     }
 }
@@ -128,6 +130,12 @@ expanding!(Popup,
     text: Style::new().fg(Color::Rgb(46, 204, 113)),
 );
 
+expanding!(Browser,
+    char_highlight: Style::new().fg(Color::Magenta),
+    dir: Style::new().fg(Color::LightCyan),
+    file: Style::new(),
+);
+
 expanding!(Input,
     selected: Style::new().fg(Color::Yellow),
     unselected: Style::new().fg(Color::Reset),
@@ -139,6 +147,7 @@ expanding!(List,
     highlight: Style::new()
         .bg(Color::Rgb(64, 64, 64))
         .add_modifier(Modifier::BOLD),
+    unhighlight: Style::new(),
 );
 
 expanding!(ProfileTab,

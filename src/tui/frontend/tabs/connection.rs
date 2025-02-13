@@ -42,9 +42,7 @@ impl Drawable for ConnctionTab {
         use Ra::Constraint;
         use Raw::{Block, Borders, Table};
         let tabs = Table::new(
-            self.items
-                .iter()
-                .map(|l| l.build_col().style(Ra::Style::default())),
+            self.items.iter().map(|l| l.build_col()),
             [
                 Constraint::Percentage(25),
                 Constraint::Min(6),

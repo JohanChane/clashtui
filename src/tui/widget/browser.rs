@@ -26,18 +26,18 @@ impl Drawable for Browser {
         let mut state = Raw::ListState::default().with_selected(Some(self.selected));
 
         let s = vec![
-            Ra::Span::raw("o").style(Ra::Style::default().fg(Ra::Color::Magenta)),
+            Ra::Span::raw("o").style(Theme::get().browser.char_highlight),
             Ra::Span::raw("pen/pre"),
-            Ra::Span::raw("v").style(Ra::Style::default().fg(Ra::Color::Magenta)),
+            Ra::Span::raw("v").style(Theme::get().browser.char_highlight),
             Ra::Span::raw("iew selected dir/file"),
         ];
 
         let list = Raw::List::new(self.items.iter().map(|file| {
-            Ra::Text::raw(file.name()).style(Ra::Style::default().fg(if file.is_dir() {
-                Ra::Color::LightCyan
+            Ra::Text::raw(file.name()).style(if file.is_dir() {
+                Theme::get().browser.dir
             } else {
-                Ra::Color::default()
-            }))
+                Theme::get().browser.file
+            })
         }))
         .scroll_padding((area.height - 3).div_ceil(2) as usize)
         .highlight_style(Theme::get().list.highlight)
