@@ -87,6 +87,12 @@ impl BackEnd {
             let url_domain = extract_domain(&url).unwrap_or("No domain");
             match (|| -> anyhow::Result<()> {
                 let mut response = apply(&url, with_proxy)?;
+                // ensure a valid yaml content
+                let content: serde_yml::Mapping = serde_yml::from_reader(&mut response)?;
+                anyhow::ensure!(
+                    content.get("proxies").is_some_and(|v| v.is_sequence()),
+                    "Not a valid clash yaml file"
+                );
                 let mut output_file = File::create(path)?;
                 std::io::copy(&mut response, &mut output_file)?;
                 Ok(())

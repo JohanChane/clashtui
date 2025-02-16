@@ -157,10 +157,8 @@ impl TabCont for ProfileTab {
                                 Some(TmpOps::UpdateWithProxyProvider(name, with_proxy));
                             self.popup_content = Some(PopMsg::AskChoices(
                                 vec![
-                                    "Should we merge all file into one?".to_owned(),
+                                    "Skip proxy-provider merging?".to_owned(),
                                     "Which is 'no_pp'".to_owned(),
-                                    "Note: For convenience, 'Y' for NO while 'N' for YES"
-                                        .to_owned(),
                                 ],
                                 vec![],
                             ));
