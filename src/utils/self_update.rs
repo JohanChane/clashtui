@@ -136,47 +136,46 @@ impl std::fmt::Display for Asset {
 }
 impl Asset {
     pub fn download(&self, path: &std::path::Path) -> anyhow::Result<()> {
-        download_to_file(path, &self.browser_download_url)
+        let url = &self.browser_download_url;
+        let Err(e) = download_to_file(path, url) else {
+            return Ok(());
+        };
+        eprintln!("{e}, try to download with `curl/wget`");
+        use std::process::{Command, Stdio};
+        fn have_this_and_exec(this: &str, args: &[&str]) -> anyhow::Result<bool> {
+            if Command::new("which")
+                .arg(this)
+                .output()
+                .is_ok_and(|r| r.status.success())
+            {
+                println!("using {this}");
+                if Command::new(this)
+                    .args(args)
+                    .stdin(Stdio::null())
+                    .status()?
+                    .success()
+                {
+                    Ok(true)
+                } else {
+                    Err(anyhow::anyhow!("Failed to download with {this}"))
+                }
+            } else {
+                Ok(false)
+            }
+        }
+        if !have_this_and_exec("curl", &["-o", path.to_str().unwrap(), "-L", url])?
+            && !have_this_and_exec("wget", &["-O", path.to_str().unwrap(), url])?
+        {
+            anyhow::bail!("Unable to find curl/wget")
+        }
+        Ok(())
     }
 }
 
 pub fn download_to_file(path: &std::path::Path, url: &str) -> anyhow::Result<()> {
-    match get_blob(url, None, Some(headers::DEFAULT_USER_AGENT)) {
-        Ok(mut rp) => {
-            let mut fp = std::fs::File::create(path)?;
-            std::io::copy(&mut rp, &mut fp)?;
-        }
-        Err(e) => {
-            eprintln!("{e}, try to download with `curl/wget`");
-            use std::process::{Command, Stdio};
-            fn have_this_and_exec(this: &str, args: &[&str]) -> anyhow::Result<bool> {
-                if Command::new("which")
-                    .arg(this)
-                    .output()
-                    .is_ok_and(|r| r.status.success())
-                {
-                    println!("using {this}");
-                    if Command::new(this)
-                        .args(args)
-                        .stdin(Stdio::null())
-                        .status()?
-                        .success()
-                    {
-                        Ok(true)
-                    } else {
-                        Err(anyhow::anyhow!("Failed to download with {this}"))
-                    }
-                } else {
-                    Ok(false)
-                }
-            }
-            if !have_this_and_exec("curl", &["-o", path.to_str().unwrap(), "-L", url])?
-                && !have_this_and_exec("wget", &["-O", path.to_str().unwrap(), url])?
-            {
-                anyhow::bail!("Unable to find curl/wget")
-            }
-        }
-    }
+    let mut rp = get_blob(url, None, Some(headers::DEFAULT_USER_AGENT))?;
+    let mut fp = std::fs::File::create(path)?;
+    std::io::copy(&mut rp, &mut fp)?;
     Ok(())
 }
 
