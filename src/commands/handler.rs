@@ -87,9 +87,9 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
             println!("{state}");
             Ok(())
         }
-        ArgCommand::CheckUpdate {
+        ArgCommand::Update {
             without_ask,
-            check_ci,
+            ci: check_ci,
             target,
         } => {
             use crate::utils::self_update::Request;
@@ -103,7 +103,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                 };
                 () => {};
             }
-            let (info, current_version, mut path) = match target {
+            let (info, current_version, current_path) = match target {
                 Target::Clashtui => {
                     let current_version = VERSION.to_owned();
                     let path = std::env::current_exe()?;
@@ -115,7 +115,12 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                         .get_clash_version()
                         .ok()
                         .unwrap_or("v0.0.0".to_owned());
-                    let path = std::path::PathBuf::from(&backend.get_config().basic.clash_bin_pth);
+                    let path = &backend.get_config().basic.clash_bin_pth;
+                    let path = if path.is_empty() {
+                        std::env::current_dir()?.join("mihomo")
+                    } else {
+                        std::path::PathBuf::from(path)
+                    };
                     let info = expand!(
                         Request::s_mihomo(check_ci),
                         "Mihomo",
@@ -149,19 +154,23 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                 } {
                     println!();
                     println!(
-                        "Download start for {} {}",
+                        "Download start for [{}]({})",
                         asset.name, asset.browser_download_url
                     );
-                    // add '.new' to the file name if the file already exists
-                    // else, use the original name
-                    if path.file_name() == Some(std::ffi::OsStr::new(&asset.name)) {
-                        path.set_file_name(format!("{}.new", asset.name));
-                    } else {
-                        path.set_file_name(&asset.name);
-                    }
-                    asset.download(&path)?;
-                    println!("Downloaded to {}", path.display());
+                    let new_path = {
+                        let mut new_path = current_path.clone();
+                        let mut new_ext = std::ffi::OsString::from("new");
+                        if let Some(ext) = new_path.extension() {
+                            new_ext.push(ext);
+                        }
+                        new_path.set_extension(new_ext);
+                        // replace binary in runtime seem to be impossile
+                        // std::fs::rename(current_path, &new_path)?;
+                        new_path
+                    };
+                    println!("To {}", new_path.display());
                     println!();
+                    asset.download(&new_path)?;
                 }
             } else {
                 println!("Up to date");
