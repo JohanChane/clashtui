@@ -93,8 +93,8 @@ impl BackEnd {
                     content.get("proxies").is_some_and(|v| v.is_sequence()),
                     "Not a valid clash yaml file"
                 );
-                let mut output_file = File::create(path)?;
-                std::io::copy(&mut response, &mut output_file)?;
+                let output_file = File::create(path)?;
+                serde_yml::to_writer(output_file, &content)?;
                 Ok(())
             })() {
                 // pretty output
