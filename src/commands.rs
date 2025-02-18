@@ -62,7 +62,7 @@ pub(crate) fn parse_args() -> Result<(Option<PackedArgs>, u8), ()> {
 /// A tool for mihomo, also support other Clash API
 #[derive(clap::Parser)]
 #[cfg_attr(debug_assertions, derive(Debug))]
-#[command(version=VERSION, about, after_help="If you have any question or suggestion, please visit https://github.com/JohanChane/clashtui")]
+#[command(version=VERSION, about, after_help=concat!("If you have any question or suggestion, please visit ", env!("CARGO_PKG_REPOSITORY")))]
 pub(crate) struct CliCmds {
     #[command(subcommand)]
     command: Option<ArgCommand>,

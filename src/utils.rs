@@ -76,7 +76,7 @@ mod data_dir {
     }
 }
 
-pub fn setup_logging(verbose: u8) {
+pub fn setup_logging(level: u8) {
     use log4rs::append::file::FileAppender;
     use log4rs::config::{Appender, Config, Root};
     use log4rs::encode::pattern::PatternEncoder;
@@ -93,9 +93,9 @@ pub fn setup_logging(verbose: u8) {
     } else {
         false
     };
-    let verbose = verbose + if cfg!(debug_assertions) { 4 } else { 2 };
+    let level = level + if cfg!(debug_assertions) { 4 } else { 2 };
     let log_level = log::LevelFilter::iter()
-        .nth(verbose as usize)
+        .nth(level as usize)
         .unwrap_or(log::LevelFilter::max());
 
     let file_appender = FileAppender::builder()

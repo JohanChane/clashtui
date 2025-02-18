@@ -29,17 +29,15 @@ fn main() {
     // handle commands
     if let Err(e) = match infos {
         Some(command) => commands::handle_cli(command, backend),
+        #[cfg(not(feature = "tui"))]
         None => {
-            #[cfg(feature = "tui")]
-            {
-                println!("Entering TUI...");
-                start_tui(backend)
-            }
-            #[cfg(not(feature = "tui"))]
-            {
-                eprintln!("use `--help/-h` for help");
-                Ok(())
-            }
+            eprintln!("use `--help/-h` for help");
+            Ok(())
+        }
+        #[cfg(feature = "tui")]
+        None => {
+            println!("Entering TUI...");
+            start_tui(backend)
         }
     } {
         eprintln!("clashtui encounter some error: {e}");
@@ -53,18 +51,22 @@ fn main() {
 #[tokio::main(flavor = "current_thread")]
 async fn start_tui(backend: BackEnd) -> anyhow::Result<()> {
     use tui::setup;
+    // load global theme
     tui::Theme::load();
+    // enter raw mode
     setup::setup()?;
-    let app = tui::FrontEnd::new();
-    setup::set_hook();
+    // and recovery from it when panic
+    setup::set_panic_hook();
+    let frontend = tui::FrontEnd::new();
     let (backend_tx, app_rx) = tokio::sync::mpsc::channel(5);
     let (app_tx, backend_rx) = tokio::sync::mpsc::channel(5);
     let backend = tokio::spawn(backend.run(backend_tx, backend_rx));
-    let app = tokio::spawn(app.run(app_tx, app_rx));
-    let (a, b) = tokio::try_join!(app, backend)?;
+    let frontend = tokio::spawn(frontend.run(app_tx, app_rx));
+    let (frontend, backend) = tokio::try_join!(frontend, backend)?;
     setup::restore()?;
-    a?;
-    b?.to_file()?;
+    // clear the result, save profiles to disk
+    frontend?;
+    backend?.to_file()?;
     Ok(())
 }
 

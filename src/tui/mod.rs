@@ -78,7 +78,7 @@ pub mod setup {
     }
 
     /// make terminal restorable after panic
-    pub fn set_hook() {
+    pub fn set_panic_hook() {
         let original_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |panic| {
             let _ = restore();
