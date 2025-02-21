@@ -70,6 +70,7 @@ impl Popup {
     }
     pub fn set_msg(&mut self, title: &str, items: Vec<String>) {
         self.title = title.to_string();
+        self.focus = Focus::Text;
         let content = items.join("\n");
         self.text = Some(Text { content, offset: 0 });
     }
@@ -77,7 +78,8 @@ impl Popup {
 impl Drawable for Popup {
     fn render(&mut self, f: &mut ratatui::Frame, _: ratatui::layout::Rect, _: bool) {
         let area = |dialog_width: u16, dialog_height: u16| {
-            let dialog_width = dialog_width.min(f.area().width - 4).max(60); // min_width = 60
+            // make up for block
+            let dialog_width = (dialog_width + 2).min(f.area().width - 4);
             let dialog_height = (dialog_height + 2).min(f.area().height - 6);
             tools::centered_rect(
                 Ra::Constraint::Length(dialog_width),
@@ -115,6 +117,7 @@ impl Drawable for Popup {
                 let ipt = ipt
                     .widget(true)
                     .block(first_block)
+                    // display the whole line while cursor moves
                     .scroll((0, (ipt.cursor as u16).saturating_sub(area.width - 8)));
                 f.render_widget(ipt, area);
             }
@@ -138,11 +141,14 @@ impl Drawable for Popup {
                 let areas = {
                     let area = area(
                         txt.width().max(chs.width()),
-                        txt.height() + chs.height() - 1,
+                        txt.height() + chs.height() + 1,
                     );
                     f.render_widget(Raw::Clear, area);
-                    Ra::Layout::vertical([Ra::Constraint::Fill(1), Ra::Constraint::Length(2)])
-                        .split(area)
+                    Ra::Layout::vertical([
+                        Ra::Constraint::Fill(1),
+                        Ra::Constraint::Length(1 + chs.height()),
+                    ])
+                    .split(area)
                 };
 
                 let para = txt.widget(self.focus == Focus::Text).block(first_block_ext);
@@ -156,12 +162,15 @@ impl Drawable for Popup {
                 let areas = {
                     let area = area(
                         txt.width().max(ipt.width()),
-                        txt.height() + ipt.height() - 1,
+                        txt.height() + ipt.height() + 1,
                     );
                     f.render_widget(Raw::Clear, area);
 
-                    Ra::Layout::vertical([Ra::Constraint::Fill(1), Ra::Constraint::Length(2)])
-                        .split(area)
+                    Ra::Layout::vertical([
+                        Ra::Constraint::Fill(1),
+                        Ra::Constraint::Length(1 + ipt.height()),
+                    ])
+                    .split(area)
                 };
 
                 let para = txt.widget(self.focus == Focus::Text).block(first_block_ext);
@@ -262,7 +271,8 @@ impl Choices {
         self.choices
             .iter()
             .map(|s| s.len())
-            .fold(0, |acc, len| acc + len + 1) as u16
+            .fold(0, |acc, len| acc + len + 3) as u16
+            - 1
     }
     #[inline]
     fn height(&self) -> u16 {
