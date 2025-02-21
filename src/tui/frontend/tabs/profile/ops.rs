@@ -61,4 +61,5 @@ pub enum TmpOps {
     Remove(String),
     SetFilter,
     Import,
+    ImportWithName(String),
 }

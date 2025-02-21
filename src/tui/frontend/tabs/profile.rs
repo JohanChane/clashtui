@@ -95,9 +95,8 @@ impl TabCont for ProfileTab {
             CallBack::ProfileCTL(result) => {
                 // require a refresh
                 self.is_profiles_outdated = true;
-                self.popup_content.replace(PopMsg::Prompt(
-                    ["Done".to_string()].into_iter().chain(result).collect(),
-                ));
+                self.popup_content
+                    .replace(PopMsg::Prompt(format!("Done\n{}", result.join("\n"))));
             }
             CallBack::ProfileInit(content, times) => {
                 if self.is_profiles_outdated {
@@ -136,7 +135,7 @@ impl TabCont for ProfileTab {
                 if let Some(op) = self.temp_content.take() {
                     match op {
                         TmpOps::UpdateWithProxy(name) => {
-                            let PopRes::Choices(selected) = res else {
+                            let PopRes::Selected(selected) = res else {
                                 unreachable!("Should always be Choices")
                             };
                             let with_proxy = match selected {
@@ -156,15 +155,12 @@ impl TabCont for ProfileTab {
                             self.temp_content =
                                 Some(TmpOps::UpdateWithProxyProvider(name, with_proxy));
                             self.popup_content = Some(PopMsg::AskChoices(
-                                vec![
-                                    "Skip proxy-provider merging?".to_owned(),
-                                    "Which is 'no_pp'".to_owned(),
-                                ],
-                                vec![],
+                                "Skip proxy-provider merging?\nWhich is 'no_pp'".to_owned(),
+                                vec!["No".to_owned(), "Yes".to_owned()],
                             ));
                         }
                         TmpOps::UpdateWithProxyProvider(name, with_proxy) => {
-                            let PopRes::Choices(selected) = res else {
+                            let PopRes::Selected(selected) = res else {
                                 unreachable!("Should always be Choices")
                             };
                             let no_pp = match selected {
@@ -182,10 +178,10 @@ impl TabCont for ProfileTab {
                             self.backend_content = Some(Call::Profile(BackendOp::Profile(
                                 ProfileOp::Update(name, with_proxy, no_pp),
                             )));
-                            self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
                         }
                         TmpOps::Remove(name) => {
-                            let PopRes::Choices(selected) = res else {
+                            let PopRes::Selected(selected) = res else {
                                 unreachable!("Should always be Choices")
                             };
                             match selected {
@@ -202,25 +198,28 @@ impl TabCont for ProfileTab {
                                 // ignore others
                                 _ => unreachable!(),
                             };
-                            self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
                         }
                         TmpOps::SetFilter => {
-                            let PopRes::Input(mut vec) = res else {
+                            let PopRes::Input(vec) = res else {
                                 unreachable!("Should always be Input")
                             };
-                            debug_assert_eq!(vec.len(), 1);
-                            self.profiles.set_filter(vec.swap_remove(0))
+                            self.profiles.set_filter(vec)
                         }
                         TmpOps::Import => {
-                            let PopRes::Input(mut vec) = res else {
+                            let PopRes::Input(name) = res else {
                                 unreachable!("Should always be Input")
                             };
-                            debug_assert_eq!(vec.len(), 2);
-                            // there will only be 2 String, using swap_remove is safe
-                            self.backend_content = Some(Call::Profile(BackendOp::Profile(
-                                ProfileOp::Add(vec.swap_remove(0), vec.swap_remove(0)),
-                            )));
-                            self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                            self.temp_content = Some(TmpOps::ImportWithName(name));
+                            self.popup_content = Some(PopMsg::Input("Url".to_owned()));
+                        }
+                        TmpOps::ImportWithName(name) => {
+                            let PopRes::Input(url) = res else {
+                                unreachable!("Should always be Input")
+                            };
+                            self.backend_content =
+                                Some(Call::Profile(BackendOp::Profile(ProfileOp::Add(name, url))));
+                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
                         }
                     }
                 };
@@ -233,7 +232,7 @@ impl TabCont for ProfileTab {
                             unreachable!()
                         }
                         TmpOps::Remove(name) => {
-                            let PopRes::Choices(selected) = res else {
+                            let PopRes::Selected(selected) = res else {
                                 unreachable!("Should always be Choices")
                             };
                             match selected {
@@ -250,25 +249,23 @@ impl TabCont for ProfileTab {
                                 // ignore others
                                 _ => unreachable!(),
                             };
-                            self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
                         }
                         TmpOps::SetFilter => {
-                            let PopRes::Input(mut vec) = res else {
+                            let PopRes::Input(name) = res else {
                                 unreachable!("Should always be Input")
                             };
-                            debug_assert_eq!(vec.len(), 1);
-                            self.templates.set_filter(vec.swap_remove(0));
+                            self.templates.set_filter(name);
                         }
                         TmpOps::Import => {
-                            let PopRes::Input(mut vec) = res else {
+                            let PopRes::Input(name) = res else {
                                 unreachable!("Should always be Input")
                             };
-                            debug_assert_eq!(vec.len(), 1);
-                            self.backend_content = Some(Call::Profile(BackendOp::Template(
-                                TemplateOp::Add(vec.swap_remove(0)),
-                            )));
-                            self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                            self.backend_content =
+                                Some(Call::Profile(BackendOp::Template(TemplateOp::Add(name))));
+                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
                         }
+                        TmpOps::ImportWithName(_) => unreachable!(),
                     }
                 }
             }
@@ -303,7 +300,7 @@ impl Drawable for ProfileTab {
                         .profiles
                         .selected()
                         .inspect(|_| {
-                            self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]))
+                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()))
                         })
                         .and_then(|index| self.profiles.get_items().get(index).cloned())
                         .map(ProfileOp::Select)
@@ -322,7 +319,7 @@ impl Drawable for ProfileTab {
                         .templates
                         .selected()
                         .inspect(|_| {
-                            self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]))
+                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()))
                         })
                         .and_then(|index| self.templates.get_items().get(index).cloned())
                         .map(TemplateOp::Generate)

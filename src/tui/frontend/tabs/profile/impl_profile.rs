@@ -12,7 +12,7 @@ impl ProfileTab {
         match ev.code.into() {
             Keys::Import => {
                 self.temp_content = Some(TmpOps::Import);
-                self.popup_content = Some(PopMsg::Input(vec!["Name".to_owned(), "Url".to_owned()]));
+                self.popup_content = Some(PopMsg::Input("Name".to_owned()));
             }
             #[cfg(feature = "template")]
             Keys::ProfileSwitch => {
@@ -23,8 +23,8 @@ impl ProfileTab {
                 if let Some(name) = name {
                     self.temp_content = Some(TmpOps::Remove(name));
                     self.popup_content = Some(PopMsg::AskChoices(
-                        vec!["Are you sure to delete this?".to_owned()],
-                        vec![],
+                        "Are you sure to delete this?".to_owned(),
+                        vec!["No".to_owned(), "Yes".to_owned()],
                     ))
                 }
             }
@@ -33,12 +33,16 @@ impl ProfileTab {
                 if let Some(name) = name {
                     self.temp_content = Some(TmpOps::UpdateWithProxy(name));
                     self.popup_content = Some(PopMsg::AskChoices(
+                        r#"Update Options
+You can decide how to update profile
+The default action is Auto (Currently, without proxy)"#
+                            .to_owned(),
                         vec![
-                            "Update Options".to_owned(),
-                            "You can decide how to update profile".to_owned(),
-                            "The default action is Auto (Currently, without proxy)".to_owned(),
+                            "No".to_owned(),
+                            "Yes".to_owned(),
+                            "with proxy".to_owned(),
+                            "without proxy".to_owned(),
                         ],
-                        vec!["with proxy".to_owned(), "without proxy".to_owned()],
                     ))
                 }
             }
@@ -49,26 +53,26 @@ impl ProfileTab {
                     self.backend_content = Some(Call::Profile(BackendOp::Profile(
                         ProfileOp::Test(name, false),
                     )));
-                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                    self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
                 }
             }
             Keys::Preview => {
                 if let Some(name) = name {
                     self.backend_content =
                         Some(Call::Profile(BackendOp::Profile(ProfileOp::Preview(name))));
-                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                    self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
                 }
             }
             Keys::Edit => {
                 if let Some(name) = name {
                     self.backend_content =
                         Some(Call::Profile(BackendOp::Profile(ProfileOp::Edit(name))));
-                    self.popup_content = Some(PopMsg::Prompt(vec!["Working".to_owned()]));
+                    self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
                 }
             }
             Keys::Search => {
                 self.temp_content = Some(TmpOps::SetFilter);
-                self.popup_content = Some(PopMsg::Input(vec!["Name".to_owned()]));
+                self.popup_content = Some(PopMsg::Input("Name".to_owned()));
             }
             _ => return EventState::NotConsumed,
         };

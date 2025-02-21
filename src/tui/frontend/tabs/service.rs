@@ -94,10 +94,10 @@ impl TabCont for ServiceTab {
                 let mode = MODE[idx];
                 let pak = Call::Service(BackendOp::SwitchMode(mode));
                 self.backend_content.replace(pak);
-                let msg = PopMsg::Prompt(vec!["Working".to_owned()]);
+                let msg = PopMsg::Prompt("Working".to_owned());
                 self.popup_content.replace(msg);
             }
-            PopRes::Choices(_) | PopRes::Input(_) => unreachable!(),
+            PopRes::Input(_) => unreachable!(),
         }
         EventState::WorkDone
     }
@@ -142,7 +142,7 @@ impl Drawable for ServiceTab {
                         idx if idx < ServiceOp::const_len() + 1 => {
                             let op = ServiceOp::ALL[index - 1];
                             self.backend_content = Some(Call::Service(BackendOp::ServiceCTL(op)));
-                            self.popup_content = Some(PopMsg::Prompt(vec!["working".to_owned()]));
+                            self.popup_content = Some(PopMsg::Prompt("working".to_owned()));
                         }
                         idx if idx == ServiceOp::const_len() + 1 => (),
                         idx if idx < ServiceOp::const_len() + 2 + ExtendOp::const_len() => {
@@ -152,8 +152,7 @@ impl Drawable for ServiceTab {
                             } else {
                                 self.backend_content =
                                     Some(Call::Service(BackendOp::TuiExtend(op)));
-                                self.popup_content =
-                                    Some(PopMsg::Prompt(vec!["working".to_owned()]));
+                                self.popup_content = Some(PopMsg::Prompt("working".to_owned()));
                             }
                         }
                         _ => unreachable!(),

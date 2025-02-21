@@ -125,15 +125,12 @@ impl Drawable for ConnctionTab {
             // KeyCode::PageUp => todo!(),
             // KeyCode::PageDown => todo!(),
             _ if crate::tui::frontend::key_bind::Keys::Search == ev.code.into() => {
-                self.popup_content = Some(PopMsg::Input(vec!["Url/Chain/Type".to_owned()]));
+                self.popup_content = Some(PopMsg::Input("Url/Chain/Type".to_owned()));
             }
             _ if crate::tui::frontend::key_bind::Keys::ConnKillAll == ev.code.into() => {
                 self.popup_content = Some(PopMsg::AskChoices(
-                    vec![
-                        "Are you sure to terminate all connections?".to_owned(),
-                        "This cannot be undone!".to_owned(),
-                    ],
-                    vec![],
+                    "Are you sure to terminate all connections?\nThis cannot be undone!".to_owned(),
+                    vec!["No".to_owned(), "Yes".to_owned()],
                 ));
             }
             _ => return EventState::NotConsumed,
@@ -154,7 +151,7 @@ impl TabCont for ConnctionTab {
     fn apply_backend_call(&mut self, op: CallBack) {
         match op {
             CallBack::ConnctionCTL(res) => {
-                self.popup_content = Some(PopMsg::Prompt(vec!["Done".to_owned(), res]))
+                self.popup_content = Some(PopMsg::Prompt(format!("Done\n{}", res)))
             }
             CallBack::ConnctionInit(items) => {
                 let ConnInfo {
@@ -187,7 +184,7 @@ impl TabCont for ConnctionTab {
     fn apply_popup_result(&mut self, res: PopRes) -> EventState {
         match res {
             // if we should terminal all connections
-            PopRes::Choices(selected) => match selected {
+            PopRes::Selected(selected) => match selected {
                 // regarded as cancel
                 0 => (),
                 // regarded as yes
@@ -196,8 +193,7 @@ impl TabCont for ConnctionTab {
                 _ => unreachable!(),
             },
             // get filter content
-            PopRes::Input(mut vec) => self.filter = Some(vec.swap_remove(0)),
-            PopRes::Selected(..) => unreachable!(),
+            PopRes::Input(name) => self.filter = Some(name),
         }
         EventState::WorkDone
     }

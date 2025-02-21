@@ -112,9 +112,9 @@ impl BackEnd {
                                 .as_str(),
                             ],
                         ) {
-                            CallBack::TuiExtend(vec!["Failed".to_owned(), e.to_string()])
+                            CallBack::TuiExtend(format!("Failed\n{e}"))
                         } else {
-                            CallBack::TuiExtend(vec!["Success".to_owned()])
+                            CallBack::TuiExtend("Success".to_owned())
                         }
                     }
                     Call::Service(tabs::service::BackendOp::Preview(path)) => {
@@ -128,7 +128,7 @@ impl BackEnd {
                     Call::Service(tabs::service::BackendOp::TuiExtend(extend_op)) => {
                         match extend_op {
                             tabs::service::ExtendOp::FullLog => match self.logcat(0, 1024) {
-                                Ok(v) => CallBack::TuiExtend(v),
+                                Ok(v) => CallBack::TuiExtend(v.join("\n")),
                                 Err(e) => CallBack::Error(e.to_string()),
                             },
                             tabs::service::ExtendOp::ViewClashtuiConfigDir => unreachable!(),
@@ -152,7 +152,7 @@ impl BackEnd {
                                         infos.push(format!("{e}"));
                                     }
                                 };
-                                CallBack::TuiExtend(infos)
+                                CallBack::TuiExtend(infos.join("\n"))
                             }
                         }
                     }

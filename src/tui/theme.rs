@@ -17,7 +17,6 @@ static RELOAD_ON_GET: Once = Once::new();
 #[derive(Default)]
 pub struct Theme {
     pub popup: Popup,
-    pub input: Input,
     pub list: List,
     pub bars: Bars,
     pub connection_tab: ConnctionTab,
@@ -84,7 +83,6 @@ impl Theme {
     const fn new() -> Self {
         Self {
             popup: Popup::new(),
-            input: Input::new(),
             list: List::new(),
             bars: Bars::new(),
             connection_tab: ConnctionTab::new(),
@@ -133,11 +131,6 @@ expanding!(Browser,
     char_highlight: Style::new().fg(Color::Magenta),
     dir: Style::new().fg(Color::LightCyan),
     file: Style::new(),
-);
-
-expanding!(Input,
-    selected: Style::new().fg(Color::Yellow),
-    unselected: Style::new().fg(Color::Reset),
 );
 
 expanding!(List,
