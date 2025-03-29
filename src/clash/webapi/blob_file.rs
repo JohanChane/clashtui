@@ -16,7 +16,7 @@ impl ClashUtil {
         with_proxy: bool,
         token: String,
     ) -> MinreqResult {
-        let mut req = minreq::get(url);
+        let mut req = super::make_request_with_cred(url)?;
         if with_proxy {
             req = req.with_proxy(minreq::Proxy::new(&self.proxy_addr)?);
         }
@@ -29,7 +29,7 @@ impl ClashUtil {
         with_proxy: bool,
         token: String,
     ) -> MinreqResult {
-        let mut req = minreq::get(url);
+        let mut req = super::make_request_with_cred(url)?;
         if with_proxy {
             req = req.with_proxy(minreq::Proxy::new(&self.proxy_addr)?);
         }

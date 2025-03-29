@@ -1,3 +1,5 @@
+use minreq::Request;
+
 pub mod webapi;
 
 mod error;
@@ -22,7 +24,7 @@ pub fn get_blob<U: Into<minreq::URL>>(
     proxy: Option<&str>,
     ua: Option<&str>,
 ) -> MinreqResult {
-    let mut req = minreq::get(url);
+    let mut req = make_request_with_cred(url)?;
     if let Some(proxy) = proxy {
         req = req.with_proxy(minreq::Proxy::new(proxy)?)
     }
@@ -30,4 +32,32 @@ pub fn get_blob<U: Into<minreq::URL>>(
         req = req.with_header(headers::USER_AGENT, ua)
     }
     req.with_timeout(*TIMEOUT).send_lazy()
+}
+
+// Support URL with Embedded Credentials
+pub fn make_request_with_cred<U: Into<minreq::URL>>(
+    url: U,
+) -> Result<minreq::Request, minreq::Error> {
+    use url::Url;
+
+    let url_str = url.into().to_string();
+
+    let parsed_url =
+        Url::parse(&url_str).map_err(|_| minreq::Error::Other("Failed to parse URL"))?;
+
+    let username = parsed_url.username();
+    let password = parsed_url.password().unwrap_or("");
+
+    let mut request_url = parsed_url.clone();
+    request_url
+        .set_username("")
+        .map_err(|_| minreq::Error::Other("Failed to clear username".into()))?;
+    request_url
+        .set_password(None)
+        .map_err(|_| minreq::Error::Other("Failed to clear password".into()))?;
+
+    let auth_value = format!("{}:{}", username, password);
+    let auth_header = format!("Basic {}", base64::encode(auth_value));
+
+    Ok(minreq::get(request_url.as_str()).with_header("Authorization", auth_header))
 }
