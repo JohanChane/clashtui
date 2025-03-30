@@ -31,7 +31,7 @@ impl Popup {
                 self.title = "Msg".to_owned();
                 self.focus = Focus::Text;
                 self.text = Some(Text { content, offset: 0 });
-                self.choices = Some(Choices { choices, index: 0 })
+                self.choices = Some(Choices::new(choices))
             }
             PopMsg::Prompt(content) => {
                 self.title = "Msg".to_owned();
@@ -41,12 +41,17 @@ impl Popup {
             PopMsg::SelectList(title, choices) => {
                 self.title = title;
                 self.focus = Focus::Extra;
-                self.choices = Some(Choices { choices, index: 0 })
+                self.choices = Some(Choices::new(choices))
             }
             PopMsg::Input(title) => {
                 self.title = title;
                 self.focus = Focus::Extra;
                 self.input = Some(Input::default())
+            }
+            PopMsg::SelectMulti(title, choices) => {
+                self.title = title;
+                self.focus = Focus::Extra;
+                self.choices = Some(Choices::new(choices).with_multi())
             }
         }
     }
@@ -61,7 +66,17 @@ impl Popup {
     pub fn collect(&mut self) -> Option<PopRes> {
         self.text.take();
         if let Some(chs) = self.choices.take() {
-            Some(PopRes::Selected(chs.index))
+            if chs.multi {
+                Some(PopRes::SelectedMulti(
+                    chs.choices
+                        .into_iter()
+                        .enumerate()
+                        .filter_map(|(idx, (_, ch))| ch.then_some(idx))
+                        .collect(),
+                ))
+            } else {
+                Some(PopRes::Selected(chs.index))
+            }
         } else if let Some(ipt) = self.input.take() {
             Some(PopRes::Input(ipt.buffer))
         } else {
@@ -252,13 +267,27 @@ impl Text {
 }
 
 struct Choices {
-    choices: Vec<String>,
+    choices: Vec<(String, bool)>,
     index: usize,
+    multi: bool,
 }
 impl Choices {
+    fn new(choices: Vec<String>) -> Self {
+        Self {
+            choices: choices.into_iter().map(|s| (s, false)).collect(),
+            index: 0,
+            multi: false,
+        }
+    }
+    fn with_multi(self) -> Self {
+        Self {
+            multi: true,
+            ..self
+        }
+    }
     #[inline]
     fn widget(&self, is_focus: bool) -> Raw::Tabs {
-        Raw::Tabs::new(self.choices.iter().map(|ch| ch.as_str()))
+        Raw::Tabs::new(self.choices.iter().map(|(ch, _)| ch.as_str()))
             .highlight_style(
                 is_focus
                     .then_some(Style::default().add_modifier(Modifier::REVERSED))
@@ -270,7 +299,7 @@ impl Choices {
     fn width(&self) -> u16 {
         self.choices
             .iter()
-            .map(|s| s.len())
+            .map(|(s, _)| s.len())
             .fold(0, |acc, len| acc + len + 3) as u16
             - 1
     }
@@ -286,6 +315,11 @@ impl Choices {
 
             KeyCode::Enter => {
                 return EventState::Yes;
+            }
+            KeyCode::Char(' ') if self.multi => {
+                if let Some((_, ch)) = self.choices.get_mut(self.index) {
+                    *ch = !*ch;
+                }
             }
             _ => return EventState::NotConsumed,
         }

@@ -97,7 +97,7 @@ impl TabCont for ServiceTab {
                 let msg = PopMsg::Prompt("Working".to_owned());
                 self.popup_content.replace(msg);
             }
-            PopRes::Input(_) => unreachable!(),
+            PopRes::Input(_) | PopRes::SelectedMulti(_) => unreachable!(),
         }
         EventState::WorkDone
     }

@@ -115,7 +115,11 @@ impl TabCont for ProfileTab {
                 self.is_templates_outdated = true;
                 self.is_profiles_outdated = true;
                 self.popup_content.replace(PopMsg::Prompt(
-                    ["Done".to_string()].into_iter().chain(result).collect(),
+                    ["Done".to_string()]
+                        .into_iter()
+                        .chain(result)
+                        .collect::<Vec<_>>()
+                        .join("\n"),
                 ));
             }
             #[cfg(feature = "template")]
@@ -134,6 +138,7 @@ impl TabCont for ProfileTab {
             Focus::Profile => {
                 if let Some(op) = self.temp_content.take() {
                     match op {
+                        TmpOps::EditWhich(..) | TmpOps::EditUses(..) => unreachable!(),
                         TmpOps::UpdateWithProxy(name) => {
                             let PopRes::Selected(selected) = res else {
                                 unreachable!("Should always be Choices")
@@ -228,9 +233,9 @@ impl TabCont for ProfileTab {
             Focus::Template => {
                 if let Some(op) = self.temp_content.take() {
                     match op {
-                        TmpOps::UpdateWithProxy(_) | TmpOps::UpdateWithProxyProvider(..) => {
-                            unreachable!()
-                        }
+                        TmpOps::ImportWithName(..)
+                        | TmpOps::UpdateWithProxy(..)
+                        | TmpOps::UpdateWithProxyProvider(..) => unreachable!(),
                         TmpOps::Remove(name) => {
                             let PopRes::Selected(selected) = res else {
                                 unreachable!("Should always be Choices")
@@ -265,7 +270,53 @@ impl TabCont for ProfileTab {
                                 Some(Call::Profile(BackendOp::Template(TemplateOp::Add(name))));
                             self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
                         }
-                        TmpOps::ImportWithName(_) => unreachable!(),
+                        TmpOps::EditWhich(name) => {
+                            let PopRes::Selected(selected) = res else {
+                                unreachable!("Should always be Choices")
+                            };
+                            match selected {
+                                // regarded as cancel
+                                // if get No, this order is dropped
+                                // as it is already moved out by `take`
+                                0 => return EventState::WorkDone,
+                                // edit uses
+                                1 => {
+                                    self.temp_content = Some(TmpOps::EditUses(name));
+                                    self.popup_content = Some(PopMsg::SelectMulti(
+                                        "Edit Uses".to_owned(),
+                                        self.profiles.get_items().to_owned(),
+                                    ));
+                                }
+                                // edit content
+                                2 => {
+                                    self.backend_content = Some(Call::Profile(
+                                        BackendOp::Template(TemplateOp::Edit(name)),
+                                    ));
+                                    self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
+                                }
+                                // ignore others
+                                _ => unreachable!(),
+                            };
+                        }
+                        TmpOps::EditUses(name) => {
+                            let PopRes::SelectedMulti(selected) = res else {
+                                unreachable!("Should always be Choices")
+                            };
+                            self.backend_content =
+                                Some(Call::Profile(BackendOp::Template(TemplateOp::Uses(
+                                    name,
+                                    self.profiles
+                                        .get_items()
+                                        .iter()
+                                        .enumerate()
+                                        .filter_map(|(idx, profile_name)| {
+                                            selected
+                                                .contains(&idx)
+                                                .then_some(profile_name.to_owned())
+                                        })
+                                        .collect(),
+                                ))));
+                        }
                     }
                 }
             }

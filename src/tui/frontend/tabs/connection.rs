@@ -194,6 +194,7 @@ impl TabCont for ConnctionTab {
             },
             // get filter content
             PopRes::Input(name) => self.filter = Some(name),
+            PopRes::SelectedMulti(_) => unreachable!(),
         }
         EventState::WorkDone
     }

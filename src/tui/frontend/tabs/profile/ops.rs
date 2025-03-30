@@ -52,6 +52,7 @@ pub enum TemplateOp {
     ///
     /// though this is asked by tab, but it will be handled at frontend
     Edit(String),
+    Uses(String, Vec<String>),
 }
 
 #[derive(PartialEq, Debug)]
@@ -62,4 +63,7 @@ pub enum TmpOps {
     SetFilter,
     Import,
     ImportWithName(String),
+    /// edit template content or uses
+    EditWhich(String),
+    EditUses(String),
 }

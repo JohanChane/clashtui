@@ -22,6 +22,7 @@ pub enum PopMsg {
     /// show infos
     Prompt(String),
     SelectList(String, Vec<String>),
+    SelectMulti(String, Vec<String>),
     Input(String),
 }
 #[cfg_attr(test, derive(Debug, PartialEq))]
@@ -30,6 +31,7 @@ pub enum PopRes {
     // Choices(usize),
     /// result of [PopMsg::SelectList]
     Selected(usize),
+    SelectedMulti(Vec<usize>),
     /// result of [PopMsg::Input]
     Input(String),
 }

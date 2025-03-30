@@ -39,9 +39,11 @@ impl ProfileTab {
             }
             Keys::Edit => {
                 if let Some(name) = name {
-                    self.backend_content =
-                        Some(Call::Profile(BackendOp::Template(TemplateOp::Edit(name))));
-                    self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
+                    self.temp_content = Some(TmpOps::EditWhich(name));
+                    self.popup_content = Some(PopMsg::AskChoices(
+                        "What you want to edit?".to_owned(),
+                        vec!["Cancel".to_owned(), "Uses".to_owned(), "Content".to_owned()],
+                    ));
                 }
             }
             Keys::Search => {
