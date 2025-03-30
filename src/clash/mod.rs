@@ -1,5 +1,3 @@
-use minreq::Request;
-
 pub mod webapi;
 
 mod error;
@@ -38,6 +36,7 @@ pub fn get_blob<U: Into<minreq::URL>>(
 pub fn make_request_with_cred<U: Into<minreq::URL>>(
     url: U,
 ) -> Result<minreq::Request, minreq::Error> {
+    use base64::Engine;
     use url::Url;
 
     let url_str = url.into().to_string();
@@ -51,13 +50,16 @@ pub fn make_request_with_cred<U: Into<minreq::URL>>(
     let mut request_url = parsed_url.clone();
     request_url
         .set_username("")
-        .map_err(|_| minreq::Error::Other("Failed to clear username".into()))?;
+        .map_err(|_| minreq::Error::Other("Failed to clear username"))?;
     request_url
         .set_password(None)
-        .map_err(|_| minreq::Error::Other("Failed to clear password".into()))?;
+        .map_err(|_| minreq::Error::Other("Failed to clear password"))?;
 
     let auth_value = format!("{}:{}", username, password);
-    let auth_header = format!("Basic {}", base64::encode(auth_value));
+    let auth_header = format!(
+        "Basic {}",
+        base64::prelude::BASE64_STANDARD.encode(auth_value)
+    );
 
     Ok(minreq::get(request_url.as_str()).with_header("Authorization", auth_header))
 }
