@@ -129,7 +129,7 @@ define_keys! {
         ProfileTestConfig(KeyCode::Char('s')),
         // ProfileInfo(KeyCode::Char('n')),
         # #[cfg(feature = "connection-tab")]
-        # Connction
+        # Connection
         /// Terminate all running connections
         ConnKillAll(KeyCode::Char('c')),
         /// Search the content

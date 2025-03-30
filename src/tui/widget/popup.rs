@@ -61,7 +61,7 @@ impl Popup {
     /// - [PopMsg::Ask] will return an enum,
     /// - [PopMsg::Input] return [Vec]
     ///
-    /// Should only be called when emiting [EventState::Yes],
+    /// Should only be called when emitting [EventState::Yes],
     /// otherwise the return value is **UB**
     pub fn collect(&mut self) -> Option<PopRes> {
         self.text.take();

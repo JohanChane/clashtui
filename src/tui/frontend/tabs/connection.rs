@@ -19,7 +19,7 @@ pub enum BackendOp {
 }
 
 #[derive(Default)]
-pub(in crate::tui::frontend) struct ConnctionTab {
+pub(in crate::tui::frontend) struct ConnectionTab {
     items: Vec<Connection>,
     filter: Option<String>,
     travel_up: u64,
@@ -31,13 +31,13 @@ pub(in crate::tui::frontend) struct ConnctionTab {
     backend_content: Option<Call>,
 }
 
-impl std::fmt::Display for ConnctionTab {
+impl std::fmt::Display for ConnectionTab {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", crate::tui::frontend::consts::TAB_TITLE_CONNECTION)
     }
 }
 
-impl Drawable for ConnctionTab {
+impl Drawable for ConnectionTab {
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, _: bool) {
         use Ra::Constraint;
         use Raw::{Block, Borders, Table};
@@ -79,7 +79,7 @@ impl Drawable for ConnctionTab {
         }
     }
 
-    /// - Catched event -> [EventState::WorkDone]
+    /// - Caught event -> [EventState::WorkDone]
     /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState {
         use crossterm::event::KeyCode;
@@ -139,7 +139,7 @@ impl Drawable for ConnctionTab {
     }
 }
 
-impl TabCont for ConnctionTab {
+impl TabCont for ConnectionTab {
     fn get_backend_call(&mut self) -> Option<Call> {
         self.backend_content.take()
     }
@@ -150,10 +150,10 @@ impl TabCont for ConnctionTab {
 
     fn apply_backend_call(&mut self, op: CallBack) {
         match op {
-            CallBack::ConnctionCTL(res) => {
+            CallBack::ConnectionCTL(res) => {
                 self.popup_content = Some(PopMsg::Prompt(format!("Done\n{}", res)))
             }
-            CallBack::ConnctionInit(items) => {
+            CallBack::ConnectionInit(items) => {
                 let ConnInfo {
                     download_total,
                     upload_total,
@@ -200,7 +200,7 @@ impl TabCont for ConnctionTab {
     }
 }
 
-impl ConnctionTab {
+impl ConnectionTab {
     /// Index of the selected item
     ///
     /// Returns `None` if no item is selected

@@ -19,7 +19,7 @@ pub struct Theme {
     pub popup: Popup,
     pub list: List,
     pub bars: Bars,
-    pub connection_tab: ConnctionTab,
+    pub connection_tab: ConnectionTab,
     pub profile_tab: ProfileTab,
     pub browser: Browser,
 }
@@ -85,7 +85,7 @@ impl Theme {
             popup: Popup::new(),
             list: List::new(),
             bars: Bars::new(),
-            connection_tab: ConnctionTab::new(),
+            connection_tab: ConnectionTab::new(),
             profile_tab: ProfileTab::new(),
             browser: Browser::new(),
         }
@@ -146,6 +146,6 @@ expanding!(ProfileTab,
     update_interval: Style::new().fg(Color::Red),
 );
 
-expanding!(ConnctionTab,
+expanding!(ConnectionTab,
     table_static: Style::new().fg(Color::Gray).bg(Color::DarkGray),
 );

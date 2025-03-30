@@ -63,14 +63,14 @@ impl BackEnd {
                 cbs.push(state);
                 #[cfg(feature = "connection-tab")]
                 let conns = match self.api.get_connections() {
-                    Ok(v) => CallBack::ConnctionInit(v),
+                    Ok(v) => CallBack::ConnectionInit(v),
                     Err(e) => {
                         if !errs.contains(&e.to_string()) {
                             //ensure writing only once
                             log::error!("An error happens in Tick:{e}");
                             errs.push(e.to_string());
                         }
-                        CallBack::ConnctionInit(Default::default())
+                        CallBack::ConnectionInit(Default::default())
                     }
                 };
                 #[cfg(feature = "connection-tab")]
@@ -160,7 +160,7 @@ impl BackEnd {
                     Call::Connection(op) => match op {
                         tabs::connection::BackendOp::Terminal(id) => {
                             match self.api.terminate_connection(Some(id)) {
-                                Ok(v) => CallBack::ConnctionCTL(if v {
+                                Ok(v) => CallBack::ConnectionCTL(if v {
                                     "Success".to_owned()
                                 } else {
                                     "Failed, log as debug level".to_owned()
@@ -170,7 +170,7 @@ impl BackEnd {
                         }
                         tabs::connection::BackendOp::TerminalAll => {
                             match self.api.terminate_connection(None) {
-                                Ok(v) => CallBack::ConnctionCTL(if v {
+                                Ok(v) => CallBack::ConnectionCTL(if v {
                                     "Success".to_owned()
                                 } else {
                                     "Failed, log as debug level".to_owned()

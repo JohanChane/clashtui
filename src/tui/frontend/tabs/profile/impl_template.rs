@@ -1,7 +1,7 @@
 use super::*;
 
 impl ProfileTab {
-    /// - Catched event -> [EventState::WorkDone]
+    /// - Caught event -> [EventState::WorkDone]
     /// - unrecognized event -> [EventState::NotConsumed]
     pub(super) fn handle_template_key_event(&mut self, ev: &KeyEvent) -> EventState {
         let name = self

@@ -32,7 +32,7 @@ impl FrontEnd {
             Box::new(tabs::profile::ProfileTab::default()),
             Box::new(tabs::service::ServiceTab::default()),
             #[cfg(feature = "connection-tab")]
-            Box::new(tabs::connection::ConnctionTab::default()),
+            Box::new(tabs::connection::ConnectionTab::default()),
         ];
         Self {
             tabs,
@@ -136,9 +136,9 @@ impl FrontEnd {
                     CallBack::TuiExtend(_) | CallBack::ServiceCTL(_) => {
                         self.tabs[1].apply_backend_call(op)
                     }
-                    // assume ConnctionTab is the third tab
+                    // assume ConnectionTab is the third tab
                     #[cfg(feature = "connection-tab")]
-                    CallBack::ConnctionInit(..) | CallBack::ConnctionCTL(_) => {
+                    CallBack::ConnectionInit(..) | CallBack::ConnectionCTL(_) => {
                         self.tabs[2].apply_backend_call(op)
                     }
                 },
@@ -208,7 +208,7 @@ impl Drawable for FrontEnd {
             match ev.code {
                 // ## the tabbar
                 // 1..=9
-                // need to kown the range
+                // need to known the range
                 KeyCode::Char(c) if c.is_ascii_digit() && c != '0' => {
                     if let Some(d) = c.to_digit(10) {
                         if d as usize <= self.tabs.len() {

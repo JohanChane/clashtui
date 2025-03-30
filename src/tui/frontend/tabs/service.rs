@@ -110,7 +110,7 @@ impl Drawable for ServiceTab {
             instance.render(f, area, true);
         }
     }
-    /// - Catched event -> [EventState::WorkDone]
+    /// - Caught event -> [EventState::WorkDone]
     /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
         if let Some(instance) = self.file_browser.as_mut() {

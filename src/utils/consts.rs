@@ -29,8 +29,8 @@ pub(crate) static TEMPLATE_PATH: Path = Lock::new(|| DataDir::get().join(TEMPLAT
 pub(crate) static _TEMP_PATH: Path = Lock::new(|| DataDir::get().join(_TMP_FILE));
 
 pub mod err {
-    pub const BACKEND_RX: &str = "backend rx dropped before STOP singal";
-    pub const BACKEND_TX: &str = "backend tx dropped before STOP singal";
-    pub const APP_RX: &str = "app rx dropped before STOP singal";
-    pub const APP_TX: &str = "app tx dropped before STOP singal";
+    pub const BACKEND_RX: &str = "backend rx dropped before STOP signal";
+    pub const BACKEND_TX: &str = "backend tx dropped before STOP signal";
+    pub const APP_RX: &str = "app rx dropped before STOP signal";
+    pub const APP_TX: &str = "app tx dropped before STOP signal";
 }

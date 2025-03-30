@@ -9,7 +9,7 @@ pub use popup::Popup;
 
 pub enum PopMsg {
     /// the first stand for the `question`,
-    /// the sencond and third stand for the `extra choices`
+    /// the second and third stand for the `extra choices`
     ///
     /// **NOTE**: support 2 extra choice only
     ///

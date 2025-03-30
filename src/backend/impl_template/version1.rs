@@ -73,7 +73,7 @@ pub(super) fn gen_template(
         let Config { uses } = serde_yml::from_value(cfg)?;
         name_urls
             .into_iter()
-            .filter(|(name, _)| uses.contains(&name))
+            .filter(|(name, _)| uses.contains(name))
             .map(|(_, url)| url)
             .collect()
     } else {

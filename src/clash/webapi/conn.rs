@@ -47,7 +47,7 @@ pub struct ConnMetaData {
 }
 
 impl ClashUtil {
-    /// returne [ConnInfo]
+    /// return [ConnInfo]
     pub fn get_connections(&self) -> CResult<ConnInfo> {
         self.request(Method::Get, "/connections", None)
             .and_then(|r| r.json())
@@ -71,7 +71,7 @@ impl ClashUtil {
         )
         .and_then(|r| {
             r.as_str().map(|s| {
-                // try to catch failiure
+                // try to catch failure
                 log::debug!("terminate conn:{s}");
                 s.is_empty()
             })

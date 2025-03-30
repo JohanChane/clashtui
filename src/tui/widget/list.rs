@@ -136,7 +136,7 @@ impl List {
     }
 
     pub fn set_items(&mut self, items: Vec<String>) {
-        // list state will be corret automatically at render
+        // list state will be correct automatically at render
         self.items = items;
         self.scrollbar = self.scrollbar.content_length(self.items.len());
     }

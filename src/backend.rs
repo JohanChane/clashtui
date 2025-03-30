@@ -32,9 +32,9 @@ pub enum CallBack {
     ProfileCTL(Vec<String>),
 
     #[cfg(feature = "connection-tab")]
-    ConnctionInit(#[debug(skip)] crate::clash::webapi::ConnInfo),
+    ConnectionInit(#[debug(skip)] crate::clash::webapi::ConnInfo),
     #[cfg(feature = "connection-tab")]
-    ConnctionCTL(String),
+    ConnectionCTL(String),
 
     #[cfg(feature = "template")]
     TemplateInit(Vec<String>),

@@ -145,7 +145,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                     }
                     println!();
                     Select::default()
-                        .append_start_prompt("Avaliable asserts:")
+                        .append_start_prompt("Available asserts:")
                         .set_end_prompt("Type the num")
                         .append_items(info.assets.iter())
                         .interact()?

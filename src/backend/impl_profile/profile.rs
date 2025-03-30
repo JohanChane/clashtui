@@ -58,7 +58,7 @@ impl LocalProfile {
             .and_then(|file| now.duration_since(file).ok())
     }
     /// merge `basic_clash_config` to `self::content`,
-    /// all items in `basic_clash_config` will be overwrited to `self::content`
+    /// all items in `basic_clash_config` will be overwritten to `self::content`
     /// except for the value is a sequence, it will be appended to the original value
     ///
     /// Note: need to call [`LocalProfile::sync_from_disk`] before call this
