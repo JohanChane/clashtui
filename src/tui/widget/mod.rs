@@ -5,26 +5,22 @@ pub mod tools;
 
 pub use browser::{Browser, Path};
 pub use list::List;
-pub use popup::Popup;
+pub use popup::{Popmsg, Popup, PopupState};
 
-pub enum PopMsg {
-    /// the first stand for the `question`,
-    /// the second and third stand for the `extra choices`
-    ///
-    /// **NOTE**: support 2 extra choice only
-    ///
-    /// this will be like
-    /// ```
-    ///     `the question`
-    /// Press y for Yes, n for No, o for `ch2`, t for `ch3`
-    /// ```
-    AskChoices(String, Vec<String>),
-    /// show infos
-    Prompt(String),
-    SelectList(String, Vec<String>),
-    SelectMulti(String, Vec<String>),
-    Input(String),
+pub struct PopMsg(Box<dyn Popmsg>);
+
+impl PopMsg {
+    pub fn new(f: impl Popmsg + 'static) -> Self {
+        Self(Box::new(f))
+    }
+    pub fn working() -> Self {
+        Self(Box::new(popup::Working))
+    }
+    pub fn msg(msg: String) -> Self {
+        Self(Box::new(popup::Msg(msg)))
+    }
 }
+
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum PopRes {
     /// result of [PopMsg::AskChoices]

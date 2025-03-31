@@ -1,7 +1,7 @@
 use super::{Call, CallBack, PopMsg, TabCont};
 use crate::tui::{
     frontend::consts::TAB_TITLE_CONNECTION,
-    widget::{tools, PopRes},
+    widget::{tools, PopRes, Popmsg},
     Drawable, EventState, Theme,
 };
 
@@ -125,17 +125,60 @@ impl Drawable for ConnectionTab {
             // KeyCode::PageUp => todo!(),
             // KeyCode::PageDown => todo!(),
             _ if crate::tui::frontend::key_bind::Keys::Search == ev.code.into() => {
-                self.popup_content = Some(PopMsg::Input("Url/Chain/Type".to_owned()));
+                self.popup_content = Some(PopMsg::new(Search));
             }
             _ if crate::tui::frontend::key_bind::Keys::ConnKillAll == ev.code.into() => {
-                self.popup_content = Some(PopMsg::AskChoices(
-                    "Are you sure to terminate all connections?\nThis cannot be undone!".to_owned(),
-                    vec!["No".to_owned(), "Yes".to_owned()],
-                ));
+                self.popup_content = Some(PopMsg::new(TerminateAll));
             }
             _ => return EventState::NotConsumed,
         }
         EventState::WorkDone
+    }
+}
+
+struct TerminateAll;
+
+impl Popmsg for TerminateAll {
+    fn start(&self, pop: &mut crate::tui::widget::Popup) {
+        pop.start()
+            .clear_all()
+            .set_title("Warning")
+            .set_question("Are you sure to terminate all connections?\nThis cannot be undone!")
+            .set_choices(["No", "Yes"].into_iter().map(|s| s.to_owned()))
+            .finish();
+    }
+
+    fn next(self: Box<Self>, pop: &mut crate::tui::widget::Popup) -> crate::tui::widget::PopupState {
+        let Some(PopRes::Selected(idx)) = pop.collect() else {
+            unreachable!()
+        };
+        match idx {
+            // regarded as cancel
+            0 => crate::tui::widget::PopupState::Canceled,
+            // regarded as yes
+            1 => crate::tui::widget::PopupState::ToBackend(Call::Connection(BackendOp::TerminalAll)),
+            // regarded as extra-choices
+            _ => unreachable!(),
+        }
+    }
+}
+
+struct Search;
+
+impl Popmsg for Search {
+    fn start(&self, pop: &mut crate::tui::widget::Popup) {
+        pop.start()
+            .clear_all()
+            .set_title("Url/Chain/Type")
+            .with_input()
+            .finish()
+    }
+
+    fn next(self: Box<Self>, pop: &mut crate::tui::widget::Popup) -> crate::tui::widget::PopupState {
+        let Some(PopRes::Input(ipt)) = pop.collect() else {
+            unreachable!()
+        };
+        crate::tui::widget::PopupState::ToFrontend(PopRes::Input(ipt))
     }
 }
 
@@ -151,7 +194,8 @@ impl TabCont for ConnectionTab {
     fn apply_backend_call(&mut self, op: CallBack) {
         match op {
             CallBack::ConnectionCTL(res) => {
-                self.popup_content = Some(PopMsg::Prompt(format!("Done\n{}", res)))
+                self.popup_content
+                    .replace(PopMsg::msg(format!("Done\n{}", res)));
             }
             CallBack::ConnectionInit(items) => {
                 let ConnInfo {
@@ -182,20 +226,10 @@ impl TabCont for ConnectionTab {
     }
 
     fn apply_popup_result(&mut self, res: PopRes) -> EventState {
-        match res {
-            // if we should terminal all connections
-            PopRes::Selected(selected) => match selected {
-                // regarded as cancel
-                0 => (),
-                // regarded as yes
-                1 => self.backend_content = Some(Call::Connection(BackendOp::TerminalAll)),
-                // regarded as extra-choices
-                _ => unreachable!(),
-            },
-            // get filter content
-            PopRes::Input(name) => self.filter = Some(name),
-            PopRes::SelectedMulti(_) => unreachable!(),
-        }
+        let PopRes::Input(name) = res else {
+            unreachable!("Should always be Input")
+        };
+        self.filter = Some(name);
         EventState::WorkDone
     }
 }

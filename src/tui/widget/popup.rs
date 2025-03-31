@@ -4,7 +4,7 @@ use Ra::{Modifier, Style, Stylize};
 
 use super::{tools, PopMsg, PopRes};
 use crate::tui::misc::EventState;
-use crate::tui::{Drawable, Theme};
+use crate::tui::{Call, Drawable, Theme};
 
 const WRAP_TRUE: Raw::Wrap = Raw::Wrap { trim: true };
 
@@ -15,7 +15,101 @@ pub struct Popup {
     input: Option<Input>,
     choices: Option<Choices>,
     focus: Focus,
+    hold: Option<Box<dyn Popmsg>>,
 }
+
+pub enum PopupState {
+    Canceled,
+    Next(Box<dyn Popmsg>),
+    ToBackend(Call),
+    ToFrontend(PopRes),
+}
+pub trait Popmsg: Send {
+    fn start(&self, pop: &mut Popup);
+    fn next(self: Box<Self>, pop: &mut Popup) -> PopupState;
+}
+
+pub struct Working;
+impl Popmsg for Working {
+    fn start(&self, pop: &mut Popup) {
+        pop.start().clear_all().quick_working();
+    }
+
+    fn next(self: Box<Self>, _: &mut Popup) -> PopupState {
+        PopupState::Canceled
+    }
+}
+
+pub struct Msg(pub String);
+impl Popmsg for Msg {
+    fn start(&self, pop: &mut Popup) {
+        pop.start()
+            .clear_all()
+            .focus_on_test()
+            .set_title("Msg")
+            .set_question(&self.0)
+            .finish()
+    }
+
+    fn next(self: Box<Self>, _: &mut Popup) -> PopupState {
+        PopupState::Canceled
+    }
+}
+
+pub struct EditWrapper<'a>(&'a mut Popup);
+impl EditWrapper<'_> {
+    pub fn clear_all(self) -> Self {
+        self.0.reset();
+        self.0.focus = Focus::Extra;
+        self
+    }
+    pub fn focus_on_test(self) -> Self {
+        self.0.focus = Focus::Text;
+        self
+    }
+    pub fn set_title(self, title: impl Into<String>) -> Self {
+        self.0.title = title.into();
+        self
+    }
+    pub fn set_choices(self, choices: impl Iterator<Item = String>) -> Self {
+        self.0.choices = Some(Choices {
+            choices: choices.map(|s| (s, false)).collect(),
+            index: 0,
+            multi: false,
+        });
+        self
+    }
+    pub fn set_question(self, question: impl Into<String>) -> Self {
+        self.0.text = Some(Text {
+            content: question.into(),
+            offset: 0,
+        });
+        self
+    }
+    pub fn set_multi(self) -> Self {
+        if let Some(chs) = self.0.choices.as_mut() {
+            chs.multi = true
+        }
+        self
+    }
+    pub fn with_input(self) -> Self {
+        self.0.input = Some(Input::default());
+        self
+    }
+    pub fn finish(self) {}
+
+    pub fn quick_working(self) {
+        self.set_title("Msg").set_question("Working").finish();
+    }
+}
+
+impl Popup {
+    #[must_use]
+    pub fn start(&mut self) -> EditWrapper {
+        EditWrapper(self)
+    }
+}
+
 impl Popup {
     pub fn reset(&mut self) {
         self.text = None;
@@ -25,34 +119,20 @@ impl Popup {
     pub fn is_empty(&self) -> bool {
         self.text.is_none() && self.input.is_none() && self.choices.is_none()
     }
-    pub fn show(&mut self, msg: PopMsg) {
-        match msg {
-            PopMsg::AskChoices(content, choices) => {
-                self.title = "Msg".to_owned();
-                self.focus = Focus::Text;
-                self.text = Some(Text { content, offset: 0 });
-                self.choices = Some(Choices::new(choices))
+    pub fn show(&mut self, PopMsg(f): PopMsg) {
+        f.start(self);
+        self.hold = Some(f);
+    }
+    pub fn next(&mut self) -> Option<PopupState> {
+        let state = self.hold.take()?;
+        match state.next(self) {
+            PopupState::Canceled => None,
+            PopupState::Next(popmsg) => {
+                popmsg.start(self);
+                self.hold = Some(popmsg);
+                None
             }
-            PopMsg::Prompt(content) => {
-                self.title = "Msg".to_owned();
-                self.focus = Focus::Text;
-                self.text = Some(Text { content, offset: 0 })
-            }
-            PopMsg::SelectList(title, choices) => {
-                self.title = title;
-                self.focus = Focus::Extra;
-                self.choices = Some(Choices::new(choices))
-            }
-            PopMsg::Input(title) => {
-                self.title = title;
-                self.focus = Focus::Extra;
-                self.input = Some(Input::default())
-            }
-            PopMsg::SelectMulti(title, choices) => {
-                self.title = title;
-                self.focus = Focus::Extra;
-                self.choices = Some(Choices::new(choices).with_multi())
-            }
+            state => Some(state),
         }
     }
     /// ### Return choice/input content
@@ -272,19 +352,6 @@ struct Choices {
     multi: bool,
 }
 impl Choices {
-    fn new(choices: Vec<String>) -> Self {
-        Self {
-            choices: choices.into_iter().map(|s| (s, false)).collect(),
-            index: 0,
-            multi: false,
-        }
-    }
-    fn with_multi(self) -> Self {
-        Self {
-            multi: true,
-            ..self
-        }
-    }
     #[inline]
     fn widget(&self, is_focus: bool) -> Raw::Tabs {
         Raw::Tabs::new(self.choices.iter().map(|(ch, _)| ch.as_str()))

@@ -1,7 +1,8 @@
+#[macro_use]
+mod ops;
 mod impl_profile;
 #[cfg(feature = "template")]
 mod impl_template;
-mod ops;
 
 use crossterm::event::KeyEvent;
 pub use ops::*;
@@ -29,8 +30,6 @@ pub(in crate::tui::frontend) struct ProfileTab {
     focus: Focus,
     popup_content: Option<PopMsg>,
     backend_content: Option<Call>,
-    /// hold content for msg ask
-    temp_content: Option<TmpOps>,
     is_profiles_outdated: bool,
     #[cfg(feature = "template")]
     is_templates_outdated: bool,
@@ -51,7 +50,6 @@ impl Default for ProfileTab {
             focus: Focus::Profile,
             popup_content: None,
             backend_content: None,
-            temp_content: None,
             is_profiles_outdated: true,
             #[cfg(feature = "template")]
             is_templates_outdated: true,
@@ -96,7 +94,7 @@ impl TabCont for ProfileTab {
                 // require a refresh
                 self.is_profiles_outdated = true;
                 self.popup_content
-                    .replace(PopMsg::Prompt(format!("Done\n{}", result.join("\n"))));
+                    .replace(PopMsg::msg(format!("Done\n{}", result.join("\n"))));
             }
             CallBack::ProfileInit(content, times) => {
                 if self.is_profiles_outdated {
@@ -114,13 +112,8 @@ impl TabCont for ProfileTab {
                 // require a refresh
                 self.is_templates_outdated = true;
                 self.is_profiles_outdated = true;
-                self.popup_content.replace(PopMsg::Prompt(
-                    ["Done".to_string()]
-                        .into_iter()
-                        .chain(result)
-                        .collect::<Vec<_>>()
-                        .join("\n"),
-                ));
+                self.popup_content
+                    .replace(PopMsg::msg(format!("Done\n{}", result.join("\n"))));
             }
             #[cfg(feature = "template")]
             CallBack::TemplateInit(content) => {
@@ -134,191 +127,16 @@ impl TabCont for ProfileTab {
     }
 
     fn apply_popup_result(&mut self, res: PopRes) -> EventState {
+        let PopRes::Input(name) = res else {
+            unreachable!("Should always be Input")
+        };
         match self.focus {
             Focus::Profile => {
-                if let Some(op) = self.temp_content.take() {
-                    match op {
-                        TmpOps::EditWhich(..) | TmpOps::EditUses(..) => unreachable!(),
-                        TmpOps::UpdateWithProxy(name) => {
-                            let PopRes::Selected(selected) = res else {
-                                unreachable!("Should always be Choices")
-                            };
-                            let with_proxy = match selected {
-                                // regarded as cancel
-                                // if get No, this order is dropped
-                                // as it is already moved out by `take`
-                                0 => return EventState::WorkDone,
-                                // regarded as yes
-                                // if get Yes, we confirm this order and ready to send it
-                                1 => Some(true),
-                                // regarded as extra-choices
-                                2 => Some(false),
-                                3 => None,
-                                // ignore others
-                                _ => unreachable!(),
-                            };
-                            self.temp_content =
-                                Some(TmpOps::UpdateWithProxyProvider(name, with_proxy));
-                            self.popup_content = Some(PopMsg::AskChoices(
-                                "Skip proxy-provider merging?\nWhich is 'no_pp'".to_owned(),
-                                vec!["No".to_owned(), "Yes".to_owned()],
-                            ));
-                        }
-                        TmpOps::UpdateWithProxyProvider(name, with_proxy) => {
-                            let PopRes::Selected(selected) = res else {
-                                unreachable!("Should always be Choices")
-                            };
-                            let no_pp = match selected {
-                                // regarded as cancel
-                                // if get No, this order is dropped
-                                // as it is already moved out by `take`
-                                0 => true,
-                                // regarded as yes
-                                // if get Yes, we confirm this order and ready to send it
-                                1 => false,
-                                // regarded as extra-choices
-                                // ignore others
-                                _ => unreachable!(),
-                            };
-                            self.backend_content = Some(Call::Profile(BackendOp::Profile(
-                                ProfileOp::Update(name, with_proxy, no_pp),
-                            )));
-                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
-                        }
-                        TmpOps::Remove(name) => {
-                            let PopRes::Selected(selected) = res else {
-                                unreachable!("Should always be Choices")
-                            };
-                            match selected {
-                                // if get No, this order is dropped
-                                // as it is already moved out by `take`
-                                0 => (),
-                                // if get Yes, we confirm this order and ready to send it
-                                1 => {
-                                    self.backend_content = Some(Call::Profile(BackendOp::Profile(
-                                        ProfileOp::Remove(name),
-                                    )))
-                                }
-                                // regarded as extra-choices
-                                // ignore others
-                                _ => unreachable!(),
-                            };
-                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
-                        }
-                        TmpOps::SetFilter => {
-                            let PopRes::Input(vec) = res else {
-                                unreachable!("Should always be Input")
-                            };
-                            self.profiles.set_filter(vec)
-                        }
-                        TmpOps::Import => {
-                            let PopRes::Input(name) = res else {
-                                unreachable!("Should always be Input")
-                            };
-                            self.temp_content = Some(TmpOps::ImportWithName(name));
-                            self.popup_content = Some(PopMsg::Input("Url".to_owned()));
-                        }
-                        TmpOps::ImportWithName(name) => {
-                            let PopRes::Input(url) = res else {
-                                unreachable!("Should always be Input")
-                            };
-                            self.backend_content =
-                                Some(Call::Profile(BackendOp::Profile(ProfileOp::Add(name, url))));
-                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
-                        }
-                    }
-                };
+                self.profiles.set_filter(name);
             }
             #[cfg(feature = "template")]
             Focus::Template => {
-                if let Some(op) = self.temp_content.take() {
-                    match op {
-                        TmpOps::ImportWithName(..)
-                        | TmpOps::UpdateWithProxy(..)
-                        | TmpOps::UpdateWithProxyProvider(..) => unreachable!(),
-                        TmpOps::Remove(name) => {
-                            let PopRes::Selected(selected) = res else {
-                                unreachable!("Should always be Choices")
-                            };
-                            match selected {
-                                // if get No, this order is dropped
-                                // as it is already moved out by `take`
-                                0 => (),
-                                // if get Yes, we confirm this order and ready to send it
-                                1 => {
-                                    self.backend_content = Some(Call::Profile(BackendOp::Template(
-                                        TemplateOp::Remove(name),
-                                    )))
-                                }
-                                // regarded as extra-choices
-                                // ignore others
-                                _ => unreachable!(),
-                            };
-                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
-                        }
-                        TmpOps::SetFilter => {
-                            let PopRes::Input(name) = res else {
-                                unreachable!("Should always be Input")
-                            };
-                            self.templates.set_filter(name);
-                        }
-                        TmpOps::Import => {
-                            let PopRes::Input(name) = res else {
-                                unreachable!("Should always be Input")
-                            };
-                            self.backend_content =
-                                Some(Call::Profile(BackendOp::Template(TemplateOp::Add(name))));
-                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
-                        }
-                        TmpOps::EditWhich(name) => {
-                            let PopRes::Selected(selected) = res else {
-                                unreachable!("Should always be Choices")
-                            };
-                            match selected {
-                                // regarded as cancel
-                                // if get No, this order is dropped
-                                // as it is already moved out by `take`
-                                0 => return EventState::WorkDone,
-                                // edit uses
-                                1 => {
-                                    self.temp_content = Some(TmpOps::EditUses(name));
-                                    self.popup_content = Some(PopMsg::SelectMulti(
-                                        "Edit Uses".to_owned(),
-                                        self.profiles.get_items().to_owned(),
-                                    ));
-                                }
-                                // edit content
-                                2 => {
-                                    self.backend_content = Some(Call::Profile(
-                                        BackendOp::Template(TemplateOp::Edit(name)),
-                                    ));
-                                    self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
-                                }
-                                // ignore others
-                                _ => unreachable!(),
-                            };
-                        }
-                        TmpOps::EditUses(name) => {
-                            let PopRes::SelectedMulti(selected) = res else {
-                                unreachable!("Should always be Choices")
-                            };
-                            self.backend_content =
-                                Some(Call::Profile(BackendOp::Template(TemplateOp::Uses(
-                                    name,
-                                    self.profiles
-                                        .get_items()
-                                        .iter()
-                                        .enumerate()
-                                        .filter_map(|(idx, profile_name)| {
-                                            selected
-                                                .contains(&idx)
-                                                .then_some(profile_name.to_owned())
-                                        })
-                                        .collect(),
-                                ))));
-                        }
-                    }
-                }
+                self.templates.set_filter(name);
             }
         }
         EventState::WorkDone
@@ -351,7 +169,7 @@ impl Drawable for ProfileTab {
                         .profiles
                         .selected()
                         .inspect(|_| {
-                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()))
+                            self.popup_content = Some(PopMsg::working());
                         })
                         .and_then(|index| self.profiles.get_items().get(index).cloned())
                         .map(ProfileOp::Select)
@@ -370,7 +188,7 @@ impl Drawable for ProfileTab {
                         .templates
                         .selected()
                         .inspect(|_| {
-                            self.popup_content = Some(PopMsg::Prompt("Working".to_owned()))
+                            self.popup_content = Some(PopMsg::working());
                         })
                         .and_then(|index| self.templates.get_items().get(index).cloned())
                         .map(TemplateOp::Generate)

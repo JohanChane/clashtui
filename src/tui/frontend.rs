@@ -107,9 +107,7 @@ impl FrontEnd {
                 Ok(op) => match op {
                     CallBack::Error(error) => {
                         self.popup
-                            .show(super::PopMsg::Prompt(
-                                format!("Error Happened\n {}", error,),
-                            ));
+                            .show(super::PopMsg::msg(format!("Error Happened\n {}", error)));
                     }
                     CallBack::Logs(logs) => {
                         self.popup.set_msg("Log", logs);
@@ -118,7 +116,7 @@ impl FrontEnd {
                         self.popup.set_msg("Preview", content);
                     }
                     CallBack::Edit => {
-                        self.popup.show(super::PopMsg::Prompt("OK".to_owned()));
+                        self.popup.show(super::PopMsg::msg("OK".to_owned()));
                     }
                     // Just update StateBar
                     CallBack::State(state) => {
@@ -184,11 +182,20 @@ impl Drawable for FrontEnd {
         if !self.popup.is_empty() {
             evst = self.popup.handle_key_event(ev);
             if evst == EventState::Yes {
-                if let Some(res) = self.popup.collect() {
-                    self.tabs
-                        .get_mut(self.tab_index)
-                        .unwrap()
-                        .apply_popup_result(res);
+                if let Some(res) = self.popup.next() {
+                    match res {
+                        super::widget::PopupState::Canceled | super::widget::PopupState::Next(..) => {
+                            unreachable!()
+                        }
+                        super::widget::PopupState::ToBackend(call) => self.backend_content = Some(call),
+                        super::widget::PopupState::ToFrontend(pop_res) => {
+                            return self
+                                .tabs
+                                .get_mut(self.tab_index)
+                                .unwrap()
+                                .apply_popup_result(pop_res)
+                        }
+                    }
                 }
             } else if evst == EventState::Cancel {
                 self.popup.reset();

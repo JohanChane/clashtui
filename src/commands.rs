@@ -167,7 +167,7 @@ enum ProfileCommand {
         name: Option<String>,
         /// update profile with proxy
         #[arg(long)]
-        with_proxy: Option<bool>,
+        with_proxy: bool,
         /// update profile with proxyprovider removed
         #[arg(long)]
         without_proxyprovider: bool,

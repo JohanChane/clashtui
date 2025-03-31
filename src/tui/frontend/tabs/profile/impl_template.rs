@@ -1,3 +1,7 @@
+use std::marker::PhantomData;
+
+use crate::tui::widget::{Popmsg, PopupState};
+
 use super::*;
 
 impl ProfileTab {
@@ -11,9 +15,7 @@ impl ProfileTab {
 
         match ev.code.into() {
             Keys::Import => {
-                self.popup_content = Some(PopMsg::Input("Path".to_owned()));
-                // helper for apply_popup_result
-                self.temp_content = Some(TmpOps::Import)
+                self.popup_content = Some(PopMsg::new(Import));
             }
             Keys::TemplateSwitch => {
                 self.focus = Focus::Profile;
@@ -21,11 +23,7 @@ impl ProfileTab {
             // place in temp_content and build msg popup content
             Keys::Delete => {
                 if let Some(name) = name {
-                    self.temp_content = Some(TmpOps::Remove(name));
-                    self.popup_content = Some(PopMsg::AskChoices(
-                        "Are you sure to delete this?".to_owned(),
-                        vec!["No".to_owned(), "Yes".to_owned()],
-                    ))
+                    self.popup_content = Some(PopMsg::new(Remove { name }));
                 }
             }
             // Keys::ProfileInfo => todo!(),
@@ -34,24 +32,117 @@ impl ProfileTab {
                     self.backend_content = Some(Call::Profile(BackendOp::Template(
                         TemplateOp::Preview(name),
                     )));
-                    self.popup_content = Some(PopMsg::Prompt("Working".to_owned()));
+                    self.popup_content = Some(PopMsg::working());
                 }
             }
             Keys::Edit => {
                 if let Some(name) = name {
-                    self.temp_content = Some(TmpOps::EditWhich(name));
-                    self.popup_content = Some(PopMsg::AskChoices(
-                        "What you want to edit?".to_owned(),
-                        vec!["Cancel".to_owned(), "Uses".to_owned(), "Content".to_owned()],
-                    ));
+                    self.popup_content = Some(PopMsg::new(Edit::<bool> {
+                        name,
+                        uses: self.profiles.get_items().to_owned(),
+                        __marker: PhantomData,
+                    }));
                 }
             }
             Keys::Search => {
-                self.temp_content = Some(TmpOps::SetFilter);
-                self.popup_content = Some(PopMsg::Input("Name".to_owned()));
+                self.popup_content = Some(PopMsg::new(Search));
             }
             _ => return EventState::NotConsumed,
         };
         EventState::WorkDone
+    }
+}
+
+struct Edit<M = bool> {
+    name: String,
+    uses: Vec<String>,
+    __marker: PhantomData<M>,
+}
+
+impl Popmsg for Edit {
+    fn start(&self, pop: &mut crate::tui::widget::Popup) {
+        pop.start()
+            .clear_all()
+            .set_title("Select")
+            .set_question("Which you want to edit?")
+            .set_choices(
+                ["None", "Uses", "Content"]
+                    .into_iter()
+                    .map(|s| s.to_owned()),
+            )
+            .finish();
+    }
+
+    fn next(self: Box<Self>, pop: &mut crate::tui::widget::Popup) -> PopupState {
+        let Some(PopRes::Selected(idx)) = pop.collect() else {
+            unreachable!("Should always be Choices")
+        };
+        let Self {
+            name,
+            uses,
+            __marker,
+        } = *self;
+        match idx {
+            0 => PopupState::Canceled,
+            1 => PopupState::Next(Box::new(Edit::<()> {
+                __marker: PhantomData,
+                name,
+                uses,
+            })),
+            2 => PopupState::ToBackend(Call::Profile(BackendOp::Template(TemplateOp::Edit(name)))),
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Popmsg for Edit<()> {
+    fn start(&self, pop: &mut crate::tui::widget::Popup) {
+        pop.start()
+            .clear_all()
+            .set_title("Edit Uses")
+            .set_choices(self.uses.iter().cloned())
+            .set_multi()
+            .finish();
+    }
+
+    fn next(self: Box<Self>, pop: &mut crate::tui::widget::Popup) -> PopupState {
+        let Some(PopRes::SelectedMulti(selected)) = pop.collect() else {
+            unreachable!("Should always be Choices")
+        };
+        let Self {
+            name,
+            uses,
+            __marker,
+        } = *self;
+        PopupState::ToBackend(Call::Profile(BackendOp::Template(TemplateOp::Uses(
+            name,
+            uses.into_iter()
+                .enumerate()
+                .filter_map(|(idx, profile_name)| selected.contains(&idx).then_some(profile_name))
+                .collect(),
+        ))))
+    }
+}
+
+gen_order_remove!(|e| BackendOp::Template(TemplateOp::Remove(e)));
+
+struct Import;
+
+impl Popmsg for Import {
+    fn start(&self, pop: &mut crate::tui::widget::Popup) {
+        pop.start()
+            .clear_all()
+            .set_title("Path")
+            .with_input()
+            .finish()
+    }
+
+    fn next(self: Box<Self>, pop: &mut crate::tui::widget::Popup) -> crate::tui::widget::PopupState {
+        let Some(PopRes::Input(name)) = pop.collect() else {
+            unreachable!("Should always be Input")
+        };
+        crate::tui::widget::PopupState::ToBackend(Call::Profile(BackendOp::Template(TemplateOp::Add(
+            name,
+        ))))
     }
 }

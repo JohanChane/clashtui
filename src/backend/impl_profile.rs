@@ -55,7 +55,7 @@ impl BackEnd {
     pub fn update_profile(
         &self,
         profile: Profile,
-        with_proxy: Option<bool>,
+        with_proxy: bool,
         remove_proxy_provider: bool,
     ) -> anyhow::Result<Vec<String>> {
         let LocalProfile {
@@ -105,8 +105,8 @@ impl BackEnd {
                 }
             }
         }
-        let with_proxy = with_proxy
-            .unwrap_or(self.api.check_connectivity().is_ok() && self.api.version().is_ok());
+        let with_proxy =
+            with_proxy && self.api.check_connectivity().is_ok() && self.api.version().is_ok();
         match dtype {
             // Imported file won't update, re-import and overwrite it if necessary
             ProfileType::File => anyhow::bail!("Not upgradable"),
@@ -199,7 +199,7 @@ impl BackEnd {
             }
             ProfileOp::Add(name, url) => {
                 self.create_profile(&name, url);
-                let res = self.update_profile(self.get_profile(name).unwrap(), None, false)?;
+                let res = self.update_profile(self.get_profile(name).unwrap(), false, false)?;
                 Ok(CallBack::ProfileCTL(res))
             }
             ProfileOp::Remove(name) => {
