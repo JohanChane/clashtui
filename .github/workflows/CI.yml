@@ -48,7 +48,7 @@ jobs:
 
       - uses: taiki-e/install-action@v2
         with:
-          tool: cross, cargo-make, cargo-deb
+          tool: cross, cargo-make
 
       - name: Test
         if: ${{ matrix.arch == 'amd64' }}

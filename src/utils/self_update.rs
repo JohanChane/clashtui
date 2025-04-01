@@ -233,7 +233,7 @@ mod test {
         );
         let raw = r#"
 - !WithTag
-  - Jackhr-arch/clashtui
+  - JohanChane/clashtui
   - Continuous_Integration
 - !Latest JohanChane/clashtui
 "#;

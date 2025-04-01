@@ -48,8 +48,9 @@ serde_json = "1.0.128"
 serde_yml = "0.0.12"
 futures-util = { version = "0.3.30", default-features = false, optional = true }
 thiserror = "2"
-url = {version = "^2"}
-base64 = {version = "^0"}
+url = { version = "^2" }
+base64 = { version = "^0" }
+self-replace = { version = "1.5.0", default-features = false }
 
 [dependencies.derive_more]
 version = "2"

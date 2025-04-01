@@ -169,8 +169,17 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                         new_path
                     };
                     println!("To {}", new_path.display());
+                    println!("If program failed to replace self, you will find the binary there");
                     println!();
                     asset.download(&new_path)?;
+                    match self_replace::self_replace(&new_path) {
+                        Ok(()) => {
+                            let _ = std::fs::remove_file(new_path);
+                        }
+                        Err(e) => {
+                            anyhow::bail!("Failed to replace self but download is finished. You may have to do it manually\nError due to {e}")
+                        }
+                    };
                 }
             } else {
                 println!("Up to date");
