@@ -35,9 +35,15 @@ default = ["tui", "connection-tab", "template", "migration_v0_2_3"]
 
 [dependencies]
 log = "0.4.22"
+env_logger = { version = "0.11.7", default-features = false, features = [
+  "humantime",
+] }
+is-root = "0.1.4"
+clap = { version = "4.5.17", features = ["derive"] }
 clap_complete = "4.5.26"
+self-replace = { version = "1.5.0", default-features = false }
 anyhow = "1.0.86"
-is-root = { version = "0.1.4" }
+thiserror = "2"
 serde = { version = "1.0.210", features = ["derive"] }
 minreq = { version = "2.12.0", features = [
   "proxy",
@@ -46,14 +52,9 @@ minreq = { version = "2.12.0", features = [
 ] }
 serde_json = "1.0.128"
 serde_yml = "0.0.12"
-futures-util = { version = "0.3.30", default-features = false, optional = true }
-thiserror = "2"
 url = { version = "^2" }
 base64 = { version = "^0" }
-self-replace = { version = "1.5.0", default-features = false }
-env_logger = { version = "0.11.7", default-features = false, features = [
-  "humantime",
-] }
+futures-util = { version = "0.3.30", default-features = false, optional = true }
 
 [dependencies.derive_more]
 version = "2"
@@ -78,17 +79,12 @@ default-features = false
 features = ["crossterm"]
 optional = true
 
-[dependencies.clap]
-version = "4.5.17"
-default-features = false
-features = ["std", "derive", "help", "usage", "suggestions", "color"]
 
 [target.'cfg(windows)'.dependencies]
 encoding_rs = "0.8.34"
 
 [patch.crates-io]
 is-root = { git = "https://github.com/Jackhr-arch/is-root" }
-
 
 [profile.release]
 lto = "fat"
