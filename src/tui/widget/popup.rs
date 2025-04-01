@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEventKind};
+use ratatui::text::Line;
 use ratatui::{prelude as Ra, widgets as Raw};
 use Ra::{Modifier, Style, Stylize};
 
@@ -354,13 +355,19 @@ struct Choices {
 impl Choices {
     #[inline]
     fn widget(&self, is_focus: bool) -> Raw::Tabs {
-        Raw::Tabs::new(self.choices.iter().map(|(ch, _)| ch.as_str()))
-            .highlight_style(
-                is_focus
-                    .then_some(Style::default().add_modifier(Modifier::REVERSED))
-                    .unwrap_or_default(),
-            )
-            .select(self.index)
+        Raw::Tabs::new(self.choices.iter().map(|(ch, is_selected)| {
+            if *is_selected {
+                Line::from(ch.as_str()).blue()
+            } else {
+                Line::from(ch.as_str())
+            }
+        }))
+        .highlight_style(
+            is_focus
+                .then_some(Style::default().add_modifier(Modifier::REVERSED))
+                .unwrap_or_default(),
+        )
+        .select(self.index)
     }
     #[inline]
     fn width(&self) -> u16 {

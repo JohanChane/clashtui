@@ -60,7 +60,7 @@ mod popups {
     ///   * If just the content or none, we are done here.
     ///   * Otherwise, set `M` to `()` and go next
     /// * Then we ask for which will be used
-    /// > FIX ME: here we use `Space` and **NO** color to warn, edit it in popup.rs
+    /// > FIX ME: here we use `Space` edit it in popup.rs
     pub struct Edit<M = bool> {
         name: String,
         uses: Vec<String>,
