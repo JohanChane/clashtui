@@ -39,8 +39,7 @@ impl Request<'static> {
     }
     pub fn s_clashtui(is_ci: bool) -> Self {
         if is_ci {
-            // main repo hasn't start CI release yet
-            Self::WithTag("Jackhr-arch/clashtui", Self::CLASHTUI_CI)
+            Self::WithTag(Self::CLASHTUI, Self::CLASHTUI_CI)
         } else {
             Self::Latest(Self::CLASHTUI)
         }
