@@ -77,18 +77,12 @@ mod data_dir {
 }
 
 pub fn setup_logging(level: u8) {
-    use log4rs::append::file::FileAppender;
-    use log4rs::config::{Appender, Config, Root};
-    use log4rs::encode::pattern::PatternEncoder;
-
-    let log_file = consts::LOG_PATH.as_path();
+    let log_path = consts::LOG_PATH.as_path();
     #[cfg(debug_assertions)]
-    let _ = std::fs::remove_file(log_file); // auto rm old log for debug
-    let flag = if std::fs::File::open(log_file)
-        .and_then(|f| f.metadata())
-        .is_ok_and(|m| m.len() > 1024 * 1024)
-    {
-        let _ = std::fs::remove_file(log_file);
+    let _ = std::fs::remove_file(log_path); // auto rm old log for debug
+    let log_file = std::fs::File::create(log_path).unwrap();
+    let flag = if log_file.metadata().is_ok_and(|m| m.len() > 1024 * 1024) {
+        let _ = std::fs::remove_file(log_path);
         true
     } else {
         false
@@ -98,22 +92,14 @@ pub fn setup_logging(level: u8) {
         .nth(level as usize)
         .unwrap_or(log::LevelFilter::max());
 
-    let file_appender = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new(
-            "{d(%H:%M:%S)} [{l}] {t} - {m}{n}",
-        ))) // Having a timestamp would be better.
-        .build(log_file)
-        .expect("Err opening log file");
-
-    let config = Config::builder()
-        .appender(Appender::builder().build("file", Box::new(file_appender)))
-        .build(Root::builder().appender("file").build(log_level))
-        .expect("Err building log config");
-
-    log4rs::init_config(config).expect("Err initing log service");
+    env_logger::builder()
+        .filter_level(log_level)
+        .format_timestamp_micros()
+        .target(env_logger::Target::Pipe(Box::new(log_file)))
+        .init();
 
     log::info!("{}", "-".repeat(20));
-    log::info!("Start Log, level: {}", log_level);
+    log::trace!("Start Log, level: {}", log_level);
     if flag {
         log::info!("Log file too large, cleared")
     }
