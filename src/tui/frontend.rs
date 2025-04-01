@@ -184,10 +184,13 @@ impl Drawable for FrontEnd {
             if evst == EventState::Yes {
                 if let Some(res) = self.popup.next() {
                     match res {
-                        super::widget::PopupState::Canceled | super::widget::PopupState::Next(..) => {
+                        super::widget::PopupState::Canceled
+                        | super::widget::PopupState::Next(..) => {
                             unreachable!()
                         }
-                        super::widget::PopupState::ToBackend(call) => self.backend_content = Some(call),
+                        super::widget::PopupState::ToBackend(call) => {
+                            self.backend_content = Some(call)
+                        }
                         super::widget::PopupState::ToFrontend(pop_res) => {
                             return self
                                 .tabs

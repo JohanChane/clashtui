@@ -74,8 +74,13 @@ impl Popmsg for Search {
 }
 macro_rules! gen_order_remove {
     ($e:expr) => {
-        struct Remove {
+        pub struct Remove {
             name: String,
+        }
+        impl Remove {
+            pub fn new(name: String) -> Self {
+                Self { name }
+            }
         }
 
         impl Popmsg for Remove {
@@ -95,9 +100,7 @@ macro_rules! gen_order_remove {
                 };
                 match idx {
                     0 => PopupState::Canceled,
-                    1 => {
-                        PopupState::ToBackend(Call::Profile($e(name)))
-                    }
+                    1 => PopupState::ToBackend(Call::Profile($e(name))),
                     _ => unreachable!(),
                 }
             }

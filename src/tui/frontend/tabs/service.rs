@@ -157,7 +157,10 @@ impl Popmsg for Modes {
             .set_choices(MODE.into_iter().map(|v| v.into()));
     }
 
-    fn next(self: Box<Self>, pop: &mut crate::tui::widget::Popup) -> crate::tui::widget::PopupState {
+    fn next(
+        self: Box<Self>,
+        pop: &mut crate::tui::widget::Popup,
+    ) -> crate::tui::widget::PopupState {
         let Some(PopRes::Selected(idx)) = pop.collect() else {
             unreachable!()
         };

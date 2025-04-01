@@ -148,7 +148,10 @@ impl Popmsg for TerminateAll {
             .finish();
     }
 
-    fn next(self: Box<Self>, pop: &mut crate::tui::widget::Popup) -> crate::tui::widget::PopupState {
+    fn next(
+        self: Box<Self>,
+        pop: &mut crate::tui::widget::Popup,
+    ) -> crate::tui::widget::PopupState {
         let Some(PopRes::Selected(idx)) = pop.collect() else {
             unreachable!()
         };
@@ -156,7 +159,9 @@ impl Popmsg for TerminateAll {
             // regarded as cancel
             0 => crate::tui::widget::PopupState::Canceled,
             // regarded as yes
-            1 => crate::tui::widget::PopupState::ToBackend(Call::Connection(BackendOp::TerminalAll)),
+            1 => {
+                crate::tui::widget::PopupState::ToBackend(Call::Connection(BackendOp::TerminalAll))
+            }
             // regarded as extra-choices
             _ => unreachable!(),
         }
@@ -174,7 +179,10 @@ impl Popmsg for Search {
             .finish()
     }
 
-    fn next(self: Box<Self>, pop: &mut crate::tui::widget::Popup) -> crate::tui::widget::PopupState {
+    fn next(
+        self: Box<Self>,
+        pop: &mut crate::tui::widget::Popup,
+    ) -> crate::tui::widget::PopupState {
         let Some(PopRes::Input(ipt)) = pop.collect() else {
             unreachable!()
         };
