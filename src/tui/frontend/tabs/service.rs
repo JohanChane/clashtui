@@ -1,8 +1,8 @@
 use crate::backend::ServiceOp;
-use crate::define_enum;
 use crate::tui::widget::{Browser, Path, Popmsg};
 use crate::{clash::webapi::Mode, tui::widget::PopRes};
 use crossterm::event::KeyEvent;
+use strum::{EnumCount, VariantArray};
 
 use crate::tui::{frontend::consts::TAB_TITLE_SERVICE, widget::List, Drawable, EventState};
 use ratatui::prelude as Ra;
@@ -19,16 +19,14 @@ pub enum BackendOp {
     Preview(std::path::PathBuf),
 }
 
-define_enum!(
-    #[derive(Clone, Copy, Debug)]
-    pub enum ExtendOp {
-        ViewClashtuiConfigDir,
-        // Generate a list of information
-        // about the application and clash core
-        GenerateInfoList,
-        FullLog,
-    }
-);
+#[derive(Clone, Copy, Debug, EnumCount, VariantArray, strum::Display)]
+pub enum ExtendOp {
+    ViewClashtuiConfigDir,
+    // Generate a list of information
+    // about the application and clash core
+    GenerateInfoList,
+    FullLog,
+}
 
 pub(in crate::tui::frontend) struct ServiceTab {
     inner: List,
@@ -44,10 +42,10 @@ impl Default for ServiceTab {
         let mut inner = List::new(TAB_TITLE_SERVICE.to_string());
         let items = inner.get_items_mut();
         items.push("SwitchMode".to_owned());
-        items.extend(ServiceOp::ALL.into_iter().map(|v| v.to_string()));
+        items.extend(ServiceOp::VARIANTS.iter().map(|v| v.to_string()));
 
         items.push("-----".to_owned());
-        items.extend(ExtendOp::ALL.into_iter().map(|v| v.to_string()));
+        items.extend(ExtendOp::VARIANTS.iter().map(|v| v.to_string()));
 
         Self {
             inner,
@@ -121,14 +119,14 @@ impl Drawable for ServiceTab {
                         0 => {
                             self.popup_content = Some(PopMsg::new(Modes));
                         }
-                        idx if idx <= ServiceOp::const_len() => {
-                            let op = ServiceOp::ALL[index - 1];
+                        idx if idx <= ServiceOp::COUNT => {
+                            let op = ServiceOp::VARIANTS[index - 1];
                             self.backend_content = Some(Call::Service(BackendOp::ServiceCTL(op)));
                             self.popup_content = Some(PopMsg::working());
                         }
-                        idx if idx == ServiceOp::const_len() + 1 => (),
-                        idx if idx < ServiceOp::const_len() + 2 + ExtendOp::const_len() => {
-                            let op = ExtendOp::ALL[index - 2 - ServiceOp::const_len()];
+                        idx if idx == ServiceOp::COUNT + 1 => (),
+                        idx if idx < ServiceOp::COUNT + 2 + ExtendOp::COUNT => {
+                            let op = ExtendOp::VARIANTS[index - 2 - ServiceOp::COUNT];
                             if let ExtendOp::ViewClashtuiConfigDir = op {
                                 self.file_browser = Some(Browser::new(crate::DataDir::get()))
                             } else {

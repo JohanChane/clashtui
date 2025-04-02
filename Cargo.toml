@@ -23,8 +23,9 @@ tui = [
   "dep:ratatui",
   "dep:crossterm",
   "dep:tokio",
-  "dep:futures-util",
+  "dep:futures-lite",
   "dep:derive_more",
+  "dep:strum",
 ]
 customized-theme = ["tui", "ratatui/serde"]
 template = []
@@ -54,7 +55,8 @@ serde_json = "1.0.128"
 serde_yml = "0.0.12"
 url = { version = "^2" }
 base64 = { version = "^0" }
-futures-util = { version = "0.3.30", default-features = false, optional = true }
+futures-lite = { version = "2.6.0", default-features = false, optional = true }
+strum = { version = "0.26.3", features = ["derive"], optional = true }
 
 [dependencies.derive_more]
 version = "2"

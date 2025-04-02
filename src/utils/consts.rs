@@ -28,6 +28,7 @@ pub(crate) static PROFILE_PATH: Path = Lock::new(|| DataDir::get().join(PROFILE_
 pub(crate) static TEMPLATE_PATH: Path = Lock::new(|| DataDir::get().join(TEMPLATE_DIR));
 pub(crate) static _TEMP_PATH: Path = Lock::new(|| DataDir::get().join(_TMP_FILE));
 
+#[cfg(feature = "tui")]
 pub mod err {
     pub const BACKEND_RX: &str = "backend rx dropped before STOP signal";
     pub const BACKEND_TX: &str = "backend tx dropped before STOP signal";

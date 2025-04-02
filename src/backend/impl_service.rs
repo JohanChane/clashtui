@@ -8,26 +8,28 @@ mod state;
 
 pub(super) use state::State;
 
-crate::define_enum!(
-    #[derive(Clone, Copy, Debug)]
-    pub enum ServiceOp {
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
-        RestartClashService,
-        RestartClashCore,
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
-        StopClashService,
-        #[cfg(target_os = "linux")]
-        SetPermission,
-        #[cfg(target_os = "windows")]
-        SwitchSysProxy,
-        #[cfg(target_os = "windows")]
-        EnableLoopback,
-        #[cfg(target_os = "windows")]
-        InstallSrv,
-        #[cfg(target_os = "windows")]
-        UnInstallSrv,
-    }
-);
+#[cfg_attr(
+    feature = "tui",
+    derive(strum::Display, strum::EnumCount, strum::VariantArray)
+)]
+#[derive(Clone, Copy, Debug)]
+pub enum ServiceOp {
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    RestartClashService,
+    RestartClashCore,
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    StopClashService,
+    #[cfg(target_os = "linux")]
+    SetPermission,
+    #[cfg(target_os = "windows")]
+    SwitchSysProxy,
+    #[cfg(target_os = "windows")]
+    EnableLoopback,
+    #[cfg(target_os = "windows")]
+    InstallSrv,
+    #[cfg(target_os = "windows")]
+    UnInstallSrv,
+}
 
 impl BackEnd {
     pub fn update_mode(&self, mode: crate::clash::webapi::Mode) -> anyhow::Result<()> {
