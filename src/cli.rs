@@ -1,5 +1,3 @@
-use crate::utils::consts::VERSION;
-
 mod complete;
 mod handler;
 mod widgets;
@@ -28,18 +26,22 @@ pub(crate) fn parse_args() -> Result<(Option<PackedArgs>, u8), ()> {
         #[cfg(feature = "customized-theme")]
         load_theme_realtime,
     } = CliCmds::parse();
+
     if let Some(generate_shell_completion) = generate_shell_completion {
         complete::gen_complete(generate_shell_completion);
         eprint!("generate completion success");
         return Err(());
     }
+
     if let Some(config_dir) = config_dir {
         super::DataDir::set(config_dir);
     }
+
     #[cfg(feature = "customized-theme")]
     if load_theme_realtime {
         crate::tui::Theme::enable_realtime();
     }
+
     if let Some(ArgCommand::Migrate { version }) = &command {
         if let Err(e) = match version {
             #[cfg(feature = "migration_v0_2_3")]
@@ -62,7 +64,12 @@ pub(crate) fn parse_args() -> Result<(Option<PackedArgs>, u8), ()> {
 /// A tool for mihomo, also support other Clash API
 #[derive(clap::Parser)]
 #[cfg_attr(debug_assertions, derive(Debug))]
-#[command(version=VERSION, about, after_help=concat!("If you have any question or suggestion, please visit ", env!("CARGO_PKG_REPOSITORY")))]
+#[command(
+    version = crate::consts::PKG_VERSION,
+    long_version = crate::consts::FULL_VERSION,
+    about,
+    after_help=concat!("If you have any question or suggestion, please visit ", env!("CARGO_PKG_REPOSITORY"))
+)]
 pub(crate) struct CliCmds {
     #[command(subcommand)]
     command: Option<ArgCommand>,
@@ -105,9 +112,6 @@ enum ArgCommand {
     },
     /// check for update
     Update {
-        /// download the first item (already filtered by arch)
-        #[arg(long, short = 'y')]
-        without_ask: bool,
         /// check ci/alpha release instead
         #[arg(long, short = 'c')]
         ci: bool,
@@ -129,7 +133,7 @@ enum OldVersion {
     /// v0.2.3
     V0_2_3,
     #[cfg(not(any(feature = "migration_v0_2_3")))]
-    /// not supported any version
+    /// not support any version
     NotSupported,
 }
 
@@ -199,9 +203,9 @@ enum ServiceCommand {
     Stop,
 }
 
-impl From<ModeCommand> for crate::clash::webapi::Mode {
+use crate::backend::Mode;
+impl From<ModeCommand> for Mode {
     fn from(value: ModeCommand) -> Self {
-        use crate::clash::webapi::Mode;
         match value {
             ModeCommand::Rule => Mode::Rule,
             ModeCommand::Direct => Mode::Direct,

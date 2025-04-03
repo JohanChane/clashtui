@@ -1,17 +1,15 @@
-use super::{ipc, BackEnd, ProfileType};
+use super::{ProfileBackend, ProfileType, ipc};
 
-#[cfg(feature = "tui")]
-use super::CallBack;
-#[cfg(feature = "tui")]
-use crate::tui::tabs::profile::TemplateOp;
 use crate::{
     consts::MAX_SUPPORTED_TEMPLATE_VERSION,
     utils::consts::{PROFILE_PATH, TEMPLATE_PATH},
 };
+#[cfg(feature = "tui")]
+use {super::CallBack, crate::tui::tabs::profile::TemplateOp};
 
 mod version1;
 
-impl BackEnd {
+impl ProfileBackend<'_> {
     pub fn get_all_templates(&self) -> std::io::Result<Vec<String>> {
         Ok(std::fs::read_dir(TEMPLATE_PATH.as_path())?
             .collect::<std::io::Result<Vec<std::fs::DirEntry>>>()?
@@ -27,11 +25,9 @@ impl BackEnd {
         let path = std::path::PathBuf::from(path);
         let file = std::fs::File::open(&path)?;
         let map: serde_yml::Mapping = serde_yml::from_reader(file)?;
-        let mut target = path.clone();
         // remove extension if exists
-        target.set_extension("");
         // file is opened, so file_name should exist
-        let name = target.file_name().unwrap();
+        let name = path.with_extension("").file_name().unwrap().to_owned();
         match map
             .get("clashtui_template_version")
             .and_then(|v| v.as_u64())
@@ -40,8 +36,8 @@ impl BackEnd {
                 std::fs::copy(&path, TEMPLATE_PATH.join(name))?;
                 Ok(None)
             }
-            Some(ver) if ver <= MAX_SUPPORTED_TEMPLATE_VERSION as u64 => {
-                std::fs::copy(&path, TEMPLATE_PATH.join(name))?;
+            Some(ver) if ver <= MAX_SUPPORTED_TEMPLATE_VERSION => {
+                std::fs::copy(&path, TEMPLATE_PATH.join(&name))?;
                 Ok(Some(format!(
                     "Name:{} Added\nClashtui Template Version {}",
                     // path from a String, should be UTF-8
@@ -110,10 +106,8 @@ impl BackEnd {
         serde_yml::to_writer(file, &map)?;
         Ok(())
     }
-}
 
-#[cfg(feature = "tui")]
-impl BackEnd {
+    #[cfg(feature = "tui")]
     pub(super) fn handle_template_op(&self, op: TemplateOp) -> anyhow::Result<CallBack> {
         match op {
             TemplateOp::GetALL => Ok(CallBack::TemplateInit(self.get_all_templates()?)),
@@ -161,7 +155,7 @@ const PROXY_PROVIDERS: &str = "proxy-providers";
 const PROXY_GROUPS: &str = "proxy-groups";
 const PROXIES: &str = "proxies";
 
-impl BackEnd {
+impl ProfileBackend<'_> {
     /// Remove `proxy-providers` and combine their contents into one file
     ///
     /// Return combined file content

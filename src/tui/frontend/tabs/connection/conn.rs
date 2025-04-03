@@ -139,10 +139,10 @@ impl Raw::WidgetRef for Connection {
         Self: Sized,
     {
         use Ra::{
-            symbols::{border, line::NORMAL},
             Constraint,
             Constraint::Length,
             Layout,
+            symbols::{border, line::NORMAL},
         };
         use Raw::{Block, Borders, Paragraph};
 

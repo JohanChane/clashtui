@@ -14,6 +14,15 @@ impl Default for Profile {
         }
     }
 }
+impl Profile {
+    pub fn load_local_profile(self) -> anyhow::Result<LocalProfile> {
+        use crate::utils::consts::PROFILE_PATH;
+        let path = PROFILE_PATH.join(&self.name);
+        let mut lpf = LocalProfile::from_pf(self, path);
+        lpf.sync_from_disk()?;
+        Ok(lpf)
+    }
+}
 
 #[derive(Clone)]
 pub struct LocalProfile {

@@ -1,24 +1,23 @@
-use super::{ipc, BackEnd};
-
 use std::fs::File;
 
+use crate::backend::clash::MinreqResult;
+
+use super::{ProfileBackend, ipc};
 #[cfg(feature = "tui")]
-use super::CallBack;
-#[cfg(feature = "tui")]
-use crate::tui::tabs::profile::ProfileOp;
+use {super::CallBack, crate::tui::tabs::profile::ProfileOp};
 
 pub(super) mod database;
 mod profile;
 
 pub use profile::{LocalProfile, Profile, ProfileType};
 
-impl BackEnd {
-    pub(super) fn create_profile<S: AsRef<str>, S2: AsRef<str>>(&self, name: S, url: S2) {
+impl ProfileBackend<'_> {
+    pub(super) fn create_profile(&self, name: impl AsRef<str>, url: impl AsRef<str>) {
         self.pm
             .insert(name, ProfileType::Url(url.as_ref().to_owned()));
     }
     pub(super) fn remove_profile(&self, pf: Profile) -> anyhow::Result<()> {
-        let pf = self.load_local_profile(pf)?;
+        let pf = pf.load_local_profile()?;
         if let Err(e) = std::fs::remove_file(pf.path) {
             if e.kind() != std::io::ErrorKind::NotFound {
                 log::warn!("Failed to Remove profile file: {e}")
@@ -27,7 +26,7 @@ impl BackEnd {
         self.pm.remove(pf.name);
         Ok(())
     }
-    pub fn get_profile<S: AsRef<str>>(&self, name: S) -> Option<Profile> {
+    pub fn get_profile(&self, name: impl AsRef<str>) -> Option<Profile> {
         self.pm.get(name)
     }
     pub fn get_all_profiles(&self) -> Vec<Profile> {
@@ -44,14 +43,6 @@ impl BackEnd {
         self.pm.set_current(pf);
     }
 
-    pub(super) fn load_local_profile(&self, pf: Profile) -> anyhow::Result<LocalProfile> {
-        use crate::utils::consts::PROFILE_PATH;
-        let path = PROFILE_PATH.join(&pf.name);
-        let mut lpf = LocalProfile::from_pf(pf, path);
-        lpf.sync_from_disk()?;
-        Ok(lpf)
-    }
-
     pub fn update_profile(
         &self,
         profile: Profile,
@@ -63,7 +54,7 @@ impl BackEnd {
             dtype,
             path,
             content,
-        } = self.load_local_profile(profile)?;
+        } = profile.load_local_profile()?;
         // ensure path is valid
         anyhow::ensure!(
             path.is_absolute(),
@@ -77,7 +68,7 @@ impl BackEnd {
         }
         // do update
         #[inline]
-        fn update_with<F: FnOnce(&str, bool) -> crate::clash::MinreqResult>(
+        fn update_with<F: FnOnce(&str, bool) -> MinreqResult>(
             url: String,
             name: String,
             path: std::path::PathBuf,
@@ -152,24 +143,24 @@ impl BackEnd {
 
     pub fn select_profile(&self, profile: Profile) -> anyhow::Result<()> {
         // load selected profile
-        let mut lprofile = self.load_local_profile(profile.clone())?;
+        let mut lprofile = profile.clone().load_local_profile()?;
         // merge that into basic profile
-        lprofile.merge(&self.base_profile)?;
+        lprofile.merge(self.base_profile)?;
         // set path to clash config file path and sync to disk
-        lprofile.path = self.cfg.basic.clash_cfg_pth.clone().into();
+        lprofile.path = self.cfg.clash_config_path.clone().into();
         lprofile.sync_to_disk()?;
         // after, change current profile
         self.set_current_profile(profile);
         // ask clash to reload config
-        self.api.config_reload(&self.cfg.basic.clash_cfg_pth)?;
+        self.api.config_reload(&self.cfg.clash_config_path)?;
         Ok(())
     }
     pub fn test_profile_config(&self, path: &str, geodata_mode: bool) -> std::io::Result<String> {
         let cmd = format!(
             "{} {} -d {} -f {} -t",
-            self.cfg.basic.clash_bin_pth,
+            self.cfg.clash_bin_path,
             if geodata_mode { "-m" } else { "" },
-            self.cfg.basic.clash_cfg_dir,
+            self.cfg.clash_config_dir,
             path,
         );
         #[cfg(target_os = "windows")]
@@ -177,9 +168,8 @@ impl BackEnd {
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         ipc::exec("sh", vec!["-c", cmd.as_str()])
     }
-}
-#[cfg(feature = "tui")]
-impl BackEnd {
+
+    #[cfg(feature = "tui")]
     pub(super) fn handle_profile_op(&self, op: ProfileOp) -> anyhow::Result<CallBack> {
         match op {
             ProfileOp::GetALL => {
@@ -189,7 +179,7 @@ impl BackEnd {
                     .map(|pf| {
                         (
                             pf.name.clone(),
-                            self.load_local_profile(pf).ok().and_then(|lp| lp.atime()),
+                            pf.load_local_profile().ok().and_then(|lp| lp.atime()),
                         )
                     })
                     .collect();
@@ -206,20 +196,19 @@ impl BackEnd {
                 self.remove_profile(self.get_profile(&name).unwrap())?;
                 Ok(CallBack::ProfileCTL(vec![format!("{name} Removed")]))
             }
-            ProfileOp::Update(name, with_proxy, without_pp) => {
+            ProfileOp::Update(name, with_proxy, remove_pp) => {
                 let res =
-                    self.update_profile(self.get_profile(name).unwrap(), with_proxy, without_pp)?;
+                    self.update_profile(self.get_profile(name).unwrap(), with_proxy, remove_pp)?;
                 Ok(CallBack::ProfileCTL(res))
             }
             ProfileOp::Select(name) => {
                 self.select_profile(self.get_profile(name).unwrap())?;
                 Ok(CallBack::ProfileCTL(vec![
-                    "Profile is now loaded".to_owned()
+                    "Profile is now loaded".to_owned(),
                 ]))
             }
             ProfileOp::Test(name, geodata_mode) => {
-                let pf = self.get_profile(name).unwrap();
-                let pf = self.load_local_profile(pf)?;
+                let pf = self.get_profile(name).unwrap().load_local_profile()?;
                 let res = self.test_profile_config(pf.path.to_str().unwrap(), geodata_mode)?;
                 Ok(CallBack::ProfileCTL(
                     res.lines().map(|s| s.to_owned()).collect(),
@@ -227,8 +216,7 @@ impl BackEnd {
             }
             ProfileOp::Preview(name) => {
                 let mut lines = Vec::with_capacity(512);
-                let pf = self.get_profile(name).unwrap();
-                let pf = self.load_local_profile(pf)?;
+                let pf = self.get_profile(name).unwrap().load_local_profile()?;
                 lines.push(
                     pf.dtype
                         .get_domain()
@@ -245,9 +233,7 @@ impl BackEnd {
                 Ok(CallBack::Preview(lines))
             }
             ProfileOp::Edit(name) => {
-                let pf = self.get_profile(name).unwrap();
-                let pf = self.load_local_profile(pf)?;
-
+                let pf = self.get_profile(name).unwrap().load_local_profile()?;
                 ipc::spawn(
                     "sh",
                     vec![

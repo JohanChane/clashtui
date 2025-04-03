@@ -1,4 +1,4 @@
-use crate::clash::webapi::{Mode, TunStack};
+use super::clash::webapi::{Mode, TunStack};
 
 pub struct State {
     pub profile: String,

@@ -1,21 +1,26 @@
+mod clash;
 mod impl_profile;
 mod impl_service;
 #[cfg(feature = "template")]
 mod impl_template;
 #[cfg(feature = "tui")]
 mod impl_tui;
+mod state;
 
-use crate::clash::webapi::ClashUtil;
+use clash::webapi::ClashUtil;
+#[cfg(feature = "connections")]
+pub use clash::webapi::{Conn, ConnInfo, ConnMetaData};
+pub use clash::{get_blob, headers, webapi::Mode};
 // configs
-use crate::utils::config::{BuildConfig, LibConfig};
+use crate::utils::config::{Basic, BuildConfig, LibConfig};
 // ipc
 use crate::utils::ipc;
 // profile
 pub use impl_profile::ProfileType;
-pub use impl_profile::{database::ProfileManager, Profile};
+pub use impl_profile::{Profile, database::ProfileManager};
 // service
 pub use impl_service::ServiceOp;
-use impl_service::State;
+use state::State;
 
 #[cfg(feature = "tui")]
 #[derive(derive_more::Debug)]
@@ -31,25 +36,15 @@ pub enum CallBack {
     ProfileInit(Vec<String>, Vec<Option<core::time::Duration>>),
     ProfileCTL(Vec<String>),
 
-    #[cfg(feature = "connection-tab")]
-    ConnectionInit(#[debug(skip)] crate::clash::webapi::ConnInfo),
-    #[cfg(feature = "connection-tab")]
+    #[cfg(feature = "connections")]
+    ConnectionInit(#[debug(skip)] clash::webapi::ConnInfo),
+    #[cfg(feature = "connections")]
     ConnectionCTL(String),
 
     #[cfg(feature = "template")]
     TemplateInit(Vec<String>),
     #[cfg(feature = "template")]
     TemplateCTL(Vec<String>),
-}
-
-#[cfg(feature = "tui")]
-impl From<anyhow::Result<CallBack>> for CallBack {
-    fn from(value: anyhow::Result<CallBack>) -> Self {
-        match value {
-            Ok(v) => v,
-            Err(e) => CallBack::Error(e.to_string()),
-        }
-    }
 }
 
 pub struct BackEnd {
@@ -67,7 +62,7 @@ impl BackEnd {
         let BuildConfig {
             cfg,
             data,
-            base_profile: base_raw,
+            base_profile,
             edit_cmd,
             open_dir_cmd,
             timeout,
@@ -76,22 +71,41 @@ impl BackEnd {
             secret,
             global_ua,
         } = value;
-        crate::clash::webapi::set_timeout(timeout);
-        let api = ClashUtil::new(external_controller, secret, proxy_addr, global_ua);
+        let api = ClashUtil::new(external_controller, secret, proxy_addr, global_ua, timeout);
         Self {
             api,
             cfg,
             pm: data,
             edit_cmd,
-            base_profile: base_raw,
+            base_profile,
             open_dir_cmd,
         }
     }
-    pub fn get_config(&self) -> &LibConfig {
-        &self.cfg
+    pub fn get_mihomo_bin_path(&self) -> &str {
+        &self.cfg.basic.clash_bin_path
     }
     /// Save all in-memory data to file
     fn save(self) -> ProfileManager {
         self.pm
+    }
+}
+
+pub struct ProfileBackend<'a> {
+    pm: &'a ProfileManager,
+    api: &'a ClashUtil,
+    base_profile: &'a serde_yml::Mapping,
+    cfg: &'a Basic,
+    edit_cmd: &'a str,
+}
+
+impl BackEnd {
+    pub fn as_profile(&self) -> ProfileBackend {
+        ProfileBackend {
+            pm: &self.pm,
+            api: &self.api,
+            base_profile: &self.base_profile,
+            cfg: &self.cfg.basic,
+            edit_cmd: &self.edit_cmd,
+        }
     }
 }

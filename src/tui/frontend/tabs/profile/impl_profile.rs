@@ -2,8 +2,6 @@ use super::*;
 use popups::*;
 
 impl ProfileTab {
-    /// - Caught event -> [EventState::WorkDone]
-    /// - unrecognized event -> [EventState::NotConsumed]
     pub(super) fn handle_profile_key_event(&mut self, ev: &KeyEvent) -> EventState {
         let name = self
             .profiles
@@ -59,7 +57,7 @@ impl ProfileTab {
             }
             _ => return EventState::NotConsumed,
         };
-        EventState::WorkDone
+        EventState::Consumed
     }
 }
 

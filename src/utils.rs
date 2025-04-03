@@ -1,5 +1,6 @@
 pub mod config;
 pub mod ipc;
+pub mod logging;
 pub mod self_update;
 
 pub(crate) mod consts;
@@ -16,8 +17,8 @@ mod data_dir {
                     let path = match std::path::absolute(&path) {
                         Ok(dir) => dir,
                         Err(e) => {
-                            log::error!("Cannot locate absolute path:{e}");
-                            log::error!("Update profile may not work");
+                            eprintln!("Cannot locate absolute path:{e}");
+                            eprintln!("Update profile may not work");
                             path
                         }
                     };
@@ -72,34 +73,5 @@ mod data_dir {
             .map(|c| c.join("clashtui"))
             .expect("failed to load home dir")
         }
-    }
-}
-
-pub fn setup_logging(level: u8) {
-    let log_path = consts::LOG_PATH.as_path();
-    #[cfg(debug_assertions)]
-    let _ = std::fs::remove_file(log_path); // auto rm old log for debug
-    let log_file = std::fs::File::create(log_path).unwrap();
-    let flag = if log_file.metadata().is_ok_and(|m| m.len() > 1024 * 1024) {
-        let _ = std::fs::remove_file(log_path);
-        true
-    } else {
-        false
-    };
-    let level = level + if cfg!(debug_assertions) { 4 } else { 2 };
-    let log_level = log::LevelFilter::iter()
-        .nth(level as usize)
-        .unwrap_or(log::LevelFilter::max());
-
-    env_logger::builder()
-        .filter_level(log_level)
-        .format_timestamp_micros()
-        .target(env_logger::Target::Pipe(Box::new(log_file)))
-        .init();
-
-    log::info!("{}", "-".repeat(20));
-    log::trace!("Start Log, level: {}", log_level);
-    if flag {
-        log::info!("Log file too large, cleared")
     }
 }

@@ -1,7 +1,7 @@
 [package]
 name = "clashtui"
 version = "0.3.0"
-edition = "2021"
+edition = "2024"
 
 authors = ["Johan Chane <johanchanex at gmail dot com>"]
 description = "Mihomo TUI Client"
@@ -29,9 +29,9 @@ tui = [
 ]
 customized-theme = ["tui", "ratatui/serde"]
 template = []
-connection-tab = ["tui", "ratatui/unstable-widget-ref"]
+connections = ["tui", "ratatui/unstable-widget-ref"]
 migration_v0_2_3 = []
-default = ["tui", "connection-tab", "template", "migration_v0_2_3"]
+default = ["tui", "connections", "template", "migration_v0_2_3"]
 
 
 [dependencies]
@@ -72,7 +72,7 @@ optional = true
 [dependencies.crossterm]
 version = "0.28.1"
 default-features = false
-features = ["events", "event-stream"]
+features = ["event-stream"]
 optional = true
 
 [dependencies.ratatui]
@@ -93,6 +93,9 @@ lto = "fat"
 opt-level = 's'
 strip = true
 
+[workspace.metadata.typos.default.extend-words]
+"ratatui" = "ratatui"
+"Chane" = "Chane"
 
 [package.metadata.deb]
 maintainer = 'Jackhr-arch <63526062+Jackhr-arch@users.noreply.github.com>'

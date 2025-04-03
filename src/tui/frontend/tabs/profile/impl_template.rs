@@ -2,8 +2,6 @@ use super::*;
 use popups::*;
 
 impl ProfileTab {
-    /// - Caught event -> [EventState::WorkDone]
-    /// - unrecognized event -> [EventState::NotConsumed]
     pub(super) fn handle_template_key_event(&mut self, ev: &KeyEvent) -> EventState {
         let name = self
             .templates
@@ -37,15 +35,13 @@ impl ProfileTab {
                     self.popup_content = Some(PopMsg::new(Edit::new(
                         name,
                         self.profiles.get_items().to_owned(),
-                    )));
+                    )))
                 }
             }
-            Keys::Search => {
-                self.popup_content = Some(PopMsg::new(Search));
-            }
+            Keys::Search => self.popup_content = Some(PopMsg::new(Search)),
             _ => return EventState::NotConsumed,
         };
-        EventState::WorkDone
+        EventState::Consumed
     }
 }
 

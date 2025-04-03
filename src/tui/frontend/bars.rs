@@ -26,7 +26,6 @@ impl FrontEnd {
             Theme::get().bars.statusbar_text,
         ))
         //.alignment(ratatui::prelude::Alignment::Right)
-        .wrap(Raw::Wrap { trim: true })
         .block(Raw::Block::new().borders(Raw::Borders::ALL));
         f.render_widget(this, area);
     }

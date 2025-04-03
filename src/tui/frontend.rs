@@ -10,14 +10,17 @@ use crate::utils::consts::err as consts_err;
 use key_bind::Keys;
 use tabs::TabCont;
 
+use Ra::{Frame, Rect};
 use crossterm::event::{self, KeyCode, KeyEvent};
 use ratatui::prelude as Ra;
 use ratatui::widgets as Raw;
 use tokio::sync::mpsc::{Receiver, Sender};
-use Ra::{Frame, Rect};
+
+// 50fps
+const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
 
 pub struct FrontEnd {
-    tabs: Vec<Box<dyn TabCont + Send>>,
+    tabs: Vec<Box<dyn TabCont>>,
     tab_index: usize,
     popup: Box<Popup>,
     should_quit: bool,
@@ -28,14 +31,13 @@ pub struct FrontEnd {
 
 impl FrontEnd {
     pub fn new() -> Self {
-        let tabs: Vec<Box<dyn TabCont + Send>> = vec![
-            Box::new(tabs::profile::ProfileTab::default()),
-            Box::new(tabs::service::ServiceTab::default()),
-            #[cfg(feature = "connection-tab")]
-            Box::new(tabs::connection::ConnectionTab::default()),
-        ];
         Self {
-            tabs,
+            tabs: vec![
+                tabs::service::ServiceTab::default().to_dyn(),
+                tabs::profile::ProfileTab::default().to_dyn(),
+                #[cfg(feature = "connections")]
+                tabs::connection::ConnectionTab::default().to_dyn(),
+            ],
             tab_index: 0,
             popup: Default::default(),
             should_quit: false,
@@ -44,44 +46,35 @@ impl FrontEnd {
         }
     }
     pub async fn run(mut self, tx: Sender<Call>, mut rx: Receiver<CallBack>) -> anyhow::Result<()> {
-        use core::time::Duration;
         use futures_lite::StreamExt as _;
-        // 50fps
-        const TICK_RATE: Duration = Duration::from_millis(20);
         let mut terminal = Ra::Terminal::new(Ra::CrosstermBackend::new(std::io::stdout()))?;
-        // this is an async solution.
-        // NOTE:
-        // `event::poll` will block the thread,
-        // and since there is only one process,
-        // the backend thread won't be able to active
         let mut stream = event::EventStream::new();
+
         while !self.should_quit {
             self.tick(&tx, &mut rx).await;
-            terminal.draw(|f| self.render(f, Default::default(), true))?;
+            terminal.draw(|f| self.render(f, f.area(), true))?;
+
             let ev = tokio::select! {
                 // avoid tokio cancel the handler
-                e = stream.next() => {e},
+                Some(v) = stream.next() => {v},
                 // make sure tui refresh
-                () = tokio::time::sleep(TICK_RATE) => {None}
+                () = tokio::time::sleep(TICK_RATE) => {continue},
             };
-            if let Some(ev) = ev {
-                match ev? {
-                    event::Event::FocusGained | event::Event::FocusLost => (),
-                    event::Event::Mouse(_) => (),
-                    event::Event::Paste(_) => (),
-                    event::Event::Key(key_event) => {
-                        #[cfg(debug_assertions)]
-                        if the_egg(key_event.code) {
-                            log::debug!("You've found the egg!")
-                        };
-                        self.handle_key_event(&key_event);
-                    }
-                    event::Event::Resize(..) => terminal.autoresize()?,
+            match ev? {
+                event::Event::Key(key_event) => {
+                    #[cfg(debug_assertions)]
+                    if the_egg(key_event.code) {
+                        log::debug!("You've found the egg!")
+                    };
+                    self.handle_key_event(&key_event);
                 }
+                event::Event::Resize(..) => terminal.autoresize()?,
+                _ => (),
             }
         }
+
         tx.send(Call::Stop).await.expect(consts_err::BACKEND_TX);
-        log::info!("App Exit");
+        log::trace!("App Exit");
         Ok(())
     }
     async fn tick(&mut self, tx: &Sender<Call>, rx: &mut Receiver<CallBack>) {
@@ -96,53 +89,42 @@ impl FrontEnd {
             tx.send(op).await.expect(consts_err::BACKEND_RX);
         }
         // handle tab ops
-        let op = self.tabs[self.tab_index].get_backend_call();
-        if let Some(op) = op {
+        if let Some(op) = self.tabs[self.tab_index].get_backend_call() {
             tx.send(op).await.expect(consts_err::BACKEND_RX);
         }
         // try to handle as much to avoid channel overflow
-        loop {
-            let op = rx.try_recv();
+        while let Ok(op) = rx.try_recv() {
             match op {
-                Ok(op) => match op {
-                    CallBack::Error(error) => {
-                        self.popup
-                            .show(super::PopMsg::msg(format!("Error Happened\n {}", error)));
-                    }
-                    CallBack::Logs(logs) => {
-                        self.popup.set_msg("Log", logs);
-                    }
-                    CallBack::Preview(content) => {
-                        self.popup.set_msg("Preview", content);
-                    }
-                    CallBack::Edit => {
-                        self.popup.show(super::PopMsg::msg("OK".to_owned()));
-                    }
-                    // Just update StateBar
-                    CallBack::State(state) => {
-                        self.state = state;
-                    }
-                    // assume ProfileTab is the first tab
-                    CallBack::ProfileInit(..) | CallBack::ProfileCTL(_) => {
-                        self.tabs[0].apply_backend_call(op)
-                    }
-                    #[cfg(feature = "template")]
-                    CallBack::TemplateInit(_) | CallBack::TemplateCTL(_) => {
-                        self.tabs[0].apply_backend_call(op)
-                    }
-                    // assume ServiceTab is the first tab
-                    CallBack::TuiExtend(_) | CallBack::ServiceCTL(_) => {
-                        self.tabs[1].apply_backend_call(op)
-                    }
-                    // assume ConnectionTab is the third tab
-                    #[cfg(feature = "connection-tab")]
-                    CallBack::ConnectionInit(..) | CallBack::ConnectionCTL(_) => {
-                        self.tabs[2].apply_backend_call(op)
-                    }
-                },
-                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => break,
-                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => {
-                    unreachable!("{}", consts_err::BACKEND_TX);
+                CallBack::Error(error) => {
+                    self.popup
+                        .show(super::PopMsg::msg(format!("Error Happened\n {}", error)));
+                }
+                CallBack::Logs(logs) => {
+                    self.popup.set_msg("Log", logs);
+                }
+                CallBack::Preview(content) => {
+                    self.popup.set_msg("Preview", content);
+                }
+                CallBack::Edit => {
+                    self.popup.show(super::PopMsg::msg("OK".to_owned()));
+                }
+                // Just update StateBar
+                CallBack::State(state) => {
+                    self.state = state;
+                }
+                CallBack::ProfileInit(..) | CallBack::ProfileCTL(_) => {
+                    self.tabs[0].apply_backend_call(op)
+                }
+                #[cfg(feature = "template")]
+                CallBack::TemplateInit(_) | CallBack::TemplateCTL(_) => {
+                    self.tabs[0].apply_backend_call(op)
+                }
+                CallBack::TuiExtend(_) | CallBack::ServiceCTL(_) => {
+                    self.tabs[1].apply_backend_call(op)
+                }
+                #[cfg(feature = "connections")]
+                CallBack::ConnectionInit(..) | CallBack::ConnectionCTL(_) => {
+                    self.tabs[2].apply_backend_call(op)
                 }
             }
         }
@@ -153,14 +135,11 @@ impl Drawable for FrontEnd {
     fn render(&mut self, f: &mut Frame, _: Rect, _: bool) {
         // split terminal into three part
         let chunks = Ra::Layout::default()
-            .constraints(
-                [
-                    Ra::Constraint::Length(3),
-                    Ra::Constraint::Min(0),
-                    Ra::Constraint::Length(3),
-                ]
-                .as_ref(),
-            )
+            .constraints([
+                Ra::Constraint::Length(3),
+                Ra::Constraint::Fill(1),
+                Ra::Constraint::Length(3),
+            ])
             .split(f.area());
         self.render_tabbar(f, chunks[0]);
         self.render_statusbar(f, chunks[2]);
@@ -174,113 +153,95 @@ impl Drawable for FrontEnd {
     }
 
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
-        let evst;
-        // handle popups first
-        // handle them only in app to avoid complexity.
-        //
-        // if there is a popup, other part will be blocked.
-        if !self.popup.is_empty() {
-            evst = self.popup.handle_key_event(ev);
-            if evst == EventState::Yes {
-                if let Some(res) = self.popup.next() {
-                    match res {
-                        super::widget::PopupState::Canceled
-                        | super::widget::PopupState::Next(..) => {
-                            unreachable!()
-                        }
-                        super::widget::PopupState::ToBackend(call) => {
-                            self.backend_content = Some(call)
-                        }
-                        super::widget::PopupState::ToFrontend(pop_res) => {
-                            return self
-                                .tabs
-                                .get_mut(self.tab_index)
-                                .unwrap()
-                                .apply_popup_result(pop_res)
-                        }
-                    }
-                }
-            } else if evst == EventState::Cancel {
-                self.popup.reset();
-            }
-            return EventState::WorkDone;
-        }
         let tab = self.tabs.get_mut(self.tab_index).unwrap();
-        // handle tabs second
-        // select the very one rather iter over vec
-        evst = tab.handle_key_event(ev);
+        // ## Popup
+        // this will block others until is done
+        if !self.popup.is_empty() {
+            match self.popup.handle_key_event(ev) {
+                EventState::Yes => {
+                    use super::widget::PopupState::{ToBackend, ToFrontend};
 
-        // handle tabbar and app owned last
-        if evst.is_notconsumed() {
-            if ev.kind != crossterm::event::KeyEventKind::Press {
-                return EventState::NotConsumed;
-            }
-            match ev.code {
-                // ## the tabbar
-                // 1..=9
-                // need to known the range
-                KeyCode::Char(c) if c.is_ascii_digit() && c != '0' => {
-                    if let Some(d) = c.to_digit(10) {
-                        if d as usize <= self.tabs.len() {
-                            // select target tab
-                            self.tab_index = (d - 1) as usize;
-                        }
+                    let Some(res) = self.popup.next() else {
+                        return EventState::Consumed;
+                    };
+                    match res {
+                        ToBackend(call) => self.backend_content = Some(call),
+                        ToFrontend(pop_res) => tab.apply_popup_result(pop_res),
+                        _ => unreachable!(),
                     }
                 }
-                KeyCode::Tab => {
-                    // select next tab
-                    self.tab_index += 1;
-                    if self.tab_index == self.tabs.len() {
-                        // loop back
-                        self.tab_index = 0;
-                    }
-                }
-                // ## the statusbar
+                EventState::Cancel => self.popup.reset(),
                 _ => (),
             }
-            // ## the other app function
-            match ev.code.into() {
-                #[cfg(debug_assertions)]
-                Keys::Debug => {}
-                Keys::LogCat => self.backend_content = Some(Call::Logs(0, 20)),
-                Keys::AppHelp => {
-                    self.popup.set_msg(
-                        "Help",
-                        Keys::ALL_DOC
-                            .into_iter()
-                            // skip a white line
-                            .skip(1)
-                            .map(|s| s.to_owned())
-                            .collect(),
-                    );
-                }
-                Keys::AppQuit => {
-                    self.should_quit = true;
-                }
-                _ => return EventState::NotConsumed,
-            }
+            return EventState::Consumed;
         }
-        EventState::WorkDone
+        // ## Tabs
+        if !matches!(tab.handle_key_event(ev), EventState::NotConsumed) {
+            return EventState::Consumed;
+        }
+        // handle tabbar and app owned last
+        if ev.kind != crossterm::event::KeyEventKind::Press {
+            return EventState::NotConsumed;
+        }
+        match ev.code {
+            // ## the tabbar
+            // 1..=9
+            KeyCode::Char(c) if c.is_ascii_digit() && c != '0' => {
+                if let Some(d) = c.to_digit(10) {
+                    if d as usize <= self.tabs.len() {
+                        // select target tab
+                        self.tab_index = (d - 1) as usize;
+                    }
+                }
+            }
+            KeyCode::Tab => {
+                // select next tab
+                self.tab_index += 1;
+                if self.tab_index == self.tabs.len() {
+                    // loop back
+                    self.tab_index = 0;
+                }
+            }
+            // ## the statusbar
+            _ => (),
+        }
+        // ## the other app function
+        match ev.code.into() {
+            #[cfg(debug_assertions)]
+            Keys::Debug => {}
+            Keys::LogCat => self.backend_content = Some(Call::Logs(0, 20)),
+            Keys::AppHelp => {
+                self.popup.set_msg(
+                    "Help",
+                    Keys::ALL_DOC
+                        .into_iter()
+                        // skip a white line
+                        .skip(1)
+                        .map(|s| s.to_owned())
+                        .collect(),
+                );
+            }
+            Keys::AppQuit => {
+                self.should_quit = true;
+            }
+            _ => (),
+        }
+
+        EventState::Consumed
     }
 }
 
 #[cfg(debug_assertions)]
 fn the_egg(key: KeyCode) -> bool {
-    static INSTANCE: std::sync::RwLock<u8> = std::sync::RwLock::new(0);
-    let mut current = INSTANCE.write().unwrap();
+    static INSTANCE: std::sync::Mutex<u8> = std::sync::Mutex::new(0);
+    let mut current = INSTANCE.lock().unwrap();
     match *current {
-        0 if key == KeyCode::Up => (),
-        1 if key == KeyCode::Up => (),
-        2 if key == KeyCode::Down => (),
-        3 if key == KeyCode::Down => (),
-        4 if key == KeyCode::Left => (),
-        5 if key == KeyCode::Right => (),
-        6 if key == KeyCode::Left => (),
-        7 if key == KeyCode::Right => (),
-        8 if (key == KeyCode::Char('b')) | (key == KeyCode::Char('B')) => (),
-        9 if (key == KeyCode::Char('a')) | (key == KeyCode::Char('A')) => (),
-        10 if (key == KeyCode::Char('b')) | (key == KeyCode::Char('B')) => (),
-        11 if (key == KeyCode::Char('a')) | (key == KeyCode::Char('A')) => (),
+        0 | 1 if matches!(key, KeyCode::Up) => (),
+        2 | 3 if matches!(key, KeyCode::Down) => (),
+        4 | 6 if matches!(key, KeyCode::Left) => (),
+        5 | 7 if matches!(key, KeyCode::Right) => (),
+        8 | 10 if matches!(key, KeyCode::Char('b') | KeyCode::Char('B')) => (),
+        9 | 11 if matches!(key, KeyCode::Char('a') | KeyCode::Char('A')) => (),
         _ => {
             *current = 0;
             return false;

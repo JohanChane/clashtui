@@ -1,12 +1,11 @@
-use crate::backend::ServiceOp;
-use crate::tui::widget::{Browser, Path, Popmsg};
-use crate::{clash::webapi::Mode, tui::widget::PopRes};
-use crossterm::event::KeyEvent;
-use strum::{EnumCount, VariantArray};
+use crate::backend::{Mode, ServiceOp};
+use crate::tui::widget::{Browser, List, Path, PopRes, Popmsg};
+use crate::tui::{Drawable, EventState, frontend::consts::TAB_TITLE_SERVICE};
 
-use crate::tui::{frontend::consts::TAB_TITLE_SERVICE, widget::List, Drawable, EventState};
-use ratatui::prelude as Ra;
 use Ra::{Frame, Rect};
+use crossterm::event::KeyEvent;
+use ratatui::prelude as Ra;
+use strum::{EnumCount, VariantArray};
 
 use super::{Call, CallBack, PopMsg, TabCont};
 
@@ -21,6 +20,7 @@ pub enum BackendOp {
 
 #[derive(Clone, Copy, Debug, EnumCount, VariantArray, strum::Display)]
 pub enum ExtendOp {
+    /// won't pass to backend
     ViewClashtuiConfigDir,
     // Generate a list of information
     // about the application and clash core
@@ -35,13 +35,11 @@ pub(in crate::tui::frontend) struct ServiceTab {
     file_browser: Option<Browser>,
 }
 
-const MODE: [Mode; 3] = [Mode::Rule, Mode::Direct, Mode::Global];
-
 impl Default for ServiceTab {
     fn default() -> Self {
-        let mut inner = List::new(TAB_TITLE_SERVICE.to_string());
+        let mut inner = List::new(TAB_TITLE_SERVICE);
         let items = inner.get_items_mut();
-        items.push("SwitchMode".to_owned());
+        items.push(Modes.to_string());
         items.extend(ServiceOp::VARIANTS.iter().map(|v| v.to_string()));
 
         items.push("-----".to_owned());
@@ -81,7 +79,7 @@ impl TabCont for ServiceTab {
             unreachable!("{} get unexpected op", TAB_TITLE_SERVICE)
         }
     }
-    fn apply_popup_result(&mut self, _: PopRes) -> EventState {
+    fn apply_popup_result(&mut self, _: PopRes) {
         unreachable!()
     }
 }
@@ -93,8 +91,6 @@ impl Drawable for ServiceTab {
             instance.render(f, area, true);
         }
     }
-    /// - Caught event -> [EventState::WorkDone]
-    /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
         if let Some(instance) = self.file_browser.as_mut() {
             match instance.handle_key_event(ev) {
@@ -107,52 +103,62 @@ impl Drawable for ServiceTab {
                     ))
                 }
                 EventState::Cancel => self.file_browser = None,
-                EventState::NotConsumed | EventState::WorkDone => (),
+                EventState::NotConsumed | EventState::Consumed => (),
             }
-            return EventState::WorkDone;
+            return EventState::Consumed;
         };
-        let event_state = self.inner.handle_key_event(ev);
-        match event_state {
+        match self.inner.handle_key_event(ev) {
             EventState::Yes => {
-                if let Some(index) = self.inner.selected() {
-                    match index {
-                        0 => {
-                            self.popup_content = Some(PopMsg::new(Modes));
-                        }
-                        idx if idx <= ServiceOp::COUNT => {
-                            let op = ServiceOp::VARIANTS[index - 1];
-                            self.backend_content = Some(Call::Service(BackendOp::ServiceCTL(op)));
+                let Some(index) = self.inner.selected() else {
+                    return EventState::NotConsumed;
+                };
+
+                const SERVICE_OP: usize = ServiceOp::COUNT;
+                const SEP: usize = ServiceOp::COUNT + 1;
+                const EXTEND_OP_START: usize = ServiceOp::COUNT + 2;
+                const EXTEND_OP_END: usize = ServiceOp::COUNT + 1 + ExtendOp::COUNT;
+
+                match index {
+                    0 => self.popup_content = Some(PopMsg::new(Modes)),
+                    1..=SERVICE_OP => {
+                        let op = ServiceOp::VARIANTS[index - 1];
+                        self.backend_content = Some(Call::Service(BackendOp::ServiceCTL(op)));
+                        self.popup_content = Some(PopMsg::working());
+                    }
+                    SEP => (),
+                    EXTEND_OP_START..=EXTEND_OP_END => {
+                        let op = ExtendOp::VARIANTS[index - 2 - ServiceOp::COUNT];
+                        if let ExtendOp::ViewClashtuiConfigDir = op {
+                            self.file_browser = Some(Browser::new(crate::DataDir::get()))
+                        } else {
+                            self.backend_content = Some(Call::Service(BackendOp::TuiExtend(op)));
                             self.popup_content = Some(PopMsg::working());
                         }
-                        idx if idx == ServiceOp::COUNT + 1 => (),
-                        idx if idx < ServiceOp::COUNT + 2 + ExtendOp::COUNT => {
-                            let op = ExtendOp::VARIANTS[index - 2 - ServiceOp::COUNT];
-                            if let ExtendOp::ViewClashtuiConfigDir = op {
-                                self.file_browser = Some(Browser::new(crate::DataDir::get()))
-                            } else {
-                                self.backend_content =
-                                    Some(Call::Service(BackendOp::TuiExtend(op)));
-                                self.popup_content = Some(PopMsg::working());
-                            }
-                        }
-                        _ => unreachable!(),
                     }
-                };
+                    _ => unreachable!(),
+                }
             }
-            EventState::Cancel | EventState::NotConsumed | EventState::WorkDone => (),
+            EventState::Cancel | EventState::Consumed => (),
+            EventState::NotConsumed => return EventState::NotConsumed,
         }
-        event_state.unify()
+        EventState::Consumed
     }
 }
 
 struct Modes;
+
+impl std::fmt::Display for Modes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SwitchMode")
+    }
+}
 
 impl Popmsg for Modes {
     fn start(&self, pop: &mut crate::tui::widget::Popup) {
         pop.start()
             .clear_all()
             .set_title("Mode")
-            .set_choices(MODE.into_iter().map(|v| v.into()));
+            .set_choices(Mode::VARIANTS.iter().map(|v| v.to_string()));
     }
 
     fn next(
@@ -162,7 +168,7 @@ impl Popmsg for Modes {
         let Some(PopRes::Selected(idx)) = pop.collect() else {
             unreachable!()
         };
-        let mode = MODE[idx];
+        let mode = Mode::VARIANTS[idx];
         crate::tui::widget::PopupState::ToBackend(Call::Service(BackendOp::SwitchMode(mode)))
     }
 }

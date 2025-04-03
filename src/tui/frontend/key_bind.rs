@@ -128,7 +128,7 @@ define_keys! {
         /// Test this profile
         ProfileTestConfig(KeyCode::Char('s')),
         // ProfileInfo(KeyCode::Char('n')),
-        # #[cfg(feature = "connection-tab")]
+        # #[cfg(feature = "connections")]
         # Connection
         /// Terminate all running connections
         ConnKillAll(KeyCode::Char('c')),

@@ -1,29 +1,15 @@
 use super::{BackEnd, CallBack, ProfileManager, State};
 
 use crate::tui::Call;
-use crate::utils::consts::err as consts_err;
+use crate::utils::{consts::err as consts_err, logging::logcat};
 use tokio::sync::mpsc::{Receiver, Sender};
 
-impl BackEnd {
-    /// read file by lines, from `total_len-start-length` to `total_len-start`
-    pub fn logcat(&self, start: usize, length: usize) -> anyhow::Result<Vec<String>> {
-        use crate::utils::consts::LOG_PATH;
-        use std::io::BufRead as _;
-        use std::io::Seek as _;
-
-        let mut fp = std::fs::File::open(LOG_PATH.as_path())?;
-        let size = {
-            let fp = fp.try_clone()?;
-            std::io::BufReader::new(fp).lines().count()
-        };
-        fp.seek(std::io::SeekFrom::Start(0))?;
-        let fp = std::io::BufReader::new(fp).lines();
-        let start = size.saturating_sub(start + length);
-        let vec = fp
-            .skip(start)
-            .take(length)
-            .collect::<std::io::Result<_>>()?;
-        Ok(vec)
+impl<E: ToString> From<Result<CallBack, E>> for CallBack {
+    fn from(value: Result<CallBack, E>) -> Self {
+        match value {
+            Ok(v) => v,
+            Err(e) => CallBack::Error(e.to_string()),
+        }
     }
 }
 
@@ -57,11 +43,15 @@ impl BackEnd {
                             log::error!("An error happens in Tick:{e}");
                             errs.push(e.to_string());
                         }
-                        CallBack::State(State::unknown(self.get_current_profile().name).to_string())
+                        CallBack::State(
+                            State::unknown(self.as_profile().get_current_profile().name)
+                                .to_string(),
+                        )
                     }
                 };
                 cbs.push(state);
-                #[cfg(feature = "connection-tab")]
+
+                #[cfg(feature = "connections")]
                 let conns = match self.api.get_connections() {
                     Ok(v) => CallBack::ConnectionInit(v),
                     Err(e) => {
@@ -73,30 +63,26 @@ impl BackEnd {
                         CallBack::ConnectionInit(Default::default())
                     }
                 };
-                #[cfg(feature = "connection-tab")]
+                #[cfg(feature = "connections")]
                 cbs.push(conns);
             } else {
                 log::debug!("Backend got:{op:?}");
                 let cb = match op {
                     Call::Profile(tabs::profile::BackendOp::Profile(op)) => {
-                        self.handle_profile_op(op).into()
+                        self.as_profile().handle_profile_op(op).into()
                     }
                     #[cfg(feature = "template")]
                     Call::Profile(tabs::profile::BackendOp::Template(op)) => {
-                        self.handle_template_op(op).into()
+                        self.as_profile().handle_template_op(op).into()
                     }
                     Call::Service(tabs::service::BackendOp::SwitchMode(mode)) => {
                         // tick will refresh state
-                        match self.update_state(None, Some(mode)) {
-                            Ok(_) => CallBack::ServiceCTL(format!("Mode is switched to {}", mode)),
-                            Err(e) => CallBack::Error(e.to_string()),
-                        }
+                        self.update_state(None, Some(mode))
+                            .map(|_| CallBack::ServiceCTL(format!("Mode is switched to {}", mode)))
+                            .into()
                     }
                     Call::Service(tabs::service::BackendOp::ServiceCTL(op)) => {
-                        match self.clash_srv_ctl(op) {
-                            Ok(v) => CallBack::ServiceCTL(v),
-                            Err(e) => CallBack::Error(e.to_string()),
-                        }
+                        self.clash_srv_ctl(op).map(CallBack::ServiceCTL).into()
                     }
                     Call::Service(tabs::service::BackendOp::OpenThis(path)) => {
                         if let Err(e) = crate::utils::ipc::spawn(
@@ -118,27 +104,25 @@ impl BackEnd {
                         }
                     }
                     Call::Service(tabs::service::BackendOp::Preview(path)) => {
-                        match std::fs::read_to_string(path) {
-                            Ok(string) => {
+                        std::fs::read_to_string(path)
+                            .map(|string| {
                                 CallBack::Preview(string.lines().map(|s| s.to_owned()).collect())
-                            }
-                            Err(err) => CallBack::Error(err.to_string()),
-                        }
+                            })
+                            .into()
                     }
                     Call::Service(tabs::service::BackendOp::TuiExtend(extend_op)) => {
                         match extend_op {
-                            tabs::service::ExtendOp::FullLog => match self.logcat(0, 1024) {
-                                Ok(v) => CallBack::TuiExtend(v.join("\n")),
-                                Err(e) => CallBack::Error(e.to_string()),
-                            },
                             tabs::service::ExtendOp::ViewClashtuiConfigDir => unreachable!(),
+                            tabs::service::ExtendOp::FullLog => logcat(0, 1024)
+                                .map(|v| CallBack::TuiExtend(v.join("\n")))
+                                .into(),
                             tabs::service::ExtendOp::GenerateInfoList => {
                                 let mut infos = vec![
                                     "# CLASHTUI".to_owned(),
-                                    format!("version:{}", crate::utils::consts::VERSION),
+                                    format!("version:{}", crate::utils::consts::FULL_VERSION),
                                 ];
                                 infos.push("# CLASH".to_owned());
-                                match self.api.version().map_err(|e| e.into()).and_then(|ver| {
+                                match self.api.version().and_then(|ver| {
                                     self.api.config_get().map(|cfg| {
                                         let mut cfg = cfg.build();
                                         cfg.insert(2, format!("version:{ver}"));
@@ -156,33 +140,25 @@ impl BackEnd {
                             }
                         }
                     }
-                    #[cfg(feature = "connection-tab")]
+                    #[cfg(feature = "connections")]
                     Call::Connection(op) => match op {
                         tabs::connection::BackendOp::Terminal(id) => {
-                            match self.api.terminate_connection(Some(id)) {
-                                Ok(v) => CallBack::ConnectionCTL(if v {
-                                    "Success".to_owned()
-                                } else {
-                                    "Failed, log as debug level".to_owned()
-                                }),
-                                Err(e) => CallBack::Error(e.to_string()),
-                            }
+                            self.api.terminate_connection(Some(id))
                         }
                         tabs::connection::BackendOp::TerminalAll => {
-                            match self.api.terminate_connection(None) {
-                                Ok(v) => CallBack::ConnectionCTL(if v {
-                                    "Success".to_owned()
-                                } else {
-                                    "Failed, log as debug level".to_owned()
-                                }),
-                                Err(e) => CallBack::Error(e.to_string()),
-                            }
+                            self.api.terminate_connection(None)
                         }
-                    },
-                    Call::Logs(start, len) => match self.logcat(start, len) {
-                        Ok(v) => CallBack::Logs(v),
-                        Err(e) => CallBack::Error(e.to_string()),
-                    },
+                    }
+                    .map(|b| {
+                        CallBack::ConnectionCTL(if b {
+                            "Success".to_owned()
+                        } else {
+                            "Failed, log as debug".to_owned()
+                        })
+                    })
+                    .into(),
+
+                    Call::Logs(start, len) => logcat(start, len).map(CallBack::Logs).into(),
                     // unfortunately, this might(in fact almost always) blocked by
                     // thousand of Call::Tick,
                     //

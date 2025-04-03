@@ -98,14 +98,14 @@ impl Drawable for List {
             KeyCode::Esc => return EventState::Cancel,
             _ => return EventState::NotConsumed,
         };
-        EventState::WorkDone
+        EventState::Consumed
     }
 }
 
 impl List {
-    pub fn new(title: String) -> Self {
+    pub fn new(title: impl Into<String>) -> Self {
         Self {
-            title,
+            title: title.into(),
             filter: None,
             items: vec![],
             extra: None,

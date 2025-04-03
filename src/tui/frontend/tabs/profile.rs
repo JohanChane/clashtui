@@ -1,21 +1,22 @@
+use crate::tui::{
+    Drawable, EventState,
+    frontend::{consts::TAB_TITLE_PROFILE, key_bind::Keys},
+    widget::{List, PopRes},
+};
+
+use Ra::{Frame, Rect};
+use crossterm::event::KeyEvent;
+use ratatui::prelude as Ra;
+
+use super::{Call, CallBack, PopMsg, TabCont};
+
 #[macro_use]
 mod ops;
 mod impl_profile;
 #[cfg(feature = "template")]
 mod impl_template;
 
-use crossterm::event::KeyEvent;
 pub use ops::*;
-
-use crate::tui::{
-    frontend::{consts::TAB_TITLE_PROFILE, key_bind::Keys},
-    widget::{List, PopRes},
-    Drawable, EventState,
-};
-use ratatui::prelude as Ra;
-use Ra::{Frame, Rect};
-
-use super::{Call, CallBack, PopMsg, TabCont};
 
 #[derive(PartialEq, Clone, Copy)]
 enum Focus {
@@ -23,6 +24,7 @@ enum Focus {
     #[cfg(feature = "template")]
     Template,
 }
+
 pub(in crate::tui::frontend) struct ProfileTab {
     profiles: List,
     #[cfg(feature = "template")]
@@ -39,9 +41,9 @@ impl Default for ProfileTab {
     fn default() -> Self {
         #[cfg(feature = "template")]
         use crate::tui::frontend::consts::TAB_TITLE_TEMPLATE;
-        let profiles = List::new(TAB_TITLE_PROFILE.to_string());
+        let profiles = List::new(TAB_TITLE_PROFILE);
         #[cfg(feature = "template")]
-        let templates = List::new(TAB_TITLE_TEMPLATE.to_owned());
+        let templates = List::new(TAB_TITLE_TEMPLATE);
 
         Self {
             profiles,
@@ -67,9 +69,6 @@ impl TabCont for ProfileTab {
     fn get_backend_call(&mut self) -> Option<Call> {
         // if not is_inited, init profiles
         // else take content
-        //
-        // since default content is to init templates
-        // every thing should have inited
         if self.is_profiles_outdated {
             Some(Call::Profile(BackendOp::Profile(ProfileOp::GetALL)))
         } else {
@@ -126,7 +125,7 @@ impl TabCont for ProfileTab {
         }
     }
 
-    fn apply_popup_result(&mut self, res: PopRes) -> EventState {
+    fn apply_popup_result(&mut self, res: PopRes) {
         let PopRes::Input(name) = res else {
             unreachable!("Should always be Input")
         };
@@ -139,7 +138,6 @@ impl TabCont for ProfileTab {
                 self.templates.set_filter(name);
             }
         }
-        EventState::WorkDone
     }
 }
 
@@ -159,8 +157,6 @@ impl Drawable for ProfileTab {
         #[cfg(not(feature = "template"))]
         self.profiles.render(f, area, self.focus == Focus::Profile);
     }
-    /// - Caught event -> [EventState::WorkDone]
-    /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &KeyEvent) -> EventState {
         match self.focus {
             Focus::Profile => {
@@ -175,7 +171,7 @@ impl Drawable for ProfileTab {
                         .map(ProfileOp::Select)
                         .map(BackendOp::Profile)
                         .map(Call::Profile);
-                    EventState::WorkDone
+                    EventState::Consumed
                 } else {
                     self.handle_profile_key_event(ev)
                 }
@@ -183,7 +179,6 @@ impl Drawable for ProfileTab {
             #[cfg(feature = "template")]
             Focus::Template => {
                 if self.templates.handle_key_event(ev) == EventState::Yes {
-                    // Enter means select
                     self.backend_content = self
                         .templates
                         .selected()
@@ -194,7 +189,7 @@ impl Drawable for ProfileTab {
                         .map(TemplateOp::Generate)
                         .map(BackendOp::Template)
                         .map(Call::Profile);
-                    EventState::WorkDone
+                    EventState::Consumed
                 } else {
                     self.handle_template_key_event(ev)
                 }

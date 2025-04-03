@@ -72,7 +72,7 @@ impl ClashConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, strum::VariantArray)]
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
     Rule,
@@ -87,11 +87,6 @@ impl std::fmt::Display for Mode {
             Mode::Direct => "Direct",
         };
         write!(f, "{}", x)
-    }
-}
-impl From<Mode> for String {
-    fn from(val: Mode) -> Self {
-        val.to_string()
     }
 }
 

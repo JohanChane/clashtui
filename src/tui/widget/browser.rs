@@ -94,7 +94,7 @@ impl Drawable for Browser {
             KeyCode::Esc => return EventState::Cancel,
             _ => (),
         };
-        EventState::WorkDone
+        EventState::Consumed
     }
 }
 

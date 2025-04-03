@@ -1,26 +1,22 @@
 mod blob_file;
 mod config;
 mod config_struct;
-#[cfg(feature = "connection-tab")]
+#[cfg(feature = "connections")]
 mod conn;
 mod control;
 
 use super::*;
 #[allow(unused)]
 pub use config_struct::{ClashConfig, LogLevel, Mode, TunConfig, TunStack};
-#[cfg(feature = "connection-tab")]
+#[cfg(feature = "connections")]
 pub use conn::{Conn, ConnInfo, ConnMetaData};
-
-pub fn set_timeout(timeout: Option<u64>) {
-    let _ = _TIMEOUT.set(timeout.unwrap_or(DEFAULT_TIMEOUT));
-}
 
 #[derive(Debug)]
 pub struct ClashUtil {
     api: String,
     secret: Option<String>,
     ua: Option<String>,
-    // timeout: u64,
+    timeout: u64,
     pub proxy_addr: String,
 }
 
@@ -30,12 +26,14 @@ impl ClashUtil {
         secret: Option<String>,
         proxy_addr: String,
         ua: Option<String>,
+        timeout: Option<u64>,
     ) -> Self {
         Self {
             api: controller_api,
             secret,
             ua,
             proxy_addr,
+            timeout: timeout.unwrap_or(DEFAULT_TIMEOUT),
         }
     }
     fn request(
@@ -51,7 +49,7 @@ impl ClashUtil {
         if let Some(s) = self.secret.as_ref() {
             req = req.with_header(headers::AUTHORIZATION, format!("Bearer {s}"));
         }
-        req.with_timeout(*TIMEOUT).send()
+        req.with_timeout(self.timeout).send()
     }
 
     #[cfg(test)]
@@ -61,6 +59,7 @@ impl ClashUtil {
             "http://127.0.0.1:9090".to_string(),
             Some("test".to_owned()),
             "http://127.0.0.1:7890".to_string(),
+            None,
             None,
         )
     }

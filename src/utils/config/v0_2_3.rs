@@ -19,13 +19,13 @@ pub fn migrate() -> anyhow::Result<()> {
     } = CtCfg::load(&DataDir::get().join("config.yaml"))
         .map_err(|e| anyhow::anyhow!("Loading v0.2.3 config file: {e}"))?;
     let basic = super::Basic {
-        clash_cfg_dir,
-        clash_bin_pth: clash_bin_path,
-        clash_cfg_pth: clash_cfg_path,
+        clash_config_dir: clash_cfg_dir,
+        clash_bin_path,
+        clash_config_path: clash_cfg_path,
     };
     let service = super::Service {
         #[cfg(any(target_os = "linux", target_os = "windows"))]
-        clash_srv_nam: clash_srv_name,
+        clash_service_name: clash_srv_name,
         #[cfg(target_os = "linux")]
         is_user,
     };

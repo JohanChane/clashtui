@@ -1,6 +1,8 @@
 use serde::Deserialize;
 
-use crate::clash::{get_blob, headers};
+use crate::backend::{get_blob, headers};
+
+const TIMEOUT: u64 = 30;
 
 #[cfg_attr(test, derive(Deserialize, Debug, PartialEq))]
 /// Describe target repo and tag
@@ -21,7 +23,12 @@ impl Request<'_> {
     ///
     /// support Github only
     pub fn get_info(self) -> anyhow::Result<Response> {
-        let rdr = get_blob(self.as_url(), None, Some(headers::DEFAULT_USER_AGENT))?;
+        let rdr = get_blob(
+            self.as_url(),
+            None,
+            Some(headers::DEFAULT_USER_AGENT),
+            TIMEOUT,
+        )?;
         Ok(serde_json::from_reader(rdr)?)
     }
 }
@@ -172,7 +179,7 @@ impl Asset {
 }
 
 pub fn download_to_file(path: &std::path::Path, url: &str) -> anyhow::Result<()> {
-    let mut rp = get_blob(url, None, Some(headers::DEFAULT_USER_AGENT))?;
+    let mut rp = get_blob(url, None, Some(headers::DEFAULT_USER_AGENT), TIMEOUT)?;
     let mut fp = std::fs::File::create(path)?;
     std::io::copy(&mut rp, &mut fp)?;
     Ok(())
@@ -215,9 +222,9 @@ mod test {
             tag_name: "v0.1.0-keep".to_owned(),
             ..Default::default()
         };
-        assert!(!r.is_newer_than(crate::consts::VERSION));
-        r.tag_name = crate::consts::VERSION.to_owned();
-        assert!(!r.is_newer_than(crate::consts::VERSION))
+        assert!(!r.is_newer_than(crate::consts::FULL_VERSION));
+        r.tag_name = crate::consts::FULL_VERSION.to_owned();
+        assert!(!r.is_newer_than(crate::consts::FULL_VERSION));
     }
     #[test]
     fn load_request() {

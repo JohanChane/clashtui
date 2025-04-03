@@ -1,31 +1,25 @@
-#[derive(PartialEq, Eq, Debug, Default, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum EventState {
+    /// a work is done and we should do something
     Yes,
+    /// a work is canceled and we might do something
     Cancel,
-    #[default]
+    /// this widget failed to process this key,
+    /// have the next widget do it
     NotConsumed,
-    WorkDone,
+    /// this widget processed this key
+    /// and we are all done here
+    Consumed,
 }
 
-#[allow(unused)]
 impl EventState {
-    /// Returns true if **NOT** equal to [`EventState::NotConsumed`].
-    pub fn is_consumed(&self) -> bool {
-        !self.is_notconsumed()
-    }
-
-    /// Returns true if equal to [`EventState::NotConsumed`].
-    pub fn is_notconsumed(&self) -> bool {
-        self == &Self::NotConsumed
-    }
-
     /// Consumes `self` and returns [`EventState::NotConsumed`] if [`EventState::is_notconsumed`],
     /// else returns [`EventState::WorkDone`].
     pub fn unify(self) -> Self {
-        if self.is_notconsumed() {
+        if matches!(self, Self::NotConsumed) {
             Self::NotConsumed
         } else {
-            Self::WorkDone
+            Self::Consumed
         }
     }
 }

@@ -2,7 +2,7 @@ use super::{CResult, ClashConfig, ClashUtil};
 use minreq::Method;
 
 impl ClashUtil {
-    pub fn config_get(&self) -> anyhow::Result<ClashConfig> {
+    pub fn config_get(&self) -> CResult<ClashConfig> {
         Ok(serde_json::from_str(
             self.request(Method::Get, "/configs", None)?.as_str()?,
         )?)

@@ -159,7 +159,7 @@ basic:
   clash_config_path: /srv/mihomo/config.yaml
   timeout: null # default to be 5, '0' DOES NOT mean no timeout
 service: 
-  clash_srv_nam: mihomo 
+  clash_service_name: mihomo 
   is_user: false
 extra:
   edit_cmd: ''
@@ -184,7 +184,7 @@ basic:
   clash_config_path: D:/MyAppData/mihomo/config.yaml
   timeout: null
 service: # is_user is not used on Windows
-  clash_srv_nam: mihomo 
+  clash_service_name: mihomo 
 extra:
   edit_cmd: ''
   open_dir_cmd: ''

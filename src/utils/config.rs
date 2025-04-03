@@ -10,18 +10,16 @@ pub mod v0_2_3;
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Basic {
-    #[serde(rename = "clash_config_dir")]
-    pub clash_cfg_dir: String,
-    #[serde(rename = "clash_bin_path")]
-    pub clash_bin_pth: String,
-    #[serde(rename = "clash_config_path")]
-    pub clash_cfg_pth: String,
+    pub clash_config_dir: String,
+    pub clash_bin_path: String,
+    pub clash_config_path: String,
 }
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Service {
     #[cfg(any(target_os = "linux", target_os = "windows"))]
-    pub clash_srv_nam: String,
+    #[serde(alias = "clash_srv_nam")]
+    pub clash_service_name: String,
     #[cfg(target_os = "linux")]
     pub is_user: bool,
 }
@@ -76,6 +74,13 @@ impl ProfileManager {
     }
 }
 
+/// under the data folder:
+/// * [`BasicInfo`] basic_clash_config.yaml
+/// * [`ProfileManager`] clashtui.db
+/// * [`log`] clashtui.log
+/// * [`ConfigFile`] config.yaml
+/// * `Folder` profiles/
+/// * `Folder` templates/
 pub struct BuildConfig {
     pub cfg: LibConfig,
     pub edit_cmd: String,
@@ -91,8 +96,8 @@ pub struct BuildConfig {
 }
 impl BuildConfig {
     pub fn init_config() -> Result<()> {
-        use crate::consts::{PROFILE_PATH, TEMPLATE_PATH};
         use crate::DataDir;
+        use crate::consts::{PROFILE_PATH, TEMPLATE_PATH};
         use std::fs;
 
         fs::create_dir_all(DataDir::get())?;

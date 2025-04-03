@@ -1,5 +1,5 @@
-use ratatui::prelude as Ra;
 use Ra::{Constraint, Layout, Rect};
+use ratatui::prelude as Ra;
 
 /// Create a centered [Rect] from `raw`
 pub fn centered_rect(width: Constraint, height: Constraint, raw: Rect) -> Rect {

@@ -4,7 +4,7 @@ basic:
   clash_config_path: ~/.local/proxy/mihomo/config.yaml
   timeout: null
 service: 
-  clash_srv_nam: mihomo
+  clash_service_name: mihomo
   is_user: false
 extra:
   edit_cmd: alacritty -e nvim %s

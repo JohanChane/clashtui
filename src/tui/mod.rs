@@ -4,7 +4,7 @@ mod misc;
 mod theme;
 mod widget;
 
-pub use frontend::{tabs, FrontEnd};
+pub use frontend::{FrontEnd, tabs};
 pub use theme::Theme;
 pub use widget::PopMsg;
 
@@ -38,7 +38,7 @@ trait Drawable {
 pub enum Call {
     Profile(tabs::profile::BackendOp),
     Service(tabs::service::BackendOp),
-    #[cfg(feature = "connection-tab")]
+    #[cfg(feature = "connections")]
     Connection(tabs::connection::BackendOp),
     #[debug("Logs")]
     /// Reads a range of lines from a file.
@@ -57,7 +57,7 @@ pub mod setup {
         cursor,
         event::{DisableMouseCapture, EnableMouseCapture},
         execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     };
 
     /// Enables raw mode and sets up the terminal for the application.

@@ -1,6 +1,8 @@
-pub(crate) const VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
+pub const FULL_VERSION: &str = concat!(env!("CLASHTUI_VERSION"));
+pub const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const PKG_NAME: &str = env!("CARGO_PKG_NAME");
 
-pub(crate) const ROOT_WARNING: &str = "Running as ROOT -- use at your own risk";
+pub const ROOT_WARNING: &str = "Running as ROOT -- use at your own risk";
 
 const CONFIG_FILE: &str = "config.yaml";
 const DATA_FILE: &str = "clashtui.db";
@@ -10,23 +12,21 @@ const LOG_FILE: &str = "clashtui.log";
 const THEME_FILE: &str = "theme.yaml";
 const PROFILE_DIR: &str = "profiles";
 const TEMPLATE_DIR: &str = "templates";
-const _TMP_FILE: &str = "/tmp/clashtui_mihomo_config_file.tmp";
 
-pub(crate) const MAX_SUPPORTED_TEMPLATE_VERSION: u8 = 1;
+pub const MAX_SUPPORTED_TEMPLATE_VERSION: u64 = 1;
 
 use crate::DataDir;
 type Lock<T> = std::sync::LazyLock<T>;
 type Path = Lock<std::path::PathBuf>;
 
-pub(crate) static CONFIG_PATH: Path = Lock::new(|| DataDir::get().join(CONFIG_FILE));
-pub(crate) static DATA_PATH: Path = Lock::new(|| DataDir::get().join(DATA_FILE));
-pub(crate) static BASIC_PATH: Path = Lock::new(|| DataDir::get().join(BASIC_FILE));
-pub(crate) static LOG_PATH: Path = Lock::new(|| DataDir::get().join(LOG_FILE));
+pub static CONFIG_PATH: Path = Lock::new(|| DataDir::get().join(CONFIG_FILE));
+pub static DATA_PATH: Path = Lock::new(|| DataDir::get().join(DATA_FILE));
+pub static BASIC_PATH: Path = Lock::new(|| DataDir::get().join(BASIC_FILE));
+pub static LOG_PATH: Path = Lock::new(|| DataDir::get().join(LOG_FILE));
 #[cfg(feature = "customized-theme")]
-pub(crate) static THEME_PATH: Path = Lock::new(|| DataDir::get().join(THEME_FILE));
-pub(crate) static PROFILE_PATH: Path = Lock::new(|| DataDir::get().join(PROFILE_DIR));
-pub(crate) static TEMPLATE_PATH: Path = Lock::new(|| DataDir::get().join(TEMPLATE_DIR));
-pub(crate) static _TEMP_PATH: Path = Lock::new(|| DataDir::get().join(_TMP_FILE));
+pub static THEME_PATH: Path = Lock::new(|| DataDir::get().join(THEME_FILE));
+pub static PROFILE_PATH: Path = Lock::new(|| DataDir::get().join(PROFILE_DIR));
+pub static TEMPLATE_PATH: Path = Lock::new(|| DataDir::get().join(TEMPLATE_DIR));
 
 #[cfg(feature = "tui")]
 pub mod err {

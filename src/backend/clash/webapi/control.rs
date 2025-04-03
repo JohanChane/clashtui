@@ -30,6 +30,7 @@ impl ClashUtil {
             "https://www.gstatic.com/generate_204",
             Some(&self.proxy_addr),
             None,
+            self.timeout,
         )
         .map(|_| ())
         .map_err(|e| e.into())

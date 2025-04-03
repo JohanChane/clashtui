@@ -1,9 +1,9 @@
+use Ra::{Modifier, Style, Stylize};
 use crossterm::event::{KeyCode, KeyEventKind};
 use ratatui::text::Line;
 use ratatui::{prelude as Ra, widgets as Raw};
-use Ra::{Modifier, Style, Stylize};
 
-use super::{tools, PopMsg, PopRes};
+use super::{PopMsg, PopRes, tools};
 use crate::tui::misc::EventState;
 use crate::tui::{Call, Drawable, Theme};
 
@@ -292,7 +292,7 @@ impl Drawable for Popup {
                 } else {
                     self.focus = Focus::Text
                 }
-                EventState::WorkDone
+                EventState::Consumed
             }
             KeyCode::Esc => EventState::Cancel,
 
@@ -343,7 +343,7 @@ impl Text {
             KeyCode::Up => self.offset = self.offset.saturating_sub(1),
             _ => return EventState::NotConsumed,
         }
-        EventState::WorkDone
+        EventState::Consumed
     }
 }
 
@@ -397,7 +397,7 @@ impl Choices {
             }
             _ => return EventState::NotConsumed,
         }
-        EventState::WorkDone
+        EventState::Consumed
     }
 }
 #[derive(Default)]
@@ -444,7 +444,7 @@ impl Input {
             }
             _ => return EventState::NotConsumed,
         }
-        EventState::WorkDone
+        EventState::Consumed
     }
 }
 impl Input {

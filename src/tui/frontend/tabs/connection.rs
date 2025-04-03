@@ -1,13 +1,13 @@
-use super::{Call, CallBack, PopMsg, TabCont};
-use crate::tui::{
-    frontend::consts::TAB_TITLE_CONNECTION,
-    widget::{tools, PopRes, Popmsg},
-    Drawable, EventState, Theme,
-};
+use crate::backend::{Conn, ConnInfo, ConnMetaData};
+use crate::tui::widget::{PopRes, Popmsg, tools};
+use crate::tui::{Drawable, EventState, Theme, frontend::consts::TAB_TITLE_CONNECTION};
 
-use crate::clash::webapi::{Conn, ConnInfo, ConnMetaData};
+use Ra::Constraint;
+use Raw::{Block, Borders, Table};
 use ratatui::prelude as Ra;
 use ratatui::widgets as Raw;
+
+use super::{Call, CallBack, PopMsg, TabCont};
 
 mod conn;
 use conn::Connection;
@@ -39,8 +39,6 @@ impl std::fmt::Display for ConnectionTab {
 
 impl Drawable for ConnectionTab {
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, _: bool) {
-        use Ra::Constraint;
-        use Raw::{Block, Borders, Table};
         let tabs = Table::new(
             self.items.iter().map(|l| l.build_col()),
             [
@@ -79,14 +77,12 @@ impl Drawable for ConnectionTab {
         }
     }
 
-    /// - Caught event -> [EventState::WorkDone]
-    /// - unrecognized event -> [EventState::NotConsumed]
     fn handle_key_event(&mut self, ev: &crossterm::event::KeyEvent) -> EventState {
         use crossterm::event::KeyCode;
         if ev.kind != crossterm::event::KeyEventKind::Press {
             return EventState::NotConsumed;
         }
-        // doing popup
+        // ## Popup
         if self.selected_con.is_some() {
             match ev.code {
                 KeyCode::Enter => {
@@ -100,7 +96,7 @@ impl Drawable for ConnectionTab {
                 KeyCode::Esc => self.selected_con = None,
                 _ => {}
             }
-            return EventState::WorkDone;
+            return EventState::Consumed;
         }
         match ev.code {
             KeyCode::Enter => {
@@ -132,7 +128,7 @@ impl Drawable for ConnectionTab {
             }
             _ => return EventState::NotConsumed,
         }
-        EventState::WorkDone
+        EventState::Consumed
     }
 }
 
@@ -156,13 +152,10 @@ impl Popmsg for TerminateAll {
             unreachable!()
         };
         match idx {
-            // regarded as cancel
             0 => crate::tui::widget::PopupState::Canceled,
-            // regarded as yes
             1 => {
                 crate::tui::widget::PopupState::ToBackend(Call::Connection(BackendOp::TerminalAll))
             }
-            // regarded as extra-choices
             _ => unreachable!(),
         }
     }
@@ -233,12 +226,11 @@ impl TabCont for ConnectionTab {
         }
     }
 
-    fn apply_popup_result(&mut self, res: PopRes) -> EventState {
+    fn apply_popup_result(&mut self, res: PopRes) {
         let PopRes::Input(name) = res else {
             unreachable!("Should always be Input")
         };
         self.filter = Some(name);
-        EventState::WorkDone
     }
 }
 
