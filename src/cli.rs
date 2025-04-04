@@ -33,7 +33,10 @@ pub(crate) fn parse_args() -> Result<(Option<PackedArgs>, u8), ()> {
         return Err(());
     }
 
-    if let Some(config_dir) = config_dir {
+    if let Some(config_dir) = config_dir
+        // try get from prefix
+        .or(std::env::var_os("CLASHTUI_CONFIG_DIR").map(std::path::PathBuf::from))
+    {
         super::DataDir::set(config_dir);
     }
 

@@ -33,8 +33,8 @@ impl FrontEnd {
     pub fn new() -> Self {
         Self {
             tabs: vec![
-                tabs::service::ServiceTab::default().to_dyn(),
                 tabs::profile::ProfileTab::default().to_dyn(),
+                tabs::service::ServiceTab::default().to_dyn(),
                 #[cfg(feature = "connections")]
                 tabs::connection::ConnectionTab::default().to_dyn(),
             ],

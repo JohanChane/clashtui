@@ -33,18 +33,8 @@ mod data_dir {
             }
         }
         pub fn get() -> &'static std::path::PathBuf {
-            DIR.get_or_init(|| {
-                // try get from prefix
-                if let Some(data_dir) = std::env::var_os("CLASHTUI_CONFIG_DIR")
-                    .map(std::path::PathBuf::from)
-                    .and_then(Self::check)
-                {
-                    data_dir
-                } else {
-                    // search 'data' or '~/.config/clashtui'
-                    load_home_dir()
-                }
-            })
+            // search 'data' or '~/.config/clashtui'
+            DIR.get_or_init(load_home_dir)
         }
     }
 
