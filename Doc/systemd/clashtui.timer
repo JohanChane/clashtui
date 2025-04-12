@@ -4,7 +4,11 @@ Wants=network-online.target
 After=network-online.target
 
 [Timer]
+# 启动后等待
+# wait after boot
 OnBootSec=1min
+# 运行周期
+# when systemd should activate it again
 OnUnitActiveSec=1d
 
 [Install]
