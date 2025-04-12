@@ -183,9 +183,9 @@ impl BackEnd {
                     &format!(
                         "install {} \"{}\" -d \"{}\" -f \"{}\"",
                         self.cfg.service.clash_service_name,
-                        self.cfg.basic.clash_bin_pth,
-                        self.cfg.basic.clash_cfg_dir,
-                        self.cfg.basic.clash_cfg_pth
+                        self.cfg.basic.clash_bin_path,
+                        self.cfg.basic.clash_config_dir,
+                        self.cfg.basic.clash_config_path
                     ),
                     true,
                 )?;
