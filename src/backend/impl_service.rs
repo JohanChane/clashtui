@@ -80,41 +80,22 @@ impl BackEnd {
 
     #[cfg(target_os = "linux")]
     pub fn clash_srv_ctl(&self, op: ServiceOp) -> Result<String, Error> {
+        let service_controller = &self.cfg.hack.service_controller;
+        let is_user = self.cfg.service.is_user;
+        let service_name = &self.cfg.service.clash_service_name;
         match op {
             ServiceOp::RestartClashService => {
-                let arg = if self.cfg.service.is_user {
-                    vec!["--user", self.cfg.service.clash_service_name.as_str()]
-                } else {
-                    vec![self.cfg.service.clash_service_name.as_str()]
-                };
-                {
-                    let mut args = vec!["restart"];
-                    args.extend(arg.iter());
-                    exec("systemctl", args)?;
-                }
-                {
-                    let mut args = vec!["status"];
-                    args.extend(arg.iter());
-                    exec("systemctl", args)
-                }
+                let args = service_controller.apply_args("restart", service_name, is_user);
+                exec(service_controller.bin_name(), args)?;
+                let args = service_controller.apply_args("status", service_name, is_user);
+                exec(service_controller.bin_name(), args)
             }
             ServiceOp::RestartClashCore => self.restart_clash(),
             ServiceOp::StopClashService => {
-                let arg = if self.cfg.service.is_user {
-                    vec!["--user", self.cfg.service.clash_service_name.as_str()]
-                } else {
-                    vec![self.cfg.service.clash_service_name.as_str()]
-                };
-                {
-                    let mut args = vec!["stop"];
-                    args.extend(arg.iter());
-                    exec("systemctl", args)?;
-                }
-                {
-                    let mut args = vec!["status"];
-                    args.extend(arg.iter());
-                    exec("systemctl", args)
-                }
+                let args = service_controller.apply_args("stop", service_name, is_user);
+                exec(service_controller.bin_name(), args)?;
+                let args = service_controller.apply_args("status", service_name, is_user);
+                exec(service_controller.bin_name(), args)
             }
             ServiceOp::SetPermission => {
                 exec("chmod", vec!["+x", self.cfg.basic.clash_bin_path.as_str()])?;

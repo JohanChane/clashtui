@@ -35,6 +35,7 @@ pub fn migrate() -> anyhow::Result<()> {
         timeout,
         edit_cmd,
         open_dir_cmd,
+        ..Default::default()
     };
     let pm = collect_profiles(DataDir::get())
         .map_err(|e| anyhow::anyhow!("Collecting profiles: {e}"))?;

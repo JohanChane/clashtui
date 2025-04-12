@@ -27,6 +27,58 @@ pub struct Service {
 pub struct LibConfig {
     pub basic: Basic,
     pub service: Service,
+    pub hack: Hack,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub enum ServiceController {
+    Systemd,
+    Nssm,
+    OpenRc,
+}
+impl ServiceController {
+    pub fn apply_args<'a>(
+        &self,
+        work_type: &'a str,
+        service_name: &'a str,
+        is_user: bool,
+    ) -> Vec<&'a str> {
+        match self {
+            // systemctl --user start service
+            ServiceController::Systemd if is_user => vec!["--user", work_type, service_name],
+            ServiceController::Systemd => vec![work_type, service_name],
+
+            // rc-service start service --user
+            ServiceController::OpenRc if is_user => vec![service_name, work_type, "--user"],
+            ServiceController::OpenRc => vec![service_name, work_type],
+
+            ServiceController::Nssm => vec![work_type, service_name],
+        }
+    }
+    pub fn bin_name(&self) -> &'static str {
+        match self {
+            ServiceController::Systemd => "systemctl",
+            ServiceController::Nssm => "nssm",
+            ServiceController::OpenRc => "rc-service",
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct Hack {
+    pub service_controller: ServiceController,
+}
+impl Default for Hack {
+    fn default() -> Self {
+        Self {
+            service_controller: if cfg!(windows) {
+                ServiceController::Nssm
+            } else {
+                ServiceController::Systemd
+            },
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -37,6 +89,7 @@ struct ConfigFile {
     timeout: Option<u64>,
     edit_cmd: String,
     open_dir_cmd: String,
+    hack: Hack,
 }
 impl Default for ConfigFile {
     fn default() -> Self {
@@ -47,6 +100,7 @@ impl Default for ConfigFile {
             timeout: Default::default(),
             edit_cmd: common_cmd.to_owned(),
             open_dir_cmd: common_cmd.to_owned(),
+            hack: Default::default(),
         }
     }
 }
@@ -119,12 +173,17 @@ impl BuildConfig {
             timeout,
             edit_cmd,
             open_dir_cmd,
+            hack,
         } = ConfigFile::from_file()?;
         let data = ProfileManager::from_file()?;
         let base_profile = BasicInfo::get_raw()?;
         let (external_controller, proxy_addr, secret, global_ua) =
             BasicInfo::from_raw(base_profile.clone())?.build()?;
-        let cfg = LibConfig { basic, service };
+        let cfg = LibConfig {
+            basic,
+            service,
+            hack,
+        };
 
         Ok(BuildConfig {
             cfg,
