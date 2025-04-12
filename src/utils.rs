@@ -12,20 +12,27 @@ mod data_dir {
 
     impl DataDir {
         fn check(path: std::path::PathBuf) -> Option<std::path::PathBuf> {
-            if path.exists() && path.is_dir() {
-                if let Ok(path) = path.canonicalize() {
-                    let path = match std::path::absolute(&path) {
-                        Ok(dir) => dir,
-                        Err(e) => {
-                            eprintln!("Cannot locate absolute path:{e}");
-                            eprintln!("Update profile may not work");
-                            path
-                        }
-                    };
-                    return Some(path);
-                }
+            if !path.exists() {
+                eprintln!("Config dir: {} does NOT exists", path.display());
+                return None;
             }
-            None
+            if !path.is_dir() {
+                eprintln!("Config dir: {} is not a dir", path.display());
+                return None;
+            }
+            let Ok(path) = path.canonicalize() else {
+                eprintln!("Failed to canonicalize path: {}", path.display());
+                return None;
+            };
+            let path = match std::path::absolute(&path) {
+                Ok(dir) => dir,
+                Err(e) => {
+                    eprintln!("Cannot locate absolute path:{e}");
+                    eprintln!("Update profile may not work");
+                    path
+                }
+            };
+            Some(path)
         }
         pub fn set(value: std::path::PathBuf) {
             if let Some(path) = Self::check(value) {

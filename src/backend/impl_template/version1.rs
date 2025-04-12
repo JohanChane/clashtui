@@ -243,7 +243,7 @@ pub(super) fn gen_template(
         for (i, url) in local_urls.iter().enumerate() {
             let mut new_pp = pp.clone();
             new_pp.remove("tpl_param");
-            // name: e.g. provier0, provider1, ...
+            // name: e.g. provider0, provider1, ...
             let the_pp_name = format!("{}{}", pp_key.as_str().unwrap(), i);
             pp_names
                 .entry(pp_key.as_str().unwrap().to_string())
