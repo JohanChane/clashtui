@@ -85,9 +85,12 @@ impl Response {
         }
     }
     /// wrapper for `is_newer_than`
-    pub fn check(self, version: &str, skip_check: bool) -> Option<Self> {
+    pub fn check(self, version: &str, skip_check: bool) -> Option<Assets> {
         if skip_check || self.is_newer_than(version) {
-            Some(self)
+            Some(Assets {
+                info: self.as_info(version),
+                assets: self.assets,
+            })
         } else {
             None
         }
@@ -112,7 +115,7 @@ impl Response {
             ..self
         }
     }
-    pub fn as_info(&self, version: String) -> String {
+    pub fn as_info(&self, version: &str) -> String {
         format!(
             r#"----------------------
 There is a new update for '{}'
@@ -129,6 +132,10 @@ CHANGELOG:
             self.body.trim()
         )
     }
+}
+pub struct Assets {
+    pub info: String,
+    pub assets: Vec<Asset>,
 }
 #[derive(Debug, Deserialize)]
 pub struct Asset {

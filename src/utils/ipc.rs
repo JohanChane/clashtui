@@ -1,9 +1,9 @@
 use std::io::Result;
 use std::process::{Command, Stdio};
 
-#[cfg_attr(target_os = "windows", path = "ipc/ipc_windows.rs")]
-#[cfg_attr(target_os = "linux", path = "ipc/ipc_linux.rs")]
-#[cfg_attr(target_os = "macos", path = "ipc/ipc_macos.rs")]
+#[cfg_attr(target_os = "windows", path = "ipc/windows.rs")]
+#[cfg_attr(target_os = "linux", path = "ipc/linux.rs")]
+#[cfg_attr(target_os = "macos", path = "ipc/macos.rs")]
 mod inner;
 
 pub use inner::*;

@@ -4,129 +4,10 @@ use std::fs::File;
 use crate::backend::ProfileManager;
 use serde::{Deserialize, Serialize};
 
+mod core;
 #[cfg(feature = "migration_v0_2_3")]
 pub mod v0_2_3;
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Basic {
-    pub clash_config_dir: String,
-    pub clash_bin_path: String,
-    pub clash_config_path: String,
-}
-#[derive(Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Service {
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
-    #[serde(alias = "clash_srv_nam")]
-    pub clash_service_name: String,
-    #[cfg(target_os = "linux")]
-    pub is_user: bool,
-}
-
-pub struct LibConfig {
-    pub basic: Basic,
-    pub service: Service,
-    pub hack: Hack,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub enum ServiceController {
-    Systemd,
-    Nssm,
-    OpenRc,
-}
-impl ServiceController {
-    pub fn apply_args<'a>(
-        &self,
-        work_type: &'a str,
-        service_name: &'a str,
-        is_user: bool,
-    ) -> Vec<&'a str> {
-        match self {
-            // systemctl --user start service
-            ServiceController::Systemd if is_user => vec!["--user", work_type, service_name],
-            ServiceController::Systemd => vec![work_type, service_name],
-
-            // rc-service start service --user
-            ServiceController::OpenRc if is_user => vec![service_name, work_type, "--user"],
-            ServiceController::OpenRc => vec![service_name, work_type],
-
-            ServiceController::Nssm => vec![work_type, service_name],
-        }
-    }
-    pub fn bin_name(&self) -> &'static str {
-        match self {
-            ServiceController::Systemd => "systemctl",
-            ServiceController::Nssm => "nssm",
-            ServiceController::OpenRc => "rc-service",
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(default)]
-pub struct Hack {
-    pub service_controller: ServiceController,
-}
-impl Default for Hack {
-    fn default() -> Self {
-        Self {
-            service_controller: if cfg!(windows) {
-                ServiceController::Nssm
-            } else {
-                ServiceController::Systemd
-            },
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(default)]
-struct ConfigFile {
-    basic: Basic,
-    service: Service,
-    timeout: Option<u64>,
-    edit_cmd: String,
-    open_dir_cmd: String,
-    hack: Hack,
-}
-impl Default for ConfigFile {
-    fn default() -> Self {
-        let common_cmd = if cfg!(windows) { "start %s" } else { "open %s" };
-        Self {
-            basic: Default::default(),
-            service: Default::default(),
-            timeout: Default::default(),
-            edit_cmd: common_cmd.to_owned(),
-            open_dir_cmd: common_cmd.to_owned(),
-            hack: Default::default(),
-        }
-    }
-}
-impl ConfigFile {
-    fn to_file(&self) -> Result<()> {
-        let fp = File::create(crate::consts::CONFIG_PATH.as_path())?;
-        serde_yml::to_writer(fp, &self)?;
-        Ok(())
-    }
-    fn from_file() -> Result<Self> {
-        let fp = File::open(crate::consts::CONFIG_PATH.as_path())?;
-        Ok(serde_yml::from_reader(fp)?)
-    }
-}
-
-impl ProfileManager {
-    pub fn to_file(&self) -> Result<()> {
-        let fp = File::create(crate::consts::DATA_PATH.as_path())?;
-        serde_yml::to_writer(fp, &self)?;
-        Ok(())
-    }
-    pub fn from_file() -> Result<Self> {
-        let fp = File::open(crate::consts::DATA_PATH.as_path())?;
-        Ok(serde_yml::from_reader(fp)?)
-    }
-}
+pub use core::*;
 
 /// under the data folder:
 /// * [`BasicInfo`] basic_clash_config.yaml
@@ -230,6 +111,13 @@ impl Default for BasicInfo {
         }
     }
 }
+
+pub struct LibConfig {
+    pub basic: Basic,
+    pub service: Service,
+    pub hack: Hack,
+}
+
 impl BasicInfo {
     fn to_file(&self) -> Result<()> {
         let fp = File::create(crate::consts::BASIC_PATH.as_path())?;
@@ -280,5 +168,29 @@ impl BasicInfo {
                 ))?,
         };
         Ok((external_controller, proxy_addr, secret, global_ua))
+    }
+}
+
+impl ConfigFile {
+    fn to_file(&self) -> Result<()> {
+        let fp = File::create(crate::consts::CONFIG_PATH.as_path())?;
+        serde_yml::to_writer(fp, &self)?;
+        Ok(())
+    }
+    fn from_file() -> Result<Self> {
+        let fp = File::open(crate::consts::CONFIG_PATH.as_path())?;
+        Ok(serde_yml::from_reader(fp)?)
+    }
+}
+
+impl ProfileManager {
+    pub fn to_file(&self) -> Result<()> {
+        let fp = File::create(crate::consts::DATA_PATH.as_path())?;
+        serde_yml::to_writer(fp, &self)?;
+        Ok(())
+    }
+    pub fn from_file() -> Result<Self> {
+        let fp = File::open(crate::consts::DATA_PATH.as_path())?;
+        Ok(serde_yml::from_reader(fp)?)
     }
 }

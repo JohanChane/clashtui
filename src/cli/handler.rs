@@ -1,3 +1,5 @@
+use anyhow::{Context, Result};
+
 use crate::{
     backend::{BackEnd, Profile, ServiceOp},
     consts::{PKG_NAME, PKG_VERSION},
@@ -5,7 +7,7 @@ use crate::{
 
 use super::*;
 
-pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
+pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> Result<()> {
     // let var: Option<bool> = std::env::var("CLASHTUI_")
     //     .ok()
     //     .and_then(|s| s.parse().ok());
@@ -27,15 +29,13 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                         eprintln!("No profile selected!");
                         Box::new(std::iter::empty())
                     };
-                    iter.inspect(|s| println!("### Profile: {}", s.name))
-                        .filter_map(|v| {
-                            backend
-                                .update_profile(v, with_proxy, without_proxyprovider)
-                                .map_err(|e| println!("- Error! {e}"))
-                                .ok()
-                        })
-                        .flatten()
-                        .for_each(|s| println!("- {s}"));
+                    for pf in iter {
+                        println!("### Profile: {}", pf.name);
+                        match backend.update_profile(pf, with_proxy, without_proxyprovider) {
+                            Ok(v) => println!("- {}", v.join("\n")),
+                            Err(e) => println!("- Error {e}"),
+                        }
+                    }
                     backend.select_profile(backend.get_current_profile())?;
                     println!("Done");
                     Ok(())
@@ -44,10 +44,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                     let Some(pf) = backend.get_profile(&name) else {
                         anyhow::bail!("Not found in database!");
                     };
-                    if let Err(e) = backend.select_profile(pf) {
-                        eprint!("Cannot select {name} due to {e}");
-                        return Err(e);
-                    };
+                    backend.select_profile(pf)?;
                     println!("Done");
                     Ok(())
                 }
@@ -58,19 +55,17 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                 ProfileCommand::List { name_only } => {
                     let mut pfs = backend.get_all_profiles();
                     pfs.sort_by(|a, b| a.name.cmp(&b.name));
-                    pfs.into_iter()
-                        .map(|pf| {
-                            if name_only {
-                                pf.name
-                            } else {
-                                format!(
-                                    "{} : {}",
-                                    pf.name,
-                                    pf.dtype.get_domain().as_deref().unwrap_or("Unknown")
-                                )
-                            }
-                        })
-                        .for_each(|pf| println!("{}", pf));
+                    for pf in pfs {
+                        if name_only {
+                            println!("{}", pf.name)
+                        } else {
+                            println!(
+                                "{}: {}",
+                                pf.name,
+                                pf.dtype.get_domain().as_deref().unwrap_or("Unknown")
+                            )
+                        }
+                    }
                     println!("Done");
                     Ok(())
                 }
@@ -101,7 +96,7 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
             let current_version = target.current_version(&backend);
             let path = target.path(&backend)?;
 
-            let Some(info) = match target {
+            let Some(assets) = match target {
                 Target::Clashtui => Request::s_clashtui(check_ci)
                     .get_info()
                     .map(|info| info.rename(PKG_NAME).filter_asserts()),
@@ -109,17 +104,17 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                     .get_info()
                     .map(|info| info.rename("Mihomo").filter_asserts()),
             }
-            .map_err(|e| anyhow::anyhow!("failed to fetch github release due to {e}"))?
+            .context("failed to fetch github release")?
             .check(&current_version, check_ci) else {
                 println!("Up to date");
                 println!("current version is {}", current_version);
                 return Ok(());
             };
 
-            println!("\n{}", info.as_info(current_version));
+            println!("\n{}", assets.info);
             let Some(asset) = Select::default()
                 .append_start_prompt("Available asserts:")
-                .append_items(info.assets.iter())
+                .append_items(assets.assets.iter())
                 .set_end_prompt("Which you want to download:")
                 .interact()?
             else {
@@ -152,9 +147,9 @@ pub fn handle_cli(command: PackedArgs, backend: BackEnd) -> anyhow::Result<()> {
                     let _ = std::fs::remove_file(new_path);
                 }
                 Err(e) => {
-                    anyhow::bail!(
-                        "Failed to replace self but download is finished. You may have to do it manually\nError due to {e}"
-                    )
+                    println!("Failed to replace self but download is finished.");
+                    println!("You may have to do it manually.");
+                    anyhow::bail!(e);
                 }
             };
             println!("Done");
@@ -174,7 +169,7 @@ impl Target {
                 .unwrap_or("v0.0.0".to_owned()),
         }
     }
-    pub fn path(&self, backend: &BackEnd) -> anyhow::Result<std::path::PathBuf> {
+    pub fn path(&self, backend: &BackEnd) -> Result<std::path::PathBuf> {
         match self {
             Target::Clashtui => Ok(std::env::current_exe()?),
             Target::Mihomo => {

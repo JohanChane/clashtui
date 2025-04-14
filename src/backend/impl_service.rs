@@ -1,3 +1,5 @@
+use crate::utils::config::ServiceController;
+
 use super::{BackEnd, Mode, State, clash::webapi::ClashConfig, ipc};
 
 #[allow(unused_imports)] // currently, only [`SwitchMode`] is impl on macOS
@@ -84,29 +86,11 @@ impl BackEnd {
         let is_user = self.cfg.service.is_user;
         let service_name = &self.cfg.service.clash_service_name;
         match op {
-            ServiceOp::RestartClashService => {
-                let args = service_controller.apply_args("restart", service_name, is_user);
-                exec(service_controller.bin_name(), args)?;
-                let args = service_controller.apply_args("status", service_name, is_user);
-                exec(service_controller.bin_name(), args)
-            }
+            ServiceOp::RestartClashService => service_controller.restart(service_name, is_user),
             ServiceOp::RestartClashCore => self.restart_clash(),
-            ServiceOp::StopClashService => {
-                let args = service_controller.apply_args("stop", service_name, is_user);
-                exec(service_controller.bin_name(), args)?;
-                let args = service_controller.apply_args("status", service_name, is_user);
-                exec(service_controller.bin_name(), args)
-            }
-            ServiceOp::SetPermission => {
-                exec("chmod", vec!["+x", self.cfg.basic.clash_bin_path.as_str()])?;
-                ipc::exec_with_sbin(
-                    "setcap",
-                    vec![
-                        "'cap_net_admin,cap_net_bind_service=+ep'",
-                        self.cfg.basic.clash_bin_path.as_str(),
-                    ],
-                )
-            }
+            ServiceOp::StopClashService => service_controller.stop(service_name, is_user),
+            ServiceOp::SetPermission => ipc::set_clash_permission(&self.cfg.basic.clash_bin_path),
+            
             #[allow(unreachable_patterns)]
             _ => Err(Error::new(
                 std::io::ErrorKind::NotFound,
@@ -219,5 +203,29 @@ impl BackEnd {
     #[cfg(windows)]
     pub fn is_system_proxy_enabled(&self) -> std::io::Result<bool> {
         ipc::is_system_proxy_enabled()
+    }
+}
+
+trait ServiceExt {
+    fn status(&self, service_name: &str, is_user: bool) -> std::io::Result<String>;
+    fn restart(&self, service_name: &str, is_user: bool) -> std::io::Result<String>;
+    fn stop(&self, service_name: &str, is_user: bool) -> std::io::Result<String>;
+}
+impl ServiceExt for ServiceController {
+    fn status(&self, service_name: &str, is_user: bool) -> std::io::Result<String> {
+        let args = self.apply_args("status", service_name, is_user);
+        exec(self.bin_name(), args)
+    }
+
+    fn restart(&self, service_name: &str, is_user: bool) -> std::io::Result<String> {
+        let args = self.apply_args("restart", service_name, is_user);
+        exec(self.bin_name(), args)?;
+        self.status(service_name, is_user)
+    }
+
+    fn stop(&self, service_name: &str, is_user: bool) -> std::io::Result<String> {
+        let args = self.apply_args("stop", service_name, is_user);
+        exec(self.bin_name(), args)?;
+        self.status(service_name, is_user)
     }
 }
