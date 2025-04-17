@@ -92,6 +92,33 @@ edit_cmd: code %s # 调用外部编辑器，%s为文件路径
 open_dir_cmd: open %s
 ```
 
+##### hack字段
+此字段默认隐藏，仅在有必要时，需手动在`config.yaml`中加入此内容
+
+``` yaml
+hack:
+  # 用于指定重启/停止mihomo服务时使用的指令
+  service_controller: Systemd # OpenRc/Systemd/Nssm
+```
+
+> 注意：目前 `service_controller` 仅在Linux上生效，因为Windows暂未适配其他的服务管理指令
+
+### 添加来自Github/Gitlab的链接
+
+由于使用量较少，我们没有实现它们的tui界面，您需要手动修改 `clashtui.db`
+
+``` yaml
+profiles:
+  profile_name: !Github
+    url: https://path/to/github
+    token: <Token>
+  profile_name2: !GitLab
+    url: https://path/to/gitlab
+    token: <Token>
+```
+
+您可以在[Doc/](./Doc/README.md)了解更多
+
 ## 使用ClashTui
 
 运行 `clashtui help` 获取帮助

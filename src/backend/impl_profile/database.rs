@@ -69,7 +69,7 @@ mod test {
         db.insert("pf2", ProfileType::Generated("template1".to_string()));
         db.insert(
             "pf3",
-            ProfileType::GitLab {
+            ProfileType::Github {
                 url: "https://github.com".to_string(),
                 token: "Token".to_string(),
             },
@@ -82,7 +82,7 @@ mod test {
             },
         );
         db.insert("pf5", ProfileType::Url("https://raw.com".to_string()));
-        let std = r#"current_profile: ''
+        let serde = r#"current_profile: ''
 profiles:
   pf5: !Url https://raw.com
   pf2: !Generated template1
@@ -90,11 +90,11 @@ profiles:
     url: https://gitlab.com
     token: Token
   pf1: File
-  pf3: !GitLab
+  pf3: !Github
     url: https://github.com
     token: Token
 "#;
-        let std: ProfileManager = serde_yml::from_str(&std).unwrap();
-        assert_eq!(db, std);
+        let serde: ProfileManager = serde_yml::from_str(serde).unwrap();
+        assert_eq!(db, serde);
     }
 }
