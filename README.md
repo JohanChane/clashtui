@@ -1,6 +1,7 @@
 # ClashTui
 
-![Demo](./Assets/clashtui_demo.gif)
+![Demo](https://github.com/user-attachments/assets/7a35f4a7-e400-4e73-b2ec-0d68f287b99c)
+
 
 Language: [English](./README.md) | [中文](./README_ZH.md)
 
