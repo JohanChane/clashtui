@@ -18,8 +18,6 @@ extra:
   edit_cmd: 'alacritty -e nvim %s'          # `%s` will be replaced by the file path. If it is empty, use `xdg-open` to open the file.
   open_dir_cmd: 'alacritty -e ranger %s'
 ```
-```
-```
 
 ## Shortcuts
 
