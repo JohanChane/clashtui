@@ -129,11 +129,23 @@ rules:
   - DOMAIN,aur.archlinux.org,Entry
 
   - GEOIP,lan,DIRECT,no-resolve
-  - GEOSITE,github,Entry
   - GEOSITE,openai,Entry-Gpt
-  - GEOSITE,telegram,Entry
+  - GEOSITE,github,Entry
+  - GEOSITE,twitter,Entry
   - GEOSITE,youtube,Entry
-  - GEOSITE,reddit,Entry
-  - GEOSITE,gfw,Entry
+  - GEOSITE,google,Entry
+  - GEOSITE,telegram,Entry
+  - GEOSITE,netflix,Entry
+  - GEOSITE,bilibili,Entry-RuleMode
+  - GEOSITE,bahamut,Entry
+  - GEOSITE,spotify,Entry
+  - GEOSITE,steam@cn,Entry-RuleMode
+  - GEOSITE,category-games@cn,Entry-RuleMode
+  - GEOSITE,CN,Entry-RuleMode
+  - GEOSITE,geolocation-!cn,Entry
+  - GEOIP,google,Entry
+  - GEOIP,netflix,Entry
+  - GEOIP,telegram,Entry
+  - GEOIP,twitter,Entry
   - GEOIP,CN,Entry-RuleMode
   - MATCH,Entry-LastMatch
