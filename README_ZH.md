@@ -10,18 +10,9 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
 
 * [支持的平台](#支持的平台)
 * [适用人群](#适用人群)
-* [安装 Mihomo 服务 (启用 Tun 模式)](#安装-mihomo-服务-启用-tun-模式)
-* [安装 clashtui](#安装-clashtui)
-    * [配置 `basic_clash_config.yaml`](#配置-basic_clash_configyaml)
-* [便携模式](#便携模式)
-* [使用说明](#使用说明)
-    * [导入链接](#导入链接)
-    * [结合 cronie 定时更新 profiles](#结合-cronie-定时更新-profiles)
-    * [使用配置模板](#使用配置模板)
-    * [高级使用](#高级使用)
-        * [配置打开文件和目录的命令](#配置打开文件和目录的命令)
-        * [自定义配置模板](#自定义配置模板)
-* [clashtui 的文件结构](#clashtui-的文件结构)
+* [Install](#install)
+* [ClashTUI Usage](#clashtui-usage)
+* [Uninstall](#uninstall)
 * [See more](#see-more)
 * [尝试新东西](#尝试新东西)
 * [项目免责声明](#项目免责声明)
@@ -39,231 +30,25 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
 -   对 clash 配置有一定了解。
 -   喜欢 TUI 软件。
 
-## 安装 Mihomo 服务 (启用 Tun 模式)
-
-比如: [ArchLinux](https://aur.archlinux.org/packages/mihomo)。
+## Install
 
 ```sh
-# ## 安装 mihomo
-paru -S mihomo
-
-# ## 添加 mihomo hook
-# cat /etc/pacman.d/hooks/mihomo.hook (没有类似于 hook 的系统可以使用 ClashSrvCtl Tab 的 SetPermission 或者使用 mihomo@root 服务)
-[Trigger]
-Operation = Install
-Operation = Upgrade
-Type = Path
-Target = usr/bin/mihomo
-
-[Action]
-When = PostTransaction
-Exec = /usr/bin/setcap 'cap_net_admin,cap_net_bind_service=+ep' /usr/bin/mihomo
-
-# ## 编辑 mihomo service unit
-# systemctl edit mihomo
-[Service]
-# 删除原先的 ExecStart
-ExecStart=
-ExecStart=/usr/bin/mihomo -d /srv/mihomo -f /srv/mihomo/config.yaml
-
-# ## 创建 /srv/mihomo
-mkdir /srv/mihomo
-cd /srv/mihomo
-chown -R mihomo:mihomo /srv/mihomo
-usermod -a -G mihomo <user>
-groups <user>       # 查看是否已经加入 mihomo group
-
-# Optional. 0.2.0 之后版本的 clashtui 会自动修复文件的权限。
-chmod g+w /srv/mihomo               # clashtui 要有创建文件的权限。
-chmod g+s /srv/mihomo               # 使 clashtui 创建的文件的组为 mihomo。为了使 clashtui 对该目录的文件有组的读写权限。
-chmod g+w /srv/mihomo/config.yaml   # clashtui 要有写的权限。
-
-# ## 设置 mihomo service unit
-systemctl enable mihomo  # 开机启动
-systemctl restart mihomo  # 启动服务
+# [optional] sudo pacman -S mihomo clashtui
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/install)"
 ```
 
-建议先用一个可用的 mihomo 配置测试 mihomo 服务是否成功。检查是否缺少 [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) 文件。
+If you want to install manually. See [Install Manually](./Doc/install_clashtui_manually.md)
 
-`mihomo` package 提供的 `mihomo.service`:
+## ClashTUI Usage
 
-```
-[Unit]
-Description=Mihomo daemon
-After=network.target NetworkManager.service systemd-networkd.service iwd.service
+See [clashtui_usage](./Doc/clashtui_usage.md)
 
-[Service]
-Type=simple
-User=mihomo
-Group=mihomo
-LimitNPROC=500
-LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
-Restart=always
-RestartSec=5
-ExecStart=/usr/bin/mihomo -d /etc/mihomo
-
-[Install]
-WantedBy=multi-user.target
-```
-
-## 安装 clashtui
-
-比如: ArchLinux
+## Uninstall
 
 ```sh
-# ## 安装 clashtui
-# 有最新的 [PKGBUILD](./PkgManagers/PKGBUILD)。
-paru -S clashtui。      # 其他 linux 发行版, 手动下载, 将 clashtui 放在 PATH 即可。
-
-# ## 配置 clashtui
-clashtui                # 先运行会在 ~/.config/clashtui 生成一些默认文件。
-
-# nvim ~/.config/clashtui/config.yaml
-# 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
-basic:
-  clash_config_dir: '/srv/mihomo'
-  clash_bin_path: '/usr/bin/mihomo'
-  clash_config_path: '/srv/mihomo/config.yaml'
-  timeout: null                     # 模拟 clash_ua 下载的超时时间。`null` 表示没有超时时间。单位是`秒`。
-service:
-  clash_srv_name: 'mihomo'          # systemctl {restart | stop} <clash_srv_name>
-  is_user: false                    # true: systemctl --user ...
-extra:
-  edit_cmd: ''
-  open_dir_cmd: ''
+curl -o /tmp/install https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/install
+bash /tmp/install -u
 ```
-
-clashtui 后续的版本没有上传到 `crates.io`, 因为现在 clashtui 分离为多个模块, 如果上传到 `crates.io`, 需要上传依赖的每个模块, 而有些模块没有必要上传到 `crates.io`。See [ref](https://users.rust-lang.org/t/is-it-possible-to-publish-crates-with-path-specified/91497/2)。所以不要使用 `cargo install clashtui` 来安装了。
-
-### 配置 `basic_clash_config.yaml`
-
-自行配置 `~/.config/clashtui/basic_clash_config.yaml`。该文件的一些基础字段会合并到 `clash_cfg_path`。可以参考[这里](./Example/basic_clash_config.yaml)配置 tun 模式。
-
-## 便携模式
-
-在 clashtui 程序所在的目录创建一个名为 `data` 的文件夹。则会将数据放在 `data` 内而不是 `~/.config/clashtui`。
-
-## 使用说明
-
-按 `?` 显示 help。
-
-### 导入链接
-
--   导入 profile: 在 `Profile` 区域, 按 `i` 输入 Name (尽量不使用后缀) 和 Uri (url or file path)。
--   更新 profile: 按 `a` 更新 Profile 的依赖的所有资源。默认使用自身代理更新, 如果开启 tun 模式或系统代理且没有可用节点的情况下, 先停止 mihomo 服务 (ClashSrvCtl Tab 的 StopClashService), 再更新即可。
--   选择 profile: 按 `Enter` 选择该 Profile。
--   打开 mihomo 的 ui: 在浏览器输入 `http://127.0.0.1:9090/ui`。前提是你的 mihomo 配置已经配置了 ui 相关的字段, [参考](https://wiki.metacubex.one/config/general/#_7)。
-
-如果是首次安装 clashtui:
--   如果更改了 `basic_clash_config` 等配置, 则重启 clashtui, 使其重新解析 `basic_clash_config` 等的更改。
--   导入一个不需要代理更新的 profile。
--   按 `a` 更新 Profile 的依赖的所有资源。
--   回车选择该 profile, 使得 `basic_clash_config` 的字段合并到 `clash_cfg_path`。
--   重启 mihomo 服务 (ClashSrvCtl Tab 的 StartClashService)。
-
-### 结合 cronie 定时更新 profiles
-
-```sh
-clashtui -u         # 以命令行的模式更新所有 profiles。如果 profile 有 proxy-providers, 同时也会更新它们。
-```
-
-所以可以结合 cronie 来定时更新 profiles:
-
-```sh
-# crontab -e
-0 10,14,16,22 * * * /usr/bin/env clashtui -u >> ~/cron.out 2>&1
-```
-
-cronie 的使用, See [ref](https://wiki.archlinuxcn.org/wiki/Cron)。
-
-### 使用配置模板
-
--   按 `t` 切换到 Templates 区域。
--   选择 `template_proxy_providers`, 按 `e` 编辑, 输入订阅链接即可。
-
-    比如:
-
-    ```
-    https://....
-    https://....
-
-    # 支持注释
-    #https://....
-    ```
-
--   按 `Enter` 生成配置到 `Profile`。按 `p` 切换回 `Profile`, `Enter` 选择该配置即可。
-
-在[这里](./Example/templates)有最新的 templates。
-
-### 高级使用
-
-#### 配置打开文件和目录的命令
-
-在 `~/.config/clashtui/config.yaml` 中配置即可。`%s` 会自动替换为选择的文件的路径。
-
-比如:
-
-```yaml
-edit_cmd: "alacritty -e nvim %s"
-opendir_cmd: "alacritty -e ranger %s"
-```
-
-#### 自定义配置模板
-
-模板功能是 clashtui 独有的。具体使用规则参考提供例子模板。
-
-定义重复使用的字段:
-
-```yaml
-proxy-anchor:
-  - delay_test: &pa_dt {url: https://www.gstatic.com/generate_204, interval: 300}
-  - proxy_provider: &pa_pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
-```
-
-为 `template_proxy_providers` 的每个链接生成一个 proxy-provider:
-
-```yaml
-proxy-providers:
-  provider:
-    tpl_param:
-    type: http    # type 字段要放在此处, 不能放入 pa_pp。原因是 clashtui 根据这个字段检测是否是网络资源。
-    <<: *pa_pp
-```
-
-为每个 proxy-providers 生成一个 `Select, Auto` proxy-group。
-
-```yaml
-proxy-groups:
-  - name: "Select"
-    tpl_param:
-      providers: ["provider"]
-    type: select
-
-  - name: "Auto"
-    tpl_param:
-      providers: ["provider"]
-    type: url-test
-    <<: *pa_dt
-```
-
-使用 `Select, Auto` proxy-groups:
-
-```yaml
-proxy-groups:
-  - name: "Entry"
-    type: select
-    proxies:
-      - <Auto>
-      - <Select>
-```
-
-## clashtui 的文件结构
-
--   basic_clash_config.yaml: mihomo 配置的基本字段, 会合并到 `clash_cfg_path`。
--   config.yaml: clashtui 的配置。
-
 ## See more
 
 [Doc](./Doc)
