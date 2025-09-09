@@ -23,7 +23,8 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-Invoke-RestMethod -Uri https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/win/install.ps1 | Invoke-Expression
+irm https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/win/install.ps1 -outfile 'install.ps1'
+.\install.ps1 -InstallDir "D:\ClashTUI" # Do not include spaces in the installation path
 ```
 
 ## ClashTUI Usage
