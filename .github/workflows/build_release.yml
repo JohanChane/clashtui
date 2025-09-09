@@ -51,10 +51,6 @@ jobs:
           cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --locked
           cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --release --locked
 
-          cd clashtui
-          cargo build --locked
-          cargo build --release --locked
-
       - name: Build linux arm64
         run: |
           rustup target add aarch64-unknown-linux-gnu
