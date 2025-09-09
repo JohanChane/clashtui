@@ -45,6 +45,12 @@ jobs:
 
       - name: Build
         run: |
+          rustup target add x86_64-unknown-linux-gnu
+          cd clashtui
+          cargo install cargo-zigbuild
+          cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --locked
+          cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --release --locked
+
           cd clashtui
           cargo build --locked
           cargo build --release --locked
@@ -64,8 +70,8 @@ jobs:
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./clashtui/target/debug/clashtui ./artifacts/clashtui-amd64.debug
-          mv ./clashtui/target/release/clashtui ./artifacts/clashtui-amd64
+          mv ./clashtui/target/x86_64-unknown-linux-gnu/debug/clashtui ./artifacts/clashtui-amd64.debug
+          mv ./clashtui/target/x86_64-unknown-linux-gnu/release/clashtui ./artifacts/clashtui-amd64
           mv ./clashtui/target/aarch64-unknown-linux-gnu/debug/clashtui ./artifacts/clashtui-arm64.debug
           mv ./clashtui/target/aarch64-unknown-linux-gnu/release/clashtui ./artifacts/clashtui-arm64
           mv ./clashtui/version.txt ./artifacts/version.txt
