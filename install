@@ -95,7 +95,7 @@ EOF
 
   echo -n "Do you want to download templates? (y/N): "
   read -r response
-  if [ "$response" = "y" ] && [ "$response" = "Y" ]; then
+  if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
     log_info "Downloading templates..."
     curl -o $CLASHTUI_CONFIG_DIR/templates/common_tpl.yaml https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/Example/templates/common_tpl.yaml
     curl -o $CLASHTUI_CONFIG_DIR/templates/generic_tpl.yaml https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/Example/templates/generic_tpl.yaml
