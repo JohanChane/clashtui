@@ -33,7 +33,7 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
 ## Install
 
 ```sh
-# [optional] sudo pacman -S mihomo clashtui
+# Optional. sudo pacman -S mihomo clashtui
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/install)"
 ```
 
