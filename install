@@ -294,7 +294,7 @@ main() {
   done
 
   sudo mkdir -p "$CLASHTUI_INSTALL_DIR/mihomo_config"
-  mkdir -p "$CLASHTUI_CONFIG_DIR/clashtui"
+  mkdir -p "$CLASHTUI_CONFIG_DIR"
 
   install_mihomo
   install_clashtui
