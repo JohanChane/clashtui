@@ -2,6 +2,7 @@
 
 CLASHTUI_CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/clashtui
 CLASHTUI_INSTALL_DIR=/opt/clashtui
+INSTALL_RES_URL_PREFIX=https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/InstallRes
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -80,28 +81,38 @@ extra:
   open_dir_cmd:
 EOF
 
-  tee "$CLASHTUI_CONFIG_DIR/basic_clash_config.yaml" >/dev/null <<'EOF'
+  echo -n "Do you want to download basic_clash_config.yaml? (y/N): "
+  read -r response
+  if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+    log_info "Downloading basic_clash_config.yaml..."
+    curl -o $CLASHTUI_CONFIG_DIR/basic_clash_config.yaml $INSTALL_RES_URL_PREFIX/basic_clash_config.yaml
+  else
+    tee "$CLASHTUI_CONFIG_DIR/basic_clash_config.yaml" >/dev/null <<'EOF'
 mixed-port: 7890
 mode: rule
 log-level: info
 external-controller: 127.0.0.1:9090
 EOF
+  fi
 
   sudo cp "$CLASHTUI_CONFIG_DIR/basic_clash_config.yaml" "$CLASHTUI_INSTALL_DIR/mihomo_config/config.yaml"
 
   mkdir "$CLASHTUI_CONFIG_DIR/profiles"
   mkdir "$CLASHTUI_CONFIG_DIR/templates"
-  touch "$CLASHTUI_CONFIG_DIR/templates/template_proxy_providers"
+  tee "$CLASHTUI_CONFIG_DIR/templates/template_proxy_providers" >/dev/null <<'EOF'
+# This is a comment
+# Place each subscription on a separate line
+EOF
 
   echo -n "Do you want to download templates? (y/N): "
   read -r response
   if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
     log_info "Downloading templates..."
-    curl -o $CLASHTUI_CONFIG_DIR/templates/common_tpl.yaml https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/Example/templates/common_tpl.yaml
-    curl -o $CLASHTUI_CONFIG_DIR/templates/generic_tpl.yaml https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/Example/templates/generic_tpl.yaml
-    curl -o $CLASHTUI_CONFIG_DIR/templates/generic_tpl_with_all.yaml https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/Example/templates/generic_tpl_with_all.yaml
-    curl -o $CLASHTUI_CONFIG_DIR/templates/generic_tpl_with_filter.yaml https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/Example/templates/generic_tpl_with_filter.yaml
-    curl -o $CLASHTUI_CONFIG_DIR/templates/generic_tpl_with_rulest.yaml https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/Example/templates/generic_tpl_with_ruleset.yaml
+    curl -o $CLASHTUI_CONFIG_DIR/templates/common_tpl.yaml $INSTALL_RES_URL_PREFIX/templates/common_tpl.yaml
+    curl -o $CLASHTUI_CONFIG_DIR/templates/generic_tpl.yaml $INSTALL_RES_URL_PREFIX/templates/generic_tpl.yaml
+    curl -o $CLASHTUI_CONFIG_DIR/templates/generic_tpl_with_all.yaml $INSTALL_RES_URL_PREFIX/templates/generic_tpl_with_all.yaml
+    curl -o $CLASHTUI_CONFIG_DIR/templates/generic_tpl_with_filter.yaml $INSTALL_RES_URL_PREFIX/templates/generic_tpl_with_filter.yaml
+    curl -o $CLASHTUI_CONFIG_DIR/templates/generic_tpl_with_rulest.yaml $INSTALL_RES_URL_PREFIX/templates/generic_tpl_with_ruleset.yaml
   fi
 }
 

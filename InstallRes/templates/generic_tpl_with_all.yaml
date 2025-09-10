@@ -1,0 +1,75 @@
+proxy-anchor:
+  - delay_test: &pa_dt {url: https://www.gstatic.com/generate_204, interval: 300}
+  - proxy_provider: &pa_pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
+
+
+proxy-groups:
+  - name: "Entry"
+    type: select
+    proxies:
+      - AllAt
+      - AllSl
+      - <At>
+      - <Sl>
+
+  - name: "AllSl"
+    type: select
+    use:
+      - <pvd>
+
+  - name: "Sl"
+    tpl_param:
+      providers: ["pvd"]
+    type: select
+
+  - name: "AllAt"
+    type: url-test
+    proxies:
+      - <At>
+    <<: *pa_dt
+
+  - name: "At"
+    tpl_param:
+      providers: ["pvd"]
+    type: url-test
+    <<: *pa_dt
+
+  - name: "Entry-RuleMode"
+    type: select
+    proxies:
+      - DIRECT
+      - Entry
+
+  - name: "Entry-LastMatch"
+    type: select
+    proxies:
+      - Entry
+      - DIRECT
+
+proxy-providers:
+  pvd:
+    tpl_param:
+    type: http
+    <<: *pa_pp
+
+rules:
+  - GEOIP,lan,DIRECT,no-resolve
+  - GEOSITE,github,Entry
+  - GEOSITE,twitter,Entry
+  - GEOSITE,youtube,Entry
+  - GEOSITE,google,Entry
+  - GEOSITE,telegram,Entry
+  - GEOSITE,netflix,Entry
+  - GEOSITE,bilibili,Entry-RuleMode
+  - GEOSITE,bahamut,Entry
+  - GEOSITE,spotify,Entry
+  - GEOSITE,steam@cn,Entry-RuleMode
+  - GEOSITE,category-games@cn,Entry-RuleMode
+  - GEOSITE,CN,Entry-RuleMode
+  - GEOSITE,geolocation-!cn,Entry
+  - GEOIP,google,Entry
+  - GEOIP,netflix,Entry
+  - GEOIP,telegram,Entry
+  - GEOIP,twitter,Entry
+  - GEOIP,CN,Entry-RuleMode
+  - MATCH,Entry-LastMatch
