@@ -45,3 +45,7 @@ Run clashtui. In the `ClashSrvCtl` tab, select `InstallSrv`. The program will in
 If you're not using scoop to install nssm, you can manually download [nssm](https://nssm.cc/download), rename it to `nssm.exe`, and add it to PATH or place it in the same directory as clashtui.
 
 The same applies to Loopback Manager. Download [Loopback Manager](https://github.com/tiagonmas/Windows-Loopback-Exemption-Manager), rename it to `EnableLoopback.exe`, and add it to PATH or place it in the directory where clashtui is located.
+
+## Download templates
+
+See [ref](https://github.com/JohanChane/clashtui/blob/main/Doc/install_clashtui_manually.md#%E4%B8%8B%E8%BD%BD%E6%A8%A1%E6%9D%BF-%E5%8F%AF%E9%80%89)

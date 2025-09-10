@@ -45,3 +45,7 @@ clash_srv_name: "mihomo"       # nssm {install | remove | restart | stop | edit}
 如果不使用 scoop 安装 nssm, 可以手动下载 [nssm](https://nssm.cc/download), 将其改名为 `nssm.exe`, 并将其加入 PATH 或者放在 clashtui 所在的目录即可。
 
 Loopback Manager 同理。下载 [Loopback Manager](https://github.com/tiagonmas/Windows-Loopback-Exemption-Manager), 将其改名为 `EnableLoopback.exe`, 然后将其加入 PATH 或者放在 clashtui 所在的目录下即可。
+
+## 下载模板
+
+See [ref](https://github.com/JohanChane/clashtui/blob/main/Doc/install_clashtui_manually_zh.md#%E4%B8%8B%E8%BD%BD%E6%A8%A1%E6%9D%BF-%E5%8F%AF%E9%80%89)
