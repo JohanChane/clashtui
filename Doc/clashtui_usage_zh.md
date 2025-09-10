@@ -104,4 +104,4 @@ proxy-groups:
 
 ---
 
-你可以在此找到最新的模板。See [ref](https://github.com/JohanChane/clashtui/tree/main/Example/templates).
+你可以在此找到最新的模板。See [ref](https://github.com/JohanChane/clashtui/tree/main/InstallRes/templates).

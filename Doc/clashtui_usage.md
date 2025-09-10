@@ -104,4 +104,4 @@ proxy-groups:
 
 ---
 
-The latest templates can be found [here](https://github.com/JohanChane/clashtui/tree/main/Example/templates).
+The latest templates can be found [here](https://github.com/JohanChane/clashtui/tree/main/InstallRes/templates).

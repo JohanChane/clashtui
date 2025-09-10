@@ -12,3 +12,7 @@ clash_cfg_dir: "D:/MyAppData/mihomo"
 clash_cfg_path: "D:/MyAppData/mihomo/config.yaml"
 clash_srv_name: "mihomo"       # nssm {install | remove | restart | stop | edit} <clash_srv_name>
 ```
+
+## 其他
+
+参考 [ref](../clashtui_usage_zh.md)
