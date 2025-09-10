@@ -43,6 +43,7 @@ param(
 $CLASHTUI_INSTALL_DIR = $InstallDir
 $CLASHTUI_CONFIG_DIR = "$env:APPDATA\clashtui"
 $MIHOMO_CONFIG_DIR = Join-Path $CLASHTUI_INSTALL_DIR "mihomo_config"
+$INSTALL_RES_URL_PREFIX = "https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/InstallRes"
 
 # Logging functions
 function Log-Info {
@@ -399,7 +400,10 @@ function Create-ConfigDirectory {
     # Create template_proxy_providers file
     $templateProxyProviders = Join-Path $templatesDir "template_proxy_providers"
     if (-not (Test-Path $templateProxyProviders)) {
-        New-Item -ItemType File -Path $templateProxyProviders -Force | Out-Null
+        @"
+# This is a comment
+# Place each subscription on a separate line
+"@ | Set-Content -Path "$templateProxyProviders" -Encoding UTF8 | Out-Null
         Log-Info "Created template_proxy_providers file: $templateProxyProviders"
     } else {
         Log-Info "template_proxy_providers file already exists: $templateProxyProviders"
@@ -408,14 +412,25 @@ function Create-ConfigDirectory {
     # Generate basic_clash_config.yaml
     $basicConfigPath = Join-Path $CLASHTUI_CONFIG_DIR "basic_clash_config.yaml"
     if (-not (Test-Path $basicConfigPath)) {
-        $basicConfigContent = @"
+        $response = Read-Host "Do you want to download basic_clash_config.yaml? (y/N)"
+
+        if ($response -eq "y" -or $response -eq "Y") {
+            $basicConfigUrl = "$INSTALL_RES_URL_PREFIX/basic_clash_config.yaml"
+            $basicConfigPath = Join-Path $CLASHTUI_CONFIG_DIR "basic_clash_config.yaml"
+            Log-Info "Downloading basic_clash_config.yaml..."
+            Invoke-WebRequest -Uri $basicConfigUrl -OutFile $basicConfigPath
+            Log-Info "Downloaded basic_clash_config.yaml to ""$basicConfigPath"""
+        } else {
+          $basicConfigContent = @"
 mixed-port: 7890
 mode: rule
 log-level: info
 external-controller: 127.0.0.1:9090
 "@
-        Set-Content -Path $basicConfigPath -Value $basicConfigContent -Encoding UTF8
-        Log-Info "Generated basic configuration file: $basicConfigPath"
+          Set-Content -Path $basicConfigPath -Value $basicConfigContent -Encoding UTF8
+          Log-Info "Generated basic configuration file: $basicConfigPath"
+        }
+
         Log-Info "Basic configuration file content:"
         Write-Host "=== Basic Configuration File Content ===" -ForegroundColor Cyan
         Write-Host $basicConfigContent -ForegroundColor Cyan
@@ -449,28 +464,28 @@ function Download-Templates {
         $templates = @(
             @{
                 Name = "common_tpl.yaml"
-                Url = "https://raw.githubusercontent.com/JohanChane/clashtui/main/Example/templates/common_tpl.yaml"
+                Url = "$INSTALL_RES_URL_PREFIX/templates/common_tpl.yaml"
             },
             @{
                 Name = "generic_tpl.yaml"
-                Url = "https://raw.githubusercontent.com/JohanChane/clashtui/main/Example/templates/generic_tpl.yaml"
+                Url = "$INSTALL_RES_URL_PREFIX/templates/generic_tpl.yaml"
             },
             @{
                 Name = "generic_tpl_with_all.yaml"
-                Url = "https://raw.githubusercontent.com/JohanChane/clashtui/main/Example/templates/generic_tpl_with_all.yaml"
+                Url = "$INSTALL_RES_URL_PREFIX/templates/generic_tpl_with_all.yaml"
             },
             @{
                 Name = "generic_tpl_with_filter.yaml"
-                Url = "https://raw.githubusercontent.com/JohanChane/clashtui/main/Example/templates/generic_tpl_with_filter.yaml"
+                Url = "$INSTALL_RES_URL_PREFIX/templates/generic_tpl_with_filter.yaml"
             },
             @{
-                Name = "generic_tpl_with_rulest.yaml"
-                Url = "https://raw.githubusercontent.com/JohanChane/clashtui/main/Example/templates/generic_tpl_with_ruleset.yaml"
+                Name = "generic_tpl_with_ruleset.yaml"
+                Url = "$INSTALL_RES_URL_PREFIX/templates/generic_tpl_with_ruleset.yaml"
             }
         )
-        
+
         $templatesDir = Join-Path $CLASHTUI_CONFIG_DIR "templates"
-        
+
         foreach ($template in $templates) {
             $outputPath = Join-Path $templatesDir $template.Name
             try {
