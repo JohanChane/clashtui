@@ -37,6 +37,7 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
 ```sh
 # Optional. sudo pacman -S mihomo clashtui
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/install)"
+# Optional. sudo systemctl enable clashtui_mihomo
 ```
 
 If you want to install manually. See [Install Manually](./Doc/install_clashtui_manually.md)

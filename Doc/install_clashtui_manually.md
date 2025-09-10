@@ -1,56 +1,56 @@
-# Install ClashTUI Manually
+# Install Clashtui Manually
 
-## Install Mihomo Service (Enable Tun Mode)
+## Installing Clashtui
 
-For example: [ArchLinux](https://aur.archlinux.org/packages/mihomo).
+For example: ArchLinux
+
+1. Install mihomo and clashtui
 
 ```sh
-# ## Install mihomo
-paru -S mihomo
-
-# ## Add mihomo hook
-# cat /etc/pacman.d/hooks/mihomo.hook (If there is no system similar to hook, use ClashSrvCtl Tab's SetPermission or use mihomo@root service)
-[Trigger]
-Operation = Install
-Operation = Upgrade
-Type = Path
-Target = usr/bin/mihomo
-
-[Action]
-When = PostTransaction
-Exec = /usr/bin/setcap 'cap_net_admin,cap_net_bind_service=+ep' /usr/bin/mihomo
-
-# ## Edit mihomo service unit
-# systemctl edit mihomo
-[Service]
-# Remove original ExecStart
-ExecStart=
-ExecStart=/usr/bin/mihomo -d /srv/mihomo -f /srv/mihomo/config.yaml
-
-# ## Create /srv/mihomo
-mkdir /srv/mihomo
-cd /srv/mihomo
-chown -R mihomo:mihomo /srv/mihomo
-usermod -a -G mihomo <user>
-groups <user>       # Check if already added to mihomo group
-
-# Optional. After version 0.2.0, clashtui will automatically fix file permissions.
-chmod g+w /srv/mihomo               # clashtui needs permission to create files.
-chmod g+s /srv/mihomo               # Make the group of files created by clashtui mihomo. This is to give clashtui group read and write permissions to files in this directory.
-chmod g+w /srv/mihomo/config.yaml   # clashtui needs write permission.
-
-# ## Set mihomo service unit
-systemctl enable mihomo  # Start on boot
-systemctl restart mihomo  # Start service
+sudo pacman -S mihomo clashtui
 ```
 
-It is recommended to test the mihomo service with a valid configuration to ensure its success. Check if [meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat) file is missing.
+Later versions of clashtui have not been uploaded to `crates.io` because clashtui has been split into multiple modules.  
+If uploaded to `crates.io`, each dependent module would need to be uploaded as well, and some modules do not necessarily need to be on `crates.io`.  
+See [ref](https://users.rust-lang.org/t/is-it-possible-to-publish-crates-with-path-specified/91497/2).  
+Therefore, do not use `cargo install clashtui` for installation.
 
-`mihomo.service` of `mihomo` package:
+2. Create the mihomo user and mihomo group, then add the user to the group
+
+*Note: These may have already been created during mihomo installation.*
+
+```sh
+sudo groupadd --system mihomo
+sudo useradd --system --no-create-home --gid mihomo --shell /bin/false mihomo
+sudo gpasswd -a $USER mihomo  # Please log out and back in for the group file permissions to take effect; this will be used later.
+groups $USER                  # Check if you have been added to the mihomo group
+```
+
+3. Create necessary files
+
+```sh
+sudo mkdir -p /opt/clashtui/mihomo_config
+cat > /opt/clashtui/mihomo_config/config.yaml << EOF
+mixed-port: 7890
+external-controller: 127.0.0.1:9090
+EOF
+
+# Optional. Pre-download geo files to allow the mihomo service to respond faster on first startup
+sudo curl -o /opt/clashtui/mihomo_config/geoip.metadb https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb
+sudo curl -o /opt/clashtui/mihomo_config/GeoSite.dat https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat
+
+sudo chown -R mihomo:mihomo /opt/clashtui/mihomo_config
+```
+
+4. Create the systemd unit `clashtui_mihomo.service`
+
+It is recommended to use the [file](https://wiki.metacubex.one/startup/service/) provided by the mihomo documentation rather than the one included with the installation, as there may be differences that make unified modifications inconvenient. Of course, if you are familiar with it, you may use the installation-provided file.
+
+Create the systemd configuration file at /etc/systemd/system/clashtui_mihomo.service: (with User and Group added)
 
 ```
 [Unit]
-Description=Mihomo daemon
+Description=mihomo Daemon, Another Clash Kernel.
 After=network.target NetworkManager.service systemd-networkd.service iwd.service
 
 [Service]
@@ -59,40 +59,55 @@ User=mihomo
 Group=mihomo
 LimitNPROC=500
 LimitNOFILE=1000000
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SYS_TIME CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SYS_TIME CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
 Restart=always
-RestartSec=5
-ExecStart=/usr/bin/mihomo -d /etc/mihomo
+ExecStartPre=/usr/bin/sleep 1s
+ExecStart=/opt/clashtui/mihomo -d /opt/clashtui/mihomo_config
+ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-## Install ClashTui
-
-For example: ArchLinux
+Link the mihomo executable:
 
 ```sh
-# ## Install clashtui
-# There is a latest [PKGBUILD](./PkgManagers/PKGBUILD).
-paru -S clashtui.      # For other Linux distributions, manually download and place clashtui in PATH.
-
-# ## Configure clashtui
-clashtui                # Running this will generate some default files in ~/.config/clashtui.
-
-# nvim ~/.config/clashtui/config.yaml
-basic:
-  clash_config_dir: '/srv/mihomo'
-  clash_bin_path: '/usr/bin/mihomo'
-  clash_config_path: '/srv/mihomo/config.yaml'
-  timeout: null
-service:
-  clash_srv_name: 'mihomo'
-  is_user: false
-extra:
-  edit_cmd: ''
-  open_dir_cmd: ''
+sudo ln -s $(which mihomo) /opt/clashtui/mihomo
 ```
 
-The subsequent versions of clashtui have not been uploaded to `crates.io` because clashtui is now separated into multiple modules. If uploaded to `crates.io`, it would require uploading each dependent module, and some modules do not need to be uploaded to `crates.io`. See [ref](https://users.rust-lang.org/t/is-it-possible-to-publish-crates-with-path-specified/91497/2). So, do not use `cargo install clashtui` for installation.
+Optional. Enable startup on boot:
+
+```sh
+sudo systemctl enable clashtui_mihomo
+```
+
+It is recommended to start the clashtui_mihomo systemd unit first to check for any issues:
+
+```sh
+sudo systemctl start clashtui_mihomo
+```
+
+## Configuring Clashtui
+
+First, run clashtui to generate necessary files in `$XDG_CONFIG_HOME/clashtui`.
+
+Modify `$XDG_CONFIG_HOME/clashtui/config.yaml`. For configuration reference, see [ref](./clashtui_usage_zh.md).
+
+Optional. Use the repository's `basic_clash_config.yaml`:
+
+```sh
+curl -o $XDG_CONFIG_HOME/clashtui/basic_clash_config.yaml https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/InstallRes/basic_clash_config.yaml
+```
+
+## Download Templates (Optional)
+
+```sh
+cd $XDG_CONFIG_HOME/clashtui/templates
+
+curl -O "https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/InstallRes/templates/common_tpl.yaml"
+curl -O "https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/InstallRes/templates/generic_tpl.yaml"
+curl -O "https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/InstallRes/templates/generic_tpl_with_all.yaml"
+curl -O "https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/InstallRes/templates/generic_tpl_with_filter.yaml"
+curl -O "https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/InstallRes/templates/generic_tpl_with_ruleset.yaml"
+```
