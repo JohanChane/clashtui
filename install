@@ -89,6 +89,10 @@ EOF
   echo -n "Do you want to download basic_clash_config.yaml? (y/N): "
   read -r response
   if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+    if [ -f "$CLASHTUI_CONFIG_DIR/basic_clash_config.yaml" ]; then
+      cp -f "$CLASHTUI_CONFIG_DIR/basic_clash_config.yaml" "$CLASHTUI_CONFIG_DIR/basic_clash_config.yaml.old"
+    fi
+
     log_info "Downloading basic_clash_config.yaml..."
     curl -o $CLASHTUI_CONFIG_DIR/basic_clash_config.yaml $INSTALL_RES_URL_PREFIX/basic_clash_config.yaml
   elif [ ! -f "$CLASHTUI_CONFIG_DIR/basic_clash_config.yaml" ]; then
