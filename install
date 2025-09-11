@@ -162,8 +162,113 @@ detect_os() {
   esac
 }
 
+# 使用/proc/cpuinfo检测CPU指令集等级（屏蔽v4，最高到v3）
+detect_using_proc() {
+    # 从/proc/cpuinfo获取CPU指令集(flags字段)
+    local flags=$(grep -m 1 '^flags' /proc/cpuinfo | awk '{print $0}')
+    
+    # 检查是否为amd64(x86-64)架构（基础要求）
+    if ! echo "$flags" | grep -q ' lm '; then
+        echo ""  # 非amd64架构，输出空
+        return
+    fi
+
+    # 定义各等级所需的指令集（最高到v3）
+    # x86-64-v1基础指令集
+    local v1_required="cmov cx8 fpu fxsr mmx osfxsr sce sse sse2"
+    # x86-64-v2扩展指令集（基于v1）
+    local v2_required="cx16 lahf_lm popcnt sse3 sse4_1 sse4_2 ssse3"
+    # x86-64-v3高级指令集（基于v2）
+    local v3_required="avx avx2 bmi1 bmi2 f16c fma lzcnt movbe osxsave"
+    # x86-64-v4旗舰指令集（基于v3）
+    local v4_required="avx512f avx512bw avx512cd avx512dq avx512vl"
+
+    # 检查指令集是否全部满足
+    local check_flags
+    check_flags() {
+        local required="$1"
+        for flag in $required; do
+            # 精确匹配指令集（前后有空格，避免部分匹配）
+            if ! echo " $flags " | grep -q " $flag "; then
+                return 1
+            fi
+        done
+        return 0
+    }
+
+    # 从高等级开始判断（v3 -> v2 -> v1）
+    # if check_flags "$v1_required" && check_flags "$v2_required" && check_flags "$v3_required" && check_flags "$v4_required"; then
+    #     echo "v4"
+    # el
+    if check_flags "$v1_required" && check_flags "$v2_required" && check_flags "$v3_required"; then
+        echo "v3"
+    elif check_flags "$v1_required" && check_flags "$v2_required"; then
+        echo "v2"
+    elif check_flags "$v1_required"; then
+        echo "v1"
+    else
+        echo ""  # 不满足v1基础要求，输出空
+    fi
+}
+
+# 使用动态链接器检测CPU指令集等级（屏蔽v4，最高到v3）
+detect_using_ld() {
+    local ld_path="/lib64/ld-linux-x86-64.so.2"
+    
+    # 检查动态链接器是否存在且可执行（非amd64架构可能不存在）
+    if [ ! -x "$ld_path" ]; then
+        echo ""  # 非amd64架构，输出空
+        return 0
+    fi
+
+    # 获取动态链接器帮助信息中带有"(supported, searched)"标记的等级
+    local levels=$("$ld_path" --help 2>/dev/null | grep -oP 'x86-64-v\d+(?=.*\(supported, searched\))' | sort -u)
+    
+    # 如果没有找到支持的等级信息，返回空
+    if [ -z "$levels" ]; then
+        echo ""
+        return 0
+    fi
+
+    # 查找最高支持的等级（最高到v3）
+    local highest_level=""
+    for level in $levels; do
+        case $level in
+            x86-64-v3) highest_level="v3"; break ;;  # 最高等级为v3
+            x86-64-v2) highest_level="v2" ;;
+            x86-64-v1) highest_level="v1" ;;
+            x86-64-v4) highest_level="v3" ;;  # 屏蔽v4，视为v3
+        esac
+    done
+
+    echo "$highest_level"
+    return 0
+}
+
+# 主函数：处理输出格式
+detect_cpu_level() {
+    # 先尝试使用动态链接器方法
+    local level=$(detect_using_ld)
+    
+    # 如果动态链接器方法返回空，使用proc方法
+    if [ -z "$level" ]; then
+        level=$(detect_using_proc)
+    fi
+    
+    # 处理输出格式：为空则输出空，有值则加前缀-
+    if [ -n "$level" ]; then
+        echo "-$level"
+    else
+        echo ""
+    fi
+}
+
+
 download_mihomo() {
-  local arch=$(detect_architecture)
+  # 先获取基础架构值
+  local base_arch=$(detect_architecture)
+  # 当基础架构为amd64时，拼接cpu_level值；否则直接使用基础架构值
+  local arch=$([ "$base_arch" = "amd64" ] && echo "${base_arch}$(detect_cpu_level)" || echo "$base_arch")
   local os=$(detect_os)
   local download_url
   local temp_dir=$(mktemp -d)
