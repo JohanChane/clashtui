@@ -131,6 +131,14 @@ fn load_app_dir(flags: &mut Flags<Flag>) -> std::path::PathBuf {
             log::error!("{}", err);
         }
     }
+    if let Err(err) = crate::utils::check_essential_files(
+        &clashtui_config_dir,
+    ) {
+        log::error!("{}", err);
+        eprintln!("Error: {}", err.reason);
+        std::process::exit(1);
+    }
+
     clashtui_config_dir
 }
 
