@@ -9,6 +9,7 @@ pub enum Flag {
     FirstInit = 1 << 1,
     ErrorDuringInit = 1 << 2,
     PortableMode = 1 << 3,
+    EssentialFileMissing = 1 << 4,
 }
 #[cfg(test)]
 mod test {

@@ -96,10 +96,50 @@ pub fn init_config(
 
     fs::create_dir(clashtui_config_dir.join("profiles"))?;
     fs::create_dir(clashtui_config_dir.join("templates"))?;
+    let template_proxy_providers_files = clashtui_config_dir.join("templates").join("template_proxy_providers");
+    if !template_proxy_providers_files.exists() {
+        fs::File::create(&template_proxy_providers_files)?;
+    }
 
     fs::write(
         clashtui_config_dir.join("basic_clash_config.yaml"),
         default_basic_clash_cfg_content,
     )?;
+    Ok(())
+}
+
+pub fn check_essential_files(
+    clashtui_config_dir: &std::path::PathBuf,
+) -> Result<()> {
+    use std::fs;
+    if !clashtui_config_dir.exists() {
+        fs::create_dir_all(clashtui_config_dir)?;
+    }
+
+    if !clashtui_config_dir.join("config.yaml").exists() {
+        return Err(CfgError::new(
+            ErrKind::LoadClashConfig,
+            "\"config.yaml\" not found in config directory".to_string(),
+        ));
+    }
+
+    if !clashtui_config_dir.join("profiles").exists() {
+        fs::create_dir(clashtui_config_dir.join("profiles"))?;
+    }
+    if !clashtui_config_dir.join("templates").exists() {
+        fs::create_dir(clashtui_config_dir.join("templates"))?;
+    }
+    let template_proxy_providers_files = clashtui_config_dir.join("templates").join("template_proxy_providers");
+    if !template_proxy_providers_files.exists() {
+        fs::File::create(&template_proxy_providers_files)?;
+    }
+
+    if !clashtui_config_dir.join("basic_clash_config.yaml").exists() {
+        return Err(CfgError::new(
+            ErrKind::LoadClashConfig,
+            "\"basic_clash_config.yaml\" not found in config directory".to_string(),
+        ));
+    }
+
     Ok(())
 }
