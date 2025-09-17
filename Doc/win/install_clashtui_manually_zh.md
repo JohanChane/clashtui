@@ -1,6 +1,6 @@
 # Install ClashTUI Manually
 
-## 安装 Mihomo 服务 (启用 Tun 模式)
+## 安装 mihomo 程序
 
 [安装 scoop](https://github.com/ScoopInstaller/Install) (可选):
 
@@ -9,42 +9,80 @@ irm get.scoop.sh -outfile 'install.ps1'
 .\install.ps1 -ScoopDir 'D:\Scoop' -ScoopGlobalDir 'D:\ScoopGlobal' -NoProxy    # 我选择安装在 D 盘。
 ```
 
-比如:
+通过 scoop 安装 mihomo:
 
--   通过 `scoop install mihomo` 安装 mihomo。或者, 下载一个适合自己系统的 [mihomo](https://github.com/MetaCubeX/mihomo/releases), 将其放在 `D:/PortableProgramFiles/mihomo/mihomo.exe`。
--   创建目录 `D:/MyAppData/mihomo` 和文件 `D:/MyAppData/mihomo/config.yaml`
--   安装 clashtui 后, 再操作。
+```powershell
+scoop install main/mihomo
+```
 
-如果可以访问 mihomo 客户端 (比如: metacubexd) 而无法访问需要代理的网站, 则尝试允许 `mihomo.exe` 通过防火墙:
--   通过 Scoop 安装的 mihomo: 允许 `D:\Scoop\apps\mihomo\1.17.0\mihomo.exe`, 而不是 current 路径的。之后 mihomo 升级版本之后, 可能还要继续这样的操作。
--   手动下载 mihomo 安装的: 允许 `D:/PortableProgramFiles/mihomo/mihomo.exe`。
+也可以手动下载适合自己系统的 mihomo。See [mihomo github releases](https://github.com/MetaCubeX/mihomo/releases)。
+
+## 检测 mihomo 是否能运行
+
+创建 mihomo 运行需要的文件:
+
+```powershell
+New-Item -ItemType Directory -Path "D:\ClashTUI\mihomo_config"            # 路径不要有空格
+New-Item -ItemType File -Path "D:\ClashTUI\mihomo_config\config.yaml"     # 添加你的 mihomo 配置
+```
+
+运行 mihomo:
+
+```powershell
+<mihomo 程序的路径> -d D:\ClashTUI\mihomo_config -f D:\ClashTUI\mihomo_config\config.yaml
+```
+
+可能出现的问题:
+1.  如果可以访问 mihomo 客户端 (比如: metacubexd) 而无法访问需要代理的网站, 则尝试允许 `mihomo.exe` 通过防火墙:
+    -   如果通过 Scoop 安装 mihomo 的: 允许 `D:\Scoop\apps\mihomo\<version>\mihomo.exe`, 而不是 current 路径的。之后 mihomo 升级版本之后, 可能还要继续这样的操作。
+    -   如果手动下载 mihomo 安装的: 允许 <mihomo 程序的路径>
+2.  mihomo 下载 geo 文件比较慢:
+
+    ```powershell
+    Invoke-WebRequest -Uri "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb" -OutFile "D:\ClashTUI\mihomo_config\geoip.metadb"
+    Invoke-WebRequest -Uri "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat" -OutFile "D:\ClashTUI\mihomo_config\GeoSite.dat"
+    ```
 
 ## 安装 clashtui
 
-手动下载安装 clashtui, 或者通过 `scoop bucket add extras; scoop install clashtui` 安装。这里有最新的 [clashtui.json](./PkgManagers/Scoop/clashtui.json)。
+通过 scoop 安装 clashtui:
 
-先运行 clashtui, 会在 `%APPDATA%/clashtui` 生成一些默认文件。
+```powershell
+scoop bucket add extras
+scoop install clashtui
+```
 
-修改 `%APPDATA%/clashtui/config.yaml`:
+也可以手动下载。[clashtui github releases](https://github.com/JohanChane/clashtui/releases)
+
+## 运行 clashtui
+
+先运行 clashtui, 会在 `%APPDATA%/clashtui` 生成一些默认文件。然后修改 `%APPDATA%/clashtui/config.yaml`。配置参考 [ref](./clashtui_usage_zh.md)
 
 ```yaml
 # 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
-#clash_core_path: "D:/PortableProgramFiles/mihomo/mihomo.exe"
-clash_core_path: "D:/Scoop/shims/mihomo.exe"       # `Get-Command mihomo`
-clash_cfg_dir: "D:/MyAppData/mihomo"
-clash_cfg_path: "D:/MyAppData/mihomo/config.yaml"
-clash_srv_name: "mihomo"       # nssm {install | remove | restart | stop | edit} <clash_srv_name>
+clash_core_path: "D:/ClashTUI/mihomo.exe"
+clash_cfg_dir: "D:/ClashTUI/mihomo_config"
+clash_cfg_path: "D:/ClashTUI/mihomo_config/config.yaml"
+clash_srv_name: "clashtui_mihomo"                           # nssm {install | remove | restart | stop | edit} <clash_srv_name>
 ```
 
-改好之后, 将 clashtui, nssm 加入 PATH:
--   scoop 安装 clashtui 的: scoop install nssm
--   手动下载安装 clashtui 的: 将 `D:/PortableProgramFiles/clashtui` 加入 PATH。
+1.  安装 [nssm](https://nssm.cc/download):
+    -   下载并改名为 nssm。
+    -   将命令加入 PATH
 
-运行 clashtui。在 `ClashSrvCtl` Tab 选择 `InstallSrv`, 程序会根据上面的配置安装 `mihomo` 内核服务。该服务会开机启动。安装之后启动内核服务, 使用 ClashSrvCtl Tab 的 StartClashService 启动 mihomo 服务。
+    如果有 scoop, 则可以直接安装:
 
-如果不使用 scoop 安装 nssm, 可以手动下载 [nssm](https://nssm.cc/download), 将其改名为 `nssm.exe`, 并将其加入 PATH 或者放在 clashtui 所在的目录即可。
+    ```powershell
+    scoop install nssm
+    ```
 
-Loopback Manager 同理。下载 [Loopback Manager](https://github.com/tiagonmas/Windows-Loopback-Exemption-Manager), 将其改名为 `EnableLoopback.exe`, 然后将其加入 PATH 或者放在 clashtui 所在的目录下即可。
+2.  安装 [Loopback Manager](https://github.com/tiagonmas/Windows-Loopback-Exemption-Manager) (可选):
+    -   下载并改名为 EnableLoopback.exe
+    -   将命令加入 PATH
+
+3.  通过 clashtui 安装和启动 clashtui_mihomo 服务:
+    -   运行 clashtui。在 `ClashSrvCtl` Tab 选择 `InstallSrv`, 程序会根据上面的配置安装 `clashtui_mihomo` 内核服务。
+    -   该服务会开机启动。安装之后启动内核服务, 使用 ClashSrvCtl Tab 的 `StartClashService` 启动 mihomo 服务。
 
 ## 下载模板
 

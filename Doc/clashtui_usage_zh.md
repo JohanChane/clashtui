@@ -7,16 +7,16 @@
 ```yaml
 # 下面参数对应命令 <clash_core_path> -d <clash_cfg_dir> -f <clash_cfg_path>
 basic:
-  clash_config_dir: '/srv/mihomo'
+  clash_config_dir: '/opt/clashtui/mihomo_config'
   clash_bin_path: '/usr/bin/mihomo'
-  clash_config_path: '/srv/mihomo/config.yaml'
+  clash_config_path: '/opt/clashtui/config.yaml'
   timeout: null                     # 模拟 clash_ua 下载的超时时间。`null` 表示没有超时时间。单位是`秒`。
 service:
   clash_srv_name: 'mihomo'          # systemctl {restart | stop} <clash_srv_name>
   is_user: false                    # true: systemctl --user ...
 extra:
-  edit_cmd: 'alacritty -e nvim %s'          # `%s` 会被替换为相应的文件路径。如果为空, 则使用 `xdg-open` 打开文件。
-  open_dir_cmd: 'alacritty -e ranger %s'
+  edit_cmd: 'alacritty -e nvim "%s"'          # `%s` 会被替换为相应的文件路径。如果为空, 则使用 `xdg-open` 打开文件。
+  open_dir_cmd: 'alacritty -e ranger "%s"'
 ```
 
 ## 快捷方式
@@ -44,8 +44,14 @@ cronie 的使用, See [ref](https://wiki.archlinuxcn.org/wiki/Cron)。
 
 ## ClashTUI 文件结构
 
-- basic_clash_config.yaml: Basic fields of mihomo configuration, which will be merged into `clash_cfg_path`.
-- config.yaml: Configuration of clashtui.
+`~/.config/clahstui`:
+-   basic_clash_config.yaml: 存放 mihomo 配置的基础字段, 这些字段会合并到 `clash_cfg_path`。
+-   config.yaml: clashtui 程序的配置。
+-   templates/template_proxy_providers: 存放模板使用的代理订阅。
+
+clash_config_path: mihomo 最终使用的配置。
+
+mihomo 配置的基础字段: 除了这些字段 "proxy-groups"、"proxy-providers"、"proxies"、"sub-rules"、"rules" 和 "rule-providers" 都是基础字段。
 
 ## Template
 

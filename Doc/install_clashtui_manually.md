@@ -1,32 +1,41 @@
-# Install Clashtui Manually
+# Install ClashTUI Manually
 
-## Installing Clashtui
+## Install mihomo
 
-For example: ArchLinux
+1.  Install the mihomo program
 
-1. Install mihomo and clashtui
+ArchLinux:
 
 ```sh
-sudo pacman -S mihomo clashtui
+sudo pacman -S mihomo
 ```
 
-Later versions of clashtui have not been uploaded to `crates.io` because clashtui has been split into multiple modules.  
-If uploaded to `crates.io`, each dependent module would need to be uploaded as well, and some modules do not necessarily need to be on `crates.io`.  
-See [ref](https://users.rust-lang.org/t/is-it-possible-to-publish-crates-with-path-specified/91497/2).  
-Therefore, do not use `cargo install clashtui` for installation.
-
-2. Create the mihomo user and mihomo group, then add the user to the group
-
-*Note: These may have already been created during mihomo installation.*
+2.  Create mihomo user and mihomo group, and add the user to the group
 
 ```sh
 sudo groupadd --system mihomo
 sudo useradd --system --no-create-home --gid mihomo --shell /bin/false mihomo
-sudo gpasswd -a $USER mihomo  # Please log out and back in for the group file permissions to take effect; this will be used later.
+sudo gpasswd -a $USER mihomo  # Please log out and log back in for the group file permissions to take effect; this will be used later.
 groups $USER                  # Check if you have been added to the mihomo group
 ```
 
-3. Create necessary files
+*It is possible that the mihomo user and group were already created during the installation of mihomo.*
+
+## Install ClashTUI
+
+Install the ClashTUI program, e.g., on ArchLinux:
+
+```sh
+sudo pacman -S clashtui
+```
+
+It is not recommended to use `cargo install clashtui` for installation:
+-   Because subsequent versions of ClashTUI have not been uploaded to `crates.io`, as ClashTUI is now split into multiple modules.
+-   Uploading to `crates.io` would require uploading each dependent module, and some modules do not need to be uploaded to `crates.io`. See [ref](https://users.rust-lang.org/t/is-it-possible-to-publish-crates-with-path-specified/91497/2).
+
+## Run mihomo
+
+1.  Create necessary files
 
 ```sh
 sudo mkdir -p /opt/clashtui/mihomo_config
@@ -35,18 +44,20 @@ mixed-port: 7890
 external-controller: 127.0.0.1:9090
 EOF
 
-# Optional. Pre-download geo files to allow the mihomo service to respond faster on first startup
+# Optional. Download geo files in advance to make the first startup of the mihomo service respond faster.
 sudo curl -o /opt/clashtui/mihomo_config/geoip.metadb https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb
 sudo curl -o /opt/clashtui/mihomo_config/GeoSite.dat https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat
 
 sudo chown -R mihomo:mihomo /opt/clashtui/mihomo_config
 ```
 
-4. Create the systemd unit `clashtui_mihomo.service`
+2.  Create a systemd unit `clashtui_mihomo.service`
 
-It is recommended to use the [file](https://wiki.metacubex.one/startup/service/) provided by the mihomo documentation rather than the one included with the installation, as there may be differences that make unified modifications inconvenient. Of course, if you are familiar with it, you may use the installation-provided file.
+It is recommended to use the [file](https://wiki.metacubex.one/startup/service/) provided by the mihomo documentation rather than the one provided by the installation.
 
-Create the systemd configuration file at /etc/systemd/system/clashtui_mihomo.service: (with User and Group added)
+There may be differences that make unified modifications inconvenient. However, if you are familiar with it, you can use the one provided by the installation.
+
+Create the systemd configuration file /etc/systemd/system/clashtui_mihomo.service: (Added User and Group)
 
 ```
 [Unit]
@@ -70,13 +81,13 @@ ExecReload=/bin/kill -HUP $MAINPID
 WantedBy=multi-user.target
 ```
 
-Link the mihomo executable:
+3.  Link the mihomo program (Optional):
 
 ```sh
 sudo ln -s $(which mihomo) /opt/clashtui/mihomo
 ```
 
-Optional. Enable startup on boot:
+4.  Enable startup on boot (Optional):
 
 ```sh
 sudo systemctl enable clashtui_mihomo
@@ -88,13 +99,11 @@ It is recommended to start the clashtui_mihomo systemd unit first to check for a
 sudo systemctl start clashtui_mihomo
 ```
 
-## Configuring Clashtui
+## Configure ClashTUI
 
-First, run clashtui to generate necessary files in `$XDG_CONFIG_HOME/clashtui`.
+First, run ClashTUI to generate necessary files. Then modify `$XDG_CONFIG_HOME/clashtui/config.yaml`. For configuration reference, see [ref](./clashtui_usage.md).
 
-Modify `$XDG_CONFIG_HOME/clashtui/config.yaml`. For configuration reference, see [ref](./clashtui_usage_zh.md).
-
-Optional. Use the repository's `basic_clash_config.yaml`:
+Use the repository's `basic_clash_config.yaml` (Optional):
 
 ```sh
 curl -o $XDG_CONFIG_HOME/clashtui/basic_clash_config.yaml https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/InstallRes/basic_clash_config.yaml
