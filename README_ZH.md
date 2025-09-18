@@ -38,7 +38,7 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs
 # Optional. sudo systemctl enable clashtui_mihomo
 ```
 
-如果你想手动安装. See [Install Manually](./Doc/install_clashtui_manually.md)
+如果你想手动安装。请参考 [Install Manually](./Doc/install_clashtui_manually_zh.md)
 
 ## ClashTUI Usage
 
