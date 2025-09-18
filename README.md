@@ -27,7 +27,7 @@ irm https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/win/install
 .\install.ps1 -InstallDir "D:\ClashTUI" # Do not include spaces in the installation path
 ```
 
-If you want to install manually, see [ref](https://github.com/JohanChane/clashtui/blob/main/Doc/win/install_clashtui_manually.md)
+If you want to install manually, see [Install manually](https://github.com/JohanChane/clashtui/blob/main/Doc/win/install_clashtui_manually.md)
 
 ## ClashTUI Usage
 
