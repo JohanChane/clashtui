@@ -81,7 +81,10 @@ impl ProfileBackend<'_> {
                 // ensure a valid yaml content
                 let content: serde_yml::Mapping = serde_yml::from_reader(&mut response)?;
                 anyhow::ensure!(
-                    content.get("proxies").is_some_and(|v| v.is_sequence()),
+                    {
+                        content.get("proxies").is_some_and(|v| v.is_sequence()) ||
+                        content.get("proxy-providers").is_some_and(|v| v.is_mapping())
+                    },
                     "Not a valid clash yaml file"
                 );
                 let output_file = File::create(path)?;
