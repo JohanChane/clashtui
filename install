@@ -26,6 +26,15 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+backup_file() {
+    [ -e "$1" ] || return 1
+    local i=1
+    while [ -e "${1}_$i" ]; do
+        ((i++))
+    done
+    mv "$1" "${1}_$i"
+}
+
 create_mihomo_user() {
   if ! id "mihomo" &>/dev/null; then
     log_info "Creating mihomo user and group..."
@@ -61,7 +70,7 @@ ExecReload=/bin/kill -HUP $MAINPID
 WantedBy=multi-user.target
 EOF
 
-  sudo ln -s $CLASHTUI_INSTALL_DIR/clashtui_mihomo.service /etc/systemd/system/
+  sudo ln -s $CLASHTUI_INSTALL_DIR/clashtui_mihomo.service /usr/lib/systemd/system/
   sudo systemctl daemon-reload
 }
 
@@ -69,9 +78,7 @@ create_clashtui_config() {
   log_info "Creating clashtui config.yaml..."
 
   # backup config.yaml
-  if [ -f "$CLASHTUI_CONFIG_DIR/config.yaml" ]; then
-    cp -f "$CLASHTUI_CONFIG_DIR/config.yaml" "$CLASHTUI_CONFIG_DIR/config.yaml.old"
-  fi
+  backup_file "$CLASHTUI_CONFIG_DIR/config.yaml"
 
   tee "$CLASHTUI_CONFIG_DIR/config.yaml" >/dev/null <<'EOF'
 basic:
@@ -90,9 +97,7 @@ EOF
   echo -n "Do you want to download basic_clash_config.yaml? (y/N): "
   read -r response
   if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
-    if [ -f "$CLASHTUI_CONFIG_DIR/basic_clash_config.yaml" ]; then
-      cp -f "$CLASHTUI_CONFIG_DIR/basic_clash_config.yaml" "$CLASHTUI_CONFIG_DIR/basic_clash_config.yaml.old"
-    fi
+    backup_file "$CLASHTUI_CONFIG_DIR/basic_clash_config.yaml"
 
     log_info "Downloading basic_clash_config.yaml..."
     curl -o $CLASHTUI_CONFIG_DIR/basic_clash_config.yaml $INSTALL_RES_URL_PREFIX/basic_clash_config.yaml
@@ -394,6 +399,7 @@ uninstall() {
   fi
 
   sudo rm -f /etc/systemd/system/clashtui_mihomo.service
+  sudo rm -f /usr/lib/systemd/system/clashtui_mihomo.service
   sudo systemctl daemon-reload
   sudo rm -f /usr/local/bin/clashtui
   sudo rm -rf /opt/clashtui
