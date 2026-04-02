@@ -34,11 +34,30 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
 
 ## Install
 
+1. \[Optional\] Install mihomo and clashtui from your package repository:
+
 ```sh
-# Optional. sudo pacman -S mihomo clashtui
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/install)"
-# Optional. sudo systemctl enable clashtui_mihomo
+sudo pacman -S mihomo clashtui  # e.g. ArchLinux
 ```
+
+The purpose of this step is to ensure `mihomo` and `clashtui` are available in your `$PATH`, which will cause the installation script to skip their installation.
+You can also download them manually and verify with: `which mihomo clashtui`
+
+2. Run the install script
+
+```sh
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/install )"
+```
+
+Note: Since the installation script downloads resources from GitHub, if the download consistently fails, you may need to enable your proxy before running the script.
+
+3. \[Optional\] Enable `clashtui_mihomo.service` on boot
+
+```sh
+sudo systemctl enable clashtui_mihomo.service
+```
+
+---
 
 If you want to install manually. See [Install Manually](./Doc/install_clashtui_manually.md)
 

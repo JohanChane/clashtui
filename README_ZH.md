@@ -11,6 +11,7 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
 * [支持的平台](#支持的平台)
 * [适用人群](#适用人群)
 * [Install](#install)
+* [Install](#install-1)
 * [ClashTUI Usage](#clashtui-usage)
 * [Uninstall](#uninstall)
 * [See more](#see-more)
@@ -32,13 +33,39 @@ Language: [English](./README.md) | [中文](./README_ZH.md)
 
 ## Install
 
+1. \[Optional\] 从仓库中安装 mihomo 和 clashtui:
+
+```sh
+sudo pacman -S mihomo clashtui  # e.g. ArchLinux
+```
+
+这一步的目的是使用你的 $PATH 有 mihomo 和 clashtui, 安装脚本就会跳过它们的安装。你也可以手动下载它们, 然后校验: `which mihomo clashtui`
+
+2. 运行安装脚本
+
+```sh
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/install )"
+```
+
+说明: 因为安装脚本的资源都是从 github 上下载的, 如果总是下载失败的话, 可以开启代理再运行脚本。
+
+3. \[Optional\] 将 `clashtui_mihomo.service` 设置为开机启动
+
+```sh
+sudo systemctl enable clashtui_mihomo.service
+```
+
+---
+
+如果你想手动安装。请参考 [Install Manually](./Doc/install_clashtui_manually_zh.md)
+
+## Install
+
 ```sh
 # Optional. sudo pacman -S mihomo clashtui
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/install)"
 # Optional. sudo systemctl enable clashtui_mihomo
 ```
-
-如果你想手动安装。请参考 [Install Manually](./Doc/install_clashtui_manually_zh.md)
 
 ## ClashTUI Usage
 
