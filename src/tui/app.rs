@@ -1,7 +1,10 @@
 use super::*;
 use tab::prelude::*;
 use tokio::sync::Notify;
+use widget::chord::ChordHandler;
 use widget::popmsg::PopUp;
+
+use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 
 // 50fps
 const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
@@ -9,9 +12,8 @@ pub(super) static FULL_RENDER: Notify = Notify::const_new();
 
 pub struct App {
     tabs: Vec<Tab>,
-    // status_tab: StatusTab,
-    // file_tab: FileTab,
     popup: PopUp,
+    chord: ChordHandler,
 
     tab_index: u8,
     should_quit: bool,
@@ -21,9 +23,8 @@ impl App {
     fn new() -> Self {
         Self {
             tabs: vec![StatusTab::default().into(), FileTab::default().into()],
-            // status_tab: StatusTab::default(),
-            // file_tab: FileTab::default(),
             popup: PopUp::default(),
+            chord: ChordHandler::default(),
             tab_index: 0,
             should_quit: false,
         }
@@ -71,29 +72,34 @@ impl App {
     }
 
     /// KeyEvent Route:
-    /// ``` md
-    /// Keyevent
-    ///     │  if popup
-    ///     ├──────► PopUp
-    ///     │  else
-    ///     └─► App ─► Tab
-    /// ```
+    /// PopUp(0) → Which(1) → Tab(2) → Global(3)
     fn handle_key_event(&mut self, kv: &KeyEvent) {
         if self.popup.check() {
             self.popup.handle_key_event(kv);
-        } else if !self.handle_global_kv(kv) {
-            self.tabs[self.tab_index as usize].handle_key_event(kv);
+            return;
         }
+
+        let ti = self.tab_index as usize;
+        let shortcuts_ptr: *const [(widget::tab::KeyCombo, &str)] = {
+            self.tabs[ti].shortcuts() as *const _
+        };
+
+        if self.chord.handle(kv, unsafe { &*shortcuts_ptr }, &mut |seq| {
+            self.tabs[ti].dispatch_shortcut(seq);
+        }) {
+            return;
+        }
+
+        self.tabs[ti].handle_key_event(kv);
+        self.handle_global_kv(kv);
     }
     fn render(&mut self, f: &mut ratatui::Frame) {
         use ratatui::prelude::{Constraint, Layout};
 
-        // split terminal into parts
         let chunks = Layout::default()
             .constraints([
                 Constraint::Length(3),
                 Constraint::Fill(1),
-                // Constraint::Length(3),
             ])
             .split(f.area());
 
@@ -106,11 +112,73 @@ impl App {
 
         self.tabs[self.tab_index as usize].render(f, chunks[1]);
 
+        if self.chord.is_active() {
+            self.render_which(f);
+        }
+
         if self.popup.check() {
             self.popup.render(f, Default::default());
         }
     }
-    /// This is the `App` layer, currently only handle Tab switch, Quitting
+
+    fn render_which(&self, f: &mut ratatui::Frame) {
+        use ratatui::layout::{Alignment, Constraint, Layout, Rect};
+        use ratatui::style::Stylize;
+        use ratatui::text::Line;
+        use ratatui::widgets::{Block, Clear, Paragraph};
+        use widget::chord::key_event_to_str;
+
+        let candidate_count = self.chord.candidates.len();
+        let cols = if candidate_count > 4 { 2 } else { 1 };
+
+        let total_height = ((candidate_count + cols - 1) / cols) as u16 + 2;
+        let total_width = if cols == 1 { 40 } else { 70 };
+
+        let area = f.area();
+        let popup_area = Rect {
+            x: area.x.saturating_add(area.width.saturating_sub(total_width) / 2),
+            y: area.y.saturating_add(area.height.saturating_sub(total_height) / 2),
+            width: total_width.min(area.width),
+            height: total_height.min(area.height),
+        };
+
+        f.render_widget(Clear, popup_area);
+
+        let block = Block::bordered()
+            .title(" Which? ")
+            .title_alignment(Alignment::Left);
+        f.render_widget(block.clone(), popup_area);
+
+        let inner = block.inner(popup_area);
+        let col_widths: Vec<_> = (0..cols)
+            .map(|_| Constraint::Ratio(1, cols as u32))
+            .collect();
+        let col_areas = Layout::horizontal(&col_widths).split(inner);
+
+        let items_per_col = (candidate_count + cols - 1) / cols;
+
+        for (col_idx, col_area) in col_areas.iter().enumerate().take(cols) {
+            let lines: Vec<Line> = self
+                .chord
+                .candidates
+                .iter()
+                .skip(col_idx * items_per_col)
+                .take(items_per_col)
+                .map(|(seq, desc)| {
+                    let remaining = &seq[self.chord.pressed.len()..];
+                    let key_str: String = remaining
+                        .iter()
+                        .map(|k| key_event_to_str(k))
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    Line::from(format!(" {}  {}", key_str, desc))
+                })
+                .collect();
+
+            f.render_widget(Paragraph::new(lines), *col_area);
+        }
+    }
+    /// Global layer (3) — last resort: Tab switch, Quit
     fn handle_global_kv(&mut self, kv: &KeyEvent) -> bool {
         if matches!(kv.kind, crossterm::event::KeyEventKind::Press) {
             use crossterm::event::KeyCode;
@@ -186,5 +254,38 @@ fn the_egg(key: crossterm::event::KeyCode) {
     *current += 1;
     if *current == 12 {
         log::debug!("You've found the egg!")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn kev(code: KeyCode) -> KeyEvent {
+        KeyEvent::new_with_kind_and_state(
+            code,
+            crossterm::event::KeyModifiers::empty(),
+            KeyEventKind::Press,
+            crossterm::event::KeyEventState::empty(),
+        )
+    }
+
+    #[test]
+    fn keyevent_vec_equals_slice() {
+        let g = kev(KeyCode::Char('g'));
+        let e = kev(KeyCode::Char('e'));
+
+        let vec: Vec<KeyEvent> = vec![g, e];
+        let slice: &[KeyEvent] = &[g, e];
+
+        assert_eq!(vec, slice);
+        assert_eq!(&vec, slice);
+    }
+
+    #[test]
+    fn keyevents_compare_equal() {
+        let a = kev(KeyCode::Char('e'));
+        let b = kev(KeyCode::Char('e'));
+        assert_eq!(a, b);
     }
 }

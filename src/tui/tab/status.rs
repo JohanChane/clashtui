@@ -4,6 +4,7 @@ use super::dev::*;
 
 newtype_tab!(StatusTab(Tab<Status>));
 
+#[derive(Clone, Copy)]
 enum Key {}
 
 impl TryFrom<&KeyEvent> for Key {

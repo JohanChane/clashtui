@@ -7,18 +7,20 @@ use super::*;
 mod_agent!(
     Key,
     [
-        (KeyCode::Left, Key::Switch),
-        (KeyCode::Right, Key::Switch),
-        (KeyCode::Down, Key::MoveDown),
-        (KeyCode::Up, Key::MoveUp),
-        (KeyCode::Enter, Key::Action(Action::Apply)),
-        (KeyCode::Char('i'), Key::Action(Action::Add)),
-        (KeyCode::Char('e'), Key::Action(Action::Edit)),
-        (KeyCode::Char('d'), Key::Action(Action::Delete)),
-        (KeyCode::Char('p'), Key::Action(Action::Preview)),
-        (KeyCode::Char('u'), Key::Action(Action::Update)),
-        (KeyCode::Char('/'), Key::Action(Action::Search)),
-        (KeyCode::Char('t'), Key::Action(Action::Test)),
+        ([KeyCode::Left], Key::Switch, ""),
+        ([KeyCode::Right], Key::Switch, ""),
+        ([KeyCode::Down], Key::MoveDown, ""),
+        ([KeyCode::Up], Key::MoveUp, ""),
+        ([KeyCode::Enter], Key::Action(Action::Apply), ""),
+        ([KeyCode::Char('i')], Key::Action(Action::Add), ""),
+        ([KeyCode::Char('e')], Key::Action(Action::Edit), ""),
+        ([KeyCode::Char('d')], Key::Action(Action::Delete), ""),
+        ([KeyCode::Char('p')], Key::Action(Action::Preview), ""),
+        ([KeyCode::Char('u')], Key::Action(Action::Update), ""),
+        ([KeyCode::Char('/')], Key::Action(Action::Search), ""),
+        ([KeyCode::Char('t')], Key::Action(Action::Test), ""),
+        ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
+        ([KeyCode::Char('g'), KeyCode::Char('e')], Key::Action(Action::GoEnd), "Go to end"),
     ]
 );
 
@@ -42,6 +44,8 @@ pub enum Action {
     Update,
     Search,
     Test,
+    GoTop,
+    GoEnd,
 }
 
 impl TryFrom<&KeyEvent> for Key {
@@ -80,6 +84,10 @@ impl BasicTabContent for Profile {
     type State = ListState;
 
     const TITLE: &str = "Profile";
+
+    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
+        all_shortcuts()
+    }
 }
 
 impl DualTabContent for Profile {
@@ -122,8 +130,15 @@ impl DualTabContent for Profile {
                 .spawn_at(task_set);
             }
             Key::Action(action) => {
-                let name = get_name!(self, state);
-                action.act(name).spawn_at(task_set)
+                match action {
+                    Action::GoTop => state.select_first(),
+                    Action::GoEnd => state.select_last(),
+                    _ => {
+                        let name = get_name!(self, state);
+                        action.act(name).spawn_at(task_set);
+                        return false;
+                    }
+                }
             }
         }
         false
@@ -183,6 +198,7 @@ mod actions {
                 Self::Preview => preview(name).await,
                 Self::Update => update(name).await,
                 Self::Test => test(name).await,
+                Self::GoTop | Self::GoEnd => do_nothing(),
             }
         }
     }

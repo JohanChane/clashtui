@@ -13,11 +13,25 @@ use crate::tui::TuiWidget;
 use crossterm::event::KeyEvent;
 use ratatui::prelude::{Frame, Rect};
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct KeyCombo(pub Vec<KeyEvent>);
+
+impl std::ops::Deref for KeyCombo {
+    type Target = [KeyEvent];
+    fn deref(&self) -> &[KeyEvent] {
+        &self.0
+    }
+}
+
 pub trait BasicTabContent: 'static {
-    type Key: for<'a> TryFrom<&'a KeyEvent, Error = ()>;
+    type Key: for<'a> TryFrom<&'a KeyEvent, Error = ()> + Copy;
     type State;
 
     const TITLE: &str;
+
+    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
+        &[]
+    }
 
     /// Allow you to do something after one task is done
     fn after_sync(&self, _task_set: &mut FutureSet<Self>) {}
@@ -84,6 +98,29 @@ where
             content,
             state,
             tasks,
+        }
+    }
+}
+
+impl<C: TabContent> Tab<C> {
+    pub fn shortcuts(&self) -> &[(KeyCombo, &'static str)] {
+        use std::sync::OnceLock;
+        static CACHED: OnceLock<Vec<(KeyCombo, &str)>> = OnceLock::new();
+        CACHED.get_or_init(|| {
+            C::all_shortcuts()
+                .iter()
+                .map(|(combo, _, desc)| (combo.clone(), *desc))
+                .collect()
+        })
+    }
+
+    pub fn dispatch_shortcut(&mut self, seq: &[KeyEvent]) {
+        for (s, key, _) in C::all_shortcuts() {
+            if &**s == seq {
+                self.content
+                    .handle_key_event(*key, &mut self.tasks, &mut self.state);
+                return;
+            }
         }
     }
 }

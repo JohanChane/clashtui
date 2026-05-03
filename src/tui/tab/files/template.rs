@@ -4,13 +4,15 @@ use crate::functions::file::template::*;
 mod_agent!(
     Key,
     [
-        (KeyCode::Left, Key::Switch),
-        (KeyCode::Right, Key::Switch),
-        (KeyCode::Down, Key::MoveDown),
-        (KeyCode::Up, Key::MoveUp),
-        (KeyCode::Char('d'), Key::Action(Action::Delete)),
-        (KeyCode::Char('p'), Key::Action(Action::Preview)),
-        (KeyCode::Enter, Key::Action(Action::Generate)),
+        ([KeyCode::Left], Key::Switch, ""),
+        ([KeyCode::Right], Key::Switch, ""),
+        ([KeyCode::Down], Key::MoveDown, ""),
+        ([KeyCode::Up], Key::MoveUp, ""),
+        ([KeyCode::Char('d')], Key::Action(Action::Delete), ""),
+        ([KeyCode::Char('p')], Key::Action(Action::Preview), ""),
+        ([KeyCode::Enter], Key::Action(Action::Generate), ""),
+        ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
+        ([KeyCode::Char('g'), KeyCode::Char('e')], Key::Action(Action::GoEnd), "Go to end"),
     ]
 );
 
@@ -19,6 +21,8 @@ pub enum Action {
     Generate,
     Delete,
     Preview,
+    GoTop,
+    GoEnd,
 }
 
 #[derive(Clone, Copy, serde::Deserialize)]
@@ -65,6 +69,10 @@ impl BasicTabContent for Template {
     type State = ListState;
 
     const TITLE: &str = "Template";
+
+    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
+        all_shortcuts()
+    }
 }
 
 impl DualTabContentMate for Template {
@@ -92,8 +100,15 @@ impl DualTabContentMate for Template {
             Key::Select => todo!(),
 
             Key::Action(action) => {
-                let name = get_name!(self, state);
-                action.act(name).spawn_at(task_set)
+                match action {
+                    Action::GoTop => state.select_first(),
+                    Action::GoEnd => state.select_last(),
+                    _ => {
+                        let name = get_name!(self, state);
+                        action.act(name).spawn_at(task_set);
+                        return false;
+                    }
+                }
             }
         }
         false
@@ -144,6 +159,7 @@ mod actions {
                 Self::Generate => generate(name).await,
                 Self::Delete => delete(name).await,
                 Self::Preview => preview(name).await,
+                Self::GoTop | Self::GoEnd => do_nothing(),
             }
         }
     }

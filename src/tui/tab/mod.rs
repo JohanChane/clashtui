@@ -10,6 +10,8 @@ mod dev {
     pub use crate::tui::theme::Theme;
 }
 
+use crate::tui::widget::tab::KeyCombo;
+
 macro_rules! tri {
     ($e:expr) => {
         match $e {
@@ -31,7 +33,7 @@ macro_rules! tri {
 }
 
 macro_rules! mod_agent {
-    ($ident: ident, [$(($raw:expr,$map:expr),)+]) => {
+    ($ident:ident, [$($tokens:tt)*]) => {
 mod agent {
     use super::*;
     use crossterm::event::*;
@@ -42,24 +44,22 @@ mod agent {
 
     static AGENT: OnceLock<Agent> = OnceLock::new();
 
-    fn default_agent() -> Agent {
-        fn quick_map(code: KeyCode) -> KeyEvent {
-            KeyEvent::new_with_kind_and_state(
-                code,
-                KeyModifiers::empty(),
-                KeyEventKind::Press,
-                KeyEventState::empty(),
-            )
-        }
-        [
-            $(($raw,$map),)+
-        ]
-        .into_iter()
-        .map(|(code, key)| (quick_map(code), key))
-        .collect()
+    fn quick_map(code: KeyCode) -> KeyEvent {
+        KeyEvent::new_with_kind_and_state(
+            code,
+            KeyModifiers::empty(),
+            KeyEventKind::Press,
+            KeyEventState::empty(),
+        )
     }
 
-    pub fn agent() -> &'static Agent{
+    fn default_agent() -> Agent {
+        let mut m = Agent::new();
+        mod_agent!(@agent m, $($tokens)*);
+        m
+    }
+
+    pub fn agent() -> &'static Agent {
         AGENT.get_or_init(default_agent)
     }
 
@@ -68,11 +68,44 @@ mod agent {
             unreachable!("KeyMap Init Twice!")
         }
     }
+
+    static SHORTCUTS: OnceLock<Vec<(KeyCombo, $ident, &'static str)>> = OnceLock::new();
+
+    pub fn all_shortcuts() -> &'static [(KeyCombo, $ident, &'static str)] {
+        SHORTCUTS.get_or_init(|| {
+            let mut v = Vec::new();
+            mod_agent!(@shortcuts v, $($tokens)*);
+            v
+        })
+    }
 }
 
-use agent::{agent};
+use agent::{agent, all_shortcuts};
 pub use agent::{init as agent_init};
     };
+
+    // ---- tt-muncher: agent (only single-key shortcuts) ----
+    (@agent $m:ident, ([$code:expr], $map:expr, $desc:expr) $($rest:tt)*) => {
+        $m.insert(quick_map($code), $map);
+        mod_agent!(@agent $m, $($rest)*);
+    };
+    (@agent $m:ident, ([$($codes:expr),+], $map:expr, $desc:expr) $($rest:tt)*) => {
+        mod_agent!(@agent $m, $($rest)*);
+    };
+    (@agent $m:ident, , $($rest:tt)*) => {
+        mod_agent!(@agent $m, $($rest)*);
+    };
+    (@agent $m:ident,) => {};
+
+    // ---- tt-muncher: shortcuts (both single-key and chords) ----
+    (@shortcuts $v:ident, ([$($codes:expr),+], $map:expr, $desc:expr) $($rest:tt)*) => {
+        $v.push((KeyCombo(vec![$(quick_map($codes)),+]), $map, $desc));
+        mod_agent!(@shortcuts $v, $($rest)*);
+    };
+    (@shortcuts $v:ident, , $($rest:tt)*) => {
+        mod_agent!(@shortcuts $v, $($rest)*);
+    };
+    (@shortcuts $v:ident,) => {};
 }
 
 macro_rules! newtype_tab {
@@ -87,6 +120,14 @@ macro_rules! newtype_tab {
             fn title(&self) -> &'static str {
                 $inner::TITLE
             }
+
+            fn shortcuts(&self) -> &[(KeyCombo, &'static str)] {
+                self.0.shortcuts()
+            }
+
+            fn dispatch_shortcut(&mut self, seq: &[crossterm::event::KeyEvent]) {
+                self.0.dispatch_shortcut(seq)
+            }
         }
     };
     ($(#[$m:meta])* $tab:ident($inner:ty), $title:literal) => {
@@ -100,12 +141,22 @@ macro_rules! newtype_tab {
             fn title(&self) -> &'static str {
                 $title
             }
+
+            fn shortcuts(&self) -> &[(KeyCombo, &'static str)] {
+                self.0.shortcuts()
+            }
+
+            fn dispatch_shortcut(&mut self, seq: &[crossterm::event::KeyEvent]) {
+                self.0.dispatch_shortcut(seq)
+            }
         }
     };
 }
 
 pub trait TuiTab: super::TuiWidget {
     fn title(&self) -> &'static str;
+    fn shortcuts(&self) -> &[(KeyCombo, &'static str)];
+    fn dispatch_shortcut(&mut self, seq: &[crossterm::event::KeyEvent]);
 }
 
 mod files;
@@ -149,6 +200,18 @@ macro_rules! enum_dispatch {
         fn title(&self) -> &'static str {
             match self {
                 $(Self::$item(inner) => inner.title(),)+
+            }
+        }
+
+        fn shortcuts(&self) -> &[(crate::tui::widget::tab::KeyCombo, &'static str)] {
+            match self {
+                $(Self::$item(inner) => inner.shortcuts(),)+
+            }
+        }
+
+        fn dispatch_shortcut(&mut self, seq: &[crossterm::event::KeyEvent]) {
+            match self {
+                $(Self::$item(inner) => inner.dispatch_shortcut(seq),)+
             }
         }
     }
