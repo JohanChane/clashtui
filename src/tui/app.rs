@@ -28,6 +28,7 @@ impl App {
                 StatusTab::default().into(),
                 FileTab::default().into(),
                 ProxiesTab::default().into(),
+                ConnectionsTab::default().into(),
             ],
             popup: PopUp::default(),
             chord: ChordHandler::default(),
@@ -188,9 +189,9 @@ impl App {
     fn handle_global_kv(&mut self, kv: &KeyEvent) -> bool {
         if matches!(kv.kind, crossterm::event::KeyEventKind::Press) {
             use crossterm::event::KeyCode;
-            const TAB_COUNT: u8 = 3;
+            const TAB_COUNT: u8 = 4;
             match kv.code {
-                KeyCode::Char(c @ '1'..='3') => self.tab_index = c as u8 - '1' as u8,
+                KeyCode::Char(c @ '1'..='4') => self.tab_index = c as u8 - '1' as u8,
                 KeyCode::Tab => {
                     if self.tab_index == TAB_COUNT - 1 {
                         self.tab_index = 0

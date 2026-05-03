@@ -145,6 +145,10 @@ pub mod connection {
         pub download: u64,
         pub start: String,
         pub chains: Vec<String>,
+        #[serde(default)]
+        pub rule: Option<String>,
+        #[serde(default, rename = "rulePayload")]
+        pub rule_payload: Option<String>,
     }
 
     #[cfg_attr(test, derive(Debug))]
@@ -162,12 +166,22 @@ pub mod connection {
         pub source_ip: String,
         pub source_port: String,
         pub remote_destination: String,
-        pub destinatio_port: String,
+        #[serde(default, rename = "destinationPort")]
+        pub destination_port: String,
+        #[serde(default, rename = "destinationIP")]
+        pub destination_ip: Option<String>,
+        #[serde(default, rename = "sniffHost")]
+        pub sniff_host: Option<String>,
     }
 
     /// return [ConnInfo]
     pub fn get_connections() -> Result<ConnInfo> {
         request(Method::Get, "/connections", None).and_then(|r| r.json())
+    }
+
+    /// Terminate all active connections
+    pub fn terminate_all_connections() -> Result<()> {
+        request(Method::Delete, "/connections", None).map(|_| ())
     }
 
     /// if `id` is some, will try to terminate that connection,

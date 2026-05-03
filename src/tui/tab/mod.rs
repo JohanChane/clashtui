@@ -159,6 +159,7 @@ pub trait TuiTab: super::TuiWidget {
     fn dispatch_shortcut(&mut self, seq: &[crossterm::event::KeyEvent]);
 }
 
+mod connections;
 mod files;
 mod proxies;
 mod status;
@@ -222,12 +223,18 @@ macro_rules! enum_dispatch {
 
 pub mod prelude {
     pub use super::TuiTab;
+    pub use super::connections::ConnectionsTab;
     pub use super::files::FileTab;
     pub use super::proxies::ProxiesTab;
     pub use super::status::StatusTab;
 
     pub fn agent_init(keymap: &mut serde_yml::Mapping) -> anyhow::Result<()> {
         use anyhow::Context;
+
+        if let Ok(map) = crate::tui::agent::get(keymap, "connections") {
+            let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
+            super::connections::agent_init(keys);
+        }
 
         if let Ok(map) = crate::tui::agent::get(keymap, "file") {
             super::files::agent_init(map).context("Loading FileTab KeyMap")?;
@@ -238,6 +245,7 @@ pub mod prelude {
 
     enum_dispatch!(
         pub enum Tab {
+            ConnectionsTab,
             FileTab,
             ProxiesTab,
             StatusTab,
