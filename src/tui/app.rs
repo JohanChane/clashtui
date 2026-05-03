@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::atomic::{AtomicU8, Ordering};
 use tab::prelude::*;
 use tokio::sync::Notify;
 use widget::chord::ChordHandler;
@@ -9,6 +10,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
 // 50fps
 const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
 pub(super) static FULL_RENDER: Notify = Notify::const_new();
+pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 
 pub struct App {
     tabs: Vec<Tab>,
@@ -201,6 +203,7 @@ impl App {
         false
     }
     fn sync(&mut self) {
+        SPINNER_FRAME.fetch_add(1, Ordering::Relaxed);
         self.popup.sync();
         self.tabs.iter_mut().for_each(|tab| tab.sync());
     }

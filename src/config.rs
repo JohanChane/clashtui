@@ -131,7 +131,7 @@ pub fn template_path() -> PathBuf {
     DATA_DIR.get().unwrap().join(defs::TEMPLATE_DIR)
 }
 pub fn load_basic() -> anyhow::Result<serde_yml::Mapping> {
-    let fp = std::fs::File::create(DATA_DIR.get().unwrap().join(defs::BASIC_FILE))?;
+    let fp = std::fs::File::open(DATA_DIR.get().unwrap().join(defs::BASIC_FILE))?;
     serde_yml::from_reader(fp).map_err(|e| e.into())
 }
 pub fn keymap_path() -> PathBuf {

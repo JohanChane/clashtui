@@ -1,6 +1,8 @@
 use crate::functions::command::{edit, test_config};
 use crate::functions::file::profile::{db, select, update_profile};
 use crate::tui::widget::popmsg::Confirm;
+use std::collections::HashSet;
+use std::sync::atomic::Ordering;
 
 use super::*;
 
@@ -17,6 +19,7 @@ mod_agent!(
         ([KeyCode::Char('d')], Key::Action(Action::Delete), ""),
         ([KeyCode::Char('p')], Key::Action(Action::Preview), ""),
         ([KeyCode::Char('u')], Key::Action(Action::Update), ""),
+        ([KeyCode::Char('a'), KeyCode::Char('u')], Key::Action(Action::UpdateAll), "Update all"),
         ([KeyCode::Char('/')], Key::Action(Action::Search), ""),
         ([KeyCode::Char('t')], Key::Action(Action::Test), ""),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
@@ -42,6 +45,7 @@ pub enum Action {
     Edit,
     Preview,
     Update,
+    UpdateAll,
     Search,
     Test,
     GoTop,
@@ -77,6 +81,7 @@ pub struct Profile {
     // atime: Vec<Option<Duration>>,
     atime: Vec<String>,
     filter: Option<String>,
+    updating: HashSet<String>,
 }
 
 impl BasicTabContent for Profile {
@@ -111,35 +116,28 @@ impl DualTabContent for Profile {
             Key::Select => {
                 let name = get_name!(self, state);
                 async move {
-                    let pf = tri!(db::get(&name).unwrap().load_local_profile());
-                    let atime = pf
-                        .atime()
-                        .map(display_duration)
-                        .unwrap_or_else(|| "Unknown".to_string());
-                    let domain = pf
-                        .dtype
-                        .get_domain()
-                        .unwrap_or_else(|| "Unknown".to_string());
-
-                    let info = format!("Profile:{name}\nAtime:{atime}\nDomain:{domain}");
-
-                    let action: Action = todo!("crate::tui::popmsg::SelectSingle");
-
-                    action.act(name).await
+                    tri!(select(db::get(&name).unwrap()));
+                    sync!((Self, Self::Mate))
                 }
                 .spawn_at(task_set);
             }
-            Key::Action(action) => {
-                match action {
-                    Action::GoTop => state.select_first(),
-                    Action::GoEnd => state.select_last(),
-                    _ => {
-                        let name = get_name!(self, state);
-                        action.act(name).spawn_at(task_set);
-                        return false;
+            Key::Action(action) => match action {
+                Action::GoTop => state.select_first(),
+                Action::GoEnd => state.select_last(),
+                Action::UpdateAll => {
+                    for name in &self.items {
+                        self.updating.insert(name.clone());
                     }
+                    actions::update_all(self.items.clone()).spawn_at(task_set)
                 }
-            }
+                _ => {
+                    let name = get_name!(self, state);
+                    if matches!(action, Action::Update) {
+                        self.updating.insert(name.clone());
+                    }
+                    action.act(name).spawn_at(task_set)
+                }
+            },
         }
         false
     }
@@ -159,19 +157,41 @@ impl DualTabContent for Profile {
             block.title_bottom(Line::raw(format!(" /: Search ")).right_aligned().reversed())
         };
 
+        let current = &crate::config::CONFIG
+            .data
+            .lock()
+            .unwrap()
+            .get_current()
+            .map(|pf| pf.name)
+            .unwrap_or_default();
+        let spinner_chars = ['/', '-', '\\', '|'];
+        let spinner_idx =
+            (crate::tui::app::SPINNER_FRAME.load(Ordering::Relaxed) as usize / 8) % 4;
+
         let iter = self
             .items
             .iter()
             .zip(self.atime.iter())
-            // filter content now
             .filter(|(value, _)| self.filter.as_deref().is_none_or(|pat| value.contains(pat)))
             .map(|(value, extra)| {
-                ListItem::new(Line::from(vec![
-                    Span::raw(value),
-                    Span::raw("("),
-                    Span::raw(extra).style(Theme::get().profile_tab.update_interval),
-                    Span::raw(")"),
-                ]))
+                let mut spans = Vec::with_capacity(5);
+
+                if self.updating.contains(value.as_str()) {
+                    spans.push(Span::raw(format!("{} ", spinner_chars[spinner_idx])));
+                } else if value == current.as_str() {
+                    spans.push(
+                        Span::raw("* ").style(Theme::get().tab.tab_focused),
+                    );
+                } else {
+                    spans.push(Span::raw("  "));
+                }
+
+                spans.push(Span::raw(value.as_str()));
+                spans.push(Span::raw("("));
+                spans.push(Span::raw(extra.as_str()).style(Theme::get().profile_tab.update_interval));
+                spans.push(Span::raw(")"));
+
+                ListItem::new(Line::from(spans))
             });
         let widget = List::from_iter(iter)
             .block(block)
@@ -199,6 +219,7 @@ mod actions {
                 Self::Update => update(name).await,
                 Self::Test => test(name).await,
                 Self::GoTop | Self::GoEnd => do_nothing(),
+                Self::UpdateAll => unreachable!("UpdateAll handled directly in handle_key_event"),
             }
         }
     }
@@ -286,12 +307,57 @@ mod actions {
     }
 
     async fn update(name: String) -> CB {
-        let with_proxy = todo!("crate::tui::popmsg::SelectSingle");
-        let remove_proxy_provider = todo!("crate::tui::popmsg::SelectSingle");
-        let result =
-            tri!(update_profile(db::get(name).unwrap(), with_proxy, remove_proxy_provider,).await);
+        let with_proxy = false;
+        let remove_proxy_provider = false;
+        let delay = fastrand::u32(3..=10);
+        tokio::time::sleep(std::time::Duration::from_secs(delay as u64)).await;
+        let result = update_profile(db::get(&name).unwrap(), with_proxy, remove_proxy_provider).await;
 
-        sync!(C)
+        let (names, atime) = get_profiles_with_readable_atime();
+        wrapper(move |(content, _): &mut C| {
+            content.updating.remove(&name);
+            match result {
+                Ok(msg) => {
+                    sync_helper(content, names, atime);
+                    Confirm::title("Updated".to_owned())
+                        .with_prompt(msg)
+                        .build_and_send();
+                }
+                Err(e) => Confirm::err(e),
+            }
+        })
+    }
+
+    pub(super) async fn update_all(names: Vec<String>) -> CB {
+        let delay = fastrand::u32(3..=10);
+        tokio::time::sleep(std::time::Duration::from_secs(delay as u64)).await;
+
+        let mut results = Vec::with_capacity(names.len());
+        for name in &names {
+            let result = update_profile(db::get(name).unwrap(), false, false).await;
+            results.push((name.clone(), result));
+        }
+
+        let (new_names, new_atime) = get_profiles_with_readable_atime();
+        wrapper(move |(content, _): &mut C| {
+            let mut msgs = Vec::with_capacity(results.len());
+            for (name, result) in results {
+                content.updating.remove(&name);
+                match result {
+                    Ok(msg) => msgs.push(msg),
+                    Err(e) => msgs.push(format!("{name}: {e}")),
+                }
+            }
+            sync_helper(content, new_names, new_atime);
+            let title = if msgs.iter().all(|m| !m.contains(':')) {
+                "All Updated"
+            } else {
+                "Updated (some failed)"
+            };
+            Confirm::title(title.to_owned())
+                .with_prompt(msgs.join("\n"))
+                .build_and_send();
+        })
     }
 
     async fn test(name: String) -> CB {

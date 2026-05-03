@@ -146,17 +146,14 @@ pub async fn update_profile(
 
 pub fn select(profile: Profile) -> anyhow::Result<()> {
     let cfg = &crate::config::CONFIG.cfg_file.basic;
-    // load selected profile
     let mut lprofile = profile.clone().load_local_profile()?;
-    // merge that into basic profile
     lprofile.merge(&crate::config::load_basic()?)?;
-    // set path to clash config file path and sync to disk
     lprofile.path = cfg.clash_config_path.clone().into();
     lprofile.sync_to_disk()?;
-    // after, change current profile
     db::set_current(profile)?;
-    // ask clash to reload config
-    crate::functions::restful::config::reload(&cfg.clash_config_path)?;
+    if let Err(e) = crate::functions::restful::config::reload(&cfg.clash_config_path) {
+        log::warn!("Failed to reload clash config: {e}");
+    }
     Ok(())
 }
 

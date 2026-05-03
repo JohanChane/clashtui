@@ -62,7 +62,8 @@ impl LocalProfile {
     /// Note: need to call [`LocalProfile::sync_from_disk`] before call this
     pub fn merge(&mut self, basic_clash_config: &serde_yml::Mapping) -> anyhow::Result<()> {
         if self.content.is_none() || basic_clash_config.is_empty() {
-            anyhow::bail!("failed to merge: one of the input content is none");
+            log::warn!("skip merge: one of the input content is none");
+            return Ok(());
         }
         let map = self.content.as_mut().unwrap();
         for (key, value) in basic_clash_config.iter() {
