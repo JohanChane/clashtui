@@ -1,13 +1,8 @@
-[workspace]
-resolver = "2"
-members = [
-    "demotui", "demotui-backend", "demotui-config", "demotui-frontend", "demotui-shared", "demotui-widgets",
-]
-
-[workspace.package]
+[package]
+name = "demotui"
 # 发布相关的通用配置
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "A demo TUI application"
 license = "MIT OR Apache-2.0"
 keywords = ["tui", "demo", "terminal"]
@@ -16,12 +11,64 @@ readme = "README.md"
 homepage = "https://github.com/yourusername/demotui"
 repository = "https://github.com/yourusername/demotui"
 
-# Release 构建配置
-[workspace.package.metadata.release]
+[package.metadata.release]
 # 发布时是否执行 cargo test
 pre-release-commands = ["cargo test"]
 # 发布后是否执行 cargo publish
 publish = true
+
+[dependencies]
+log = "0.4.22"
+env_logger = { version = "0.11.7", default-features = false, features = [
+    "humantime",
+] }
+anyhow = "1.0.86"
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
+serde_yml = "0.0.12"
+minreq = { version = "2.12.0", features = [
+    "proxy",
+    "https",
+    "json-using-serde",
+] }
+strum = { version = "0.26.3", features = ["derive"] }
+base64 = { version = "^0", optional = true }
+url-parse = { version = "1", optional = true }
+
+# CLI
+clap = { version = "4.5.17", features = ["derive"] }
+clap_complete = "4.5.26"
+# is-root = "0.1.4"
+# self-replace = { version = "1.5.0", default-features = false }
+
+# TUI
+tokio = { version = "1.48.0", features = [
+    "fs",
+    "rt",
+    "rt-multi-thread",
+    "macros",
+    "sync",
+    "time",
+], optional = true }
+crossterm = { version = "*", features = [
+    "event-stream",
+    "serde",
+], default-features = false, optional = true }
+ratatui = { version = "0.29.0", features = [
+    "crossterm",
+], default-features = false, optional = true }
+futures-lite = { version = "2.6.0", default-features = false, optional = true }
+
+
+[features]
+customized-theme = ["tui", "ratatui/serde"]
+migration_v0_2_3 = []
+tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-lite"]
+
+deprecated = ["dep:url-parse", "dep:base64"]
+
+default = ["customized-theme"]
+
 
 # 工作空间的 release 配置
 [profile.release]
@@ -30,30 +77,4 @@ lto = true
 strip = true
 panic = "abort"
 incremental = false
-opt-level = "z"  # 优化大小，也可以用 "s" 或 "3"
-
-[workspace.dependencies]
-log = "0.4.22"
-env_logger = { version = "0.11.7", default-features = false, features = ["humantime"] }
-is-root = "0.1.4"
-clap = { version = "4.5.17", features = ["derive"] }
-clap_complete = "4.5.26"
-self-replace = { version = "1.5.0", default-features = false }
-anyhow = "1.0.86"
-thiserror = "2"
-serde = { version = "1.0.210", features = ["derive"] }
-minreq = { version = "2.12.0", features = ["proxy", "https", "json-using-serde"] }
-serde_json = "1.0.128"
-serde_yml = "0.0.12"
-url = { version = "^2" }
-base64 = { version = "^0" }
-ordered-float = {version = "5.1.0"}
-libc = "0.2.176"
-
-# 将可选依赖分组
-futures-lite = { version = "2.6.0", default-features = false }
-strum = { version = "0.26.3", features = ["derive"] }
-derive_more = { version = "2", default-features = false, features = ["debug"] }
-tokio = { version = "1.40.0", features = ["rt", "rt-multi-thread", "macros", "sync", "time"] }
-crossterm = { version = "0.28.1", default-features = false, features = ["event-stream"] }
-ratatui = { version = "0.29.0", default-features = false, features = ["crossterm"] }
+opt-level = "z"     # 优化大小，也可以用 "s" 或 "3"
