@@ -171,10 +171,12 @@ mod_agent!(
         ([KeyCode::Char('h')],             Key::Parent,      ""),
         ([KeyCode::Char('l')],             Key::Expand,      ""),
         ([KeyCode::Enter],                 Key::Select,      ""),
+        ([KeyCode::Char('t')],             Key::TestDelay,   "Test delay"),
         // 多键 chord（a 前缀）
-        ([KeyCode::Char('a'), KeyCode::Char('s')], Key::ToggleSort,  "Toggle sort"),
-        ([KeyCode::Char('a'), KeyCode::Char('f')], Key::CollapseAll, "Collapse all"),
-        ([KeyCode::Char('a'), KeyCode::Char('e')], Key::ExpandAll,   "Expand all"),
+        ([KeyCode::Char('a'), KeyCode::Char('s')], Key::ToggleSort,   "Toggle sort"),
+        ([KeyCode::Char('a'), KeyCode::Char('f')], Key::CollapseAll,  "Collapse all"),
+        ([KeyCode::Char('a'), KeyCode::Char('e')], Key::ExpandAll,    "Expand all"),
+        ([KeyCode::Char('a'), KeyCode::Char('t')], Key::TestAllDelay, "Test all delay"),
     ]
 );
 ```
@@ -188,6 +190,8 @@ mod_agent!(
 | `h` | Parent | Folder: 折叠自身 / Link/File: 折叠父目录并跳转 |
 | `l` | Expand | Folder: 展开 / Link: 跳到目标 Folder / File: 无操作 |
 | `Enter` | Select | Folder: toggle 展开 / Link: PUT 选择 / File: PUT 选择 |
+| `t` | TestDelay | Folder: 对组内所有节点测速 / Link/File: 对单节点测速 |
+| `a t` | TestAllDelay | 对全部节点批量测速 |
 | `a s` | ToggleSort | 开关排序（字母顺序 ↔ GLOBAL.all 顺序） |
 | `a f` | CollapseAll | 折叠全部 Folder |
 | `a e` | ExpandAll | 展开全部 Folder |
@@ -197,11 +201,12 @@ mod_agent!(
 多键 chord（`a s`、`a f`、`a e`）按 `a` 时弹出 Which 面板：
 
 ```
-┌ Which? ──────────┐
-│  s  Toggle sort   │
-│  f  Collapse all  │
-│  e  Expand all    │
-└──────────────────┘
+┌ Which? ───────────┐
+│  s  Toggle sort    │
+│  f  Collapse all   │
+│  e  Expand all     │
+│  t  Test all delay │
+└───────────────────┘
 ```
 
 后续按键过滤候选：精确匹配 → dispatch，0 候选 → 关闭并消费，Esc → 关闭。
@@ -212,6 +217,7 @@ mod_agent!(
 #[derive(Clone, Copy)]
 enum Key {
     MoveUp, MoveDown, Parent, Expand, Select,
+    TestDelay, TestAllDelay,
     ToggleSort, CollapseAll, ExpandAll,
 }
 
@@ -222,7 +228,23 @@ impl TryFrom<&KeyEvent> for Key {
 }
 ```
 
-仅单键存在于 `agent()` HashMap 中；chord 键（`a`、`s`、`f`、`e`）不由 TryFrom 处理，走 ChordHandler Which 路由。
+仅单键存在于 `agent()` HashMap 中；chord 键（`a`、`s`、`f`、`e`、`t`）不由 TryFrom 处理，走 ChordHandler Which 路由。
+
+### 延时测试
+
+`t` 键根据选中节点类型分发：
+
+| 节点类型 | `t` 行为 | 实现 |
+|---------|---------|------|
+| Folder | 对组内所有节点批量测速 | `test_group_delay(name, url, timeout)` → 等 2s → re-fetch |
+| File | 对单节点测速 | `test_proxy_delay(name, url, timeout)` → re-fetch |
+| Link | 对 Link 指向的节点测速 | 同上，target = Link 的 name |
+
+`a t` 遍历所有 Folder 和顶层 File，顺序调用测速 API，完成后 re-fetch 刷新全树。
+
+测试 URL：优先使用 proxy 自身的 `test_url`（来自 API 响应）。若无 `test_url`，则不传 `url` 参数，由 Mihomo 使用该节点配置的 `test-url`（或内核默认 `https://www.gstatic.com/generate_204`）。超时取 `config.timeout`（默认 5s）。
+
+测试期间 `Proxies.error` 字段显示状态信息（`"Testing {name}..."` 或 `"Testing all (N groups/nodes)..."`），完成后清除。
 
 ---
 
@@ -286,7 +308,6 @@ src/
 
 ## 八、TODO
 
-- **测速** — 单节点/组测速，显示延迟 ms。测速进行中用 spinner 动画指示（`/` `-` `\` `|` 循环）。
 - **侧边栏** — 大屏时显示节点详情面板。
 
 ---

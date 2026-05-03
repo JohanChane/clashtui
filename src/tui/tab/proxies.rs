@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use ratatui::text::Line;
 use ratatui::widgets::ListItem;
 use std::collections::HashMap;
+use std::time::Instant;
 
 newtype_tab!(ProxiesTab(Tab<Proxies>));
 
@@ -17,9 +18,13 @@ mod_agent!(
         ([KeyCode::Char('h')], Key::Parent, ""),
         ([KeyCode::Char('l')], Key::Expand, ""),
         ([KeyCode::Enter], Key::Select, ""),
-        ([KeyCode::Char('a'), KeyCode::Char('s')], Key::ToggleSort, "Toggle sort"),
+        ([KeyCode::Char('s'), KeyCode::Char('s')], Key::ToggleSort, "Toggle sort"),
+        ([KeyCode::Char('s'), KeyCode::Char('d')], Key::SortByDelay, "Sort by delay"),
         ([KeyCode::Char('a'), KeyCode::Char('f')], Key::CollapseAll, "Collapse all"),
         ([KeyCode::Char('a'), KeyCode::Char('e')], Key::ExpandAll, "Expand all"),
+        ([KeyCode::Char('t')], Key::TestDelay, "Test delay"),
+        ([KeyCode::Char('a'), KeyCode::Char('t')], Key::TestAllDelay, "Test all delay"),
+        ([KeyCode::Char('r')], Key::Refresh, "Refresh"),
     ]
 );
 
@@ -33,6 +38,10 @@ enum Key {
     CollapseAll,
     ExpandAll,
     ToggleSort,
+    SortByDelay,
+    TestDelay,
+    TestAllDelay,
+    Refresh,
 }
 
 impl TryFrom<&KeyEvent> for Key {
@@ -109,6 +118,7 @@ struct ProxyTree {
     nodes: Vec<NodeItem>,
     name_index: HashMap<String, usize>,
     sorted: bool,
+    sort_by_delay: bool,
 }
 
 impl Default for ProxyTree {
@@ -117,6 +127,7 @@ impl Default for ProxyTree {
             nodes: Vec::new(),
             name_index: HashMap::new(),
             sorted: false,
+            sort_by_delay: false,
         }
     }
 }
@@ -167,7 +178,7 @@ impl ProxyTree {
         }
 
         for name in &top {
-            Self::push_entry(&mut nodes, name, None, None, 0, proxies, &expanded_map);
+            Self::push_entry(&mut nodes, name, None, None, 0, proxies, &expanded_map, self.sort_by_delay);
         }
 
         self.nodes = nodes;
@@ -184,6 +195,7 @@ impl ProxyTree {
         depth: usize,
         proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,
         expanded_map: &HashMap<String, bool>,
+        sort_by_delay: bool,
     ) {
         let proxy = match proxies.get(name) {
             Some(p) => p,
@@ -201,7 +213,7 @@ impl ProxyTree {
             depth,
             node_type,
             proxy_type: proxy.proxy_type.clone(),
-            delay: proxy.history.last().map(|r| r.delay),
+            delay: None,
             parent,
             expanded,
             is_now: parent_now == Some(name),
@@ -210,18 +222,36 @@ impl ProxyTree {
         if has_kids && expanded {
             if let Some(ref kids) = proxy.all {
                 let my_now = proxy.now.as_deref();
-                for kid in kids {
+                let ordered_kids: Vec<&String> = if sort_by_delay {
+                    let mut v: Vec<&String> = kids.iter().collect();
+                    v.sort_by_key(|kid| {
+                        proxies.get(kid.as_str())
+                            .and_then(|p| p.history.last())
+                            .map(|r| r.delay)
+                            .or_else(|| {
+                                proxy.extra.get(kid.as_str())
+                                    .and_then(|info| info.history.last())
+                                    .map(|r| r.delay)
+                            })
+                            .unwrap_or(u64::MAX)
+                    });
+                    v
+                } else {
+                    kids.iter().collect()
+                };
+                for kid in &ordered_kids {
                     let is_group = proxies
                         .get(kid.as_str())
                         .map(|p| p.all.as_ref().map(|a| !a.is_empty()).unwrap_or(false))
                         .unwrap_or(false);
                     if is_group {
-                        // Sub-group → Link
+                        // Sub-group → Link, inherit type + delay from target
+                        let kid_proxy = proxies.get(kid.as_str());
                         nodes.push(NodeItem {
-                            name: kid.clone(),
+                            name: (*kid).clone(),
                             depth: depth + 1,
                             node_type: NodeType::Link,
-                            proxy_type: String::new(),
+                            proxy_type: kid_proxy.map(|p| p.proxy_type.clone()).unwrap_or_default(),
                             delay: None,
                             parent: Some(name.to_owned()),
                             expanded: false,
@@ -231,7 +261,7 @@ impl ProxyTree {
                         // Leaf → File
                         let kid_proxy = proxies.get(kid.as_str());
                         nodes.push(NodeItem {
-                            name: kid.clone(),
+                            name: (*kid).clone(),
                             depth: depth + 1,
                             node_type: NodeType::File,
                             proxy_type: kid_proxy.map(|p| p.proxy_type.clone()).unwrap_or_default(),
@@ -314,6 +344,7 @@ struct Proxies {
     tree: ProxyTree,
     proxies: IndexMap<String, crate::functions::restful::proxies::Proxy>,
     error: Option<String>,
+    testing_since: Option<Instant>,
 }
 
 impl Proxies {
@@ -410,9 +441,129 @@ impl Proxies {
             Key::ExpandAll => {
                 self.tree.expand_all(&self.proxies);
             }
+            Key::Refresh => {
+                async {
+                    let response = tri!(proxies::fetch_proxies(), or_set);
+                    wrapper(move |content: &mut Self| {
+                        content.proxies = response.proxies;
+                        content.tree.rebuild_from_proxies(&content.proxies);
+                        content.error = None;
+                    })
+                }
+                .spawn_at(task_set);
+            }
             Key::ToggleSort => {
                 self.tree.sorted = !self.tree.sorted;
                 self.tree.rebuild_from_proxies(&self.proxies);
+            }
+            Key::SortByDelay => {
+                self.tree.sort_by_delay = !self.tree.sort_by_delay;
+                self.tree.rebuild_from_proxies(&self.proxies);
+            }
+            Key::TestDelay => {
+                let info = self.tree.node_at(current)
+                    .map(|n| (n.name.clone(), n.node_type.clone()));
+                if let Some((name, ntype)) = info {
+                    let timeout = crate::config::CONFIG.cfg_file.timeout.unwrap_or(5) * 1000;
+                    let test_url = self.proxies.get(&name)
+                        .and_then(|p| p.test_url.clone());
+                    match ntype {
+                        NodeType::Folder => {
+                            self.error = Some(format!("Testing group {name}..."));
+                            self.testing_since = Some(Instant::now());
+                            async move {
+                                let delays = tri!(proxies::test_group_delay(&name, test_url.as_deref(), timeout));
+                                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                                let mut response = tri!(proxies::fetch_proxies(), or_set);
+                                for (child_name, d) in &delays {
+                                    if let Some(proxy) = response.proxies.get_mut(child_name) {
+                                        proxy.history.push(proxies::DelayRecord { delay: *d });
+                                    }
+                                }
+                                wrapper(move |content: &mut Self| {
+                                    content.proxies = response.proxies;
+                                    content.tree.rebuild_from_proxies(&content.proxies);
+                                    content.error = None;
+                                    content.testing_since = None;
+                                })
+                            }
+                            .spawn_at(task_set);
+                        }
+                        _ => {
+                            self.error = Some(format!("Testing {name}..."));
+                            self.testing_since = Some(Instant::now());
+                            async move {
+                                let delay = match proxies::test_proxy_delay(&name, test_url.as_deref(), timeout) {
+                                    Err(e) => {
+                                        return wrapper(move |content: &mut Self| {
+                                            content.error = Some(e.to_string());
+                                            content.testing_since = None;
+                                        });
+                                    }
+                                    Ok(d) => d,
+                                };
+                                let mut response = tri!(proxies::fetch_proxies(), or_set);
+                                if let (Some(d), Some(proxy)) = (delay, response.proxies.get_mut(&name)) {
+                                    proxy.history.push(proxies::DelayRecord { delay: d });
+                                }
+                                wrapper(move |content: &mut Self| {
+                                    content.proxies = response.proxies;
+                                    content.tree.rebuild_from_proxies(&content.proxies);
+                                    content.error = None;
+                                    content.testing_since = None;
+                                })
+                            }
+                            .spawn_at(task_set);
+                        }
+                    }
+                }
+            }
+            Key::TestAllDelay => {
+                let folders: Vec<String> = self.tree.nodes.iter()
+                    .filter(|n| n.node_type == NodeType::Folder)
+                    .map(|n| n.name.clone())
+                    .collect();
+                let files: Vec<String> = self.tree.nodes.iter()
+                    .filter(|n| n.node_type == NodeType::File && n.depth == 0)
+                    .map(|n| n.name.clone())
+                    .collect();
+                let total = folders.len() + files.len();
+                if total == 0 {
+                    return;
+                }
+                let proxies_map = self.proxies.clone();
+                let timeout = crate::config::CONFIG.cfg_file.timeout.unwrap_or(5) * 1000;
+                self.error = Some(format!("Testing all ({total} groups/nodes)..."));
+                self.testing_since = Some(Instant::now());
+                async move {
+                    let mut all_delays: HashMap<String, u64> = HashMap::new();
+                    for name in &folders {
+                        let url = proxies_map.get(name.as_str())
+                            .and_then(|p| p.test_url.clone());
+                        if let Ok(delays) = proxies::test_group_delay(name, url.as_deref(), timeout) {
+                            all_delays.extend(delays);
+                        }
+                    }
+                    for name in &files {
+                        let url = proxies_map.get(name.as_str())
+                            .and_then(|p| p.test_url.clone());
+                        if let Ok(Some(d)) = proxies::test_proxy_delay(name, url.as_deref(), timeout) {
+                            all_delays.insert(name.clone(), d);
+                        }
+                    }
+                    let mut response = tri!(proxies::fetch_proxies(), or_set);
+                    for (name, d) in &all_delays {
+                        if let Some(proxy) = response.proxies.get_mut(name) {
+                            proxy.history.push(proxies::DelayRecord { delay: *d });
+                        }
+                    }
+                    wrapper(move |content: &mut Self| {
+                        content.proxies = response.proxies;
+                        content.tree.rebuild_from_proxies(&content.proxies);
+                        content.error = None;
+                    })
+                }
+                .spawn_at(task_set);
             }
         }
     }
@@ -470,19 +621,34 @@ impl TabContent for Proxies {
             .border_style(Theme::get().tab.tab_focused)
             .title(Self::TITLE);
 
-        let block = if self.tree.sorted {
+        let block = if self.tree.sort_by_delay {
+            block.title_bottom(Line::raw(" delay ").right_aligned().reversed())
+        } else if self.tree.sorted {
             block.title_bottom(Line::raw(" sorted ").right_aligned().reversed())
         } else {
             block
         };
 
+        let spinner_str = self.testing_since.map(|since| {
+            let elapsed = since.elapsed().as_millis() as usize;
+            let spinner = ['|', '/', '-', '\\'];
+            let c = spinner[(elapsed / 100) % 4];
+            let msg = self.error.as_deref().unwrap_or("Testing...");
+            format!(" {c} {msg}")
+        });
+
         if self.tree.is_empty() {
-            if let Some(ref err) = self.error {
-                let widget = ratatui::widgets::Paragraph::new(err.as_str()).block(block);
-                f.render_widget(widget, area);
-            }
+            let msg = spinner_str.as_deref().unwrap_or(self.error.as_deref().unwrap_or(""));
+            let widget = ratatui::widgets::Paragraph::new(msg).block(block);
+            f.render_widget(widget, area);
             return;
         }
+
+        let block = if let Some(ref s) = spinner_str {
+            block.title_bottom(Line::raw(s.as_str()))
+        } else {
+            block
+        };
 
         let items: Vec<ListItem> = self
             .tree
@@ -501,9 +667,10 @@ impl TabContent for Proxies {
                         if node.is_now { "*" } else { " " }
                     }
                 };
-                let type_str = match node.node_type {
-                    NodeType::Link => String::new(),
-                    _ => format!("[{}]", node.proxy_type),
+                let type_str = if node.proxy_type.is_empty() {
+                    String::new()
+                } else {
+                    format!("[{}]", node.proxy_type)
                 };
                 let delay_str = node.delay.map(|d| format!("{}ms", d)).unwrap_or_default();
 
@@ -606,7 +773,7 @@ mod tests {
         assert!(dispatched.is_empty(), "no dispatch on first key");
         assert!(ch.is_active(), "chord should be active after 'a'");
         assert_eq!(ch.pressed.len(), 1);
-        assert_eq!(ch.candidates.len(), 3, "should have 3 candidates: ToggleSort, CollapseAll, ExpandAll");
+        assert_eq!(ch.candidates.len(), 4, "should have 4 candidates: ToggleSort, CollapseAll, ExpandAll, TestAllDelay");
     }
 
     #[test]
