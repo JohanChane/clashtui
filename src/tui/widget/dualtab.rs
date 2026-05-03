@@ -52,6 +52,8 @@ where
     state: (C1::State, C2::State),
     tasks: FutureSet<(C1, C2)>,
     is_focus_on_c1: bool,
+    c1_shortcuts: Vec<(KeyCombo, &'static str)>,
+    c2_shortcuts: Vec<(KeyCombo, &'static str)>,
 }
 
 impl<C1, C2> Default for DualTab<C1, C2>
@@ -67,11 +69,21 @@ where
         let mut tasks = Default::default();
         content.0.init(&mut tasks, &mut state.0);
         content.1.init(&mut tasks, &mut state.1);
+        let c1_shortcuts: Vec<(KeyCombo, &'static str)> = C1::all_shortcuts()
+            .iter()
+            .map(|(combo, _, desc)| (combo.clone(), *desc))
+            .collect();
+        let c2_shortcuts: Vec<(KeyCombo, &'static str)> = C2::all_shortcuts()
+            .iter()
+            .map(|(combo, _, desc)| (combo.clone(), *desc))
+            .collect();
         Self {
             content,
             state,
             tasks,
             is_focus_on_c1: true,
+            c1_shortcuts,
+            c2_shortcuts,
         }
     }
 }
@@ -82,24 +94,10 @@ where
     C2: DualTabContentMate<Mate = C1>,
 {
     pub fn shortcuts(&self) -> &[(KeyCombo, &'static str)] {
-        use std::sync::OnceLock;
-        static C1_CACHED: OnceLock<Vec<(KeyCombo, &str)>> = OnceLock::new();
-        static C2_CACHED: OnceLock<Vec<(KeyCombo, &str)>> = OnceLock::new();
-
         if self.is_focus_on_c1 {
-            C1_CACHED.get_or_init(|| {
-                C1::all_shortcuts()
-                    .iter()
-                    .map(|(combo, _, desc)| (combo.clone(), *desc))
-                    .collect()
-            })
+            &self.c1_shortcuts
         } else {
-            C2_CACHED.get_or_init(|| {
-                C2::all_shortcuts()
-                    .iter()
-                    .map(|(combo, _, desc)| (combo.clone(), *desc))
-                    .collect()
-            })
+            &self.c2_shortcuts
         }
     }
 

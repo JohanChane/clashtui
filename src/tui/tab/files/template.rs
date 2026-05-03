@@ -71,7 +71,7 @@ impl BasicTabContent for Template {
     const TITLE: &str = "Template";
 
     fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        all_shortcuts()
+        agent::all_shortcuts()
     }
 }
 

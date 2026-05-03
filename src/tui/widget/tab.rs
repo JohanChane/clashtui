@@ -58,6 +58,7 @@ pub struct Tab<C: TabContent> {
     content: C,
     state: C::State,
     tasks: FutureSet<C>,
+    shortcuts: Vec<(KeyCombo, &'static str)>,
 }
 
 impl<C> TuiWidget for Tab<C>
@@ -94,24 +95,22 @@ where
         let mut state = Default::default();
         let mut tasks = Default::default();
         content.init(&mut tasks, &mut state);
+        let shortcuts: Vec<(KeyCombo, &'static str)> = C::all_shortcuts()
+            .iter()
+            .map(|(combo, _, desc)| (combo.clone(), *desc))
+            .collect();
         Self {
             content,
             state,
             tasks,
+            shortcuts,
         }
     }
 }
 
 impl<C: TabContent> Tab<C> {
     pub fn shortcuts(&self) -> &[(KeyCombo, &'static str)] {
-        use std::sync::OnceLock;
-        static CACHED: OnceLock<Vec<(KeyCombo, &str)>> = OnceLock::new();
-        CACHED.get_or_init(|| {
-            C::all_shortcuts()
-                .iter()
-                .map(|(combo, _, desc)| (combo.clone(), *desc))
-                .collect()
-        })
+        &self.shortcuts
     }
 
     pub fn dispatch_shortcut(&mut self, seq: &[KeyEvent]) {

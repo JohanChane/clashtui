@@ -120,6 +120,8 @@ pub mod download {
     }
 }
 
+pub mod proxies;
+
 pub mod connection {
     use super::*;
 

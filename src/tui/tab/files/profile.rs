@@ -91,7 +91,7 @@ impl BasicTabContent for Profile {
     const TITLE: &str = "Profile";
 
     fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        all_shortcuts()
+        agent::all_shortcuts()
     }
 }
 
