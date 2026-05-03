@@ -162,6 +162,7 @@ pub trait TuiTab: super::TuiWidget {
 mod connections;
 mod files;
 mod proxies;
+mod srvctl;
 mod status;
 
 macro_rules! enum_dispatch {
@@ -226,6 +227,7 @@ pub mod prelude {
     pub use super::connections::ConnectionsTab;
     pub use super::files::FileTab;
     pub use super::proxies::ProxiesTab;
+    pub use super::srvctl::SrvCtlTab;
     pub use super::status::StatusTab;
 
     pub fn agent_init(keymap: &mut serde_yml::Mapping) -> anyhow::Result<()> {
@@ -240,6 +242,11 @@ pub mod prelude {
             super::files::agent_init(map).context("Loading FileTab KeyMap")?;
         }
 
+        if let Ok(map) = crate::tui::agent::get(keymap, "srvctl") {
+            let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
+            super::srvctl::agent_init(keys);
+        }
+
         Ok(())
     }
 
@@ -248,6 +255,7 @@ pub mod prelude {
             ConnectionsTab,
             FileTab,
             ProxiesTab,
+            SrvCtlTab,
             StatusTab,
         }
     );

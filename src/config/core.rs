@@ -37,7 +37,7 @@ pub struct Basic {
 #[serde(default)]
 pub struct Service {
     #[cfg(any(target_os = "linux", target_os = "windows"))]
-    #[serde(alias = "clash_srv_nam")]
+    #[serde(alias = "clash_srv_name")]
     pub clash_service_name: String,
     #[cfg(target_os = "linux")]
     pub is_user: bool,

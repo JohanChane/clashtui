@@ -36,9 +36,6 @@ impl<C: Msg> Wrapper for Instance<C> {
         if let Some(prompt) = self.prompt.as_mut() {
             use ratatui::symbols::{border, line::NORMAL};
             use ratatui::widgets::Borders;
-            // ┌─┐
-            // │  │
-            // ├─┤
             let base_block = base_block.border_set(border::Set {
                 bottom_left: NORMAL.vertical_right,
                 bottom_right: NORMAL.vertical_left,
@@ -50,12 +47,20 @@ impl<C: Msg> Wrapper for Instance<C> {
 
             let areas = {
                 let (content_width, content_height) = self.content.size();
-                let (prompt_width, prompt_height) = prompt.size();
-                let area = calc_area_from(
-                    content_width.max(prompt_width),
-                    content_height + prompt_height + 1,
-                    f.area(),
-                );
+                let (_prompt_width, prompt_height) = prompt.size();
+                let prompt_text_w = prompt
+                    .prompt
+                    .lines()
+                    .map(|l| l.len() as u16)
+                    .max()
+                    .unwrap_or(0);
+                let title_w = self.title.len() as u16;
+                let w = content_width
+                    .max(prompt_text_w)
+                    .max(title_w)
+                    .max(20);
+                let h = content_height + prompt_height + 1;
+                let area = calc_area_from(w, h, f.area());
                 f.render_widget(Clear, area);
 
                 Layout::vertical([Constraint::Fill(1), Constraint::Length(1 + content_height)])
@@ -68,7 +73,9 @@ impl<C: Msg> Wrapper for Instance<C> {
         } else {
             let area = {
                 let (width, height) = self.content.size();
-                calc_area_from(width, height, f.area())
+                let title_w = self.title.len() as u16;
+                let w = width.max(title_w).max(20);
+                calc_area_from(w, height, f.area())
             };
             f.render_widget(Clear, area);
             self.content.render(f, area, base_block, true);
@@ -118,8 +125,12 @@ impl Prompt {
 
 fn calc_area_from(dialog_width: u16, dialog_height: u16, area: Rect) -> Rect {
     // make up for block
-    let dialog_width = (dialog_width + 2).min(area.width - 4);
-    let dialog_height = (dialog_height + 2).min(area.height - 6);
+    let dialog_width = (dialog_width + 2)
+        .max(30)
+        .min(area.width.saturating_sub(4));
+    let dialog_height = (dialog_height + 2)
+        .max(3)
+        .min(area.height.saturating_sub(6));
 
     let width = Constraint::Length(dialog_width);
     let height = Constraint::Length(dialog_height);
