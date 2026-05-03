@@ -4,6 +4,7 @@ mod profile;
 
 use super::PROFILE_PATH;
 use crate::config::database::{Profile, ProfileType};
+use super::net_resource::{ExtractNetResources, ResourceSection};
 pub use profile::LocalProfile;
 
 pub mod db {
@@ -48,12 +49,14 @@ fn update_with<F: FnOnce(&str, bool) -> Result<minreq::ResponseLazy, minreq::Err
     name: String,
     path: std::path::PathBuf,
     with_proxy: bool,
+    clash_cfg_dir: &std::path::Path,
     apply: F,
-) -> String {
+) -> Vec<String> {
     let url_domain = extract_domain(&url).unwrap_or("Unknown domain");
-    match (|| -> anyhow::Result<()> {
+    let mut results: Vec<String> = Vec::new();
+
+    let content: serde_yml::Mapping = match (|| -> anyhow::Result<serde_yml::Mapping> {
         let mut response = apply(&url, with_proxy)?;
-        // ensure a valid yaml content
         let content: serde_yml::Mapping = serde_yml::from_reader(&mut response)?;
         anyhow::ensure!(
             {
@@ -64,17 +67,56 @@ fn update_with<F: FnOnce(&str, bool) -> Result<minreq::ResponseLazy, minreq::Err
             },
             "Not a valid clash yaml file"
         );
-        let output_file = File::create(path)?;
+        let output_file = File::create(&path)?;
         serde_yml::to_writer(output_file, &content)?;
-        Ok(())
+        Ok(content)
     })() {
-        // pretty output
-        Ok(_) => format!("Updated: {name}({url_domain})"),
+        Ok(content) => {
+            results.push(format!("Updated: {name}({url_domain})"));
+            content
+        }
         Err(err) => {
-            log::error!("Update profile {name}:{err}");
-            format!("Not Updated: {name}({url_domain})")
+            let msg = format!("Not Updated: {name}({url_domain}): {err}");
+            log::error!("{msg}");
+            results.push(msg);
+            return results;
+        }
+    };
+
+    let net_resources = content.extract(&[ResourceSection::ProxyProvider, ResourceSection::RuleProvider]);
+    for res in &net_resources {
+        let res_domain = extract_domain(&res.url).unwrap_or("Unknown domain");
+        let res_path = clash_cfg_dir.join(&res.path);
+        if let Some(parent) = res_path.parent() {
+            if !parent.exists() {
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    results.push(format!("  Not Updated: {}({}): create dir error: {e}", res.name, res_domain));
+                    continue;
+                }
+            }
+        }
+        match crate::functions::restful::download::profile(&res.url, with_proxy) {
+            Ok(mut response) => {
+                let output_file = match File::create(&res_path) {
+                    Ok(f) => f,
+                    Err(e) => {
+                        results.push(format!("  Not Updated: {}({}): {e}", res.name, res_domain));
+                        continue;
+                    }
+                };
+                let mut buf_writer = std::io::BufWriter::new(output_file);
+                match std::io::copy(&mut response, &mut buf_writer) {
+                    Ok(_) => results.push(format!("  Updated: {}({})", res.name, res_domain)),
+                    Err(e) => results.push(format!("  Not Updated: {}({}): write error: {e}", res.name, res_domain)),
+                }
+            }
+            Err(e) => {
+                results.push(format!("  Not Updated: {}({}): {e}", res.name, res_domain));
+            }
         }
     }
+
+    results
 }
 
 pub async fn update_profile(
@@ -103,15 +145,16 @@ pub async fn update_profile(
     let with_proxy = with_proxy
         && crate::functions::restful::control::version().is_ok()
         && crate::functions::restful::control::check_connectivity().is_ok();
+    let clash_cfg_dir = std::path::Path::new(&crate::config::CONFIG.cfg_file.basic.clash_config_dir);
     match dtype {
         // Imported file won't update, re-import and overwrite it if necessary
         ProfileType::File => anyhow::bail!("Not upgradable"),
         // Update via the given link
         ProfileType::Url(url) => {
-            let res = update_with(url, name, path, with_proxy, |url, with_proxy| {
+            let lines = update_with(url, name, path, with_proxy, clash_cfg_dir, |url, with_proxy| {
                 crate::functions::restful::download::profile(url, with_proxy)
             });
-            Ok(res)
+            Ok(lines.join("\n"))
         }
         ProfileType::Generated(template_name) => {
             // rebuild from template
@@ -128,18 +171,6 @@ pub async fn update_profile(
             };
             serde_yml::to_writer(std::fs::File::create(path)?, &content)?;
             Ok(format!("Regenerated: {}(From {template_name})", name))
-        }
-        ProfileType::Github { url, token } => {
-            let res = update_with(url, name, path, with_proxy, |url, with_proxy| {
-                crate::functions::restful::download::github(url, with_proxy, token)
-            });
-            Ok(res)
-        }
-        ProfileType::GitLab { url, token } => {
-            let res = update_with(url, name, path, with_proxy, |url, with_proxy| {
-                crate::functions::restful::download::gitlab(url, with_proxy, token)
-            });
-            Ok(res)
         }
     }
 }
@@ -160,6 +191,15 @@ pub fn select(profile: Profile) -> anyhow::Result<()> {
 pub fn extract_domain(url: &str) -> Option<&str> {
     if let Some(protocol_end) = url.find("://") {
         let rest = &url[(protocol_end + 3)..];
+        let rest = if let Some(at_pos) = rest.find('@') {
+            if let Some(slash_pos) = rest.find('/') {
+                if at_pos < slash_pos { &rest[(at_pos + 1)..] } else { rest }
+            } else {
+                &rest[(at_pos + 1)..]
+            }
+        } else {
+            rest
+        };
         return if let Some(path_start) = rest.find('/') {
             Some(&rest[..path_start])
         } else {

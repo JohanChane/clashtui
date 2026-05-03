@@ -4,6 +4,7 @@ macro_rules! pm {
     };
 }
 
+pub mod net_resource;
 pub mod profile;
 pub mod template;
 

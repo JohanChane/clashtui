@@ -110,8 +110,6 @@ impl ProfileType {
             ProfileType::File => None,
             ProfileType::Url(url) => extract_domain(url).map(|s| s.to_owned()),
             ProfileType::Generated(name) => Some(format!("From template {name}")),
-            ProfileType::Github { url, token: _ } => extract_domain(url).map(|s| s.to_owned()),
-            ProfileType::GitLab { url, token: _ } => extract_domain(url).map(|s| s.to_owned()),
         }
     }
 }

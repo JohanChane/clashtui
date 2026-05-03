@@ -1,0 +1,38 @@
+proxies:
+  - name: direct
+    type: direct
+
+proxy-providers:
+  pp-dcdn:
+    type: http
+    url: https://cdn.example.com/dcdn.yaml
+    path: ./proxy-providers/dcdn.yaml
+    interval: 3600
+  pp-aws:
+    type: http
+    url: https://s3.amazonaws.com/bucket/proxies.yaml
+    path: ./proxy-providers/aws.yaml
+    interval: 7200
+  pp-no-url:
+    type: http
+    path: ./proxy-providers/no-url.yaml
+    interval: 3600
+
+rule-providers:
+  rp-reject:
+    type: http
+    behavior: classical
+    url: https://rules.example.org/reject.yaml
+    path: ./rule-providers/reject.yaml
+    interval: 86400
+  rp-ads:
+    type: http
+    behavior: domain
+    url: https://filters.example.net/ads.yaml
+    path: ./rule-providers/ads.yaml
+    interval: 43200
+  rp-no-path:
+    type: http
+    behavior: classical
+    url: https://rules.example.org/no-path.yaml
+    interval: 86400

@@ -41,11 +41,11 @@ Resolved to (in order): exe-relative `data/` dir if it exists ("portable mode") 
 
 ### Multi-file Modules
 
-Pattern: `modname.rs` re-exports from `modname/` directory. E.g. `src/cli.rs` + `src/cli/`, `src/tui.rs` + `src/tui/`, etc.
+Pattern: `modname.rs` re-exports from `modname/` directory. Applies to `src/cli.rs` + `src/cli/`, `src/tui.rs` + `src/tui/`, `src/config.rs` + `src/config/`, `src/functions.rs` + `src/functions/`.
 
 ### TUI Event Loop (50fps)
 
-Defined in `src/tui/app.rs:32`. Each frame: `terminal.draw(render)` → `sync()` → wait for key/tick/resize via `tokio::select!`. Key routing is three-layer, no return values: **PopUp** → **App** (global shortcuts) → **Tab** (active tab).
+Defined in `src/tui/app.rs:41`. Each frame: `terminal.draw(render)` → `sync()` → wait for key/tick/resize via `tokio::select!`. Key routing is four-layer (see `app.rs:83`): **PopUp**(0) → **Chord/Which**(1) → **Tab**(2) → **Global**(3). Layer 1 handles multi-key chord shortcuts (e.g. `g g`). Tab takes `&mut self` with no return; Global returns `bool`.
 
 ## Adding a New Tab
 
