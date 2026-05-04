@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use tab::prelude::*;
 use tokio::sync::Notify;
 use widget::chord::ChordHandler;
+use widget::help::HelpPanel;
 use widget::popmsg::PopUp;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
@@ -16,6 +17,7 @@ pub struct App {
     tabs: Vec<Tab>,
     popup: PopUp,
     chord: ChordHandler,
+    help: HelpPanel,
 
     tab_index: u8,
     should_quit: bool,
@@ -33,6 +35,7 @@ impl App {
             ],
             popup: PopUp::default(),
             chord: ChordHandler::default(),
+            help: HelpPanel::default(),
             tab_index: 0,
             should_quit: false,
         }
@@ -121,10 +124,15 @@ impl App {
     }
 
     /// KeyEvent Route:
-    /// PopUp(0) → Which(1) → Tab(2) → Global(3)
+    /// PopUp(0) → Help(1) → Which(2) → Tab(3) → Global(4)
     fn handle_key_event(&mut self, kv: &KeyEvent) {
         if self.popup.check() {
             self.popup.handle_key_event(kv);
+            return;
+        }
+
+        if self.help.is_active() {
+            self.help.dismiss();
             return;
         }
 
@@ -163,6 +171,10 @@ impl App {
 
         if self.chord.is_active() {
             self.render_which(f);
+        }
+
+        if self.help.is_active() {
+            self.render_help(f, &self.tabs[self.tab_index as usize]);
         }
 
         if self.popup.check() {
@@ -227,7 +239,11 @@ impl App {
             f.render_widget(Paragraph::new(lines), *col_area);
         }
     }
-    /// Global layer (3) — last resort: Tab switch, Quit
+
+    fn render_help(&self, f: &mut ratatui::Frame, tab: &Tab) {
+        widget::help::render_help(f, tab);
+    }
+    /// Global layer (4) — last resort: Tab switch, Quit, Help
     fn handle_global_kv(&mut self, kv: &KeyEvent) -> bool {
         if matches!(kv.kind, crossterm::event::KeyEventKind::Press) {
             use crossterm::event::KeyCode;
@@ -242,6 +258,7 @@ impl App {
                     }
                 }
                 KeyCode::Char('q') => self.should_quit = true,
+                KeyCode::Char('?') => self.help.toggle(),
                 _ => return false,
             }
             return true;
