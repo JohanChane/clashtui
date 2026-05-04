@@ -13,8 +13,9 @@ mod_agent!(
         ([KeyCode::Right], Key::Switch, ""),
         ([KeyCode::Down], Key::MoveDown, ""),
         ([KeyCode::Up], Key::MoveUp, ""),
-        ([KeyCode::Enter], Key::Action(Action::Apply), ""),
+        ([KeyCode::Enter], Key::Select, ""),
         ([KeyCode::Char('i')], Key::Action(Action::Add), ""),
+        ([KeyCode::Char('I')], Key::Action(Action::ImportFile), "Import from file"),
         ([KeyCode::Char('e')], Key::Action(Action::Edit), ""),
         ([KeyCode::Char('d')], Key::Action(Action::Delete), ""),
         ([KeyCode::Char('p')], Key::Action(Action::Preview), ""),
@@ -24,6 +25,7 @@ mod_agent!(
         ([KeyCode::Char('t')], Key::Action(Action::Test), ""),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
         ([KeyCode::Char('g'), KeyCode::Char('e')], Key::Action(Action::GoEnd), "Go to end"),
+        ([KeyCode::Char('N')], Key::Action(Action::ToggleNoPp), "Toggle no proxy-provider"),
     ]
 );
 
@@ -40,7 +42,7 @@ pub enum Key {
 #[derive(Clone, Copy, serde::Deserialize)]
 pub enum Action {
     Add,
-    Apply,
+    ImportFile,
     Delete,
     Edit,
     Preview,
@@ -50,6 +52,7 @@ pub enum Action {
     Test,
     GoTop,
     GoEnd,
+    ToggleNoPp,
 }
 
 impl TryFrom<&KeyEvent> for Key {
@@ -116,7 +119,7 @@ impl DualTabContent for Profile {
             Key::Select => {
                 let name = get_name!(self, state);
                 async move {
-                    tri!(select(db::get(&name).unwrap()));
+                    tri!(select(db::get(&name).unwrap()).await);
                     sync!((Self, Self::Mate))
                 }
                 .spawn_at(task_set);
@@ -187,9 +190,8 @@ impl DualTabContent for Profile {
                 }
 
                 spans.push(Span::raw(value.as_str()));
-                spans.push(Span::raw("("));
+                spans.push(Span::raw(" "));
                 spans.push(Span::raw(extra.as_str()).style(Theme::get().profile_tab.update_interval));
-                spans.push(Span::raw(")"));
 
                 ListItem::new(Line::from(spans))
             });
@@ -212,12 +214,13 @@ mod actions {
             match self {
                 Self::Search => search().await,
                 Self::Add => add().await,
+                Self::ImportFile => import_file().await,
                 Self::Edit => _edit(name).await,
-                Self::Apply => apply(name).await,
                 Self::Delete => delete(name).await,
                 Self::Preview => preview(name).await,
                 Self::Update => update(name).await,
                 Self::Test => test(name).await,
+                Self::ToggleNoPp => toggle_no_pp(name).await,
                 Self::GoTop | Self::GoEnd => do_nothing(),
                 Self::UpdateAll => unreachable!("UpdateAll handled directly in handle_key_event"),
             }
@@ -256,8 +259,41 @@ mod actions {
                 .await,
             or_cancel
         );
-        let pf = tri!(db::create(name, url));
-        tri!(update_profile(pf, false, false).await);
+        let path = crate::functions::file::PROFILE_YAMLS_PATH.join(format!("{name}.yaml"));
+        {
+            let mut response = tri!(crate::functions::restful::download::profile(&url, false));
+            let content: serde_yml::Mapping = tri!(serde_yml::from_reader(&mut response));
+            if let Some(parent) = path.parent() {
+                tri!(std::fs::create_dir_all(parent));
+            }
+            let file = tri!(std::fs::File::create(&path));
+            tri!(serde_yml::to_writer(file, &content));
+        }
+        tri!(db::create(name, url));
+
+        sync!(C)
+    }
+
+    async fn import_file() -> CB {
+        let name = tri!(
+            Input::new()
+                .with_title("Profile Name".to_owned())
+                .build_and_send()
+                .await,
+            or_cancel
+        );
+        let source_path = tri!(
+            Input::new()
+                .with_title("File Path".to_owned())
+                .build_and_send()
+                .await,
+            or_cancel
+        );
+
+        tri!(crate::functions::file::profile::import_profile_from_file(
+            &source_path,
+            &name
+        ));
 
         sync!(C)
     }
@@ -269,10 +305,13 @@ mod actions {
         do_nothing()
     }
 
-    async fn apply(name: String) -> CB {
-        tri!(select(db::get(name).unwrap()));
+    async fn toggle_no_pp(name: String) -> CB {
+        tri!(db::toggle_no_pp(&name));
 
-        do_nothing()
+        let (names, atime) = get_profiles_with_readable_atime();
+        wrapper(move |(content, _): &mut C| {
+            sync_helper(content, names, atime);
+        })
     }
 
     async fn delete(name: String) -> CB {
@@ -308,17 +347,21 @@ mod actions {
 
     async fn update(name: String) -> CB {
         let with_proxy = false;
-        let remove_proxy_provider = false;
-        let delay = fastrand::u32(3..=10);
-        tokio::time::sleep(std::time::Duration::from_secs(delay as u64)).await;
-        let result = update_profile(db::get(&name).unwrap(), with_proxy, remove_proxy_provider).await;
+        let result = update_profile(db::get(&name).unwrap(), with_proxy).await;
 
         let (names, atime) = get_profiles_with_readable_atime();
         wrapper(move |(content, _): &mut C| {
             content.updating.remove(&name);
             match result {
-                Ok(msg) => {
+                Ok(upd) => {
                     sync_helper(content, names, atime);
+                    let mut msg = format!("Updated: {}", upd.name);
+                    if !upd.net_updates.is_empty() {
+                        msg.push('\n');
+                        msg.push_str(&crate::functions::file::net_resource::format_net_updates(
+                            &upd.net_updates,
+                        ));
+                    }
                     Confirm::title("Updated".to_owned())
                         .with_prompt(msg)
                         .build_and_send();
@@ -329,30 +372,41 @@ mod actions {
     }
 
     pub(super) async fn update_all(names: Vec<String>) -> CB {
-        let delay = fastrand::u32(3..=10);
-        tokio::time::sleep(std::time::Duration::from_secs(delay as u64)).await;
-
         let mut results = Vec::with_capacity(names.len());
         for name in &names {
-            let result = update_profile(db::get(name).unwrap(), false, false).await;
+            let result = update_profile(db::get(name).unwrap(), false).await;
             results.push((name.clone(), result));
         }
 
         let (new_names, new_atime) = get_profiles_with_readable_atime();
         wrapper(move |(content, _): &mut C| {
             let mut msgs = Vec::with_capacity(results.len());
+            let mut has_net_updates = false;
             for (name, result) in results {
                 content.updating.remove(&name);
                 match result {
-                    Ok(msg) => msgs.push(msg),
+                    Ok(upd) => {
+                        let mut msg = format!("Updated: {}", upd.name);
+                        if !upd.net_updates.is_empty() {
+                            has_net_updates = true;
+                            msg.push('\n');
+                            msg.push_str(
+                                &crate::functions::file::net_resource::format_net_updates(
+                                    &upd.net_updates,
+                                ),
+                            );
+                        }
+                        msgs.push(msg);
+                    }
                     Err(e) => msgs.push(format!("{name}: {e}")),
                 }
             }
             sync_helper(content, new_names, new_atime);
-            let title = if msgs.iter().all(|m| !m.contains(':')) {
-                "All Updated"
-            } else {
+            let has_errors = msgs.iter().any(|m| m.contains(':') && !m.contains(": ok"));
+            let title = if has_errors {
                 "Updated (some failed)"
+            } else {
+                "All Updated"
             };
             Confirm::title(title.to_owned())
                 .with_prompt(msgs.join("\n"))
@@ -373,17 +427,26 @@ mod actions {
 }
 
 pub(super) fn get_profiles_with_readable_atime() -> (Vec<String>, Vec<String>) {
+    use crate::config::database::ProfileType;
+    use crate::functions::file::profile::extract_domain;
+
     let mut composed: Vec<(String, String)> = crate::functions::file::profile::db::get_all()
         .into_iter()
         .map(|pf| {
-            (
-                pf.name.clone(),
-                pf.load_local_profile()
-                    .ok()
-                    .and_then(|lp| lp.atime())
-                    .map(display_duration)
-                    .unwrap_or_else(|| "Unknown".to_owned()),
-            )
+            let name = pf.name.clone();
+            let no_pp = pf.no_pp;
+            let domain = match &pf.dtype {
+                ProfileType::File => "local import".to_owned(),
+                ProfileType::Url(url) => extract_domain(url).unwrap_or("unknown").to_owned(),
+            };
+            let atime = pf
+                .load_local_profile()
+                .ok()
+                .and_then(|lp| lp.atime())
+                .map(display_duration)
+                .unwrap_or_else(|| "Unknown".to_owned());
+            let no_pp_str = if no_pp { "nopp" } else { "" };
+            (name, format!("{domain}|{atime}|{no_pp_str}"))
         })
         .collect();
     composed.sort_unstable();

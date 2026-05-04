@@ -1,11 +1,7 @@
-use std::fs::File;
-
 mod profile;
 
-use super::PROFILE_PATH;
+use super::PROFILE_YAMLS_PATH;
 use crate::config::database::{Profile, ProfileType};
-use super::net_resource::{ExtractNetResources, ResourceSection};
-pub use profile::LocalProfile;
 
 pub mod db {
     use super::*;
@@ -17,7 +13,7 @@ pub mod db {
         Ok(pm.get(name).unwrap())
     }
     pub fn remove(pf: Profile) -> anyhow::Result<()> {
-        if let Err(e) = std::fs::remove_file(PROFILE_PATH.join(&pf.name)) {
+        if let Err(e) = std::fs::remove_file(PROFILE_YAMLS_PATH.join(format!("{}.yaml", &pf.name))) {
             if e.kind() != std::io::ErrorKind::NotFound {
                 log::warn!("Failed to Remove profile file: {e}")
             }
@@ -41,151 +37,143 @@ pub mod db {
         pm.set_current(pf);
         pm.to_file()
     }
+    pub fn toggle_no_pp(name: impl AsRef<str>) -> anyhow::Result<bool> {
+        let mut pm = pm!();
+        let current = pm.get(name.as_ref()).map(|pf| pf.no_pp).unwrap_or(false);
+        let new = !current;
+        pm.set_no_pp(name.as_ref(), new);
+        pm.to_file()?;
+        Ok(new)
+    }
 }
 
-#[inline]
-fn update_with<F: FnOnce(&str, bool) -> Result<minreq::ResponseLazy, minreq::Error>>(
-    url: String,
-    name: String,
-    path: std::path::PathBuf,
-    with_proxy: bool,
-    clash_cfg_dir: &std::path::Path,
-    apply: F,
-) -> Vec<String> {
-    let url_domain = extract_domain(&url).unwrap_or("Unknown domain");
-    let mut results: Vec<String> = Vec::new();
+pub fn import_profile_from_file(source_path: &str, profile_name: &str) -> anyhow::Result<Profile> {
+    let source = std::path::Path::new(source_path);
+    anyhow::ensure!(source.exists(), "Source file not found: {source_path}");
+    anyhow::ensure!(source.is_file(), "Source path is not a file: {source_path}");
 
-    let content: serde_yml::Mapping = match (|| -> anyhow::Result<serde_yml::Mapping> {
-        let mut response = apply(&url, with_proxy)?;
-        let content: serde_yml::Mapping = serde_yml::from_reader(&mut response)?;
-        anyhow::ensure!(
-            {
-                content.get("proxies").is_some_and(|v| v.is_sequence())
-                    || content
-                        .get("proxy-providers")
-                        .is_some_and(|v| v.is_mapping())
-            },
-            "Not a valid clash yaml file"
-        );
-        let output_file = File::create(&path)?;
-        serde_yml::to_writer(output_file, &content)?;
-        Ok(content)
-    })() {
-        Ok(content) => {
-            results.push(format!("Updated: {name}({url_domain})"));
-            content
-        }
-        Err(err) => {
-            let msg = format!("Not Updated: {name}({url_domain}): {err}");
-            log::error!("{msg}");
-            results.push(msg);
-            return results;
-        }
+    let content: serde_yml::Mapping = {
+        let file = std::fs::File::open(source)?;
+        serde_yml::from_reader(file)
+            .map_err(|e| anyhow::anyhow!("Invalid YAML in source file: {e}"))?
     };
+    anyhow::ensure!(
+        content.get("proxies").is_some_and(|v| v.is_sequence())
+            || content
+                .get("proxy-providers")
+                .is_some_and(|v| v.is_mapping()),
+        "Not a valid clash YAML file"
+    );
 
-    let net_resources = content.extract(&[ResourceSection::ProxyProvider, ResourceSection::RuleProvider]);
-    for res in &net_resources {
-        let res_domain = extract_domain(&res.url).unwrap_or("Unknown domain");
-        let res_path = clash_cfg_dir.join(&res.path);
-        if let Some(parent) = res_path.parent() {
-            if !parent.exists() {
-                if let Err(e) = std::fs::create_dir_all(parent) {
-                    results.push(format!("  Not Updated: {}({}): create dir error: {e}", res.name, res_domain));
-                    continue;
-                }
-            }
-        }
-        match crate::functions::restful::download::profile(&res.url, with_proxy) {
-            Ok(mut response) => {
-                let output_file = match File::create(&res_path) {
-                    Ok(f) => f,
-                    Err(e) => {
-                        results.push(format!("  Not Updated: {}({}): {e}", res.name, res_domain));
-                        continue;
-                    }
-                };
-                let mut buf_writer = std::io::BufWriter::new(output_file);
-                match std::io::copy(&mut response, &mut buf_writer) {
-                    Ok(_) => results.push(format!("  Updated: {}({})", res.name, res_domain)),
-                    Err(e) => results.push(format!("  Not Updated: {}({}): write error: {e}", res.name, res_domain)),
-                }
-            }
-            Err(e) => {
-                results.push(format!("  Not Updated: {}({}): {e}", res.name, res_domain));
-            }
-        }
+    let dest = PROFILE_YAMLS_PATH.join(format!("{profile_name}.yaml"));
+    if dest.exists() {
+        anyhow::bail!(
+            "Profile '{profile_name}' already exists in profile_yamls/"
+        );
     }
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::copy(source, &dest)?;
 
-    results
+    let mut pm = pm!();
+    pm.insert(profile_name, ProfileType::File);
+    pm.to_file()?;
+    Ok(pm.get(profile_name).unwrap())
+}
+
+pub struct UpdateResult {
+    pub name: String,
+    pub net_updates: Vec<crate::functions::file::net_resource::NetResourceUpdate>,
 }
 
 pub async fn update_profile(
     profile: Profile,
     with_proxy: bool,
-    remove_proxy_provider: bool,
-) -> anyhow::Result<String> {
-    let LocalProfile {
-        name,
-        dtype,
-        path,
-        content,
-    } = profile.load_local_profile()?;
-    // ensure path is valid
-    anyhow::ensure!(
-        path.is_absolute(),
-        "trying to call `download_blob` without absolute path"
-    );
-    let directory = path
-        .parent()
-        .ok_or(anyhow::anyhow!("trying to download to '/' is not allowed"))?;
-    if !directory.exists() {
-        std::fs::create_dir_all(directory)?;
-    }
-    // do update
-    let with_proxy = with_proxy
-        && crate::functions::restful::control::version().is_ok()
-        && crate::functions::restful::control::check_connectivity().is_ok();
-    let clash_cfg_dir = std::path::Path::new(&crate::config::CONFIG.cfg_file.basic.clash_config_dir);
-    match dtype {
-        // Imported file won't update, re-import and overwrite it if necessary
-        ProfileType::File => anyhow::bail!("Not upgradable"),
-        // Update via the given link
-        ProfileType::Url(url) => {
-            let lines = update_with(url, name, path, with_proxy, clash_cfg_dir, |url, with_proxy| {
-                crate::functions::restful::download::profile(url, with_proxy)
-            });
-            Ok(lines.join("\n"))
-        }
-        ProfileType::Generated(template_name) => {
-            // rebuild from template
-            use super::template::apply_template;
-            if let Err(e) = apply_template(template_name.clone()) {
-                anyhow::bail!("Failed to regenerate from {template_name}: {e}")
-            };
-            let content = if remove_proxy_provider {
-                use super::template::update_profile_without_pp;
+) -> anyhow::Result<UpdateResult> {
+    use super::template::fetch_net_resource_statuses;
 
-                update_profile_without_pp(content.unwrap_or_default(), with_proxy)?
-            } else {
-                content.unwrap_or_default()
-            };
-            serde_yml::to_writer(std::fs::File::create(path)?, &content)?;
-            Ok(format!("Regenerated: {}(From {template_name})", name))
+    let path = PROFILE_YAMLS_PATH.join(format!("{}.yaml", &profile.name));
+
+    if let ProfileType::Url(ref url) = profile.dtype {
+        let mut response = crate::functions::restful::download::profile(url, with_proxy)?;
+        let content: serde_yml::Mapping = serde_yml::from_reader(&mut response)
+            .map_err(|e| anyhow::anyhow!("Failed to parse downloaded profile YAML: {e}"))?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
         }
+        serde_yml::to_writer(std::fs::File::create(&path)?, &content)?;
     }
+
+    anyhow::ensure!(
+        path.exists(),
+        "Profile file not found: {}. Download it first.",
+        path.display()
+    );
+
+    let content: serde_yml::Mapping = {
+        let file = std::fs::File::open(&path)?;
+        serde_yml::from_reader(file)
+            .map_err(|e| anyhow::anyhow!("Failed to read profile YAML: {e}"))?
+    };
+
+    let net_updates = fetch_net_resource_statuses(&content, with_proxy).await;
+    serde_yml::to_writer(std::fs::File::create(&path)?, &content)?;
+    Ok(UpdateResult {
+        name: profile.name,
+        net_updates,
+    })
 }
 
-pub fn select(profile: Profile) -> anyhow::Result<()> {
+pub async fn select(profile: Profile) -> anyhow::Result<()> {
+    use super::template::{fetch_net_resource_statuses, update_profile_without_pp};
+
     let cfg = &crate::config::CONFIG.cfg_file.basic;
     let mut lprofile = profile.clone().load_local_profile()?;
+    anyhow::ensure!(
+        lprofile.content.is_some(),
+        "Profile {} is empty or not yet downloaded. Run update first.",
+        profile.name
+    );
+
+    if profile.no_pp {
+        let content = lprofile.content.take().unwrap_or_default();
+        let (new_content, _) = update_profile_without_pp(content, false).await?;
+        lprofile.content = Some(new_content);
+    } else if let Some(ref content) = lprofile.content {
+        fetch_net_resource_statuses(content, false).await;
+    }
+
+    rewrite_provider_paths(lprofile.content.as_mut());
+
     lprofile.merge(&crate::config::load_basic()?)?;
-    lprofile.path = cfg.clash_config_path.clone().into();
+    let out_path = std::path::absolute(std::path::PathBuf::from(&cfg.clash_config_path))
+        .map_err(|e| anyhow::anyhow!("Failed to resolve config path: {e}"))?;
+    lprofile.path = out_path.clone();
     lprofile.sync_to_disk()?;
     db::set_current(profile)?;
-    if let Err(e) = crate::functions::restful::config::reload(&cfg.clash_config_path) {
-        log::warn!("Failed to reload clash config: {e}");
-    }
+    crate::functions::restful::config::reload(&out_path.display().to_string())
+        .map_err(|e| anyhow::anyhow!("Config written but reload failed: {e}"))?;
     Ok(())
+}
+
+fn rewrite_provider_paths(content: Option<&mut serde_yml::Mapping>) {
+    let Some(content) = content else { return };
+    let cache = std::path::PathBuf::from(
+        &crate::config::CONFIG.cfg_file.basic.clash_config_dir,
+    );
+    for section in &["proxy-providers", "rule-providers"] {
+        let Some(serde_yml::Value::Mapping(providers)) = content.get_mut(*section) else {
+            continue;
+        };
+        for (_, v) in providers {
+            let Some(provider) = v.as_mapping_mut() else { continue };
+            let Some(path_val) = provider.get_mut("path") else { continue };
+            let Some(rel) = path_val.as_str() else { continue };
+            let abs_path = cache.join(rel);
+            *path_val = serde_yml::Value::String(abs_path.display().to_string());
+        }
+    }
 }
 
 pub fn extract_domain(url: &str) -> Option<&str> {

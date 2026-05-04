@@ -71,7 +71,17 @@ pub mod config {
                 .to_string(),
             ),
         )
-        .and_then(|r| r.as_str().map(|s| s.to_owned()))
+        .and_then(|r| {
+            if r.status_code >= 200 && r.status_code < 300 {
+                r.as_str().map(|s| s.to_owned()).map_err(|e| e.into())
+            } else {
+                let body = r.as_str().unwrap_or("(non-utf8 body)");
+                Err(minreq::Error::IoError(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("HTTP {}: {body}", r.status_code),
+                )))
+            }
+        })
     }
 
     pub fn patch(payload: String) -> Result<String> {

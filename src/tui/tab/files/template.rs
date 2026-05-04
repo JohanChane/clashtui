@@ -168,7 +168,8 @@ mod actions {
     type C = (<Template as DualTabContentMate>::Mate, Template);
 
     async fn generate(name: String) -> CB {
-        tri!(apply_template(name));
+        let profile_name = format!("{name}.generated");
+        tri!(apply_template(&name, &profile_name));
         sync!(C)
     }
 

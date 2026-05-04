@@ -1,0 +1,13 @@
+proxy-providers:
+  pvd:
+    tpl_param:
+    type: http
+    interval: 3600
+    url: https://example.com/sub1.yaml
+proxy-groups:
+  - name: Auto
+    type: url-test
+    tpl_param:
+      no_providers_here:
+    url: https://www.gstatic.com/generate_204
+    interval: 300

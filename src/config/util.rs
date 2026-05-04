@@ -7,9 +7,10 @@ pub mod defs {
     pub const LOG_FILE: &str = "clashtui.log";
     #[cfg(feature = "customized-theme")]
     pub const THEME_FILE: &str = "theme.yaml";
-    pub const PROFILE_DIR: &str = "profiles";
+    pub const PROFILE_YAMLS_DIR: &str = "profile_yamls";
     pub const TEMPLATE_DIR: &str = "templates";
     pub const KEYMAP_FILE: &str = "keymap.yaml";
+    pub const PROVIDER_CACHE_DIR: &str = "providers";
 }
 
 pub(super) fn load_home_dir() -> Result<std::path::PathBuf> {

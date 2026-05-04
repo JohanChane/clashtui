@@ -37,6 +37,47 @@ impl App {
             should_quit: false,
         }
     }
+    #[cfg(target_os = "linux")]
+    fn check_startup_perms(&self) {
+        let dir = std::path::Path::new(&crate::config::CONFIG.cfg_file.basic.clash_config_dir);
+        if crate::functions::command::check_file_permissions(dir) {
+            return;
+        }
+
+        let _ = crate::tui::hold(true);
+
+        use std::io::Write;
+        print!(
+            "File permissions in '{}' need repair. Fix now? [Y/n] ",
+            dir.display()
+        );
+        let _ = std::io::stdout().flush();
+
+        let mut input = String::new();
+        let _ = std::io::stdin().read_line(&mut input);
+
+        let _ = crate::tui::hold(false);
+
+        if input.trim().to_lowercase().as_str() != "y" {
+            return;
+        }
+
+        let Some(group) = crate::functions::command::get_dir_group_name(dir) else {
+            return;
+        };
+
+        if let Err(e) = crate::functions::command::repair_file_permissions(dir, &group) {
+            let _ = crate::tui::hold(true);
+            eprintln!("Error: {}", e);
+            use std::io::Read;
+            print!("Press Enter to continue...");
+            let _ = std::io::stdout().flush();
+            let _ = std::io::stdin().read(&mut [0u8]);
+            let _ = crate::tui::hold(false);
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    fn check_startup_perms(&self) {}
     #[tokio::main]
     pub async fn serve() -> anyhow::Result<()> {
         let mut app = Self::new();
@@ -45,7 +86,7 @@ impl App {
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
 
-        while !app.should_quit {
+        app.check_startup_perms();        while !app.should_quit {
             terminal.draw(|f| app.render(f))?;
             app.sync();
 

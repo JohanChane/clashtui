@@ -1,0 +1,86 @@
+proxy-providers:
+  pvd0:
+    type: http
+    interval: 3600
+    url: https://example.com/sub1.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+    path: proxy-providers/tpl/multi_provider_tpl/pvd0.yaml
+  pvd1:
+    type: http
+    interval: 3600
+    url: https://example.com/sub2.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+    path: proxy-providers/tpl/multi_provider_tpl/pvd1.yaml
+  pvd20:
+    type: http
+    interval: 7200
+    url: https://example.com/sub1.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 600
+    path: proxy-providers/tpl/multi_provider_tpl/pvd20.yaml
+  pvd21:
+    type: http
+    interval: 7200
+    url: https://example.com/sub2.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 600
+    path: proxy-providers/tpl/multi_provider_tpl/pvd21.yaml
+  static:
+    type: file
+    path: ./proxy-providers/static.yaml
+proxy-groups:
+  - name: Select
+    type: select
+    proxies:
+      - DIRECT
+      - Auto-pvd0
+      - Auto-pvd1
+      - Fallback-pvd20
+      - Fallback-pvd21
+  - name: Auto-pvd0
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    use:
+      - pvd0
+  - name: Auto-pvd1
+    type: url-test
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+    use:
+      - pvd1
+  - name: Fallback-pvd20
+    type: fallback
+    url: https://www.gstatic.com/generate_204
+    interval: 600
+    use:
+      - pvd20
+  - name: Fallback-pvd21
+    type: fallback
+    url: https://www.gstatic.com/generate_204
+    interval: 600
+    use:
+      - pvd21
+  - name: AllInOne
+    type: select
+    use:
+      - pvd0
+      - pvd1
+      - pvd20
+      - pvd21
+    proxies:
+      - DIRECT
+  - name: Direct
+    type: select
+    proxies:
+      - DIRECT

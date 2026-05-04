@@ -60,7 +60,7 @@ ratatui = { version = "0.29.0", features = [
     "crossterm",
 ], default-features = false, optional = true }
 futures-lite = { version = "2.6.0", default-features = false, optional = true }
-
+nix = { version = "0", features = ["user", "fs"] }
 
 [features]
 customized-theme = ["tui", "ratatui/serde"]

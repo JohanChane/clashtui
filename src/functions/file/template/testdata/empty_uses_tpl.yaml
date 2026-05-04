@@ -1,0 +1,31 @@
+proxy-providers:
+  pvd:
+    tpl_param:
+    type: http
+    interval: 3600
+    url: https://example.com/sub1.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+  static:
+    type: http
+    interval: 3600
+    url: https://static.example.com/proxy.yaml
+    path: ./proxy-providers/static.yaml
+proxy-groups:
+  - name: Select
+    type: select
+    proxies:
+      - DIRECT
+  - name: Auto
+    type: url-test
+    tpl_param:
+      providers:
+        - pvd
+    url: https://www.gstatic.com/generate_204
+    interval: 300
+  - name: Direct
+    type: select
+    proxies:
+      - DIRECT

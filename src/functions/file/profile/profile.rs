@@ -5,8 +5,8 @@ use crate::config::database::{Profile, ProfileType};
 
 impl Profile {
     pub fn load_local_profile(self) -> anyhow::Result<LocalProfile> {
-        use super::PROFILE_PATH;
-        let path = PROFILE_PATH.join(&self.name);
+        use super::PROFILE_YAMLS_PATH;
+        let path = PROFILE_YAMLS_PATH.join(format!("{}.yaml", &self.name));
         let mut lpf = LocalProfile::from_pf(self, path);
         lpf.sync_from_disk()?;
         Ok(lpf)
@@ -85,7 +85,7 @@ impl LocalProfile {
         Ok(serde_yml::to_writer(fp, &content)?)
     }
     pub fn from_pf(pf: Profile, path: std::path::PathBuf) -> Self {
-        let Profile { name, dtype } = pf;
+        let Profile { name, dtype, .. } = pf;
         Self {
             name,
             dtype,
@@ -97,19 +97,17 @@ impl LocalProfile {
     pub fn sync_from_disk(&mut self) -> anyhow::Result<()> {
         if self.path.is_file() {
             let fp = File::open(&self.path)?;
-            self.content = serde_yml::from_reader(fp).ok();
+            self.content = Some(serde_yml::from_reader(fp)?);
         }
         Ok(())
     }
 }
 
 impl ProfileType {
-    /// if [ProfileType::is_upgradable], return [Some]
     pub fn get_domain(&self) -> Option<String> {
         match self {
             ProfileType::File => None,
             ProfileType::Url(url) => extract_domain(url).map(|s| s.to_owned()),
-            ProfileType::Generated(name) => Some(format!("From template {name}")),
         }
     }
 }

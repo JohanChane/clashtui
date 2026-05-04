@@ -6,12 +6,59 @@ pub enum ResourceSection {
     RuleProvider,
 }
 
+impl std::fmt::Display for ResourceSection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ResourceSection::ProxyProvider => write!(f, "proxy-provider"),
+            ResourceSection::RuleProvider => write!(f, "rule-provider"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NetResource {
     pub name: String,
     pub url: String,
     pub path: String,
     pub section: ResourceSection,
+}
+
+#[derive(Clone, Debug)]
+pub struct NetResourceUpdate {
+    pub name: String,
+    pub url: String,
+    pub path: String,
+    pub section: ResourceSection,
+    pub ok: bool,
+    pub error: Option<String>,
+}
+
+pub fn format_net_updates(updates: &[NetResourceUpdate]) -> String {
+    updates
+        .iter()
+        .map(|u| {
+            let domain = extract_domain(&u.url).unwrap_or(&u.url);
+            if u.ok {
+                format!("  {} {} {}: ok", u.section, u.name, domain)
+            } else {
+                format!(
+                    "  {} {} {}: FAILED — {}",
+                    u.section,
+                    u.name,
+                    domain,
+                    u.error.as_deref().unwrap_or("unknown")
+                )
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn extract_domain(url: &str) -> Option<&str> {
+    let rest = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))?;
+    rest.split('/').next()
 }
 
 pub trait ExtractNetResources {

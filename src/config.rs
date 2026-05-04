@@ -3,7 +3,7 @@
 //! * [`ProfileManager`] clashtui.db
 //! * [`log`] clashtui.log
 //! * [`ConfigFile`] config.yaml
-//! * `Folder` profiles/
+//! * `Folder` profile_yamls/
 //! * `Folder` templates/
 
 use anyhow::{Context, Result, ensure};
@@ -53,9 +53,25 @@ pub struct Config {
 
 impl Config {
     fn load() -> Result<Self> {
-        let cfg_file = ConfigFile::from_file()?;
+        let mut cfg_file = ConfigFile::from_file()?;
         let basic_info = BasicInfo::from_file()?;
         let data = ProfileManager::from_file()?.into();
+        if !cfg_file.basic.clash_config_path.is_empty() {
+            cfg_file.basic.clash_config_path = std::path::absolute(
+                std::path::PathBuf::from(&cfg_file.basic.clash_config_path),
+            )
+            .context("Failed to resolve clash_config_path")?
+            .display()
+            .to_string();
+        }
+        if !cfg_file.basic.clash_config_dir.is_empty() {
+            cfg_file.basic.clash_config_dir = std::path::absolute(
+                std::path::PathBuf::from(&cfg_file.basic.clash_config_dir),
+            )
+            .context("Failed to resolve clash_config_dir")?
+            .display()
+            .to_string();
+        }
         Ok(Self {
             cfg_file,
             data,
@@ -115,7 +131,7 @@ pub fn init_config() -> Result<()> {
     ProfileManager::default().to_file()?;
 
     fs::create_dir(path.join(defs::TEMPLATE_DIR))?;
-    fs::create_dir(path.join(defs::PROFILE_DIR))?;
+    fs::create_dir(path.join(defs::PROFILE_YAMLS_DIR))?;
 
     Ok(())
 }
@@ -124,11 +140,17 @@ pub fn init_config() -> Result<()> {
 pub fn theme_path() -> PathBuf {
     DATA_DIR.get().unwrap().join(defs::TEMPLATE_DIR)
 }
-pub fn profile_path() -> PathBuf {
-    DATA_DIR.get().unwrap().join(defs::PROFILE_DIR)
-}
 pub fn template_path() -> PathBuf {
     DATA_DIR.get().unwrap().join(defs::TEMPLATE_DIR)
+}
+pub fn profile_yamls_path() -> PathBuf {
+    DATA_DIR.get().unwrap().join(defs::PROFILE_YAMLS_DIR)
+}
+pub fn provider_cache_path() -> PathBuf {
+    DATA_DIR.get().unwrap().join(defs::PROVIDER_CACHE_DIR)
+}
+pub fn template_proxy_providers_path() -> PathBuf {
+    DATA_DIR.get().unwrap().join(defs::TEMPLATE_DIR).join("template_proxy_providers")
 }
 pub fn load_basic() -> anyhow::Result<serde_yml::Mapping> {
     let fp = std::fs::File::open(DATA_DIR.get().unwrap().join(defs::BASIC_FILE))?;

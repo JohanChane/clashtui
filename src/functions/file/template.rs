@@ -1,4 +1,4 @@
-use super::{MAX_SUPPORTED_TEMPLATE_VERSION, PROFILE_PATH, TEMPLATE_PATH};
+use super::{MAX_SUPPORTED_TEMPLATE_VERSION, PROFILE_YAMLS_PATH, TEMPLATE_PATH};
 use crate::config::database::ProfileType;
 
 mod version1;
@@ -44,78 +44,51 @@ pub fn create_template(path: String) -> anyhow::Result<Option<String>> {
         ),
     }
 }
-pub fn apply_template(name: String) -> anyhow::Result<()> {
-    let path = TEMPLATE_PATH.join(&name);
-    let file =
-        std::fs::File::open(&path).inspect_err(|e| log::error!("Founding template {name}:{e}"))?;
+pub fn apply_template(template_name: &str, profile_name: &str) -> anyhow::Result<()> {
+    let path = TEMPLATE_PATH.join(template_name);
+    let file = std::fs::File::open(&path)
+        .inspect_err(|e| log::error!("Founding template {template_name}:{e}"))?;
     let map: serde_yml::Mapping = serde_yml::from_reader(file)?;
-    let local_urls = super::profile::db::get_all()
-        .into_iter()
-        .flat_map(|pf| {
-            if let ProfileType::Url(url) = pf.dtype {
-                Some((pf.name, url))
-            } else {
-                None
-            }
-        })
-        .collect();
     let gened = match map
         .get("clashtui_template_version")
         .and_then(|v| v.as_u64())
     {
-        None | Some(1) => version1::gen_template(map, &name, local_urls)?,
+        None | Some(1) => version1::gen_template(map, template_name)?,
         Some(_) => unimplemented!(),
     };
-    let gened_name = format!("{name}.clashtui_generated");
-    let path = PROFILE_PATH.join(&gened_name);
-    serde_yml::to_writer(std::fs::File::create(path)?, &gened)?;
+    let output_path = PROFILE_YAMLS_PATH.join(format!("{profile_name}.yaml"));
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    serde_yml::to_writer(std::fs::File::create(&output_path)?, &gened)?;
     let mut pm = pm!();
-    pm.insert(gened_name, ProfileType::Generated(name));
+    pm.insert(profile_name, ProfileType::File);
     pm.to_file()?;
-    Ok(())
-}
-
-pub fn edit_uses(name: String, profiles: Vec<String>) -> anyhow::Result<()> {
-    let path = TEMPLATE_PATH.join(&name);
-    let file =
-        std::fs::File::open(&path).inspect_err(|e| log::error!("Founding template {name}:{e}"))?;
-    let mut map: serde_yml::Mapping = serde_yml::from_reader(file)?;
-
-    let uses = map
-        .entry("clashtui".into())
-        .or_insert(serde_yml::Value::Mapping(Default::default()))
-        .as_mapping_mut()
-        .ok_or(anyhow::anyhow!("'clashtui' is not a map"))?
-        .entry("uses".into())
-        .or_insert(serde_yml::Value::Sequence(Default::default()))
-        .as_sequence_mut()
-        .ok_or(anyhow::anyhow!("'uses' is not a array"))?;
-    uses.clear();
-    uses.extend(profiles.into_iter().map(|s| s.into()));
-
-    let file = std::fs::File::create(&path)
-        .inspect_err(|e| log::error!("Founding template {name}:{e}"))?;
-    serde_yml::to_writer(file, &map)?;
     Ok(())
 }
 
 const PROXY_PROVIDERS: &str = "proxy-providers";
 const PROXY_GROUPS: &str = "proxy-groups";
 const PROXIES: &str = "proxies";
+const RULE_PROVIDERS: &str = "rule-providers";
+const RULES: &str = "rules";
 
-/// Remove `proxy-providers` and combine their contents into one file
-///
-/// Return combined file content
-pub fn update_profile_without_pp(
+/// Remove net resource sections (`proxy-providers`, `rule-providers`) and embed
+/// their remote content into the profile YAML. Also saves each downloaded
+/// resource to the provider cache directory.
+/// Downloads all resources in parallel via `spawn_blocking`.
+/// Returns modified YAML mapping and per-resource update status.
+pub async fn update_profile_without_pp(
     mut tpl: serde_yml::Mapping,
     with_proxy: bool,
-) -> anyhow::Result<serde_yml::Mapping> {
+) -> anyhow::Result<(serde_yml::Mapping, Vec<crate::functions::file::net_resource::NetResourceUpdate>)> {
+    use crate::functions::file::net_resource::{NetResourceUpdate, ResourceSection};
     use std::collections::HashMap;
 
-    // why we define these again?
-    // the content may change between versions
-    // but only a small part will be used in this function
-    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    let mut statuses: Vec<NetResourceUpdate> = Vec::new();
+
+    // --- Proxy-Providers ---
+    #[derive(serde::Deserialize, Debug)]
     struct PPitem {
         url: Option<String>,
         #[serde(flatten)]
@@ -131,75 +104,311 @@ pub fn update_profile_without_pp(
         __others: serde_yml::Value,
     }
 
-    let Some(pps) = tpl.remove(PROXY_PROVIDERS) else {
-        // if there is not proxy-providers in file, just return
-        return Ok(tpl);
-    };
-    let pps: HashMap<String, PPitem> = serde_yml::from_value(pps)?;
-    // pp_name with proxies
-    let mut pp_proxies: HashMap<String, Vec<serde_yml::Value>> = HashMap::new();
-    for (pp_name, pp) in pps {
-        let Some(url) = pp.url else {
-            continue;
-        };
-        let mut loaded: serde_yml::Mapping =
-            match crate::functions::restful::download::profile(&url, with_proxy) {
-                Ok(rdr) => serde_yml::from_reader(rdr)?,
-                Err(e) => {
-                    log::error!("Failed to download remote profile: {e}");
-                    continue;
-                }
-            };
+    let pp_proxies = if let Some(pps) = tpl.remove(PROXY_PROVIDERS) {
+        let pps: HashMap<String, PPitem> = serde_yml::from_value(pps)?;
 
-        let loaded_proxies: Vec<serde_yml::Value> = loaded
+        let mut download_handles = Vec::new();
+        for (pp_name, pp) in pps {
+            let Some(url) = pp.url else { continue; };
+            let pp_name_clone = pp_name.clone();
+            let pp_path = pp
+                .__others
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned();
+            let cfg_dir = std::path::PathBuf::from(
+                &crate::config::CONFIG.cfg_file.basic.clash_config_dir,
+            );
+            download_handles.push(tokio::task::spawn_blocking(move || {
+                if !pp_path.is_empty() {
+                    let dest = cfg_dir.join(&pp_path);
+                    if let Ok(buf) = std::fs::read(&dest) {
+                        if let Ok(yaml) = serde_yml::from_slice::<serde_yml::Mapping>(&buf) {
+                            return (pp_name_clone, url, pp_path, Ok(yaml));
+                        }
+                    }
+                }
+                match crate::functions::restful::download::profile(&url, with_proxy) {
+                    Ok(mut rdr) => {
+                        let mut buf = Vec::new();
+                        if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
+                            return (
+                                pp_name_clone,
+                                url,
+                                pp_path,
+                                Err(e.to_string()),
+                            );
+                        }
+                        if !pp_path.is_empty() {
+                            let dest = cfg_dir.join(&pp_path);
+                            if let Some(parent) = dest.parent() {
+                                let _ = std::fs::create_dir_all(parent);
+                            }
+                            let _ = std::fs::write(&dest, &buf);
+                        }
+                        let yaml = serde_yml::from_slice::<serde_yml::Mapping>(&buf).map_err(|e| e.to_string());
+                        (pp_name_clone, url, pp_path, yaml)
+                    }
+                    Err(e) => (pp_name_clone, url, pp_path, Err(e.to_string())),
+                }
+            }));
+        }
+
+        let mut pp_proxies: HashMap<String, Vec<serde_yml::Value>> = HashMap::new();
+        for handle in download_handles {
+            let (pp_name, url, pp_path, result) = handle.await?;
+            match result {
+                Ok(mut loaded) => {
+                    let loaded_proxies: Vec<serde_yml::Value> = loaded
+                        .remove(PROXIES)
+                        .and_then(|v| serde_yml::from_value(v).ok())
+                        .unwrap_or_default();
+                    let renamed_proxies = loaded_proxies
+                        .into_iter()
+                        .map(|mut proxy| {
+                            if let Some(serde_yml::Value::String(name)) = proxy.get_mut("name") {
+                                name.insert_str(0, pp_name.as_str());
+                            }
+                            proxy
+                        })
+                        .collect();
+                    pp_proxies.insert(pp_name.clone(), renamed_proxies);
+                    statuses.push(NetResourceUpdate {
+                        name: pp_name,
+                        url,
+                        path: pp_path,
+                        section: ResourceSection::ProxyProvider,
+                        ok: true,
+                        error: None,
+                    });
+                }
+                Err(e) => {
+                    statuses.push(NetResourceUpdate {
+                        name: pp_name,
+                        url,
+                        path: pp_path,
+                        section: ResourceSection::ProxyProvider,
+                        ok: false,
+                        error: Some(e),
+                    });
+                }
+            }
+        }
+        pp_proxies
+    } else {
+        HashMap::new()
+    };
+
+    if !pp_proxies.is_empty() {
+        let pgs = tpl
+            .remove(PROXY_GROUPS)
+            .ok_or(anyhow::anyhow!("{PROXY_GROUPS} not found"))?;
+        let mut pgs: Vec<PGitem> = serde_yml::from_value(pgs)?;
+        for pg in &mut pgs {
+            let mut proxies = pg.proxies.take().unwrap_or_default();
+            if let Some(uses) = pg.us_.take() {
+                for pp_name in uses {
+                    proxies.extend(
+                        pp_proxies
+                            .get(&pp_name)
+                            .iter()
+                            .flat_map(|v| v.iter())
+                            .filter_map(|proxy| proxy.get("name"))
+                            .map(|name| name.as_str().unwrap().to_owned()),
+                    );
+                }
+            }
+            if proxies.is_empty() {
+                pg.proxies = Some(vec!["COMPATIBLE".to_owned()]);
+            } else {
+                pg.proxies = Some(proxies);
+            }
+        }
+        tpl.insert(PROXY_GROUPS.into(), serde_yml::to_value(pgs)?);
+
+        let mut tpl_proxies: Vec<serde_yml::Value> = tpl
             .remove(PROXIES)
             .and_then(|v| serde_yml::from_value(v).ok())
             .unwrap_or_default();
-        log::warn!("{:?}", loaded_proxies);
-        let renamed_proxies = loaded_proxies
-            .into_iter()
-            .map(|mut proxy| {
-                if let Some(serde_yml::Value::String(name)) = proxy.get_mut("name") {
-                    name.insert_str(0, pp_name.as_str());
-                }
-                proxy
-            })
-            .collect();
-        pp_proxies.insert(pp_name, renamed_proxies);
+        tpl_proxies.extend(pp_proxies.into_values().flatten());
+        tpl.insert(PROXIES.into(), tpl_proxies.into());
     }
 
-    let pgs = tpl
-        .remove(PROXY_GROUPS)
-        .ok_or(anyhow::anyhow!("{PROXY_GROUPS} not found"))?;
-    let mut pgs: Vec<PGitem> = serde_yml::from_value(pgs)?;
-    for pg in &mut pgs {
-        let mut proxies = pg.proxies.take().unwrap_or_default();
-        if let Some(uses) = pg.us_.take() {
-            for pp_name in uses {
-                proxies.extend(
-                    pp_proxies
-                        .get(&pp_name)
-                        .iter()
-                        .flat_map(|v| v.iter())
-                        .filter_map(|proxy| proxy.get("name"))
-                        .map(|name| name.as_str().unwrap().to_owned()),
-                );
+    // --- Rule-Providers ---
+    #[derive(serde::Deserialize, Debug)]
+    struct RPitem {
+        url: Option<String>,
+        #[serde(flatten)]
+        __others: serde_yml::Value,
+    }
+
+    if let Some(rps) = tpl.remove(RULE_PROVIDERS) {
+        let rps: HashMap<String, RPitem> = serde_yml::from_value(rps)?;
+
+        let mut download_handles = Vec::new();
+        for (rp_name, rp) in rps {
+            let Some(url) = rp.url else { continue; };
+            let rp_name_clone = rp_name.clone();
+            let rp_path = rp
+                .__others
+                .get("path")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_owned();
+            let cfg_dir = std::path::PathBuf::from(
+                &crate::config::CONFIG.cfg_file.basic.clash_config_dir,
+            );
+            download_handles.push(tokio::task::spawn_blocking(move || {
+                if !rp_path.is_empty() {
+                    let dest = cfg_dir.join(&rp_path);
+                    if let Ok(buf) = std::fs::read(&dest) {
+                        if let Ok(yaml) = serde_yml::from_slice::<serde_yml::Mapping>(&buf) {
+                            return (rp_name_clone, url, rp_path, Ok(yaml));
+                        }
+                    }
+                }
+                match crate::functions::restful::download::profile(&url, with_proxy) {
+                    Ok(mut rdr) => {
+                        let mut buf = Vec::new();
+                        if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
+                            return (
+                                rp_name_clone,
+                                url,
+                                rp_path,
+                                Err(e.to_string()),
+                            );
+                        }
+                        if !rp_path.is_empty() {
+                            let dest = cfg_dir.join(&rp_path);
+                            if let Some(parent) = dest.parent() {
+                                let _ = std::fs::create_dir_all(parent);
+                            }
+                            let _ = std::fs::write(&dest, &buf);
+                        }
+                        let yaml = serde_yml::from_slice::<serde_yml::Mapping>(&buf).map_err(|e| e.to_string());
+                        (rp_name_clone, url, rp_path, yaml)
+                    }
+                    Err(e) => (rp_name_clone, url, rp_path, Err(e.to_string())),
+                }
+            }));
+        }
+
+        let mut all_rules: Vec<serde_yml::Value> = Vec::new();
+        for handle in download_handles {
+            let (rp_name, url, rp_path, result) = handle.await?;
+            match result {
+                Ok(mut loaded) => {
+                    let rules: Vec<serde_yml::Value> = loaded
+                        .remove("payload")
+                        .or_else(|| loaded.remove(RULES))
+                        .and_then(|v| serde_yml::from_value(v).ok())
+                        .unwrap_or_default();
+                    all_rules.extend(rules);
+                    statuses.push(NetResourceUpdate {
+                        name: rp_name,
+                        url,
+                        path: rp_path,
+                        section: ResourceSection::RuleProvider,
+                        ok: true,
+                        error: None,
+                    });
+                }
+                Err(e) => {
+                    statuses.push(NetResourceUpdate {
+                        name: rp_name,
+                        url,
+                        path: rp_path,
+                        section: ResourceSection::RuleProvider,
+                        ok: false,
+                        error: Some(e),
+                    });
+                }
             }
         }
-        if proxies.is_empty() {
-            pg.proxies = Some(vec!["COMPATIBLE".to_owned()]);
-        } else {
-            pg.proxies = Some(proxies);
+        if !all_rules.is_empty() {
+            let mut existing_rules: Vec<serde_yml::Value> = tpl
+                .remove(RULES)
+                .and_then(|v| serde_yml::from_value(v).ok())
+                .unwrap_or_default();
+            existing_rules.extend(all_rules);
+            tpl.insert(RULES.into(), existing_rules.into());
         }
     }
-    tpl.insert(PROXY_GROUPS.into(), serde_yml::to_value(pgs)?);
 
-    let mut tpl_proxies: Vec<serde_yml::Value> = tpl
-        .remove(PROXIES)
-        .and_then(|v| serde_yml::from_value(v).ok())
-        .unwrap_or_default();
-    tpl_proxies.extend(pp_proxies.into_values().flatten());
-    tpl.insert(PROXIES.into(), tpl_proxies.into());
+    Ok((tpl, statuses))
+}
 
-    Ok(tpl)
+/// Extract net resource URLs from a YAML profile and download them in
+/// parallel to collect status. Saves each downloaded resource to the
+/// provider cache directory, keyed by its `path` field.
+pub async fn fetch_net_resource_statuses(
+    yaml: &serde_yml::Mapping,
+    with_proxy: bool,
+) -> Vec<crate::functions::file::net_resource::NetResourceUpdate> {
+    use crate::functions::file::net_resource::{ExtractNetResources, NetResourceUpdate, ResourceSection};
+
+    let resources =
+        yaml.extract(&[ResourceSection::ProxyProvider, ResourceSection::RuleProvider]);
+
+    if resources.is_empty() {
+        return Vec::new();
+    }
+
+    let mut handles = Vec::with_capacity(resources.len());
+    for resource in resources {
+        let url = resource.url;
+        let name = resource.name;
+        let path = std::path::PathBuf::from(&crate::config::CONFIG.cfg_file.basic.clash_config_dir)
+            .join(&resource.path);
+        let section = resource.section;
+        handles.push(tokio::task::spawn_blocking(move || {
+            match crate::functions::restful::download::profile(&url, with_proxy) {
+                Ok(mut rdr) => {
+                    let mut buf = Vec::new();
+                    if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
+                        return (name, url, path, section, false, Some(e.to_string()));
+                    }
+                    if let Some(parent) = path.parent() {
+                        if let Err(e) = std::fs::create_dir_all(parent) {
+                            return (name, url, path, section, false, Some(e.to_string()));
+                        }
+                    }
+                    match std::fs::write(&path, &buf) {
+                        Ok(()) => (name, url, path, section, true, None),
+                        Err(e) => (name, url, path, section, false, Some(e.to_string())),
+                    }
+                }
+                Err(e) => (name, url, path, section, false, Some(e.to_string())),
+            }
+        }));
+    }
+
+    let mut statuses = Vec::with_capacity(handles.len());
+    for handle in handles {
+        let (name, url, path, section, ok, error) = match handle.await {
+            Ok(v) => v,
+            Err(e) => {
+                statuses.push(NetResourceUpdate {
+                    name: String::new(),
+                    url: String::new(),
+                    path: String::new(),
+                    section: ResourceSection::ProxyProvider,
+                    ok: false,
+                    error: Some(e.to_string()),
+                });
+                continue;
+            }
+        };
+        statuses.push(NetResourceUpdate {
+            path: path.display().to_string(),
+            name,
+            url,
+            section,
+            ok,
+            error,
+        });
+    }
+
+    statuses
 }

@@ -1,0 +1,21 @@
+proxy-providers:
+  static:
+    type: http
+    interval: 3600
+    url: https://static.example.com/proxy.yaml
+    path: ./proxy-providers/static.yaml
+  another:
+    type: http
+    interval: 7200
+    url: https://another.example.com/proxy.yaml
+    path: ./proxy-providers/another.yaml
+proxy-groups:
+  - name: Select
+    type: select
+    proxies:
+      - DIRECT
+      - REJECT
+  - name: Direct
+    type: select
+    proxies:
+      - DIRECT

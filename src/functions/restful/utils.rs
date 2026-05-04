@@ -13,7 +13,9 @@ pub fn request(
 ) -> Result<minreq::Response> {
     let mut req = minreq::Request::new(method, CONFIG.external_controller.clone() + sub_url);
     if let Some(kv) = payload {
-        req = req.with_body(kv);
+        req = req
+            .with_header("Content-Type", "application/json")
+            .with_body(kv);
     }
     if let Some(s) = CONFIG.secret.as_ref() {
         req = req.with_header(headers::AUTHORIZATION, format!("Bearer {s}"));
