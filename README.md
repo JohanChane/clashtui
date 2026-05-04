@@ -78,8 +78,8 @@ bash /tmp/install -u
 
 ## Trying new things
 
-- [dev](https://github.com/JohanChane/clashtui/tree/dev)
-- [clashcli](https://github.com/JohanChane/clashtui/tree/aio)
+- [demotui](https://github.com/JohanChane/demotui): New framework for clashtui (in development)
+- [dev](https://github.com/JohanChane/clashtui/tree/dev): Will eventually be replaced by demotui
 
 ## Project Disclaimer
 

@@ -74,8 +74,8 @@ bash /tmp/install -u
 
 ## 尝试新东西
 
--   [dev](https://github.com/JohanChane/clashtui/tree/dev)
--   [clashcli](https://github.com/JohanChane/clashtui/tree/aio)
+- [demotui](https://github.com/JohanChane/demotui): clashtui 的新框架 (开发中)
+- [dev](https://github.com/JohanChane/clashtui/tree/dev): 最终会被 demotui 取代
 
 ## 项目免责声明
 
