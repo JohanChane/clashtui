@@ -38,10 +38,10 @@ pub enum Key {
     Search,
 }
 
-impl TryFrom<&KeyEvent> for Key {
+impl TryFrom<&crate::tui::Key> for Key {
     type Error = ();
 
-    fn try_from(ev: &KeyEvent) -> Result<Self, Self::Error> {
+    fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
         let agent = agent();
         if !agent.is_empty() {
             return agent.get(ev).map(|act| *act).ok_or(());

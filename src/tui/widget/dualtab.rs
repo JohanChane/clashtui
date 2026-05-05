@@ -1,6 +1,5 @@
 pub use super::tab::*;
-use crate::tui::TuiWidget;
-use crossterm::event::KeyEvent;
+use crate::tui::{Key, TuiWidget};
 use ratatui::prelude::{Frame, Rect};
 
 pub trait DualTabContent: BasicTabContent
@@ -101,7 +100,7 @@ where
         }
     }
 
-    pub fn dispatch_shortcut(&mut self, seq: &[KeyEvent]) {
+    pub fn dispatch_shortcut(&mut self, seq: &[Key]) {
         if self.is_focus_on_c1 {
             for (s, key, _) in C1::all_shortcuts() {
                 if &**s == seq {
@@ -139,7 +138,7 @@ where
     C1: DualTabContent<Mate = C2>,
     C2: DualTabContentMate<Mate = C1>,
 {
-    fn handle_key_event(&mut self, kv: &KeyEvent) {
+    fn handle_key_event(&mut self, kv: &Key) {
         if self.is_focus_on_c1 {
             if let Ok(key) = C1::Key::try_from(kv) {
                 if DualTabContent::handle_key_event(

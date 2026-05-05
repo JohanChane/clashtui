@@ -9,22 +9,21 @@
 //! new_type_impl_tuiwidget!(TheTab);
 //! ```
 
-use crate::tui::TuiWidget;
-use crossterm::event::KeyEvent;
+use crate::tui::{Key, TuiWidget};
 use ratatui::prelude::{Frame, Rect};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct KeyCombo(pub Vec<KeyEvent>);
+pub struct KeyCombo(pub Vec<Key>);
 
 impl std::ops::Deref for KeyCombo {
-    type Target = [KeyEvent];
-    fn deref(&self) -> &[KeyEvent] {
+    type Target = [Key];
+    fn deref(&self) -> &[Key] {
         &self.0
     }
 }
 
 pub trait BasicTabContent: 'static {
-    type Key: for<'a> TryFrom<&'a KeyEvent, Error = ()> + Copy;
+    type Key: for<'a> TryFrom<&'a Key, Error = ()> + Copy;
     type State;
 
     const TITLE: &str;
@@ -65,7 +64,7 @@ impl<C> TuiWidget for Tab<C>
 where
     C: TabContent,
 {
-    fn handle_key_event(&mut self, kv: &KeyEvent) {
+    fn handle_key_event(&mut self, kv: &Key) {
         if let Ok(key) = C::Key::try_from(kv) {
             self.content
                 .handle_key_event(key, &mut self.tasks, &mut self.state)
@@ -113,7 +112,7 @@ impl<C: TabContent> Tab<C> {
         &self.shortcuts
     }
 
-    pub fn dispatch_shortcut(&mut self, seq: &[KeyEvent]) {
+    pub fn dispatch_shortcut(&mut self, seq: &[Key]) {
         for (s, key, _) in C::all_shortcuts() {
             if &**s == seq {
                 self.content

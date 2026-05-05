@@ -1,19 +1,21 @@
-use crossterm::event::KeyEvent;
 use utils::*;
 
 mod agent;
 mod app;
+mod key;
 mod popmsg;
+mod signals;
 mod tab;
 mod theme;
 mod utils;
 mod widget;
 
 pub use app::App;
+pub use key::Key;
 pub use theme::Theme;
 
 trait TuiWidget {
-    fn handle_key_event(&mut self, kv: &KeyEvent);
+    fn handle_key_event(&mut self, kv: &Key);
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect);
     fn sync(&mut self);
 }

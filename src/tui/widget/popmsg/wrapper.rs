@@ -1,4 +1,5 @@
 use super::*;
+use crate::tui::Key;
 use crate::tui::theme::Theme;
 use crossterm::event::KeyCode;
 use ratatui::layout::{Constraint, Layout};
@@ -8,13 +9,13 @@ use ratatui::widgets::{Clear, Paragraph};
 pub type Wrapped = Box<dyn Wrapper + Send>;
 
 pub trait Wrapper {
-    fn handle_key_event(&mut self, kv: &KeyEvent) -> Route;
+    fn handle_key_event(&mut self, kv: &Key) -> Route;
     fn render(&mut self, f: &mut Frame);
     fn send(self: Box<Self>);
 }
 
 impl<C: Msg> Wrapper for Instance<C> {
-    fn handle_key_event(&mut self, kv: &KeyEvent) -> Route {
+    fn handle_key_event(&mut self, kv: &Key) -> Route {
         if matches!(kv.code, KeyCode::Tab) {
             self.is_focus_prompt = (!self.is_focus_prompt) && self.prompt.is_some();
             return Route::Keep;
@@ -99,7 +100,7 @@ impl Prompt {
             offset: (0, 0),
         }
     }
-    fn handle_key_event(&mut self, kv: &KeyEvent) -> Route {
+    fn handle_key_event(&mut self, kv: &Key) -> Route {
         match kv.code {
             KeyCode::Up => self.offset.0 = self.offset.0.saturating_sub(1),
             KeyCode::Down => self.offset.0 += 1,

@@ -7,10 +7,10 @@ newtype_tab!(StatusTab(Tab<Status>));
 #[derive(Clone, Copy)]
 enum Key {}
 
-impl TryFrom<&KeyEvent> for Key {
+impl TryFrom<&crate::tui::Key> for Key {
     type Error = ();
 
-    fn try_from(_: &KeyEvent) -> Result<Self, Self::Error> {
+    fn try_from(_: &crate::tui::Key) -> Result<Self, Self::Error> {
         Err(())
     }
 }

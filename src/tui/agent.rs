@@ -30,11 +30,11 @@ pub fn get(value: &mut serde_yml::Mapping, idx: &str) -> Result<serde_yml::Mappi
 
 #[test]
 fn example() -> anyhow::Result<()> {
-    use crossterm::event::*;
     use std::collections::HashMap;
+    use crate::tui::Key;
 
     #[derive(serde::Deserialize, Debug)]
-    enum Key {
+    enum K {
         Select,
     }
 
@@ -43,18 +43,19 @@ keymap:
   file:
     profile:
       ? code: Enter
-        modifiers: ''
-        kind: Press
-        state: ''
+        shift: false
+        ctrl: false
+        alt: false
+        super_: false
       : Select
 "#;
     let value =
         serde_yml::from_str::<serde_yml::Mapping>(str)?["keymap"]["file"]["profile"].clone();
-    let keymap: HashMap<KeyEvent, Key> = serde_yml::from_value(value)?;
+    let keymap: HashMap<Key, K> = serde_yml::from_value(value)?;
     println!("{:?}", keymap);
     assert!(matches!(
-        keymap.get(&KeyEvent::new(KeyCode::Enter, KeyModifiers::empty())),
-        Some(Key::Select)
+        keymap.get(&Key { code: crossterm::event::KeyCode::Enter, shift: false, ctrl: false, alt: false, super_: false }),
+        Some(K::Select)
     ));
     Ok(())
 }

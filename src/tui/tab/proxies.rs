@@ -44,10 +44,10 @@ enum Key {
     Refresh,
 }
 
-impl TryFrom<&KeyEvent> for Key {
+impl TryFrom<&crate::tui::Key> for Key {
     type Error = ();
 
-    fn try_from(ev: &KeyEvent) -> Result<Self, Self::Error> {
+    fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
         let agent = agent();
         if !agent.is_empty() {
             return agent.get(ev).map(|act| *act).ok_or(());
@@ -714,21 +714,23 @@ impl Proxies {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::tui::Key as TuiKey;
     use crate::tui::widget::{chord::ChordHandler, tab::KeyCombo};
-    use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+    use crossterm::event::KeyCode;
 
-    fn mk_kev(code: KeyCode) -> KeyEvent {
-        KeyEvent::new_with_kind_and_state(code, KeyModifiers::empty(), KeyEventKind::Press, KeyEventState::empty())
+    use super::{Key, Proxies, Tab, agent};
+
+    fn mk_key(code: KeyCode) -> TuiKey {
+        TuiKey { code, shift: false, ctrl: false, alt: false, super_: false }
     }
 
     fn make_shortcuts() -> Vec<(KeyCombo, &'static str)> {
-        Proxies::all_shortcuts().iter().map(|(c, _, d)| (c.clone(), *d)).collect()
+        all_shortcuts().iter().map(|(c, _, d)| (c.clone(), *d)).collect()
     }
 
     #[test]
     fn all_shortcuts_contains_chords() {
-        let descs: Vec<&str> = Proxies::all_shortcuts().iter()
+        let descs: Vec<&str> = all_shortcuts().iter()
             .filter(|(_, k, _)| matches!(k, Key::CollapseAll | Key::ExpandAll))
             .map(|(_, _, d)| *d)
             .collect();
@@ -738,53 +740,53 @@ mod tests {
     #[test]
     fn single_key_shortcuts_in_agent() {
         let a = agent();
-        assert!(a.contains_key(&mk_kev(KeyCode::Char('j'))));
+        assert!(a.contains_key(&mk_key(KeyCode::Char('j'))));
     }
 
     #[test]
     fn try_from_uses_agent() {
-        let kev = mk_kev(KeyCode::Char('j'));
+        let kev = mk_key(KeyCode::Char('j'));
         let key = Key::try_from(&kev);
         assert!(matches!(key, Ok(Key::MoveDown)));
     }
 
     #[test]
     fn chords_not_in_try_from() {
-        let kev = mk_kev(KeyCode::Char('a'));
+        let kev = mk_key(KeyCode::Char('a'));
         let key = Key::try_from(&kev);
         assert!(key.is_err());
     }
 
     #[test]
     fn dispatch_shortcut_matches_chord() {
-        let seq: Vec<KeyEvent> = vec![mk_kev(KeyCode::Char('a')), mk_kev(KeyCode::Char('f'))];
-        let found = Proxies::all_shortcuts().iter().any(|(combo, _, _)| &**combo == seq);
+        let seq: Vec<TuiKey> = vec![mk_key(KeyCode::Char('a')), mk_key(KeyCode::Char('f'))];
+        let found = all_shortcuts().iter().any(|(combo, _, _)| &**combo == seq);
         assert!(found, "dispatch_shortcut should find (a,f) chord");
     }
 
     #[test]
     fn chord_handler_a_initiates_chord_mode() {
-        let a = mk_kev(KeyCode::Char('a'));
+        let a = mk_key(KeyCode::Char('a'));
         let shortcuts = make_shortcuts();
         let mut ch = ChordHandler::default();
-        let mut dispatched: Vec<Vec<KeyEvent>> = vec![];
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
         let consumed = ch.handle(&a, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
         assert!(consumed, "chord should consume 'a'");
         assert!(dispatched.is_empty(), "no dispatch on first key");
         assert!(ch.is_active(), "chord should be active after 'a'");
         assert_eq!(ch.pressed.len(), 1);
-        assert_eq!(ch.candidates.len(), 4, "should have 4 candidates: ToggleSort, CollapseAll, ExpandAll, TestAllDelay");
+        assert_eq!(ch.candidates.len(), 3, "should have 3 candidates: CollapseAll, ExpandAll, TestAllDelay");
     }
 
     #[test]
     fn chord_handler_as_dispatches_toggle_sort() {
-        let a = mk_kev(KeyCode::Char('a'));
-        let s = mk_kev(KeyCode::Char('s'));
+        let s1 = mk_key(KeyCode::Char('s'));
+        let s2 = mk_key(KeyCode::Char('s'));
         let shortcuts = make_shortcuts();
         let mut ch = ChordHandler::default();
-        let mut dispatched: Vec<Vec<KeyEvent>> = vec![];
-        ch.handle(&a, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
-        let consumed = ch.handle(&s, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
+        ch.handle(&s1, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = ch.handle(&s2, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
         assert!(consumed);
         assert_eq!(dispatched.len(), 1);
         assert_eq!(dispatched[0].len(), 2);
@@ -793,11 +795,11 @@ mod tests {
 
     #[test]
     fn chord_handler_af_dispatches_collapse_all() {
-        let a = mk_kev(KeyCode::Char('a'));
-        let f = mk_kev(KeyCode::Char('f'));
+        let a = mk_key(KeyCode::Char('a'));
+        let f = mk_key(KeyCode::Char('f'));
         let shortcuts = make_shortcuts();
         let mut ch = ChordHandler::default();
-        let mut dispatched: Vec<Vec<KeyEvent>> = vec![];
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
         ch.handle(&a, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
         let consumed = ch.handle(&f, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
         assert!(consumed);
@@ -808,11 +810,11 @@ mod tests {
 
     #[test]
     fn chord_handler_ae_dispatches_expand_all() {
-        let a = mk_kev(KeyCode::Char('a'));
-        let e = mk_kev(KeyCode::Char('e'));
+        let a = mk_key(KeyCode::Char('a'));
+        let e = mk_key(KeyCode::Char('e'));
         let shortcuts = make_shortcuts();
         let mut ch = ChordHandler::default();
-        let mut dispatched: Vec<Vec<KeyEvent>> = vec![];
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
         ch.handle(&a, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
         let consumed = ch.handle(&e, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
         assert!(consumed);
@@ -823,7 +825,7 @@ mod tests {
 
     #[test]
     fn s_no_longer_a_single_key_shortcut() {
-        let kev = mk_kev(KeyCode::Char('s'));
+        let kev = mk_key(KeyCode::Char('s'));
         assert!(Key::try_from(&kev).is_err(), "'s' should no longer be a single-key shortcut");
     }
 
@@ -835,17 +837,17 @@ mod tests {
         let shortcuts = tab.shortcuts();
         assert!(!shortcuts.is_empty(), "Tab<Proxies>::shortcuts() should not be empty");
         let has_chord = shortcuts.iter().any(|(combo, _)| {
-            combo.len() > 1 && combo[0] == mk_kev(KeyCode::Char('a'))
+            combo.len() > 1 && combo[0] == mk_key(KeyCode::Char('a'))
         });
         assert!(has_chord, "Tab<Proxies>::shortcuts() should contain 'a' chord entries");
     }
 
     #[test]
     fn chord_handler_a_single_key_still_works() {
-        let j = mk_kev(KeyCode::Char('j'));
+        let j = mk_key(KeyCode::Char('j'));
         let shortcuts = make_shortcuts();
         let mut ch = ChordHandler::default();
-        let mut dispatched: Vec<Vec<KeyEvent>> = vec![];
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
         let consumed = ch.handle(&j, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
         assert!(consumed);
         assert_eq!(dispatched.len(), 1);

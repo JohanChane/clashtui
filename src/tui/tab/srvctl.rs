@@ -1,5 +1,4 @@
 use super::dev::*;
-use crossterm::event::KeyEventKind;
 use ratatui::{text::Line, widgets::ListItem};
 
 newtype_tab!(SrvCtlTab(Tab<SrvCtlContent>));
@@ -22,16 +21,13 @@ pub(super) enum SrvCtlKey {
     MoveDown,
 }
 
-impl TryFrom<&KeyEvent> for SrvCtlKey {
+impl TryFrom<&crate::tui::Key> for SrvCtlKey {
     type Error = ();
 
-    fn try_from(ev: &KeyEvent) -> Result<Self, Self::Error> {
+    fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
         let agent = agent();
         if !agent.is_empty() {
             return agent.get(ev).map(|k| *k).ok_or(());
-        }
-        if ev.kind != KeyEventKind::Press {
-            return Err(());
         }
         Ok(match ev.code {
             KeyCode::Enter => Self::Execute,

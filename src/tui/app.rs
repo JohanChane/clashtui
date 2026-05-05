@@ -1,17 +1,20 @@
 use super::*;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use tab::prelude::*;
 use tokio::sync::Notify;
 use widget::chord::ChordHandler;
 use widget::help::HelpPanel;
 use widget::popmsg::PopUp;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::KeyCode;
+use Key;
 
 // 50fps
 const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
 pub(super) static FULL_RENDER: Notify = Notify::const_new();
 pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
+pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
+pub(crate) static RESIZE: AtomicBool = AtomicBool::new(false);
 
 pub struct App {
     tabs: Vec<Tab>,
@@ -20,7 +23,6 @@ pub struct App {
     help: HelpPanel,
 
     tab_index: u8,
-    should_quit: bool,
 }
 
 impl App {
@@ -37,7 +39,6 @@ impl App {
             chord: ChordHandler::default(),
             help: HelpPanel::default(),
             tab_index: 0,
-            should_quit: false,
         }
     }
     #[cfg(target_os = "linux")]
@@ -83,13 +84,19 @@ impl App {
     fn check_startup_perms(&self) {}
     #[tokio::main]
     pub async fn serve() -> anyhow::Result<()> {
+        signals::Signals::start()?;
         let mut app = Self::new();
         let mut events = crossterm::event::EventStream::new();
         let mut invt = tokio::time::interval(TICK_RATE);
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
 
-        app.check_startup_perms();        while !app.should_quit {
+        app.check_startup_perms();
+        while !QUIT.load(Ordering::Relaxed) {
+            if RESIZE.swap(false, Ordering::Relaxed) {
+                terminal.autoresize()?;
+            }
+
             terminal.draw(|f| app.render(f))?;
             app.sync();
 
@@ -112,9 +119,12 @@ impl App {
                 Event::Key(key_event) => {
                     #[cfg(debug_assertions)]
                     the_egg(key_event.code);
-                    app.handle_key_event(&key_event);
+                    let key: Key = key_event.into();
+                    app.handle_key_event(&key);
                 }
-                Event::Resize(..) => terminal.autoresize()?,
+                Event::Resize(..) => {
+                    RESIZE.store(true, Ordering::Relaxed);
+                }
                 _ => (),
             }
         }
@@ -125,7 +135,7 @@ impl App {
 
     /// KeyEvent Route:
     /// PopUp(0) → Help(1) → Which(2) → Tab(3) → Global(4)
-    fn handle_key_event(&mut self, kv: &KeyEvent) {
+    fn handle_key_event(&mut self, kv: &Key) {
         if self.popup.check() {
             self.popup.handle_key_event(kv);
             return;
@@ -244,26 +254,35 @@ impl App {
         widget::help::render_help(f, tab);
     }
     /// Global layer (4) — last resort: Tab switch, Quit, Help
-    fn handle_global_kv(&mut self, kv: &KeyEvent) -> bool {
-        if matches!(kv.kind, crossterm::event::KeyEventKind::Press) {
-            use crossterm::event::KeyCode;
-            const TAB_COUNT: u8 = 5;
-            match kv.code {
-                KeyCode::Char(c @ '1'..='5') => self.tab_index = c as u8 - '1' as u8,
-                KeyCode::Tab => {
-                    if self.tab_index == TAB_COUNT - 1 {
-                        self.tab_index = 0
-                    } else {
-                        self.tab_index += 1
-                    }
-                }
-                KeyCode::Char('q') => self.should_quit = true,
-                KeyCode::Char('?') => self.help.toggle(),
-                _ => return false,
+    fn handle_global_kv(&mut self, kv: &Key) -> bool {
+        const TAB_COUNT: u8 = 5;
+        match kv.code {
+            KeyCode::Char(c @ '1'..='5') if !kv.ctrl && !kv.alt && !kv.super_ => {
+                self.tab_index = c as u8 - '1' as u8;
+                return true;
             }
-            return true;
+            KeyCode::Tab if !kv.ctrl && !kv.alt && !kv.super_ => {
+                if self.tab_index == TAB_COUNT - 1 {
+                    self.tab_index = 0;
+                } else {
+                    self.tab_index += 1;
+                }
+                return true;
+            }
+            KeyCode::Char('q') if !kv.ctrl && !kv.alt && !kv.super_ => {
+                QUIT.store(true, Ordering::Relaxed);
+                return true;
+            }
+            KeyCode::Char('c') if kv.ctrl && !kv.alt && !kv.super_ => {
+                QUIT.store(true, Ordering::Relaxed);
+                return true;
+            }
+            KeyCode::Char('?') if !kv.ctrl && !kv.alt && !kv.super_ => {
+                self.help.toggle();
+                return true;
+            }
+            _ => false,
         }
-        false
     }
     fn sync(&mut self) {
         SPINNER_FRAME.fetch_add(1, Ordering::Relaxed);
@@ -327,13 +346,8 @@ fn the_egg(key: crossterm::event::KeyCode) {
 mod tests {
     use super::*;
 
-    fn kev(code: KeyCode) -> KeyEvent {
-        KeyEvent::new_with_kind_and_state(
-            code,
-            crossterm::event::KeyModifiers::empty(),
-            KeyEventKind::Press,
-            crossterm::event::KeyEventState::empty(),
-        )
+    fn kev(code: KeyCode) -> Key {
+        Key { code, shift: false, ctrl: false, alt: false, super_: false }
     }
 
     #[test]
@@ -341,8 +355,8 @@ mod tests {
         let g = kev(KeyCode::Char('g'));
         let e = kev(KeyCode::Char('e'));
 
-        let vec: Vec<KeyEvent> = vec![g, e];
-        let slice: &[KeyEvent] = &[g, e];
+        let vec: Vec<Key> = vec![g, e];
+        let slice: &[Key] = &[g, e];
 
         assert_eq!(vec, slice);
         assert_eq!(&vec, slice);

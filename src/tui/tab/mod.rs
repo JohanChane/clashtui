@@ -1,7 +1,8 @@
 mod dev {
     pub use crate::tui::widget::dualtab::*;
     pub use crate::tui::widget::tab::*;
-    pub use crossterm::event::{KeyCode, KeyEvent};
+    pub use crate::tui::Key as TuiKey;
+    pub use crossterm::event::KeyCode;
     pub use ratatui::prelude::{Frame, Rect};
     pub use ratatui::style::{Color, Stylize as _};
     pub use ratatui::widgets::{Block, List, ListState, StatefulWidget};
@@ -36,21 +37,26 @@ macro_rules! mod_agent {
     ($ident:ident, [$($tokens:tt)*]) => {
 mod agent {
     use super::*;
-    use crossterm::event::*;
     use std::collections::HashMap;
     use std::sync::OnceLock;
 
-    pub type Agent = HashMap<KeyEvent, $ident>;
+    pub type Agent = HashMap<crate::tui::Key, $ident>;
 
     static AGENT: OnceLock<Agent> = OnceLock::new();
 
-    fn quick_map(code: KeyCode) -> KeyEvent {
-        KeyEvent::new_with_kind_and_state(
+    fn key_from_str(s: &str) -> crate::tui::Key {
+        use std::str::FromStr;
+        crate::tui::Key::from_str(s).expect("invalid key string in mod_agent!")
+    }
+
+    fn quick_map(code: KeyCode) -> crate::tui::Key {
+        crate::tui::Key {
             code,
-            KeyModifiers::empty(),
-            KeyEventKind::Press,
-            KeyEventState::empty(),
-        )
+            shift: matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase()),
+            ctrl: false,
+            alt: false,
+            super_: false,
+        }
     }
 
     fn default_agent() -> Agent {
@@ -89,6 +95,10 @@ pub use agent::{init as agent_init};
         $m.insert(quick_map($code), $map);
         mod_agent!(@agent $m, $($rest)*);
     };
+    (@agent $m:ident, (key($s:literal), $map:expr, $desc:expr) $($rest:tt)*) => {
+        $m.insert(key_from_str($s), $map);
+        mod_agent!(@agent $m, $($rest)*);
+    };
     (@agent $m:ident, ([$($codes:expr),+], $map:expr, $desc:expr) $($rest:tt)*) => {
         mod_agent!(@agent $m, $($rest)*);
     };
@@ -100,6 +110,10 @@ pub use agent::{init as agent_init};
     // ---- tt-muncher: shortcuts (both single-key and chords) ----
     (@shortcuts $v:ident, ([$($codes:expr),+], $map:expr, $desc:expr) $($rest:tt)*) => {
         $v.push((KeyCombo(vec![$(quick_map($codes)),+]), $map, $desc));
+        mod_agent!(@shortcuts $v, $($rest)*);
+    };
+    (@shortcuts $v:ident, (key($s:literal), $map:expr, $desc:expr) $($rest:tt)*) => {
+        $v.push((KeyCombo(vec![key_from_str($s)]), $map, $desc));
         mod_agent!(@shortcuts $v, $($rest)*);
     };
     (@shortcuts $v:ident, , $($rest:tt)*) => {
@@ -125,7 +139,7 @@ macro_rules! newtype_tab {
                 self.0.shortcuts()
             }
 
-            fn dispatch_shortcut(&mut self, seq: &[crossterm::event::KeyEvent]) {
+            fn dispatch_shortcut(&mut self, seq: &[crate::tui::Key]) {
                 self.0.dispatch_shortcut(seq)
             }
         }
@@ -146,7 +160,7 @@ macro_rules! newtype_tab {
                 self.0.shortcuts()
             }
 
-            fn dispatch_shortcut(&mut self, seq: &[crossterm::event::KeyEvent]) {
+            fn dispatch_shortcut(&mut self, seq: &[crate::tui::Key]) {
                 self.0.dispatch_shortcut(seq)
             }
         }
@@ -156,7 +170,7 @@ macro_rules! newtype_tab {
 pub trait TuiTab: super::TuiWidget {
     fn title(&self) -> &'static str;
     fn shortcuts(&self) -> &[(KeyCombo, &'static str)];
-    fn dispatch_shortcut(&mut self, seq: &[crossterm::event::KeyEvent]);
+    fn dispatch_shortcut(&mut self, seq: &[crate::tui::Key]);
 }
 
 mod connections;
@@ -180,7 +194,7 @@ macro_rules! enum_dispatch {
     })+
 
     impl crate::tui::TuiWidget for Tab {
-        fn handle_key_event(&mut self, kv: &crossterm::event::KeyEvent) {
+        fn handle_key_event(&mut self, kv: &crate::tui::Key) {
             match self {
                 $(Self::$item(inner) => inner.handle_key_event(kv),)+
             }
@@ -212,7 +226,7 @@ macro_rules! enum_dispatch {
             }
         }
 
-        fn dispatch_shortcut(&mut self, seq: &[crossterm::event::KeyEvent]) {
+        fn dispatch_shortcut(&mut self, seq: &[crate::tui::Key]) {
             match self {
                 $(Self::$item(inner) => inner.dispatch_shortcut(seq),)+
             }

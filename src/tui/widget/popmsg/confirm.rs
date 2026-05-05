@@ -20,7 +20,7 @@ impl Confirm {
 impl Msg for Confirm {
     type Result = ();
 
-    fn match_key_event(&mut self, kv: &KeyEvent) -> Route {
+    fn match_key_event(&mut self, kv: &Key) -> Route {
         if matches!(kv.code, KeyCode::Enter | KeyCode::Esc | KeyCode::Char(' ')) {
             Route::Drop
         } else {

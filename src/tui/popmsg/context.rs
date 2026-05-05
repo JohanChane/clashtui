@@ -1,4 +1,5 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crate::tui::Key;
+use crossterm::event::KeyCode;
 
 pub struct Context {
     pub widget: WidgetState,
@@ -7,7 +8,7 @@ pub struct Context {
 }
 impl Context {
     /// Should not be called in [Cell](super::Cell)
-    pub fn handle_key_event(&mut self, kv: &KeyEvent) {
+    pub fn handle_key_event(&mut self, kv: &Key) {
         if !self.focus_on_text {
             self.widget.handle_key_event(kv);
         } else if let Some(text) = self.text.as_mut() {
@@ -55,7 +56,7 @@ pub struct TextState {
     page_size: u8,
 }
 impl TextState {
-    fn handle_key_event(&mut self, kv: &KeyEvent) {
+    fn handle_key_event(&mut self, kv: &Key) {
         match kv.code {
             KeyCode::Down => {}
             KeyCode::Up => {}

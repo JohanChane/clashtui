@@ -3,7 +3,8 @@ mod input;
 
 mod dev {
     pub use crate::tui::widget::popmsg::{Msg, MsgBuilder, Route};
-    pub use crossterm::event::{KeyCode, KeyEvent};
+    pub use crate::tui::Key;
+    pub use crossterm::event::KeyCode;
     pub use ratatui::prelude::{Frame, Rect};
     pub use ratatui::widgets::Block;
     pub use tokio::sync::oneshot::Sender;

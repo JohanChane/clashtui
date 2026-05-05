@@ -1,5 +1,5 @@
+use crate::tui::Key;
 use crate::tui::TuiWidget;
-use crossterm::event::KeyEvent;
 use ratatui::prelude::{Frame, Rect};
 use ratatui::widgets::Block;
 use std::sync::{LazyLock, Mutex, mpsc};
@@ -28,7 +28,7 @@ pub enum Route {
 pub trait Msg {
     type Result;
 
-    fn match_key_event(&mut self, kv: &KeyEvent) -> Route;
+    fn match_key_event(&mut self, kv: &Key) -> Route;
     fn send(self, tx: Sender<Self::Result>);
     fn render(&self, f: &mut Frame, area: Rect, block: Block, is_focused: bool);
     /// (Width, Height)
@@ -47,7 +47,7 @@ impl PopUp {
 }
 
 impl TuiWidget for PopUp {
-    fn handle_key_event(&mut self, kv: &KeyEvent) {
+    fn handle_key_event(&mut self, kv: &Key) {
         if let Some(instance) = self.content.last_mut() {
             match instance.handle_key_event(kv) {
                 Route::Keep => {}

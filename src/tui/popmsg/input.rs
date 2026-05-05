@@ -14,7 +14,7 @@ pub struct Input {
 impl Msg for Input {
     type Result = String;
 
-    fn match_key_event(&mut self, kv: &KeyEvent) -> Route {
+    fn match_key_event(&mut self, kv: &Key) -> Route {
         match kv.code {
             KeyCode::Enter => return Route::Send,
             KeyCode::Esc => return Route::Drop,
@@ -108,7 +108,7 @@ pub struct InputMasked {
 impl Msg for InputMasked {
     type Result = String;
 
-    fn match_key_event(&mut self, kv: &KeyEvent) -> Route {
+    fn match_key_event(&mut self, kv: &Key) -> Route {
         match kv.code {
             KeyCode::Enter => return Route::Send,
             KeyCode::Esc => return Route::Drop,

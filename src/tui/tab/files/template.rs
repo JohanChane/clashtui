@@ -35,18 +35,15 @@ pub enum Key {
     Action(Action),
 }
 
-impl TryFrom<&KeyEvent> for Key {
+impl TryFrom<&crate::tui::Key> for Key {
     type Error = ();
 
-    fn try_from(value: &KeyEvent) -> Result<Self, Self::Error> {
+    fn try_from(value: &crate::tui::Key) -> Result<Self, Self::Error> {
         let agent = agent();
         if !agent.is_empty() {
             return agent.get(value).map(|act| *act).ok_or(());
         }
 
-        if value.kind != crossterm::event::KeyEventKind::Press {
-            return Err(());
-        }
         Ok(match value.code {
             KeyCode::Enter => Self::Select,
             KeyCode::Right | KeyCode::Left => Self::Switch,

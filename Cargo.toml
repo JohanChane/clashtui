@@ -60,12 +60,16 @@ ratatui = { version = "0.29.0", features = [
     "crossterm",
 ], default-features = false, optional = true }
 futures-lite = { version = "2.6.0", default-features = false, optional = true }
+signal-hook-tokio = { version = "0", features = ["futures-v0_3"], optional = true }
 nix = { version = "0", features = ["user", "fs"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [features]
 customized-theme = ["tui", "ratatui/serde"]
 migration_v0_2_3 = []
-tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-lite"]
+tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-lite", "dep:signal-hook-tokio"]
 
 deprecated = ["dep:url-parse", "dep:base64"]
 
