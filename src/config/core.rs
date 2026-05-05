@@ -6,6 +6,7 @@ pub struct ConfigFile {
     pub basic: Basic,
     pub service: Service,
     pub timeout: Option<u64>,
+    pub test_url: Option<String>,
     pub extra: Extra,
     #[serde(skip_serializing)]
     pub hack: Hack,
@@ -16,6 +17,7 @@ impl Default for ConfigFile {
             basic: Default::default(),
             service: Default::default(),
             timeout: Default::default(),
+            test_url: Default::default(),
             extra: Default::default(),
             hack: Default::default(),
         }

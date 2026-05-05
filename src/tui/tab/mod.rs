@@ -31,6 +31,16 @@ macro_rules! tri {
             }
         }
     };
+    ($e:expr, or_set) => {
+        match $e {
+            Ok(v) => v,
+            Err(e) => {
+                return wrapper(move |content: &mut Self| {
+                    content.error = Some(e.to_string());
+                });
+            }
+        }
+    };
 }
 
 macro_rules! mod_agent {

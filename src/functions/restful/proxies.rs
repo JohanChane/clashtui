@@ -113,7 +113,7 @@ pub fn test_proxy_delay(name: &str, url: Option<&str>, timeout: u64) -> Result<O
         let delay = v.get("delay").and_then(|d| {
             d.as_u64().or_else(|| d.as_str().and_then(|s| s.parse().ok()))
         });
-        Ok(delay)
+        Ok(delay.filter(|&d| d > 0))
     })
 }
 
@@ -129,7 +129,7 @@ pub fn test_group_delay(name: &str, url: Option<&str>, timeout: u64) -> Result<H
         let map = v.as_object().map(|obj| {
             obj.iter().filter_map(|(k, v)| {
                 let delay = v.as_u64().or_else(|| v.as_str().and_then(|s| s.parse().ok()))?;
-                Some((k.clone(), delay))
+                if delay > 0 { Some((k.clone(), delay)) } else { None }
             }).collect()
         }).unwrap_or_default();
         Ok(map)
