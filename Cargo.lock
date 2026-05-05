@@ -281,6 +281,7 @@ dependencies = [
  "signal-hook-tokio",
  "strum",
  "tokio",
+ "unicode-width 0.2.0",
  "url-parse",
 ]
 

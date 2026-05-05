@@ -6,7 +6,7 @@ use widget::chord::ChordHandler;
 use widget::help::HelpPanel;
 use widget::popmsg::PopUp;
 
-use crossterm::event::KeyCode;
+use crossterm::event::{KeyCode, KeyEventKind};
 use Key;
 
 // 50fps
@@ -116,7 +116,7 @@ impl App {
 
             use crossterm::event::Event;
             match ev {
-                Event::Key(key_event) => {
+                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                     #[cfg(debug_assertions)]
                     the_egg(key_event.code);
                     let key: Key = key_event.into();

@@ -719,6 +719,7 @@ mod tests {
     use crossterm::event::KeyCode;
 
     use super::{Key, Proxies, Tab, agent};
+    use super::all_shortcuts;
 
     fn mk_key(code: KeyCode) -> TuiKey {
         TuiKey { code, shift: false, ctrl: false, alt: false, super_: false }
