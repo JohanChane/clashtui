@@ -90,7 +90,7 @@ impl std::fmt::Display for Mode {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, strum::VariantArray)]
 #[serde(rename_all = "lowercase")]
 pub enum LogLevel {
     Silent,

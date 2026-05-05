@@ -1,5 +1,6 @@
 use super::dev::*;
-use ratatui::{text::Line, widgets::ListItem};
+use ratatui::text::Line;
+use ratatui::widgets::ListItem;
 
 newtype_tab!(SrvCtlTab(Tab<SrvCtlContent>));
 
@@ -7,6 +8,7 @@ mod_agent!(
     SrvCtlKey,
     [
         ([KeyCode::Enter], SrvCtlKey::Execute, "Execute selected operation"),
+        ([KeyCode::Esc], SrvCtlKey::Esc, ""),
         ([KeyCode::Up], SrvCtlKey::MoveUp, ""),
         ([KeyCode::Down], SrvCtlKey::MoveDown, ""),
         ([KeyCode::Char('k')], SrvCtlKey::MoveUp, ""),
@@ -19,6 +21,7 @@ pub(super) enum SrvCtlKey {
     Execute,
     MoveUp,
     MoveDown,
+    Esc,
 }
 
 impl TryFrom<&crate::tui::Key> for SrvCtlKey {
@@ -31,6 +34,7 @@ impl TryFrom<&crate::tui::Key> for SrvCtlKey {
         }
         Ok(match ev.code {
             KeyCode::Enter => Self::Execute,
+            KeyCode::Esc => Self::Esc,
             KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
             KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
             _ => return Err(()),
@@ -74,7 +78,12 @@ impl SrvCtlOp {
         }
     }
     fn all() -> Vec<Self> {
-        vec![Self::Stop, Self::Restart, Self::SetPermission, Self::FixFilePermissions]
+        vec![
+            Self::Stop,
+            Self::Restart,
+            Self::SetPermission,
+            Self::FixFilePermissions,
+        ]
     }
 }
 
@@ -149,6 +158,7 @@ impl TabContent for SrvCtlContent {
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
     ) {
+        // ---- main list routing ----
         match key {
             SrvCtlKey::MoveUp => {
                 let i = state.selected().unwrap_or(0);
@@ -164,6 +174,7 @@ impl TabContent for SrvCtlContent {
                 let Some(idx) = state.selected() else { return };
                 let Some(op) = self.ops.get(idx) else { return };
                 let op = *op;
+
                 let bin_path = self.bin_path.clone();
                 let config_dir = crate::config::CONFIG.cfg_file.basic.clash_config_dir.clone();
                 let needs_sudo = !self.is_user;
@@ -266,6 +277,7 @@ impl TabContent for SrvCtlContent {
                 }
                 .spawn_at(task_set);
             }
+            _ => {}
         }
     }
 

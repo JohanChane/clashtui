@@ -176,6 +176,7 @@ pub trait TuiTab: super::TuiWidget {
 mod connections;
 mod files;
 mod proxies;
+mod settings;
 mod srvctl;
 mod status;
 
@@ -241,6 +242,7 @@ pub mod prelude {
     pub use super::connections::ConnectionsTab;
     pub use super::files::FileTab;
     pub use super::proxies::ProxiesTab;
+    pub use super::settings::SettingsTab;
     pub use super::srvctl::SrvCtlTab;
     pub use super::status::StatusTab;
 
@@ -261,6 +263,11 @@ pub mod prelude {
             super::srvctl::agent_init(keys);
         }
 
+        if let Ok(map) = crate::tui::agent::get(keymap, "settings") {
+            let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
+            super::settings::agent_init(keys);
+        }
+
         Ok(())
     }
 
@@ -269,6 +276,7 @@ pub mod prelude {
             ConnectionsTab,
             FileTab,
             ProxiesTab,
+            SettingsTab,
             SrvCtlTab,
             StatusTab,
         }
