@@ -75,8 +75,17 @@ pub fn set_permission(bin_path: &str, password: Option<&str>) -> Result<String> 
 }
 
 pub fn edit(path: &str) -> Result<()> {
+    log::debug!("edit: path={path} cmd={}", CONFIG.cfg_file.extra.edit_cmd);
     spawn(
         "sh",
-        vec!["-c", CONFIG.cfg_file.edit_cmd.replace("%s", path).as_str()],
+        vec!["-c", CONFIG.cfg_file.extra.edit_cmd.replace("%s", path).as_str()],
+    )
+}
+
+pub fn open_dir(path: &str) -> Result<()> {
+    log::debug!("open_dir: path={path} cmd={}", CONFIG.cfg_file.extra.open_dir_cmd);
+    spawn(
+        "sh",
+        vec!["-c", CONFIG.cfg_file.extra.open_dir_cmd.replace("%s", path).as_str()],
     )
 }

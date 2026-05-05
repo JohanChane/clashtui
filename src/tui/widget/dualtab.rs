@@ -101,9 +101,11 @@ where
     }
 
     pub fn dispatch_shortcut(&mut self, seq: &[Key]) {
+        log::debug!("dispatch_shortcut: seq={seq:?} focus_c1={}", self.is_focus_on_c1);
         if self.is_focus_on_c1 {
-            for (s, key, _) in C1::all_shortcuts() {
+            for (s, key, desc) in C1::all_shortcuts() {
                 if &**s == seq {
+                    log::debug!("dispatch_shortcut: matched C1 '{desc}'");
                     if DualTabContent::handle_key_event(
                         &mut self.content.0,
                         *key,
@@ -116,8 +118,9 @@ where
                 }
             }
         } else {
-            for (s, key, _) in C2::all_shortcuts() {
+            for (s, key, desc) in C2::all_shortcuts() {
                 if &**s == seq {
+                    log::debug!("dispatch_shortcut: matched C2 '{desc}'");
                     if DualTabContentMate::handle_key_event(
                         &mut self.content.1,
                         *key,

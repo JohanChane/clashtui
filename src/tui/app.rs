@@ -1,5 +1,6 @@
 use super::*;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::LazyLock;
 use tab::prelude::*;
 use tokio::sync::Notify;
 use widget::chord::ChordHandler;
@@ -7,6 +8,7 @@ use widget::help::HelpPanel;
 use widget::popmsg::PopUp;
 
 use crossterm::event::{KeyCode, KeyEventKind};
+use widget::tab::KeyCombo;
 use Key;
 
 // 50fps
@@ -16,10 +18,39 @@ pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
 pub(crate) static RESIZE: AtomicBool = AtomicBool::new(false);
 
+static GLOBAL_CHORD_SHORTCUTS: LazyLock<Vec<(KeyCombo, &str)>> = LazyLock::new(|| {
+    fn ctrl(c: char) -> Key {
+        Key {
+            code: KeyCode::Char(c),
+            shift: false,
+            ctrl: true,
+            alt: false,
+            super_: false,
+        }
+    }
+    fn plain(c: char) -> Key {
+        Key {
+            code: KeyCode::Char(c),
+            shift: false,
+            ctrl: false,
+            alt: false,
+            super_: false,
+        }
+    }
+    vec![
+        (KeyCombo(vec![ctrl('g'), plain('c')]), "Open app config dir"),
+        (
+            KeyCombo(vec![ctrl('g'), plain('m')]),
+            "Open clash config dir",
+        ),
+    ]
+});
+
 pub struct App {
     tabs: Vec<Tab>,
     popup: PopUp,
     chord: ChordHandler,
+    global_chord: ChordHandler,
     help: HelpPanel,
 
     tab_index: u8,
@@ -37,6 +68,7 @@ impl App {
             ],
             popup: PopUp::default(),
             chord: ChordHandler::default(),
+            global_chord: ChordHandler::default(),
             help: HelpPanel::default(),
             tab_index: 0,
         }
@@ -134,11 +166,38 @@ impl App {
     }
 
     /// KeyEvent Route:
-    /// PopUp(0) → Help(1) → Which(2) → Tab(3) → Global(4)
+    /// PopUp(0) → GlobalChord(0.5) → Help(1) → Which(2) → Tab(3) → Global(4)
     fn handle_key_event(&mut self, kv: &Key) {
+        log::debug!("K: {kv}");
+
         if self.popup.check() {
             self.popup.handle_key_event(kv);
             return;
+        }
+
+        {
+            let shortcuts_ptr: *const [(KeyCombo, &str)] =
+                GLOBAL_CHORD_SHORTCUTS.as_slice() as *const _;
+            if self.global_chord.handle(kv, unsafe { &*shortcuts_ptr }, &mut |seq| {
+                log::debug!("global_chord dispatch: {seq:?}");
+                match seq.last().and_then(|k| k.plain()) {
+                    Some('c') => {
+                        log::debug!("open_dir: config dir");
+                        let _ = crate::functions::command::open_dir(
+                            crate::config::config_dir_path().to_str().unwrap(),
+                        );
+                    }
+                    Some('m') => {
+                        log::debug!("open_dir: clash config dir");
+                        let _ = crate::functions::command::open_dir(
+                            &crate::config::CONFIG.cfg_file.basic.clash_config_dir,
+                        );
+                    }
+                    _ => {}
+                }
+            }) {
+                return;
+            }
         }
 
         if self.help.is_active() {
@@ -152,6 +211,7 @@ impl App {
         };
 
         if self.chord.handle(kv, unsafe { &*shortcuts_ptr }, &mut |seq| {
+            log::debug!("chord dispatch: {seq:?}");
             self.tabs[ti].dispatch_shortcut(seq);
         }) {
             return;
@@ -181,6 +241,10 @@ impl App {
 
         if self.chord.is_active() {
             self.render_which(f);
+        }
+
+        if self.global_chord.is_active() {
+            self.render_global_which(f);
         }
 
         if self.help.is_active() {
@@ -237,6 +301,64 @@ impl App {
                 .take(items_per_col)
                 .map(|(seq, desc)| {
                     let remaining = &seq[self.chord.pressed.len()..];
+                    let key_str: String = remaining
+                        .iter()
+                        .map(|k| key_event_to_str(k))
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    Line::from(format!(" {}  {}", key_str, desc))
+                })
+                .collect();
+
+            f.render_widget(Paragraph::new(lines), *col_area);
+        }
+    }
+
+    fn render_global_which(&self, f: &mut ratatui::Frame) {
+        use ratatui::layout::{Alignment, Constraint, Layout, Rect};
+        use ratatui::style::Stylize;
+        use ratatui::text::Line;
+        use ratatui::widgets::{Block, Clear, Paragraph};
+        use widget::chord::key_event_to_str;
+
+        let candidate_count = self.global_chord.candidates.len();
+        let cols = if candidate_count > 4 { 2 } else { 1 };
+
+        let total_height = ((candidate_count + cols - 1) / cols) as u16 + 2;
+        let total_width = if cols == 1 { 40 } else { 70 };
+
+        let area = f.area();
+        let popup_area = Rect {
+            x: area.x.saturating_add(area.width.saturating_sub(total_width) / 2),
+            y: area.y.saturating_add(area.height.saturating_sub(total_height) / 2),
+            width: total_width.min(area.width),
+            height: total_height.min(area.height),
+        };
+
+        f.render_widget(Clear, popup_area);
+
+        let block = Block::bordered()
+            .title(" Which? ")
+            .title_alignment(Alignment::Left);
+        f.render_widget(block.clone(), popup_area);
+
+        let inner = block.inner(popup_area);
+        let col_widths: Vec<_> = (0..cols)
+            .map(|_| Constraint::Ratio(1, cols as u32))
+            .collect();
+        let col_areas = Layout::horizontal(&col_widths).split(inner);
+
+        let items_per_col = (candidate_count + cols - 1) / cols;
+
+        for (col_idx, col_area) in col_areas.iter().enumerate().take(cols) {
+            let lines: Vec<Line> = self
+                .global_chord
+                .candidates
+                .iter()
+                .skip(col_idx * items_per_col)
+                .take(items_per_col)
+                .map(|(seq, desc)| {
+                    let remaining = &seq[self.global_chord.pressed.len()..];
                     let key_str: String = remaining
                         .iter()
                         .map(|k| key_event_to_str(k))

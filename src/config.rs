@@ -140,6 +140,9 @@ pub fn init_config() -> Result<()> {
 pub fn theme_path() -> PathBuf {
     DATA_DIR.get().unwrap().join(defs::TEMPLATE_DIR)
 }
+pub fn config_dir_path() -> PathBuf {
+    DATA_DIR.get().unwrap().clone()
+}
 pub fn template_path() -> PathBuf {
     DATA_DIR.get().unwrap().join(defs::TEMPLATE_DIR)
 }

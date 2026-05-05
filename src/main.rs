@@ -16,6 +16,16 @@ fn main() {
         return;
     }
 
+    let log_path = config::config_dir_path().join("clashtui.log");
+    let log_file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+        .expect("Failed to open log file");
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("warn"))
+        .target(env_logger::Target::Pipe(Box::new(log_file)))
+        .init();
+
     tui::init().unwrap();
 
     tui::App::serve().unwrap();

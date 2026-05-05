@@ -1,4 +1,5 @@
 use super::*;
+use crate::functions::command::edit;
 use crate::functions::file::template::*;
 
 mod_agent!(
@@ -9,6 +10,7 @@ mod_agent!(
         ([KeyCode::Down], Key::MoveDown, ""),
         ([KeyCode::Up], Key::MoveUp, ""),
         ([KeyCode::Char('d')], Key::Action(Action::Delete), ""),
+        ([KeyCode::Char('e')], Key::Action(Action::Edit), ""),
         ([KeyCode::Char('p')], Key::Action(Action::Preview), ""),
         ([KeyCode::Enter], Key::Action(Action::Generate), ""),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
@@ -16,16 +18,17 @@ mod_agent!(
     ]
 );
 
-#[derive(Clone, Copy, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
 pub enum Action {
     Generate,
     Delete,
+    Edit,
     Preview,
     GoTop,
     GoEnd,
 }
 
-#[derive(Clone, Copy, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
 pub enum Key {
     Switch,
     MoveUp,
@@ -89,6 +92,7 @@ impl DualTabContentMate for Template {
         task_set: &mut FutureSet<(Self::Mate, Self)>,
         state: &mut Self::State,
     ) -> bool {
+        log::debug!("Template::handle_key_event: key={key:?} items.len={}", self.items.len());
         match key {
             Key::Switch => return true,
             Key::MoveDown => state.select_next(),
@@ -97,11 +101,13 @@ impl DualTabContentMate for Template {
             Key::Select => todo!(),
 
             Key::Action(action) => {
+                log::debug!("Template::Action: {action:?}");
                 match action {
                     Action::GoTop => state.select_first(),
                     Action::GoEnd => state.select_last(),
                     _ => {
                         let name = get_name!(self, state);
+                        log::debug!("Template::Action name={name}");
                         action.act(name).spawn_at(task_set);
                         return false;
                     }
@@ -155,6 +161,7 @@ mod actions {
             match self {
                 Self::Generate => generate(name).await,
                 Self::Delete => delete(name).await,
+                Self::Edit => _edit(name).await,
                 Self::Preview => preview(name).await,
                 Self::GoTop | Self::GoEnd => do_nothing(),
             }
@@ -172,6 +179,13 @@ mod actions {
 
     async fn delete(name: String) -> CB {
         todo!()
+    }
+
+    async fn _edit(name: String) -> CB {
+        let path = crate::config::template_path().join(&name);
+        log::debug!("template::_edit: path={}", path.display());
+        tri!(edit(path.to_str().unwrap()));
+        do_nothing()
     }
 
     async fn preview(name: String) -> CB {

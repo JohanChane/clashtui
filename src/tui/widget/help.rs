@@ -38,9 +38,11 @@ pub fn render_help(f: &mut ratatui::Frame, tab: &impl TuiTab) {
         (KeyCombo(vec![]), "Cycle tabs"),
         (KeyCombo(vec![]), "Toggle help"),
         (KeyCombo(vec![]), "Quit"),
+        (KeyCombo(vec![]), "Open app config dir"),
+        (KeyCombo(vec![]), "Open clash config dir"),
     ]);
 
-    let global_labels: &[&str] = &["1-5", "<Tab>", "?", "q"];
+    let global_labels: &[&str] = &["1-5", "<Tab>", "?", "q", "C-g c", "C-g m"];
 
     let tab_entries = shortcuts.len();
     let global_entries = global_shortcuts.len();

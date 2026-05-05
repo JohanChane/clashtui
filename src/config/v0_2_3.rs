@@ -29,12 +29,15 @@ pub fn migrate() -> anyhow::Result<()> {
         #[cfg(target_os = "linux")]
         is_user,
     };
+    let extra = super::Extra {
+        edit_cmd,
+        open_dir_cmd,
+    };
     let config = super::ConfigFile {
         basic,
         service,
         timeout,
-        edit_cmd,
-        open_dir_cmd,
+        extra,
         ..Default::default()
     };
     let pm = collect_profiles(DataDir::get())

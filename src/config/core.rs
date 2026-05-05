@@ -6,21 +6,34 @@ pub struct ConfigFile {
     pub basic: Basic,
     pub service: Service,
     pub timeout: Option<u64>,
-    pub edit_cmd: String,
-    pub open_dir_cmd: String,
+    pub extra: Extra,
     #[serde(skip_serializing)]
     pub hack: Hack,
 }
 impl Default for ConfigFile {
     fn default() -> Self {
-        let common_cmd = if cfg!(windows) { "start %s" } else { "open %s" };
         Self {
             basic: Default::default(),
             service: Default::default(),
             timeout: Default::default(),
+            extra: Default::default(),
+            hack: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct Extra {
+    pub edit_cmd: String,
+    pub open_dir_cmd: String,
+}
+impl Default for Extra {
+    fn default() -> Self {
+        let common_cmd = if cfg!(windows) { "start %s" } else { "open %s" };
+        Self {
             edit_cmd: common_cmd.to_owned(),
             open_dir_cmd: common_cmd.to_owned(),
-            hack: Default::default(),
         }
     }
 }
