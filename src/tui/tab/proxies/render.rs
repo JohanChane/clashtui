@@ -6,6 +6,18 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, List, ListItem};
 
 pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListState) {
+    // Clamp cursor to valid range
+    if let Some(idx) = state.selected() {
+        let len = content.tree.len();
+        if len == 0 {
+            state.select(None);
+        } else if idx >= len {
+            state.select(Some(len.saturating_sub(1)));
+        }
+    } else if content.tree.len() > 0 {
+        state.select(Some(0));
+    }
+
     let block = Block::bordered()
         .border_style(Theme::get().tab.tab_focused)
         .title(Proxies::TITLE);

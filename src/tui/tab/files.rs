@@ -21,7 +21,11 @@ macro_rules! sync {
 macro_rules! get_name {
     ($self:expr, $state:expr) => {
         if let Some(idx) = $state.selected() {
-            $self.items[idx].clone()
+            if idx < $self.items.len() {
+                $self.items[idx].clone()
+            } else {
+                return false;
+            }
         } else {
             return false;
         }

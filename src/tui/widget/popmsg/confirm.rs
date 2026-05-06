@@ -21,14 +21,18 @@ impl Msg for Confirm {
     type Result = ();
 
     fn match_key_event(&mut self, kv: &Key) -> Route {
-        if matches!(kv.code, KeyCode::Enter | KeyCode::Esc | KeyCode::Char(' ')) {
+        if matches!(kv.code, KeyCode::Enter | KeyCode::Char(' ')) {
+            Route::Send
+        } else if matches!(kv.code, KeyCode::Esc) {
             Route::Drop
         } else {
             Route::Keep
         }
     }
 
-    fn send(self, _: Sender<Self::Result>) {}
+    fn send(self, tx: Sender<Self::Result>) {
+        let _ = tx.send(());
+    }
 
     fn render(&self, f: &mut Frame, area: Rect, block: Block, is_focused: bool) {
         let widget = Paragraph::new(if is_focused {

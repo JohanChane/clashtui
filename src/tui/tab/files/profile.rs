@@ -11,20 +11,24 @@ mod_agent!(
     [
         ([KeyCode::Left], Key::Switch, ""),
         ([KeyCode::Right], Key::Switch, ""),
+        ([KeyCode::Char('h')], Key::Switch, ""),
+        ([KeyCode::Char('l')], Key::Switch, ""),
         ([KeyCode::Down], Key::MoveDown, ""),
         ([KeyCode::Up], Key::MoveUp, ""),
+        ([KeyCode::Char('j')], Key::MoveDown, ""),
+        ([KeyCode::Char('k')], Key::MoveUp, ""),
         ([KeyCode::Enter], Key::Select, ""),
         ([KeyCode::Char('i')], Key::Action(Action::Add), ""),
         ([KeyCode::Char('I')], Key::Action(Action::ImportFile), "Import from file"),
         ([KeyCode::Char('e')], Key::Action(Action::Edit), ""),
-        ([KeyCode::Char('d')], Key::Action(Action::Delete), ""),
+        ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Action(Action::Delete), "Delete profile"),
         ([KeyCode::Char('p')], Key::Action(Action::Preview), ""),
         ([KeyCode::Char('u')], Key::Action(Action::Update), ""),
         ([KeyCode::Char('a'), KeyCode::Char('u')], Key::Action(Action::UpdateAll), "Update all"),
         ([KeyCode::Char('/')], Key::Action(Action::Search), ""),
         ([KeyCode::Char('t')], Key::Action(Action::Test), ""),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
-        ([KeyCode::Char('g'), KeyCode::Char('e')], Key::Action(Action::GoEnd), "Go to end"),
+        ([KeyCode::Char('G')], Key::Action(Action::GoEnd), "Go to end"),
         ([KeyCode::Char('N')], Key::Action(Action::ToggleNoPp), "Toggle no proxy-provider"),
     ]
 );
@@ -65,9 +69,9 @@ impl TryFrom<&crate::tui::Key> for Key {
         }
 
         Ok(match value.code {
-            KeyCode::Right | KeyCode::Left => Self::Switch,
-            KeyCode::Down => Self::MoveDown,
-            KeyCode::Up => Self::MoveUp,
+            KeyCode::Right | KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('l') => Self::Switch,
+            KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
+            KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
             KeyCode::Enter => Self::Select,
 
             _ => return Err(()),
@@ -143,6 +147,17 @@ impl DualTabContent for Profile {
     }
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, is_focused: bool) {
+        // Clamp cursor to valid range
+        if let Some(idx) = state.selected() {
+            if self.items.is_empty() {
+                state.select(None);
+            } else if idx >= self.items.len() {
+                state.select(Some(self.items.len().saturating_sub(1)));
+            }
+        } else if !self.items.is_empty() {
+            state.select(Some(0));
+        }
+
         let block = Block::bordered()
             .border_style(if is_focused {
                 Theme::get().tab.tab_focused
@@ -312,6 +327,13 @@ mod actions {
     }
 
     async fn delete(name: String) -> CB {
+        let rx = Confirm::title(format!("Delete profile?"))
+            .with_prompt(format!("Delete {name}?\nEnter to confirm, Esc to cancel"))
+            .build_and_send();
+        if rx.await.is_err() {
+            return do_nothing();
+        }
+
         let pf = db::get(name).unwrap();
         tri!(db::remove(pf));
 

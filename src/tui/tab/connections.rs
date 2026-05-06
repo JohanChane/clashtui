@@ -274,9 +274,12 @@ impl TabContent for Connections {
                     let rx = crate::tui::widget::popmsg::Confirm::title(
                         format!("Terminate connection?"),
                     )
-                    .with_prompt(format!("{host}\nPress any key to confirm"))
+                    .with_prompt(format!("{host}\nEnter to confirm, Esc to cancel"))
                     .build_and_send();
-                    let _ = rx.await;
+                    if rx.await.is_err() {
+                        // Cancelled
+                        return do_nothing();
+                    }
                     let _ = connection::terminate_connection(Some(id));
                     let info = tri!(connection::get_connections(), or_cancel);
                     wrapper(move |content: &mut Connections| {
@@ -322,9 +325,12 @@ impl TabContent for Connections {
                 let prompt = format!("Close {count} connection(s)");
                 async move {
                     let rx = crate::tui::widget::popmsg::Confirm::title(prompt)
-                        .with_prompt("Press any key to confirm".to_owned())
+                        .with_prompt("Enter to confirm, Esc to cancel".to_owned())
                         .build_and_send();
-                    let _ = rx.await;
+                    if rx.await.is_err() {
+                        // Cancelled
+                        return do_nothing();
+                    }
                     if use_bulk {
                         let _ = connection::terminate_all_connections();
                     } else {
@@ -510,6 +516,16 @@ impl Connections {
         // Store original order index in a separate field would be ideal,
         // but we can rebuild from conns on SortReset since conns retains API order
         self.apply_sort();
+        // Clamp cursor to valid range
+        if self.display_rows.is_empty() {
+            self.row = None;
+        } else if let Some(r) = self.row {
+            if r >= self.display_rows.len() {
+                self.row = Some(self.display_rows.len().saturating_sub(1));
+            }
+        } else {
+            self.row = Some(0);
+        }
     }
 
     fn apply_sort(&mut self) {

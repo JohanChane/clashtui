@@ -1,20 +1,26 @@
 use super::*;
 use crate::functions::command::edit;
 use crate::functions::file::template::*;
+use crate::tui::widget::popmsg::Confirm;
 
 mod_agent!(
     Key,
     [
         ([KeyCode::Left], Key::Switch, ""),
         ([KeyCode::Right], Key::Switch, ""),
+        ([KeyCode::Char('h')], Key::Switch, ""),
+        ([KeyCode::Char('l')], Key::Switch, ""),
         ([KeyCode::Down], Key::MoveDown, ""),
         ([KeyCode::Up], Key::MoveUp, ""),
-        ([KeyCode::Char('d')], Key::Action(Action::Delete), ""),
+        ([KeyCode::Char('j')], Key::MoveDown, ""),
+        ([KeyCode::Char('k')], Key::MoveUp, ""),
+        ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Action(Action::Delete), "Delete template"),
         ([KeyCode::Char('e')], Key::Action(Action::Edit), ""),
         ([KeyCode::Char('p')], Key::Action(Action::Preview), ""),
         ([KeyCode::Enter], Key::Action(Action::Generate), ""),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
-        ([KeyCode::Char('g'), KeyCode::Char('e')], Key::Action(Action::GoEnd), "Go to end"),
+        ([KeyCode::Char('G')], Key::Action(Action::GoEnd), "Go to end"),
+        ([KeyCode::Char('/')], Key::Action(Action::Search), "Search/Filter"),
     ]
 );
 
@@ -24,6 +30,7 @@ pub enum Action {
     Delete,
     Edit,
     Preview,
+    Search,
     GoTop,
     GoEnd,
 }
@@ -49,9 +56,9 @@ impl TryFrom<&crate::tui::Key> for Key {
 
         Ok(match value.code {
             KeyCode::Enter => Self::Select,
-            KeyCode::Right | KeyCode::Left => Self::Switch,
-            KeyCode::Down => Self::MoveDown,
-            KeyCode::Up => Self::MoveUp,
+            KeyCode::Right | KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('l') => Self::Switch,
+            KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
+            KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
 
             _ => return Err(()),
         })
@@ -118,6 +125,17 @@ impl DualTabContentMate for Template {
     }
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, is_focused: bool) {
+        // Clamp cursor to valid range
+        if let Some(idx) = state.selected() {
+            if self.items.is_empty() {
+                state.select(None);
+            } else if idx >= self.items.len() {
+                state.select(Some(self.items.len().saturating_sub(1)));
+            }
+        } else if !self.items.is_empty() {
+            state.select(Some(0));
+        }
+
         let block = Block::bordered()
             .border_style(if is_focused {
                 Theme::get().tab.tab_focused
@@ -163,6 +181,7 @@ mod actions {
                 Self::Delete => delete(name).await,
                 Self::Edit => _edit(name).await,
                 Self::Preview => preview(name).await,
+                Self::Search => search().await,
                 Self::GoTop | Self::GoEnd => do_nothing(),
             }
         }
@@ -178,7 +197,27 @@ mod actions {
     }
 
     async fn delete(name: String) -> CB {
-        todo!()
+        let rx = Confirm::title(format!("Delete template?"))
+            .with_prompt(format!("Delete {name}?\nEnter to confirm, Esc to cancel"))
+            .build_and_send();
+        if rx.await.is_err() {
+            return do_nothing();
+        }
+
+        let path = crate::config::template_path().join(&name);
+        match std::fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => {
+                Confirm::err(e);
+                return do_nothing();
+            }
+        }
+
+        let templates = tri!(get_all_templates());
+        wrapper(move |(_, content): &mut C| {
+            content.items = templates;
+        })
     }
 
     async fn _edit(name: String) -> CB {
@@ -190,5 +229,19 @@ mod actions {
 
     async fn preview(name: String) -> CB {
         todo!()
+    }
+
+    async fn search() -> CB {
+        let filter = tri!(
+            Input::new()
+                .with_title("Filter".to_owned())
+                .build_and_send()
+                .await,
+            or_cancel
+        );
+
+        wrapper(|(_, content): &mut C| {
+            content.filter = (!filter.is_empty()).then_some(filter);
+        })
     }
 }
