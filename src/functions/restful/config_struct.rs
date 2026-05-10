@@ -1,20 +1,16 @@
 use serde::{Deserialize, Serialize};
-/// config loaded from clash core (mihomo or sing-box)
-///
-/// Fields present in both cores are always displayed if available.
-/// Core-specific fields are Optional and only shown when the API returns them.
+/// config loaded from clash core
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ClashConfig {
+    // Core infos
     pub mode: Mode,
-    #[serde(default)]
-    pub tun: Option<TunConfig>,
-    // Common (both cores)
+    pub tun: TunConfig,
+    // Extend infos
     pub log_level: Option<LogLevel>,
     pub bind_address: Option<String>,
     pub allow_lan: Option<bool>,
     pub ipv6: Option<bool>,
-    // Mihomo-specific
     pub global_client_fingerprint: Option<String>,
     pub tcp_concurrent: Option<bool>,
     pub global_ua: Option<String>,
@@ -24,91 +20,63 @@ pub struct ClashConfig {
     pub geo_auto_update: Option<bool>,
     pub geo_update_interval: Option<u16>,
     pub find_process_mode: Option<String>,
-    // sing-box-specific
-    pub port: Option<u16>,
-    pub socks_port: Option<u16>,
-    pub redir_port: Option<u16>,
-    pub tproxy_port: Option<u16>,
-    pub mixed_port: Option<u16>,
-    pub mode_list: Option<Vec<String>>,
 }
 impl ClashConfig {
     pub fn build(&self) -> Vec<String> {
-        let mut lines = vec![format!("mode:{}", self.mode)];
-
-        if let Some(ref v) = self.tun {
-            lines.push(format!("tun:{v}"));
+        macro_rules! build {
+            ($($value:ident),+ $(,)? $(#Option $(,)? $($option_value:ident),+)? $(,)?) => {
+                vec![$(
+                    format!("{}:{}", stringify!($value), $value),
+                )+
+                $($(
+                    match $option_value {
+                        Some(v) => format!("{}:{}", stringify!($option_value), v),
+                        None => format!("{}:Unknown", stringify!($option_value)),
+                    },
+                )+)?
+                ]
+            };
         }
-        if let Some(ref v) = self.log_level {
-            lines.push(format!("log_level:{v}"));
-        }
-        if let Some(ref v) = self.bind_address {
-            lines.push(format!("bind_address:{v}"));
-        }
-        if let Some(v) = self.allow_lan {
-            lines.push(format!("allow_lan:{v}"));
-        }
-        if let Some(v) = self.ipv6 {
-            lines.push(format!("ipv6:{v}"));
-        }
-        if let Some(ref v) = self.global_client_fingerprint {
-            lines.push(format!("global_client_fingerprint:{v}"));
-        }
-        if let Some(v) = self.tcp_concurrent {
-            lines.push(format!("tcp_concurrent:{v}"));
-        }
-        if let Some(ref v) = self.global_ua {
-            lines.push(format!("global_ua:{v}"));
-        }
-        if let Some(ref v) = self.dns {
-            lines.push(format!("dns:{v}"));
-        }
-        if let Some(v) = self.geodata_mode {
-            lines.push(format!("geodata_mode:{v}"));
-        }
-        if let Some(v) = self.unified_delay {
-            lines.push(format!("unified_delay:{v}"));
-        }
-        if let Some(v) = self.geo_auto_update {
-            lines.push(format!("geo_auto_update:{v}"));
-        }
-        if let Some(v) = self.geo_update_interval {
-            lines.push(format!("geo_update_interval:{v}"));
-        }
-        if let Some(ref v) = self.find_process_mode {
-            lines.push(format!("find_process_mode:{v}"));
-        }
-        if let Some(v) = self.port {
-            lines.push(format!("port:{v}"));
-        }
-        if let Some(v) = self.socks_port {
-            lines.push(format!("socks_port:{v}"));
-        }
-        if let Some(v) = self.redir_port {
-            lines.push(format!("redir_port:{v}"));
-        }
-        if let Some(v) = self.tproxy_port {
-            lines.push(format!("tproxy_port:{v}"));
-        }
-        if let Some(v) = self.mixed_port {
-            lines.push(format!("mixed_port:{v}"));
-        }
-        if let Some(ref v) = self.mode_list {
-            lines.push(format!("mode_list:{}", v.join(", ")));
-        }
-
-        lines
+        let ClashConfig {
+            mode,
+            tun,
+            log_level,
+            bind_address,
+            allow_lan,
+            ipv6,
+            global_client_fingerprint,
+            tcp_concurrent,
+            global_ua,
+            dns,
+            geodata_mode,
+            unified_delay,
+            geo_auto_update,
+            geo_update_interval,
+            find_process_mode,
+        } = self;
+        build!(mode, tun,
+            #Option
+            log_level,
+            bind_address,
+            allow_lan,
+            ipv6,
+            global_client_fingerprint,
+            tcp_concurrent,
+            global_ua,
+            dns,
+            geodata_mode,
+            unified_delay,
+            geo_auto_update,
+            geo_update_interval,
+            find_process_mode)
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, strum::VariantArray)]
 #[serde(rename_all = "lowercase")]
 pub enum Mode {
-    #[serde(alias = "Rule")]
     Rule,
-    #[serde(alias = "Global")]
     Global,
-    #[serde(alias = "Direct")]
     Direct,
 }
 impl std::fmt::Display for Mode {

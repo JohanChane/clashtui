@@ -7,7 +7,7 @@ cargo build                    # debug build
 cargo run                      # run (debug)
 cargo run --release            # run (release — LTO, stripped, panic=abort)
 cargo check                    # type-check only
-cargo test                     # run all 81 tests (inline #[test]; no tests/ dir)
+cargo test                     # run all tests (inline #[test]; no tests/ dir)
 ```
 
 No lint/format config files, no CI, no Makefile.
@@ -33,73 +33,31 @@ This crate uses Rust edition 2024. Notable differences from 2021: `unsafe_op_in_
 
 ## Architecture
 
-Five-phase startup in `src/main.rs`:
-1. **CLI parse** — `cli::from_env()` + `handle_early_exit()`
-2. **config init** — `config::init(cmd.config_dir)` loads YAML config + database
-3. **TUI init** — `tui::init()` (agent keymap + theme + raw mode + panic hook)
-4. **serve** — `App::serve()` (event loop)
-5. **restore + save** — `tui::restore()` then `config::CONFIG.save()`
+Three-phase startup in `src/main.rs`: **CLI parse** → **config init** → **TUI init + serve + restore**.
 
 - `src/cli.rs` — clap derive parser. `from_env()` merges CLI args with `CLASHTUI_CONFIG_DIR` env var.
-- `src/config.rs` — loads YAML config + database from config dir. Must be an **existing, non-empty directory** (`src/config.rs:100-103`). Access live config via `config::CONFIG` (derefs to `Config`).
-- `src/tui.rs` — entry: `init()` (agent::init → Theme::load → raw_mode::setup → set_panic_hook), `App::serve()` (event loop), `restore()`. Also exports `hold(on: bool)` which temporarily leaves/enters raw mode (used when prompting the user on stdin/stdout during TUI runtime).
+- `src/config.rs` — loads YAML config + database from config dir. Must be an **existing, non-empty directory**.
+- `src/tui.rs` — entry: `init()` (raw mode + theme + agent), `App::serve()` (event loop), `restore()`. Also exports `hold(on: bool)` which temporarily leaves/enters raw mode (used when prompting the user on stdin/stdout during TUI runtime).
 
 ### Config Directory
 
-Resolved to (in order): exe-relative `data/` dir if it exists ("portable mode") → `$XDG_CONFIG_HOME/clashtui` → `~/.config/clashtui`. The directory must already be a non-empty directory.
-
-Config files live inside this dir:
-- `config.yaml` — main config (loaded by `ConfigFile::from_file()` in `config::util.rs`)
-- `keymap.yaml` — per-tab key remappings (loaded by `agent::init()` in `src/tui/agent.rs`)
-- `theme.yaml` — custom theme (only effective with `customized-theme` feature)
-- `basic_clash_config.yaml` — clash subprocess config
-- `clashtui.db` — profile manager database (saved on exit via `config::CONFIG.save()`)
-- `clashtui.log` — log output (writes via `env_logger` with `Pipe` target)
+Resolved to (in order): exe-relative `data/` dir if it exists ("portable mode") → `$XDG_CONFIG_HOME/clashtui` → `~/.config/clashtui`. The directory must already exist and be non-empty (`src/config/util.rs:16`).
 
 ### Multi-file Modules
 
 Pattern: `modname.rs` re-exports from `modname/` directory. Applies to `src/cli.rs` + `src/cli/`, `src/tui.rs` + `src/tui/`, `src/config.rs` + `src/config/`, `src/functions.rs` + `src/functions/`.
 
-Some TUI modules use a hybrid: `src/tui/tab/` contains both `status.rs` (single file) and `proxies/` + `proxies.rs` (multi-file module pattern). The same hybrid applies to `files/` + `files.rs`.
-
 ### TUI Event Loop (~50fps, at least 20ms/frame)
 
-Defined in `src/tui/app.rs:119` (`serve()` method, loop at line 128). Each frame:
-1. Handle deferred resize via `RESIZE` atomic flag
-2. `terminal.draw(render)` — render current frame
-3. `sync()` — advance completed async tasks
-4. Wait for key/tick/resize via `tokio::select!`
-5. Process key event (Press only, Release is ignored)
-
-Key routing is **six-layer** (`src/tui/app.rs:169`):
-
-| Layer | Index | Handler | Purpose |
-|-------|-------|---------|---------|
-| PopUp | 0 | `popup.handle_key_event` | Modal dialogs steal all input |
-| GlobalChord | 0.5 | `global_chord.handle` | Hardcoded chords: `Ctrl-g c` (open config dir), `Ctrl-g m` (open clash dir) |
-| Help | 1 | `help.dismiss` | Dismiss help panel on any key |
-| Which/Chord | 2 | `chord.handle` | Per-tab chord shortcuts (e.g. multi-key sequences) |
-| Tab | 3 | `tabs[ti].handle_key_event` | Active tab handles input |
-| Global | 4 | `handle_global_kv` | Tab switch (`1`-`6`, `Tab`), quit (`q`, `Ctrl-c`), help toggle (`?`) |
-
-### Existing Tabs (6 total)
-
-| Key | Tab | Type |
-|-----|-----|------|
-| `1` | StatusTab | `Tab<StatusContent>` |
-| `2` | FileTab | `DualTab<ProfileContent, TemplateContent>` |
-| `3` | ProxiesTab | `Tab<ProxiesContent>` |
-| `4` | ConnectionsTab | `Tab<ConnectionsContent>` |
-| `5` | SettingsTab | `Tab<SettingsContent>` |
-| `6` | SrvCtlTab | `Tab<SrvCtlContent>` |
+Defined in `src/tui/app.rs:82`. Each frame: `terminal.draw(render)` → `sync()` → wait for key/tick/resize via `tokio::select!`. Key routing is four-layer (see `src/tui/app.rs:124`): **PopUp**(0) → **Chord/Which**(1) → **Tab**(2) → **Global**(3). Layer 1 handles multi-key chord shortcuts (e.g. `g g`). Tab takes `&mut self` with no return; Global returns `bool`.
 
 ## Adding a New Tab
 
 Requires edits in these places:
 
 1. Define content type implementing `BasicTabContent` + `TabContent` (see `docs/dev.md` for full trait details)
-2. In `src/tui/tab/mod.rs`: add `mod mytab;` or `mod mytab/` + `mod mytab.rs`, add `newtype_tab!`, add variant to `enum_dispatch!` and `prelude`
-3. In `src/tui/app.rs`: add to `tabs` vec in `App::new()`, update `TAB_COUNT` const and `'1'..='6'` char range in `handle_global_kv`, add agent init call in `prelude::agent_init`
+2. In `src/tui/tab/mod.rs`: add `newtype_tab!`, add variant to `enum_dispatch!` and `prelude`
+3. In `src/tui/app.rs`: add to `tabs` vec, update the local `TAB_COUNT` const and the `'1'..='5'` char range in `handle_global_kv`, add agent init call in `prelude::agent_init`
 4. If dual-pane, implement `DualTabContent` / `DualTabContentMate` (see `src/tui/widget/dualtab.rs`)
 
 `newtype_tab!` has two forms:
@@ -112,18 +70,14 @@ Requires edits in these places:
 - **`sync()` runs after `render` each frame** — so current frame shows state from the last sync cycle.
 - **Async I/O**: spawn into `FutureSet` (a `JoinSet<Callback>`) via `.spawn_at(tasks)`. Callbacks are `Box<dyn FnOnce(&mut Content)>`. The event loop auto-advances them in `sync()`.
 - **Error handling in async blocks**: use `tri!()` for user-visible errors (shows Confirm popup), `tri!(, or_cancel)` for silent cancel on error.
-- **Keymaps**: `mod_agent!` macro in each tab module defines default key bindings. Users can override via `keymap.yaml` in config dir. See `src/tui/agent.rs`.
+- **Keymaps**: `mod_agent!` macro in each tab module defines default key bindings. Users can override via `keymap.yaml`. See `src/tui/agent.rs`.
 - **PopUp**: one-shot channel pattern. Build via `Input::new().with_title(...).build_and_send().await`. Only use PopUp when user input is needed — use inline status for simple confirmations/errors.
-- **Key struct** (`src/tui/key.rs`): contains `code`, `shift`, `ctrl`, `alt`, `super_`. String format: plain chars (`a`), uppercase for shift (`A`), or `<C-S-x>` for modifiers. `From<KeyEvent>` normalizes shift for char keys.
-- **Resize**: sets `RESIZE` atomic flag in event handler; processed at top of next frame loop (avoids mid-frame resize issues).
-- **FULL_RENDER**: used by `hold()` to force terminal clear when leaving/entering raw mode.
-- **Global chord shortcuts** (`Ctrl-g c`, `Ctrl-g m`) are hardcoded in `GLOBAL_CHORD_SHORTCUTS`, not user-configurable.
 
 ## Macros
 
 Custom macros (defined in `src/tui/tab/mod.rs`, `src/tui/widget/mod.rs`, `src/config/util.rs`):
 - `tri!` / `tri!(, or_cancel)` — error handling in async callbacks
-- `mod_agent!` — per-tab key binding defaults + shortcut chords
+- `mod_agent!` — per-tab key binding defaults
 - `newtype_tab!` — boilerplate for tab wrapper types (two forms: with/without explicit title)
 - `enum_dispatch!` — dispatches `TuiWidget` + `TuiTab` to enum variants
 - `new_type_impl_tuiwidget!` — auto-implements `TuiWidget` for newtype wrappers
@@ -136,11 +90,3 @@ Custom macros (defined in `src/tui/tab/mod.rs`, `src/tui/widget/mod.rs`, `src/co
 ## OpenSpec
 
 This repo uses OpenSpec (`openspec/config.yaml`) with `schema: spec-driven`. Active changes live in `openspec/changes/`. Run `openspec` commands or use the openspec skills in `.opencode/skills/`.
-
-## Documentation
-
-Key docs are in `docs/`:
-- `docs/dev.md` — tab development guide, trait details
-- `docs/design.md` — overall design
-- `docs/get_started.md` — setup guide
-- `docs/support_singbox/` — sing-box vs mihomo comparison (`cmd.md`, `config.md`, `api_data.md`) and support analysis (`singbox_support.md`)

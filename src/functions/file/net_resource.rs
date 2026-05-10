@@ -120,46 +120,6 @@ impl ExtractNetResources for serde_yml::Mapping {
     }
 }
 
-pub fn extract_singbox_net_resources(content: &serde_json::Value) -> Vec<NetResource> {
-    let mut resources = Vec::new();
-
-    if let serde_json::Value::Array(outbounds) = &content["outbounds"] {
-        for outbound in outbounds {
-            let name = outbound["tag"].as_str().unwrap_or("unnamed");
-            if let Some(url) = outbound["outbound"]["url"].as_str() {
-                if let Some(path) = outbound["outbound"]["path"].as_str() {
-                    resources.push(NetResource {
-                        name: name.to_owned(),
-                        url: url.to_owned(),
-                        path: path.to_owned(),
-                        section: ResourceSection::ProxyProvider,
-                    });
-                }
-            }
-        }
-    }
-
-    if let serde_json::Value::Array(rule_sets) = &content["route"]["rule_set"] {
-        for rule_set in rule_sets {
-            let tag = rule_set["tag"].as_str().unwrap_or("unnamed");
-            let is_remote = rule_set["type"].as_str() == Some("remote");
-            if is_remote {
-                if let Some(url) = rule_set["url"].as_str() {
-                    let path = rule_set["path"].as_str().unwrap_or("rules.db");
-                    resources.push(NetResource {
-                        name: tag.to_owned(),
-                        url: url.to_owned(),
-                        path: path.to_owned(),
-                        section: ResourceSection::RuleProvider,
-                    });
-                }
-            }
-        }
-    }
-
-    resources
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -290,81 +250,6 @@ mod tests {
             Value::String("not-a-mapping".to_string()),
         );
         let resources = yaml.extract(&[ResourceSection::ProxyProvider]);
-        assert!(resources.is_empty());
-    }
-
-    #[test]
-    fn extract_singbox_empty_json() {
-        let json: serde_json::Value = serde_json::json!({});
-        let resources = extract_singbox_net_resources(&json);
-        assert!(resources.is_empty());
-    }
-
-    #[test]
-    fn extract_singbox_outbounds_with_url() {
-        let json: serde_json::Value = serde_json::json!({
-            "outbounds": [
-                {
-                    "tag": "hk-node",
-                    "type": "vless",
-                    "outbound": {
-                        "url": "https://example.com/hk.json",
-                        "path": "./outbounds/hk.json"
-                    }
-                }
-            ]
-        });
-        let resources = extract_singbox_net_resources(&json);
-        assert_eq!(resources.len(), 1);
-        assert_eq!(resources[0].name, "hk-node");
-        assert_eq!(resources[0].url, "https://example.com/hk.json");
-        assert_eq!(resources[0].path, "./outbounds/hk.json");
-    }
-
-    #[test]
-    fn extract_singbox_rule_set_remote() {
-        let json: serde_json::Value = serde_json::json!({
-            "route": {
-                "rule_set": [
-                    {
-                        "type": "remote",
-                        "tag": "geoip-cn",
-                        "format": "binary",
-                        "url": "https://example.com/geoip.db",
-                        "path": "./rules/geoip.db"
-                    }
-                ]
-            }
-        });
-        let resources = extract_singbox_net_resources(&json);
-        assert_eq!(resources.len(), 1);
-        assert_eq!(resources[0].name, "geoip-cn");
-        assert_eq!(resources[0].section, ResourceSection::RuleProvider);
-    }
-
-    #[test]
-    fn extract_singbox_rule_set_local_ignored() {
-        let json: serde_json::Value = serde_json::json!({
-            "route": {
-                "rule_set": [
-                    {
-                        "type": "local",
-                        "tag": "my-rules",
-                        "path": "./rules/local.json"
-                    }
-                ]
-            }
-        });
-        let resources = extract_singbox_net_resources(&json);
-        assert!(resources.is_empty());
-    }
-
-    #[test]
-    fn extract_singbox_no_outbounds_no_route() {
-        let json: serde_json::Value = serde_json::json!({
-            "log": {"level": "info"}
-        });
-        let resources = extract_singbox_net_resources(&json);
         assert!(resources.is_empty());
     }
 }

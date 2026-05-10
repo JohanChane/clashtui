@@ -18,7 +18,8 @@ mod_agent!(
         ([KeyCode::Char('j')], Key::MoveDown, ""),
         ([KeyCode::Char('k')], Key::MoveUp, ""),
         ([KeyCode::Enter], Key::Select, ""),
-        ([KeyCode::Char('i')], Key::Action(Action::Add), "Import (URL or file)"),
+        ([KeyCode::Char('i')], Key::Action(Action::Add), ""),
+        ([KeyCode::Char('I')], Key::Action(Action::ImportFile), "Import from file"),
         ([KeyCode::Char('e')], Key::Action(Action::Edit), ""),
         ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Action(Action::Delete), "Delete profile"),
         ([KeyCode::Char('p')], Key::Action(Action::Preview), ""),
@@ -127,9 +128,6 @@ impl DualTabContent for Profile {
             Key::Action(action) => match action {
                 Action::GoTop => state.select_first(),
                 Action::GoEnd => state.select_last(),
-                Action::Add | Action::ImportFile => {
-                    action.act(String::new()).spawn_at(task_set)
-                }
                 Action::UpdateAll => {
                     for name in &self.items {
                         self.updating.insert(name.clone());
@@ -227,7 +225,8 @@ mod actions {
         pub async fn act(self, name: String) -> CB {
             match self {
                 Self::Search => search().await,
-                Self::Add | Self::ImportFile => import().await,
+                Self::Add => add().await,
+                Self::ImportFile => import_file().await,
                 Self::Edit => _edit(name).await,
                 Self::Delete => delete(name).await,
                 Self::Preview => preview(name).await,
@@ -257,7 +256,7 @@ mod actions {
         })
     }
 
-    async fn import() -> CB {
+    async fn add() -> CB {
         let name = tri!(
             Input::new()
                 .with_title("Name".to_owned())
@@ -265,69 +264,48 @@ mod actions {
                 .await,
             or_cancel
         );
-        let source = tri!(
+        let url = tri!(
             Input::new()
-                .with_title("URL or File Path".to_owned())
+                .with_title("Url".to_owned())
+                .build_and_send()
+                .await,
+            or_cancel
+        );
+        let path = crate::functions::file::PROFILE_YAMLS_PATH.join(format!("{name}.yaml"));
+        {
+            let mut response = tri!(crate::functions::restful::download::profile(&url, false));
+            let content: serde_yml::Mapping = tri!(serde_yml::from_reader(&mut response));
+            if let Some(parent) = path.parent() {
+                tri!(std::fs::create_dir_all(parent));
+            }
+            let file = tri!(std::fs::File::create(&path));
+            tri!(serde_yml::to_writer(file, &content));
+        }
+        tri!(db::create(name, url));
+
+        sync!(C)
+    }
+
+    async fn import_file() -> CB {
+        let name = tri!(
+            Input::new()
+                .with_title("Profile Name".to_owned())
+                .build_and_send()
+                .await,
+            or_cancel
+        );
+        let source_path = tri!(
+            Input::new()
+                .with_title("File Path".to_owned())
                 .build_and_send()
                 .await,
             or_cancel
         );
 
-        let is_url = source.starts_with("http://") || source.starts_with("https://");
-        let is_singbox =
-            crate::config::CONFIG.cfg_file.core_type == crate::config::CoreType::Singbox;
-
-        if is_singbox {
-            let content: serde_json::Value = if is_url {
-                let mut response =
-                    tri!(crate::functions::restful::download::profile(&source, false));
-                tri!(serde_json::from_reader(&mut response))
-            } else {
-                let file = tri!(std::fs::File::open(&source));
-                tri!(serde_json::from_reader(file))
-            };
-            let path = crate::functions::file::PROFILE_JSONS_PATH
-                .join(format!("{name}.json"));
-            {
-                if let Some(parent) = path.parent() {
-                    tri!(std::fs::create_dir_all(parent));
-                }
-                tri!(std::fs::create_dir_all(
-                    &*crate::functions::file::PROFILE_JSONS_PATH
-                ));
-                let file = tri!(std::fs::File::create(&path));
-                tri!(serde_json::to_writer(file, &content));
-            }
-            {
-                let mut pm = crate::config::CONFIG.data.lock().unwrap();
-                let dtype = if is_url {
-                    crate::config::database::ProfileType::Url(source.clone())
-                } else {
-                    crate::config::database::ProfileType::Singbox
-                };
-                pm.insert(&name, dtype);
-                tri!(pm.to_file());
-            }
-        } else if is_url {
-            let path =
-                crate::functions::file::PROFILE_YAMLS_PATH.join(format!("{name}.yaml"));
-            {
-                let mut response =
-                    tri!(crate::functions::restful::download::profile(&source, false));
-                let content: serde_yml::Mapping =
-                    tri!(serde_yml::from_reader(&mut response));
-                if let Some(parent) = path.parent() {
-                    tri!(std::fs::create_dir_all(parent));
-                }
-                let file = tri!(std::fs::File::create(&path));
-                tri!(serde_yml::to_writer(file, &content));
-            }
-            tri!(db::create(name, source));
-        } else {
-            tri!(crate::functions::file::profile::import_profile_from_file(
-                &source, &name
-            ));
-        }
+        tri!(crate::functions::file::profile::import_profile_from_file(
+            &source_path,
+            &name
+        ));
 
         sync!(C)
     }
@@ -340,21 +318,6 @@ mod actions {
     }
 
     async fn toggle_no_pp(name: String) -> CB {
-        {
-            let pf = tri!(db::get(&name).ok_or_else(|| anyhow::anyhow!("Profile not found")));
-            if pf.dtype == crate::config::database::ProfileType::Singbox
-                || crate::config::CONFIG
-                    .data
-                    .lock()
-                    .unwrap()
-                    .contains_in_singbox(&pf.name)
-            {
-                Confirm::err(anyhow::anyhow!(
-                    "no_pp is not applicable for sing-box profiles (proxy-provider not supported)"
-                ));
-                return do_nothing();
-            }
-        }
         tri!(db::toggle_no_pp(&name));
 
         let (names, atime) = get_profiles_with_readable_atime();
@@ -491,16 +454,9 @@ pub(super) fn get_profiles_with_readable_atime() -> (Vec<String>, Vec<String>) {
         .map(|pf| {
             let name = pf.name.clone();
             let no_pp = pf.no_pp;
-            let is_singbox = pf.dtype == ProfileType::Singbox
-                || crate::config::CONFIG
-                    .data
-                    .lock()
-                    .unwrap()
-                    .contains_in_singbox(&pf.name);
             let domain = match &pf.dtype {
                 ProfileType::File => "local import".to_owned(),
                 ProfileType::Url(url) => extract_domain(url).unwrap_or("unknown").to_owned(),
-                ProfileType::Singbox => "singbox profile".to_owned(),
             };
             let atime = pf
                 .load_local_profile()
@@ -508,13 +464,7 @@ pub(super) fn get_profiles_with_readable_atime() -> (Vec<String>, Vec<String>) {
                 .and_then(|lp| lp.atime())
                 .map(display_duration)
                 .unwrap_or_else(|| "Unknown".to_owned());
-            let no_pp_str = if is_singbox {
-                "N/A"
-            } else if no_pp {
-                "nopp"
-            } else {
-                ""
-            };
+            let no_pp_str = if no_pp { "nopp" } else { "" };
             (name, format!("{domain}|{atime}|{no_pp_str}"))
         })
         .collect();

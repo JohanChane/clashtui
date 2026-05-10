@@ -253,7 +253,7 @@ pub mod prelude {
     pub use super::files::FileTab;
     pub use super::proxies::ProxiesTab;
     pub use super::settings::SettingsTab;
-    pub use super::srvctl::CoreSrvCtlTab;
+    pub use super::srvctl::SrvCtlTab;
     pub use super::status::StatusTab;
 
     pub fn agent_init(keymap: &mut serde_yml::Mapping) -> anyhow::Result<()> {
@@ -287,7 +287,7 @@ pub mod prelude {
             FileTab,
             ProxiesTab,
             SettingsTab,
-            CoreSrvCtlTab,
+            SrvCtlTab,
             StatusTab,
         }
     );
