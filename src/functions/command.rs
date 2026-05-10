@@ -3,6 +3,7 @@ mod platform;
 mod utils;
 
 use crate::config::CONFIG;
+use crate::config::CoreType;
 use anyhow::Result;
 use std::{path::Path, process::Command};
 
@@ -28,12 +29,18 @@ pub fn test_config(profile_path: Option<&Path>, enable_geodata_mode: bool) -> St
     stringify_output(opt)
 }
 
-fn svc_operation(op: &str, password: Option<&str>) -> Result<String> {
+fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) -> Result<String> {
     let host = &CONFIG.cfg_file.hack.service_controller;
     let svc = &CONFIG.cfg_file.service;
+    let ct = core_type.unwrap_or(CONFIG.cfg_file.core_type);
 
-    let svc_args = host.args(op, &svc.clash_service_name, svc.is_user);
-    if svc.is_user {
+    let (service_name, is_user) = match ct {
+        CoreType::Mihomo => (&svc.clash_service_name, svc.is_user),
+        CoreType::Singbox => (&svc.singbox_service_name, svc.singbox_is_user),
+    };
+
+    let svc_args = host.args(op, service_name, is_user);
+    if is_user {
         return exec(host.bin_name(), svc_args);
     }
     let mut argv = vec![host.bin_name()];
@@ -45,33 +52,16 @@ fn svc_operation(op: &str, password: Option<&str>) -> Result<String> {
     }
 }
 
+pub fn stop_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
+    svc_operation("stop", password, Some(core_type))
+}
+
 pub fn restart_service(password: Option<&str>) -> Result<String> {
-    svc_operation("restart", password)
+    svc_operation("restart", password, None)
 }
 
 pub fn stop_service(password: Option<&str>) -> Result<String> {
-    svc_operation("stop", password)
-}
-
-pub fn set_permission(bin_path: &str, password: Option<&str>) -> Result<String> {
-    let setcap_path = Path::new("/usr/sbin/setcap");
-    let setcap_bin = if setcap_path.exists() {
-        setcap_path.as_os_str().to_str().unwrap_or("setcap")
-    } else {
-        "setcap"
-    };
-    let cap_args = "cap_net_admin,cap_net_bind_service=+ep";
-
-    let real_path = std::fs::canonicalize(bin_path)
-        .unwrap_or_else(|_| Path::new(bin_path).to_path_buf());
-    let real_path_str = real_path.to_str().unwrap_or(bin_path);
-
-    let argv = vec![setcap_bin, cap_args, real_path_str];
-
-    match password {
-        Some(pw) => exec_sudo(argv, pw),
-        None => exec("sudo", argv),
-    }
+    svc_operation("stop", password, None)
 }
 
 pub fn edit(path: &str) -> Result<()> {

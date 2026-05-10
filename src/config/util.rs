@@ -4,10 +4,12 @@ pub mod defs {
     pub const CONFIG_FILE: &str = "config.yaml";
     pub const DATA_FILE: &str = "clashtui.db";
     pub const BASIC_FILE: &str = "basic_clash_config.yaml";
+    pub const BASIC_SINGBOX_FILE: &str = "basic_singbox_config.json";
     pub const LOG_FILE: &str = "clashtui.log";
     #[cfg(feature = "customized-theme")]
     pub const THEME_FILE: &str = "theme.yaml";
     pub const PROFILE_YAMLS_DIR: &str = "profile_yamls";
+    pub const PROFILE_JSONS_DIR: &str = "profile_jsons";
     pub const TEMPLATE_DIR: &str = "templates";
     pub const KEYMAP_FILE: &str = "keymap.yaml";
     pub const PROVIDER_CACHE_DIR: &str = "providers";
@@ -54,6 +56,14 @@ macro_rules! load_save {
         impl $id {
             pub fn from_file() -> Result<Self> {
                 let fp = std::fs::File::open(DATA_DIR.get().unwrap().join($name))?;
+                Ok(serde_yml::from_reader(fp)?)
+            }
+        }
+    };
+    ($id:ident, $name:expr, no_save, $subdir:expr) => {
+        impl $id {
+            pub fn from_file() -> Result<Self> {
+                let fp = std::fs::File::open(DATA_DIR.get().unwrap().join($subdir).join($name))?;
                 Ok(serde_yml::from_reader(fp)?)
             }
         }

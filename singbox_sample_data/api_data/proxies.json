@@ -1,0 +1,693 @@
+{
+  "proxies": {
+    "GLOBAL": {
+      "type": "Selector",
+      "name": "GLOBAL",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT",
+        "vmess-ipdktc33",
+        "过滤掉15条线路",
+        "🇯🇵 日本-优化",
+        "🇯🇵 日本-优化2",
+        "🇯🇵 日本-优化3",
+        "🇸🇬 新加坡-优化-Gemini-GPT",
+        "🇸🇬 新加坡-优化2-Gemini-GPT",
+        "🇸🇬 新加坡-优化3-Gemini",
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港-优化2-Gemini",
+        "🇭🇰 香港-优化3-Gemini",
+        "🇭🇰 香港WAP-优化-Gemini",
+        "🇭🇰 香港WAP-优化2-Gemini",
+        "🇭🇰 香港WAP-优化3-Gemini",
+        "🇮🇳 印度-优化",
+        "🇹🇼 台湾-优化",
+        "🇹🇼 台湾-优化2-GPT",
+        "🇹🇼 台湾-优化3",
+        "🇺🇸 美国LA-优化-GPT",
+        "🇺🇸 美国LA-优化2-GPT",
+        "🇺🇸 美国LA-优化3-GPT",
+        "🇨🇦 加拿大-优化",
+        "🇨🇦 加拿大-优化2",
+        "🇨🇦 加拿大-优化3",
+        "🇩🇪 德国-优化",
+        "🇩🇪 德国-优化2",
+        "🇬🇧 英国-优化-GPT",
+        "🇬🇧 英国-优化2",
+        "🇬🇧 英国-优化3"
+      ]
+    },
+    "DIRECT": {
+      "type": "Direct",
+      "name": "DIRECT",
+      "udp": true,
+      "history": []
+    },
+    "REJECT": {
+      "type": "Reject",
+      "name": "REJECT",
+      "udp": true,
+      "history": []
+    },
+    "vmess-ipdktc33": {
+      "type": "VMess",
+      "name": "vmess-ipdktc33",
+      "udp": false,
+      "history": []
+    },
+    "过滤掉15条线路": {
+      "type": "VMess",
+      "name": "过滤掉15条线路",
+      "udp": false,
+      "history": []
+    },
+    "🇯🇵 日本-优化": {
+      "type": "VMess",
+      "name": "🇯🇵 日本-优化",
+      "udp": false,
+      "history": []
+    },
+    "🇯🇵 日本-优化2": {
+      "type": "VMess",
+      "name": "🇯🇵 日本-优化2",
+      "udp": false,
+      "history": []
+    },
+    "🇯🇵 日本-优化3": {
+      "type": "VMess",
+      "name": "🇯🇵 日本-优化3",
+      "udp": false,
+      "history": []
+    },
+    "🇸🇬 新加坡-优化-Gemini-GPT": {
+      "type": "VMess",
+      "name": "🇸🇬 新加坡-优化-Gemini-GPT",
+      "udp": false,
+      "history": []
+    },
+    "🇸🇬 新加坡-优化2-Gemini-GPT": {
+      "type": "VMess",
+      "name": "🇸🇬 新加坡-优化2-Gemini-GPT",
+      "udp": false,
+      "history": []
+    },
+    "🇸🇬 新加坡-优化3-Gemini": {
+      "type": "VMess",
+      "name": "🇸🇬 新加坡-优化3-Gemini",
+      "udp": false,
+      "history": []
+    },
+    "🇭🇰 香港-优化-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港-优化-Gemini",
+      "udp": false,
+      "history": [
+        {
+          "time": "2026-05-06T23:58:21.637587482+08:00",
+          "delay": 3162
+        }
+      ]
+    },
+    "🇭🇰 香港-优化2-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港-优化2-Gemini",
+      "udp": false,
+      "history": []
+    },
+    "🇭🇰 香港-优化3-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港-优化3-Gemini",
+      "udp": false,
+      "history": []
+    },
+    "🇭🇰 香港WAP-优化-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港WAP-优化-Gemini",
+      "udp": false,
+      "history": []
+    },
+    "🇭🇰 香港WAP-优化2-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港WAP-优化2-Gemini",
+      "udp": false,
+      "history": []
+    },
+    "🇭🇰 香港WAP-优化3-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港WAP-优化3-Gemini",
+      "udp": false,
+      "history": []
+    },
+    "🇮🇳 印度-优化": {
+      "type": "VMess",
+      "name": "🇮🇳 印度-优化",
+      "udp": false,
+      "history": []
+    },
+    "🇹🇼 台湾-优化": {
+      "type": "VMess",
+      "name": "🇹🇼 台湾-优化",
+      "udp": false,
+      "history": []
+    },
+    "🇹🇼 台湾-优化2-GPT": {
+      "type": "VMess",
+      "name": "🇹🇼 台湾-优化2-GPT",
+      "udp": false,
+      "history": []
+    },
+    "🇹🇼 台湾-优化3": {
+      "type": "VMess",
+      "name": "🇹🇼 台湾-优化3",
+      "udp": false,
+      "history": [
+        {
+          "time": "2026-05-06T23:58:10.284867522+08:00",
+          "delay": 328
+        }
+      ]
+    },
+    "🇺🇸 美国LA-优化-GPT": {
+      "type": "VMess",
+      "name": "🇺🇸 美国LA-优化-GPT",
+      "udp": false,
+      "history": [
+        {
+          "time": "2026-05-06T23:58:20.670848645+08:00",
+          "delay": 2324
+        }
+      ]
+    },
+    "🇺🇸 美国LA-优化2-GPT": {
+      "type": "VMess",
+      "name": "🇺🇸 美国LA-优化2-GPT",
+      "udp": false,
+      "history": []
+    },
+    "🇺🇸 美国LA-优化3-GPT": {
+      "type": "VMess",
+      "name": "🇺🇸 美国LA-优化3-GPT",
+      "udp": false,
+      "history": []
+    },
+    "🇨🇦 加拿大-优化": {
+      "type": "VMess",
+      "name": "🇨🇦 加拿大-优化",
+      "udp": false,
+      "history": []
+    },
+    "🇨🇦 加拿大-优化2": {
+      "type": "VMess",
+      "name": "🇨🇦 加拿大-优化2",
+      "udp": false,
+      "history": []
+    },
+    "🇨🇦 加拿大-优化3": {
+      "type": "VMess",
+      "name": "🇨🇦 加拿大-优化3",
+      "udp": false,
+      "history": []
+    },
+    "🇩🇪 德国-优化": {
+      "type": "VMess",
+      "name": "🇩🇪 德国-优化",
+      "udp": false,
+      "history": []
+    },
+    "🇩🇪 德国-优化2": {
+      "type": "VMess",
+      "name": "🇩🇪 德国-优化2",
+      "udp": false,
+      "history": []
+    },
+    "🇬🇧 英国-优化-GPT": {
+      "type": "VMess",
+      "name": "🇬🇧 英国-优化-GPT",
+      "udp": false,
+      "history": []
+    },
+    "🇬🇧 英国-优化2": {
+      "type": "VMess",
+      "name": "🇬🇧 英国-优化2",
+      "udp": false,
+      "history": []
+    },
+    "🇬🇧 英国-优化3": {
+      "type": "VMess",
+      "name": "🇬🇧 英国-优化3",
+      "udp": false,
+      "history": []
+    },
+    "🚀 节点选择": {
+      "type": "Selector",
+      "name": "🚀 节点选择",
+      "udp": false,
+      "history": [],
+      "now": "🇭🇰 香港节点",
+      "all": [
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇸🇬 狮城节点",
+        "🇯🇵 日本节点",
+        "🇺🇲 美国节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换",
+        "DIRECT"
+      ]
+    },
+    "🚀 手动切换": {
+      "type": "Selector",
+      "name": "🚀 手动切换",
+      "udp": false,
+      "history": [],
+      "now": "vmess-ipdktc33",
+      "all": [
+        "vmess-ipdktc33",
+        "过滤掉15条线路",
+        "🇯🇵 日本-优化",
+        "🇯🇵 日本-优化2",
+        "🇯🇵 日本-优化3",
+        "🇸🇬 新加坡-优化-Gemini-GPT",
+        "🇸🇬 新加坡-优化2-Gemini-GPT",
+        "🇸🇬 新加坡-优化3-Gemini",
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港-优化2-Gemini",
+        "🇭🇰 香港-优化3-Gemini",
+        "🇭🇰 香港WAP-优化-Gemini",
+        "🇭🇰 香港WAP-优化2-Gemini",
+        "🇭🇰 香港WAP-优化3-Gemini",
+        "🇮🇳 印度-优化",
+        "🇹🇼 台湾-优化",
+        "🇹🇼 台湾-优化2-GPT",
+        "🇹🇼 台湾-优化3",
+        "🇺🇸 美国LA-优化-GPT",
+        "🇺🇸 美国LA-优化2-GPT",
+        "🇺🇸 美国LA-优化3-GPT",
+        "🇨🇦 加拿大-优化",
+        "🇨🇦 加拿大-优化2",
+        "🇨🇦 加拿大-优化3",
+        "🇩🇪 德国-优化",
+        "🇩🇪 德国-优化2",
+        "🇬🇧 英国-优化-GPT",
+        "🇬🇧 英国-优化2",
+        "🇬🇧 英国-优化3"
+      ]
+    },
+    "📲 电报消息": {
+      "type": "Selector",
+      "name": "📲 电报消息",
+      "udp": false,
+      "history": [],
+      "now": "🚀 节点选择",
+      "all": [
+        "🚀 节点选择",
+        "🇸🇬 狮城节点",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇯🇵 日本节点",
+        "🇺🇲 美国节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换",
+        "DIRECT"
+      ]
+    },
+    "💬 Ai平台": {
+      "type": "Selector",
+      "name": "💬 Ai平台",
+      "udp": false,
+      "history": [],
+      "now": "🚀 节点选择",
+      "all": [
+        "🚀 节点选择",
+        "🇸🇬 狮城节点",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇯🇵 日本节点",
+        "🇺🇲 美国节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换",
+        "DIRECT"
+      ]
+    },
+    "📹 油管视频": {
+      "type": "Selector",
+      "name": "📹 油管视频",
+      "udp": false,
+      "history": [],
+      "now": "🚀 节点选择",
+      "all": [
+        "🚀 节点选择",
+        "🇸🇬 狮城节点",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇯🇵 日本节点",
+        "🇺🇲 美国节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换",
+        "DIRECT"
+      ]
+    },
+    "🎥 奈飞视频": {
+      "type": "Selector",
+      "name": "🎥 奈飞视频",
+      "udp": true,
+      "history": [],
+      "now": "🎥 奈飞节点",
+      "all": [
+        "🎥 奈飞节点",
+        "🚀 节点选择",
+        "🇸🇬 狮城节点",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇯🇵 日本节点",
+        "🇺🇲 美国节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换",
+        "DIRECT"
+      ]
+    },
+    "📺 巴哈姆特": {
+      "type": "Selector",
+      "name": "📺 巴哈姆特",
+      "udp": false,
+      "history": [],
+      "now": "🇨🇳 台湾节点",
+      "all": [
+        "🇨🇳 台湾节点",
+        "🚀 节点选择",
+        "🚀 手动切换",
+        "DIRECT"
+      ]
+    },
+    "📺 哔哩哔哩": {
+      "type": "Selector",
+      "name": "📺 哔哩哔哩",
+      "udp": true,
+      "history": [],
+      "now": "🎯 全球直连",
+      "all": [
+        "🎯 全球直连",
+        "🇨🇳 台湾节点",
+        "🇭🇰 香港节点"
+      ]
+    },
+    "🌍 国外媒体": {
+      "type": "Selector",
+      "name": "🌍 国外媒体",
+      "udp": false,
+      "history": [],
+      "now": "🚀 节点选择",
+      "all": [
+        "🚀 节点选择",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇸🇬 狮城节点",
+        "🇯🇵 日本节点",
+        "🇺🇲 美国节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换",
+        "DIRECT"
+      ]
+    },
+    "🌏 国内媒体": {
+      "type": "Selector",
+      "name": "🌏 国内媒体",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇸🇬 狮城节点",
+        "🇯🇵 日本节点",
+        "🚀 手动切换"
+      ]
+    },
+    "📢 谷歌FCM": {
+      "type": "Selector",
+      "name": "📢 谷歌FCM",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT",
+        "🚀 节点选择",
+        "🇺🇲 美国节点",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇸🇬 狮城节点",
+        "🇯🇵 日本节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换"
+      ]
+    },
+    "Ⓜ️ 微软Bing": {
+      "type": "Selector",
+      "name": "Ⓜ️ 微软Bing",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT",
+        "🚀 节点选择",
+        "🇺🇲 美国节点",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇸🇬 狮城节点",
+        "🇯🇵 日本节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换"
+      ]
+    },
+    "Ⓜ️ 微软云盘": {
+      "type": "Selector",
+      "name": "Ⓜ️ 微软云盘",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT",
+        "🚀 节点选择",
+        "🇺🇲 美国节点",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇸🇬 狮城节点",
+        "🇯🇵 日本节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换"
+      ]
+    },
+    "Ⓜ️ 微软服务": {
+      "type": "Selector",
+      "name": "Ⓜ️ 微软服务",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT",
+        "🚀 节点选择",
+        "🇺🇲 美国节点",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇸🇬 狮城节点",
+        "🇯🇵 日本节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换"
+      ]
+    },
+    "🍎 苹果服务": {
+      "type": "Selector",
+      "name": "🍎 苹果服务",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT",
+        "🚀 节点选择",
+        "🇺🇲 美国节点",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇸🇬 狮城节点",
+        "🇯🇵 日本节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换"
+      ]
+    },
+    "🎮 游戏平台": {
+      "type": "Selector",
+      "name": "🎮 游戏平台",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT",
+        "🚀 节点选择",
+        "🇺🇲 美国节点",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇸🇬 狮城节点",
+        "🇯🇵 日本节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换"
+      ]
+    },
+    "🎶 网易音乐": {
+      "type": "Selector",
+      "name": "🎶 网易音乐",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT",
+        "🚀 节点选择"
+      ]
+    },
+    "🎯 全球直连": {
+      "type": "Selector",
+      "name": "🎯 全球直连",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT",
+        "🚀 节点选择"
+      ]
+    },
+    "🛑 广告拦截": {
+      "type": "Selector",
+      "name": "🛑 广告拦截",
+      "udp": true,
+      "history": [],
+      "now": "REJECT",
+      "all": [
+        "REJECT",
+        "DIRECT"
+      ]
+    },
+    "🍃 应用净化": {
+      "type": "Selector",
+      "name": "🍃 应用净化",
+      "udp": true,
+      "history": [],
+      "now": "REJECT",
+      "all": [
+        "REJECT",
+        "DIRECT"
+      ]
+    },
+    "🐟 漏网之鱼": {
+      "type": "Selector",
+      "name": "🐟 漏网之鱼",
+      "udp": false,
+      "history": [],
+      "now": "🚀 节点选择",
+      "all": [
+        "🚀 节点选择",
+        "DIRECT",
+        "🇭🇰 香港节点",
+        "🇨🇳 台湾节点",
+        "🇸🇬 狮城节点",
+        "🇯🇵 日本节点",
+        "🇺🇲 美国节点",
+        "🇰🇷 韩国节点",
+        "🚀 手动切换"
+      ]
+    },
+    "🇭🇰 香港节点": {
+      "type": "Selector",
+      "name": "🇭🇰 香港节点",
+      "udp": false,
+      "history": [
+        {
+          "time": "2026-05-06T23:58:21.637587482+08:00",
+          "delay": 3162
+        }
+      ],
+      "now": "🇭🇰 香港-优化-Gemini",
+      "all": [
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港-优化2-Gemini",
+        "🇭🇰 香港-优化3-Gemini",
+        "🇭🇰 香港WAP-优化-Gemini",
+        "🇭🇰 香港WAP-优化2-Gemini",
+        "🇭🇰 香港WAP-优化3-Gemini"
+      ]
+    },
+    "🇯🇵 日本节点": {
+      "type": "Selector",
+      "name": "🇯🇵 日本节点",
+      "udp": false,
+      "history": [],
+      "now": "🇯🇵 日本-优化",
+      "all": [
+        "🇯🇵 日本-优化",
+        "🇯🇵 日本-优化2",
+        "🇯🇵 日本-优化3"
+      ]
+    },
+    "🇺🇲 美国节点": {
+      "type": "Selector",
+      "name": "🇺🇲 美国节点",
+      "udp": false,
+      "history": [
+        {
+          "time": "2026-05-06T23:58:20.670848645+08:00",
+          "delay": 2324
+        }
+      ],
+      "now": "🇺🇸 美国LA-优化-GPT",
+      "all": [
+        "🇺🇸 美国LA-优化-GPT",
+        "🇺🇸 美国LA-优化2-GPT",
+        "🇺🇸 美国LA-优化3-GPT"
+      ]
+    },
+    "🇸🇬 狮城节点": {
+      "type": "Selector",
+      "name": "🇸🇬 狮城节点",
+      "udp": false,
+      "history": [],
+      "now": "🇸🇬 新加坡-优化-Gemini-GPT",
+      "all": [
+        "🇸🇬 新加坡-优化-Gemini-GPT",
+        "🇸🇬 新加坡-优化2-Gemini-GPT",
+        "🇸🇬 新加坡-优化3-Gemini"
+      ]
+    },
+    "🇨🇳 台湾节点": {
+      "type": "Selector",
+      "name": "🇨🇳 台湾节点",
+      "udp": false,
+      "history": [],
+      "now": "🇹🇼 台湾-优化",
+      "all": [
+        "🇹🇼 台湾-优化",
+        "🇹🇼 台湾-优化2-GPT",
+        "🇹🇼 台湾-优化3"
+      ]
+    },
+    "🇰🇷 韩国节点": {
+      "type": "Selector",
+      "name": "🇰🇷 韩国节点",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT"
+      ]
+    },
+    "🎥 奈飞节点": {
+      "type": "Selector",
+      "name": "🎥 奈飞节点",
+      "udp": true,
+      "history": [],
+      "now": "DIRECT",
+      "all": [
+        "DIRECT"
+      ]
+    }
+  }
+}

@@ -1,8 +1,24 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum CoreType {
+    #[serde(rename = "mihomo")]
+    Mihomo,
+    #[serde(rename = "singbox")]
+    Singbox,
+}
+impl Default for CoreType {
+    fn default() -> Self {
+        Self::Mihomo
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct ConfigFile {
+    #[serde(alias = "core_type")]
+    pub core_type: CoreType,
     pub basic: Basic,
     pub service: Service,
     pub timeout: Option<u64>,
@@ -10,21 +26,25 @@ pub struct ConfigFile {
     pub extra: Extra,
     #[serde(skip_serializing)]
     pub hack: Hack,
+    pub singbox: SingboxBasic,
 }
 impl Default for ConfigFile {
     fn default() -> Self {
         Self {
+            core_type: Default::default(),
             basic: Default::default(),
             service: Default::default(),
             timeout: Default::default(),
             test_url: Default::default(),
             extra: Default::default(),
             hack: Default::default(),
+            singbox: Default::default(),
         }
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Extra {
     pub edit_cmd: String,
@@ -40,7 +60,7 @@ impl Default for Extra {
     }
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Basic {
     pub clash_config_dir: String,
@@ -48,17 +68,29 @@ pub struct Basic {
     pub clash_config_path: String,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SingboxBasic {
+    pub singbox_bin_path: String,
+    pub singbox_config_dir: String,
+    pub singbox_config_path: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Service {
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     #[serde(alias = "clash_srv_name")]
     pub clash_service_name: String,
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    pub singbox_service_name: String,
     #[cfg(target_os = "linux")]
     pub is_user: bool,
+    #[cfg(target_os = "linux")]
+    pub singbox_is_user: bool,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct Hack {
     pub service_controller: ServiceController,
@@ -75,7 +107,7 @@ impl Default for Hack {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum ServiceController {
     Systemd,
     Nssm,

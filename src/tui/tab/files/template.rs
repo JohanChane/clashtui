@@ -204,7 +204,7 @@ mod actions {
             return do_nothing();
         }
 
-        let path = crate::config::template_path().join(&name);
+        let path = crate::functions::file::TEMPLATE_PATH.join(&name);
         match std::fs::remove_file(&path) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -221,7 +221,7 @@ mod actions {
     }
 
     async fn _edit(name: String) -> CB {
-        let path = crate::config::template_path().join(&name);
+        let path = crate::functions::file::TEMPLATE_PATH.join(&name);
         log::debug!("template::_edit: path={}", path.display());
         tri!(edit(path.to_str().unwrap()));
         do_nothing()

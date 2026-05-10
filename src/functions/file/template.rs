@@ -96,6 +96,7 @@ pub async fn update_profile_without_pp(
     }
     #[derive(serde::Deserialize, serde::Serialize, Debug)]
     struct PGitem {
+        #[serde(rename = "use")]
         #[serde(skip_serializing_if = "Option::is_none")]
         us_: Option<Vec<String>>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -361,6 +362,74 @@ pub async fn fetch_net_resource_statuses(
         let name = resource.name;
         let path = std::path::PathBuf::from(&crate::config::CONFIG.cfg_file.basic.clash_config_dir)
             .join(&resource.path);
+        let section = resource.section;
+        handles.push(tokio::task::spawn_blocking(move || {
+            match crate::functions::restful::download::profile(&url, with_proxy) {
+                Ok(mut rdr) => {
+                    let mut buf = Vec::new();
+                    if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
+                        return (name, url, path, section, false, Some(e.to_string()));
+                    }
+                    if let Some(parent) = path.parent() {
+                        if let Err(e) = std::fs::create_dir_all(parent) {
+                            return (name, url, path, section, false, Some(e.to_string()));
+                        }
+                    }
+                    match std::fs::write(&path, &buf) {
+                        Ok(()) => (name, url, path, section, true, None),
+                        Err(e) => (name, url, path, section, false, Some(e.to_string())),
+                    }
+                }
+                Err(e) => (name, url, path, section, false, Some(e.to_string())),
+            }
+        }));
+    }
+
+    let mut statuses = Vec::with_capacity(handles.len());
+    for handle in handles {
+        let (name, url, path, section, ok, error) = match handle.await {
+            Ok(v) => v,
+            Err(e) => {
+                statuses.push(NetResourceUpdate {
+                    name: String::new(),
+                    url: String::new(),
+                    path: String::new(),
+                    section: ResourceSection::ProxyProvider,
+                    ok: false,
+                    error: Some(e.to_string()),
+                });
+                continue;
+            }
+        };
+        statuses.push(NetResourceUpdate {
+            path: path.display().to_string(),
+            name,
+            url,
+            section,
+            ok,
+            error,
+        });
+    }
+
+    statuses
+}
+
+pub async fn fetch_net_resource_statuses_from_resources(
+    resources: &[crate::functions::file::net_resource::NetResource],
+    base_dir: &std::path::Path,
+    with_proxy: bool,
+) -> Vec<crate::functions::file::net_resource::NetResourceUpdate> {
+    use crate::functions::file::net_resource::{NetResourceUpdate, ResourceSection};
+
+    if resources.is_empty() {
+        return Vec::new();
+    }
+
+    let mut handles = Vec::with_capacity(resources.len());
+    for resource in resources.iter().cloned() {
+        let url = resource.url;
+        let name = resource.name;
+        let path = base_dir.join(&resource.path);
         let section = resource.section;
         handles.push(tokio::task::spawn_blocking(move || {
             match crate::functions::restful::download::profile(&url, with_proxy) {

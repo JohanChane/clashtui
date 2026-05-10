@@ -1,0 +1,153 @@
+{
+  "connections": [
+    {
+      "chains": [
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港节点",
+        "🚀 节点选择",
+        "🐟 漏网之鱼"
+      ],
+      "download": 900,
+      "id": "06dd12ac-8597-4385-8c2e-c1edeced8e78",
+      "metadata": {
+        "destinationIP": "",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "push.services.mozilla.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "172.19.0.1",
+        "sourcePort": "57900",
+        "type": "tun/tun-in"
+      },
+      "rule": "final",
+      "rulePayload": "",
+      "start": "2026-05-07T00:07:13.607617797+08:00",
+      "upload": 2751
+    },
+    {
+      "chains": [
+        "DIRECT",
+        "🎯 全球直连"
+      ],
+      "download": 601684,
+      "id": "e246169e-9d05-40ad-91ae-4a79c28a7260",
+      "metadata": {
+        "destinationIP": "120.233.185.134",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "api.deepseek.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "172.19.0.1",
+        "sourcePort": "52432",
+        "type": "tun/tun-in"
+      },
+      "rule": "rule_set=geoip-cn => route(🎯 全球直连)",
+      "rulePayload": "",
+      "start": "2026-05-07T00:07:44.345118394+08:00",
+      "upload": 572622
+    },
+    {
+      "chains": [
+        "DIRECT",
+        "🎯 全球直连"
+      ],
+      "download": 22799,
+      "id": "691abb8c-6482-4b45-a0f8-95daafc7aad0",
+      "metadata": {
+        "destinationIP": "112.53.48.40",
+        "destinationPort": "8080",
+        "dnsMode": "normal",
+        "host": "",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "172.19.0.1",
+        "sourcePort": "34674",
+        "type": "tun/tun-in"
+      },
+      "rule": "rule_set=geoip-cn => route(🎯 全球直连)",
+      "rulePayload": "",
+      "start": "2026-05-06T23:58:03.569802128+08:00",
+      "upload": 12453
+    },
+    {
+      "chains": [
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港节点",
+        "🚀 节点选择",
+        "📲 电报消息"
+      ],
+      "download": 6754,
+      "id": "0beca519-d35c-430d-82c2-958c8faa7674",
+      "metadata": {
+        "destinationIP": "91.108.56.118",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "172.19.0.1",
+        "sourcePort": "36584",
+        "type": "tun/tun-in"
+      },
+      "rule": "domain_suffix=[t.me tdesktop.com telegra.ph...] ip_cidr=[91.108.0.0/16 95.161.64.0/20 109.239.140.0/24...] => route(📲 电报消息)",
+      "rulePayload": "",
+      "start": "2026-05-07T00:07:12.973364311+08:00",
+      "upload": 2664
+    },
+    {
+      "chains": [
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港节点",
+        "🚀 节点选择",
+        "🐟 漏网之鱼"
+      ],
+      "download": 4262,
+      "id": "8f9beef4-2bd7-45ca-b1af-c8db5869532c",
+      "metadata": {
+        "destinationIP": "",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "firefox.settings.services.mozilla.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "172.19.0.1",
+        "sourcePort": "47400",
+        "type": "tun/tun-in"
+      },
+      "rule": "final",
+      "rulePayload": "",
+      "start": "2026-05-07T00:07:14.363164897+08:00",
+      "upload": 916
+    },
+    {
+      "chains": [
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港节点",
+        "🚀 节点选择",
+        "🐟 漏网之鱼"
+      ],
+      "download": 1217,
+      "id": "bfd1bfc5-6284-4441-9d5f-c52e68004357",
+      "metadata": {
+        "destinationIP": "",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "push.services.mozilla.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "172.19.0.1",
+        "sourcePort": "36654",
+        "type": "tun/tun-in"
+      },
+      "rule": "final",
+      "rulePayload": "",
+      "start": "2026-05-07T00:08:18.948268291+08:00",
+      "upload": 2134
+    }
+  ],
+  "downloadTotal": 4912755,
+  "memory": 17375232,
+  "uploadTotal": 2402576
+}

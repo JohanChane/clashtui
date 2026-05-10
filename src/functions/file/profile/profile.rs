@@ -106,7 +106,7 @@ impl LocalProfile {
 impl ProfileType {
     pub fn get_domain(&self) -> Option<String> {
         match self {
-            ProfileType::File => None,
+            ProfileType::File | ProfileType::Singbox => None,
             ProfileType::Url(url) => extract_domain(url).map(|s| s.to_owned()),
         }
     }

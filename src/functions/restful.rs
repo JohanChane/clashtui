@@ -199,7 +199,7 @@ pub mod connection {
 
     #[cfg_attr(test, derive(Debug))]
     #[derive(Deserialize, Default)]
-    #[serde(rename_all = "camelCase")]
+    #[serde(rename_all = "camelCase", default)]
     pub struct ConnInfo {
         pub download_total: u64,
         pub upload_total: u64,
@@ -226,15 +226,18 @@ pub mod connection {
     #[serde(rename_all = "camelCase")]
     pub struct ConnMetaData {
         pub network: String,
-        #[serde(rename = "type")]
+        #[serde(rename = "type", default)]
         pub ctype: String,
         pub host: String,
+        #[serde(default)]
         pub process: String,
+        #[serde(default)]
         pub process_path: String,
 
         #[serde(rename = "sourceIP")]
         pub source_ip: String,
         pub source_port: String,
+        #[serde(default)]
         pub remote_destination: String,
         #[serde(default, rename = "destinationPort")]
         pub destination_port: String,
