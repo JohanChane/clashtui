@@ -61,7 +61,12 @@ impl Config {
     fn load() -> Result<Self> {
         let mut cfg_file = ConfigFile::from_file()?;
         let basic_info = BasicInfo::from_file()?;
-        let data: Mutex<ProfileManager> = ProfileManager::from_file()?.into();
+        let mut data: ProfileManager = ProfileManager::from_file()?;
+        // migrate File → Template for mihomo profiles with clashtui marker
+        if data.migrate_file_to_template(&profile_yamls_path()) {
+            let _ = data.to_file();
+        }
+        let data: Mutex<ProfileManager> = data.into();
         cfg_file.core_type = data.lock().unwrap().core_type;
         if !cfg_file.basic.clash_config_path.is_empty() {
             cfg_file.basic.clash_config_path = std::path::absolute(

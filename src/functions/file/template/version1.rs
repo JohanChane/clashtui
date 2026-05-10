@@ -1,8 +1,6 @@
-use std::io::{BufRead, BufReader};
-
 use anyhow::Context;
 
-use super::{PROXY_GROUPS, PROXY_PROVIDERS, TEMPLATE_PATH};
+use super::{PROXY_GROUPS, PROXY_PROVIDERS};
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 struct PGparam {
@@ -24,32 +22,16 @@ struct PGitem {
     __others: serde_yml::Value,
 }
 
-fn read_template_proxy_providers() -> anyhow::Result<Vec<String>> {
-    let path = TEMPLATE_PATH.join("template_proxy_providers");
-    let file = match std::fs::File::open(&path) {
-        Ok(f) => f,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(e) => anyhow::bail!("Failed to open template_proxy_providers: {e}"),
-    };
-    let urls: Vec<String> = BufReader::new(file)
-        .lines()
-        .map_while(Result::ok)
-        .map(|v| v.trim().to_owned())
-        .filter(|v| !(v.is_empty() || v.starts_with('#')))
-        .collect();
-    Ok(urls)
-}
-
 pub(super) fn gen_template(
     tpl: serde_yml::Mapping,
     template_name: &str,
+    urls: &[String],
 ) -> anyhow::Result<serde_yml::Mapping> {
     let tpl_name = std::path::Path::new(template_name)
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or(template_name);
-    let proxy_urls = read_template_proxy_providers()?;
-    gen_template_with_urls(tpl, tpl_name, &proxy_urls)
+    gen_template_with_urls(tpl, tpl_name, urls)
 }
 
 pub(super) fn gen_template_with_urls(
@@ -245,6 +227,11 @@ pub(super) fn gen_template_with_urls(
             );
         }
     }
+
+    out_parsed_yaml.insert(
+        "clashtui".into(),
+        serde_yml::Value::Null,
+    );
 
     Ok(out_parsed_yaml)
 }
@@ -449,11 +436,12 @@ mod tests {
     }
 
     #[test]
-    fn test_no_clashtui_marker() {
+    fn test_clashtui_marker_present() {
         let tpl = load_yaml(testdata_path("simple_tpl.yaml")).unwrap();
         let result = gen_template_with_urls(tpl, "simple_tpl", &["https://example.com/sub1.yaml".into()]).unwrap();
 
-        assert!(!result.contains_key("clashtui"));
+        assert!(result.contains_key("clashtui"));
+        assert_eq!(result.get("clashtui").unwrap(), &serde_yml::Value::Null);
     }
 
     #[test]

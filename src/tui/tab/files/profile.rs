@@ -501,6 +501,7 @@ pub(super) fn get_profiles_with_readable_atime() -> (Vec<String>, Vec<String>) {
                 ProfileType::File => "local import".to_owned(),
                 ProfileType::Url(url) => extract_domain(url).unwrap_or("unknown").to_owned(),
                 ProfileType::Singbox => "singbox profile".to_owned(),
+                ProfileType::Template { .. } => "template".to_owned(),
             };
             let atime = pf
                 .load_local_profile()

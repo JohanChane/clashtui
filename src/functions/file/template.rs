@@ -1,7 +1,9 @@
-use super::{MAX_SUPPORTED_TEMPLATE_VERSION, PROFILE_YAMLS_PATH, TEMPLATE_PATH};
+use super::{MAX_SUPPORTED_TEMPLATE_VERSION, PROFILE_JSONS_PATH, PROFILE_YAMLS_PATH, TEMPLATE_PATH};
 use crate::config::database::ProfileType;
+use anyhow::Context as _;
 
 mod version1;
+pub mod singbox;
 
 pub fn get_all_templates() -> std::io::Result<Vec<String>> {
     Ok(std::fs::read_dir(TEMPLATE_PATH.as_path())?
@@ -14,6 +16,17 @@ pub fn get_all_templates() -> std::io::Result<Vec<String>> {
         })
         .collect())
 }
+pub fn read_template_proxy_providers() -> anyhow::Result<Vec<String>> {
+    let path = crate::config::template_proxy_providers_path();
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read template_proxy_providers: {}", path.display()))?;
+    Ok(content
+        .lines()
+        .map(|l| l.trim().to_owned())
+        .filter(|l| !l.is_empty() && !l.starts_with('#'))
+        .collect())
+}
+
 pub fn create_template(path: String) -> anyhow::Result<Option<String>> {
     let path = std::path::PathBuf::from(path);
     let file = std::fs::File::open(&path)?;
@@ -44,7 +57,7 @@ pub fn create_template(path: String) -> anyhow::Result<Option<String>> {
         ),
     }
 }
-pub fn apply_template(template_name: &str, profile_name: &str) -> anyhow::Result<()> {
+pub fn apply_template(template_name: &str, profile_name: &str, urls: &[String]) -> anyhow::Result<()> {
     let path = TEMPLATE_PATH.join(template_name);
     let file = std::fs::File::open(&path)
         .inspect_err(|e| log::error!("Founding template {template_name}:{e}"))?;
@@ -53,16 +66,51 @@ pub fn apply_template(template_name: &str, profile_name: &str) -> anyhow::Result
         .get("clashtui_template_version")
         .and_then(|v| v.as_u64())
     {
-        None | Some(1) => version1::gen_template(map, template_name)?,
+        None | Some(1) => version1::gen_template(map, template_name, urls)?,
         Some(_) => unimplemented!(),
     };
     let output_path = PROFILE_YAMLS_PATH.join(format!("{profile_name}.yaml"));
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    serde_yml::to_writer(std::fs::File::create(&output_path)?, &gened)?;
+    // atomic write
+    let tmp_path = output_path.with_extension("yaml.tmp");
+    serde_yml::to_writer(std::fs::File::create(&tmp_path)?, &gened)?;
+    std::fs::rename(&tmp_path, &output_path)?;
     let mut pm = pm!();
-    pm.insert(profile_name, ProfileType::File);
+    pm.insert(profile_name, ProfileType::Template {
+        template: template_name.to_owned(),
+        urls: urls.to_vec(),
+    });
+    pm.to_file()?;
+    Ok(())
+}
+
+pub async fn apply_template_singbox(
+    template_name: &str,
+    profile_name: &str,
+    urls: &[String],
+    with_proxy: bool,
+) -> anyhow::Result<()> {
+    let path = TEMPLATE_PATH.join(template_name);
+    let file = std::fs::File::open(&path)
+        .inspect_err(|e| log::error!("Opening template {template_name}:{e}"))?;
+    let map: serde_json::Value = serde_json::from_reader(file)?;
+    let gened = singbox::gen_template_singbox(&map, template_name, urls, with_proxy).await?;
+    let output_path = PROFILE_JSONS_PATH.join(format!("{profile_name}.json"));
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    // atomic write
+    let tmp_path = output_path.with_extension("json.tmp");
+    let file = std::fs::File::create(&tmp_path)?;
+    serde_json::to_writer_pretty(file, &gened)?;
+    std::fs::rename(&tmp_path, &output_path)?;
+    let mut pm = pm!();
+    pm.insert(profile_name, ProfileType::Template {
+        template: template_name.to_owned(),
+        urls: urls.to_vec(),
+    });
     pm.to_file()?;
     Ok(())
 }
