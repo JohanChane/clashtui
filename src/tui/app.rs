@@ -65,7 +65,7 @@ impl App {
                 ProxiesTab::default().into(),
                 ConnectionsTab::default().into(),
                 SettingsTab::default().into(),
-                SrvCtlTab::default().into(),
+                CoreSrvCtlTab::default().into(),
             ],
             popup: PopUp::default(),
             chord: ChordHandler::default(),
@@ -76,7 +76,12 @@ impl App {
     }
     #[cfg(target_os = "linux")]
     fn check_startup_perms(&self) {
-        let dir = std::path::Path::new(&crate::config::CONFIG.cfg_file.basic.clash_config_dir);
+        use crate::config::CoreType;
+        let dir_str = match crate::config::CONFIG.cfg_file.core_type {
+            CoreType::Mihomo => &crate::config::CONFIG.cfg_file.basic.clash_config_dir,
+            CoreType::Singbox => &crate::config::CONFIG.cfg_file.singbox.singbox_config_dir,
+        };
+        let dir = std::path::Path::new(dir_str);
         if crate::functions::command::check_file_permissions(dir) {
             return;
         }
@@ -126,6 +131,11 @@ impl App {
 
         app.check_startup_perms();
         while !QUIT.load(Ordering::Relaxed) {
+            if crate::tui::EXT_PROC.load(Ordering::SeqCst) {
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                continue;
+            }
+
             if RESIZE.swap(false, Ordering::Relaxed) {
                 terminal.autoresize()?;
             }
@@ -185,7 +195,7 @@ impl App {
                     Some('c') => {
                         log::debug!("open_dir: config dir");
                         let _ = crate::functions::command::open_dir(
-                            crate::config::config_dir_path().to_str().unwrap(),
+                            crate::config::config_root_path().to_str().unwrap(),
                         );
                     }
                     Some('m') => {

@@ -2,6 +2,7 @@ use super::*;
 use crate::functions::command::edit;
 use crate::functions::file::template::*;
 use crate::tui::widget::popmsg::Confirm;
+use std::cell::Cell;
 
 mod_agent!(
     Key,
@@ -18,6 +19,7 @@ mod_agent!(
         ([KeyCode::Char('e')], Key::Action(Action::Edit), ""),
         ([KeyCode::Char('p')], Key::Action(Action::Preview), ""),
         ([KeyCode::Enter], Key::Action(Action::Generate), ""),
+        ([KeyCode::Char('f')], Key::Action(Action::FzfFind), "Fuzzy find template"),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
         ([KeyCode::Char('G')], Key::Action(Action::GoEnd), "Go to end"),
         ([KeyCode::Char('/')], Key::Action(Action::Search), "Search/Filter"),
@@ -31,6 +33,7 @@ pub enum Action {
     Edit,
     Preview,
     Search,
+    FzfFind,
     GoTop,
     GoEnd,
 }
@@ -69,6 +72,7 @@ impl TryFrom<&crate::tui::Key> for Key {
 pub struct Template {
     items: Vec<String>,
     filter: Option<String>,
+    jump_target: Cell<Option<usize>>,
 }
 
 impl BasicTabContent for Template {
@@ -112,6 +116,11 @@ impl DualTabContentMate for Template {
                 match action {
                     Action::GoTop => state.select_first(),
                     Action::GoEnd => state.select_last(),
+                    Action::FzfFind => {
+                        let items = self.items.clone();
+                        actions::fzf_find(items).spawn_at(task_set);
+                        return false;
+                    }
                     _ => {
                         let name = get_name!(self, state);
                         log::debug!("Template::Action name={name}");
@@ -125,6 +134,10 @@ impl DualTabContentMate for Template {
     }
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, is_focused: bool) {
+        if let Some(idx) = self.jump_target.take() {
+            state.select(Some(idx));
+        }
+
         // Clamp cursor to valid range
         if let Some(idx) = state.selected() {
             if self.items.is_empty() {
@@ -182,6 +195,7 @@ mod actions {
                 Self::Edit => _edit(name).await,
                 Self::Preview => preview(name).await,
                 Self::Search => search().await,
+                Self::FzfFind => unreachable!("FzfFind handled directly"),
                 Self::GoTop | Self::GoEnd => do_nothing(),
             }
         }
@@ -191,8 +205,9 @@ mod actions {
     type C = (<Template as DualTabContentMate>::Mate, Template);
 
     async fn generate(name: String) -> CB {
-        let profile_name = format!("{name}.generated");
-        tri!(apply_template(&name, &profile_name));
+        let profile_name = format!("{name}.tpl");
+        let urls = tri!(read_template_proxy_providers());
+        tri!(apply_template(&name, &profile_name, &urls));
         sync!(C)
     }
 
@@ -204,7 +219,7 @@ mod actions {
             return do_nothing();
         }
 
-        let path = crate::config::template_path().join(&name);
+        let path = crate::functions::file::TEMPLATE_PATH.join(&name);
         match std::fs::remove_file(&path) {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -221,7 +236,7 @@ mod actions {
     }
 
     async fn _edit(name: String) -> CB {
-        let path = crate::config::template_path().join(&name);
+        let path = crate::functions::file::TEMPLATE_PATH.join(&name);
         log::debug!("template::_edit: path={}", path.display());
         tri!(edit(path.to_str().unwrap()));
         do_nothing()
@@ -242,6 +257,18 @@ mod actions {
 
         wrapper(|(_, content): &mut C| {
             content.filter = (!filter.is_empty()).then_some(filter);
+        })
+    }
+
+    pub(super) async fn fzf_find(items: Vec<String>) -> CB {
+        let selected = tokio::task::spawn_blocking(move || {
+            crate::tui::widget::fzffind::run_fzf(&items, "Find Template")
+        })
+        .await
+        .unwrap_or(None);
+
+        wrapper(move |(_, content): &mut C| {
+            content.jump_target.set(selected);
         })
     }
 }

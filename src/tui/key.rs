@@ -29,7 +29,15 @@ impl Default for Key {
 impl From<KeyEvent> for Key {
 	fn from(value: KeyEvent) -> Self {
 		let shift = match (value.code, value.modifiers) {
-			(KeyCode::Char(c), _) => c.is_ascii_uppercase(),
+			(KeyCode::Char(c), m) => {
+				if c.is_ascii_uppercase() {
+					true
+				} else if !c.is_ascii_alphabetic() && m.contains(KeyModifiers::SHIFT) {
+					false
+				} else {
+					false
+				}
+			}
 			(KeyCode::BackTab, _) => false,
 			(_, m) => m.contains(KeyModifiers::SHIFT),
 		};
@@ -101,6 +109,91 @@ impl FromStr for Key {
 			bail!("empty key");
 		}
 		Ok(key)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	fn key_event(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
+		KeyEvent::new(code, modifiers)
+	}
+
+	#[test]
+	fn plain_char_no_modifiers() {
+		let k = Key::from(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
+		assert_eq!(k.code, KeyCode::Char('a'));
+		assert!(!k.shift);
+		assert!(!k.ctrl);
+		assert!(!k.alt);
+		assert!(!k.super_);
+	}
+
+	#[test]
+	fn uppercase_char_infers_shift() {
+		let k = Key::from(key_event(KeyCode::Char('A'), KeyModifiers::NONE));
+		assert_eq!(k.code, KeyCode::Char('A'));
+		assert!(k.shift);
+	}
+
+	#[test]
+	fn uppercase_char_with_shift_modifier() {
+		let k = Key::from(key_event(KeyCode::Char('A'), KeyModifiers::SHIFT));
+		assert_eq!(k.code, KeyCode::Char('A'));
+		assert!(k.shift);
+	}
+
+	#[test]
+	fn ctrl_key() {
+		let k = Key::from(key_event(KeyCode::Char('w'), KeyModifiers::CONTROL));
+		assert_eq!(k.code, KeyCode::Char('w'));
+		assert!(k.ctrl);
+		assert!(!k.shift);
+	}
+
+	#[test]
+	fn non_alpha_shift_stripped_windows_style() {
+		let k = Key::from(key_event(KeyCode::Char('~'), KeyModifiers::SHIFT));
+		assert_eq!(k.code, KeyCode::Char('~'));
+		assert!(!k.shift, "shift should be stripped for non-alpha char");
+	}
+
+	#[test]
+	fn non_alpha_shift_stripped_unix_style() {
+		let k = Key::from(key_event(KeyCode::Char('~'), KeyModifiers::NONE));
+		assert_eq!(k.code, KeyCode::Char('~'));
+		assert!(!k.shift);
+	}
+
+	#[test]
+	fn shift_digit_normalized() {
+		let k_win = Key::from(key_event(KeyCode::Char('!'), KeyModifiers::SHIFT));
+		let k_unix = Key::from(key_event(KeyCode::Char('!'), KeyModifiers::NONE));
+		assert_eq!(k_win, k_unix);
+		assert_eq!(k_win.code, KeyCode::Char('!'));
+		assert!(!k_win.shift);
+	}
+
+	#[test]
+	fn lowercase_alpha_stays_unshifted() {
+		let k = Key::from(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
+		assert_eq!(k.code, KeyCode::Char('a'));
+		assert!(!k.shift);
+	}
+
+	#[test]
+	fn backtab_shift_is_false() {
+		let k = Key::from(key_event(KeyCode::BackTab, KeyModifiers::SHIFT));
+		assert_eq!(k.code, KeyCode::BackTab);
+		assert!(!k.shift);
+	}
+
+	#[test]
+	fn non_char_key_with_shift() {
+		let k = Key::from(key_event(KeyCode::Up, KeyModifiers::SHIFT));
+		assert_eq!(k.code, KeyCode::Up);
+		assert!(k.shift);
 	}
 }
 

@@ -2,11 +2,6 @@ pub mod raw_mode {
     //! Provides functions for setting up and restoring the terminal.
 
     use crossterm::{
-        cursor,
-        event::{
-            DisableMouseCapture, EnableMouseCapture, KeyboardEnhancementFlags,
-            PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
-        },
         execute,
         terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     };
@@ -14,24 +9,13 @@ pub mod raw_mode {
     /// Enables raw mode and sets up the terminal for the application.
     pub fn setup() -> Result<(), std::io::Error> {
         enable_raw_mode()?;
-        execute!(
-            std::io::stdout(),
-            EnterAlternateScreen,
-            EnableMouseCapture,
-            PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::REPORT_EVENT_TYPES)
-        )
+        execute!(std::io::stdout(), EnterAlternateScreen)
     }
 
     /// Disables raw mode and restores the terminal to its original state.
     pub fn restore() -> Result<(), std::io::Error> {
         disable_raw_mode()?;
-        execute!(
-            std::io::stdout(),
-            LeaveAlternateScreen,
-            DisableMouseCapture,
-            PopKeyboardEnhancementFlags,
-            cursor::Show
-        )
+        execute!(std::io::stdout(), LeaveAlternateScreen, crossterm::cursor::Show)
     }
 
     /// make terminal restorable after panic

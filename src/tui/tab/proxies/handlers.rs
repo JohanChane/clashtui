@@ -7,6 +7,25 @@ use super::content::Proxies;
 use super::tree::NodeType;
 
 impl Proxies {
+    pub fn fzf_find(&mut self, items: Vec<(String, usize)>, task_set: &mut FutureSet<Self>) {
+        let names: Vec<String> = items.iter().map(|(name, _)| name.clone()).collect();
+        async move {
+            let selected = tokio::task::spawn_blocking(move || {
+                crate::tui::widget::fzffind::run_fzf(&names, "Find Proxy")
+            })
+            .await
+            .unwrap_or(None);
+            // Map fzf positional index back to tree index
+            let target = selected.and_then(|pos| items.get(pos).map(|(_, idx)| *idx));
+            wrapper(move |content: &mut Self| {
+                content.jump_target.set(target);
+            })
+        }
+        .spawn_at(task_set);
+    }
+}
+
+impl Proxies {
     pub fn select_inline(
         &mut self,
         group: String,
