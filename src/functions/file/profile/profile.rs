@@ -5,13 +5,8 @@ use crate::config::database::{Profile, ProfileType};
 
 impl Profile {
     pub fn load_local_profile(self) -> anyhow::Result<LocalProfile> {
-        use super::super::PROFILE_JSONS_PATH;
         use super::PROFILE_YAMLS_PATH;
-        let path = if super::is_singbox_profile(&self) {
-            PROFILE_JSONS_PATH.join(format!("{}.json", &self.name))
-        } else {
-            PROFILE_YAMLS_PATH.join(format!("{}.yaml", &self.name))
-        };
+        let path = PROFILE_YAMLS_PATH.join(format!("{}.yaml", &self.name));
         let mut lpf = LocalProfile::from_pf(self, path);
         lpf.sync_from_disk()?;
         Ok(lpf)
@@ -111,7 +106,7 @@ impl LocalProfile {
 impl ProfileType {
     pub fn get_domain(&self) -> Option<String> {
         match self {
-            ProfileType::File | ProfileType::Singbox | ProfileType::Template { .. } => None,
+            ProfileType::File | ProfileType::Singbox => None,
             ProfileType::Url(url) => extract_domain(url).map(|s| s.to_owned()),
         }
     }

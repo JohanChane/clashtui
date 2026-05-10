@@ -191,9 +191,8 @@ mod actions {
     type C = (<Template as DualTabContentMate>::Mate, Template);
 
     async fn generate(name: String) -> CB {
-        let profile_name = format!("{name}.tpl");
-        let urls = tri!(read_template_proxy_providers());
-        tri!(apply_template(&name, &profile_name, &urls));
+        let profile_name = format!("{name}.generated");
+        tri!(apply_template(&name, &profile_name));
         sync!(C)
     }
 

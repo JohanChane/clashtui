@@ -29,4 +29,3 @@ proxy-groups:
     type: select
     proxies:
       - DIRECT
-clashtui: null
