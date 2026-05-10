@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use std::cell::Cell;
 use std::time::Instant;
 
-use super::tree::{NodeType, ProxyTree};
+use super::tree::{NodeType, ProxyTree, SortMode};
 
 #[derive(Default)]
 pub struct Proxies {
@@ -13,9 +13,18 @@ pub struct Proxies {
     pub error: Option<String>,
     pub testing_since: Option<Instant>,
     pub jump_target: Cell<Option<usize>>,
+    pub filter: Option<String>,
 }
 
 impl Proxies {
+    fn resolve_group_for_sort(&self, cursor: usize) -> Option<String> {
+        let node = self.tree.node_at(cursor)?;
+        match node.node_type {
+            NodeType::Folder => Some(node.name.clone()),
+            NodeType::Link | NodeType::File => node.parent.clone(),
+        }
+    }
+
     pub fn dispatch_key(
         &mut self,
         key: super::Key,
@@ -33,6 +42,16 @@ impl Proxies {
             super::Key::MoveDown => {
                 if current + 1 < self.tree.len() {
                     state.select(Some(current + 1));
+                }
+            }
+            super::Key::GoTop => {
+                if self.tree.len() > 0 {
+                    state.select(Some(0));
+                }
+            }
+            super::Key::GoBottom => {
+                if self.tree.len() > 0 {
+                    state.select(Some(self.tree.len().saturating_sub(1)));
                 }
             }
             super::Key::Parent => {
@@ -92,18 +111,69 @@ impl Proxies {
             super::Key::ExpandAll => self.tree.expand_all(&self.proxies),
             super::Key::Refresh => self.refresh(task_set),
             super::Key::SortByName => {
-                self.tree.sorted = !self.tree.sorted;
-                self.tree.sort_by_delay = false;
-                self.tree.rebuild_from_proxies(&self.proxies);
+                if let Some(group_name) = self.resolve_group_for_sort(current) {
+                    if let Some(idx) = self.tree.find_folder_index(&group_name) {
+                        let new_mode = if self.tree.nodes[idx].sort_mode == SortMode::ByName {
+                            SortMode::None
+                        } else {
+                            SortMode::ByName
+                        };
+                        self.tree.nodes[idx].sort_mode = new_mode;
+                        self.tree.rebuild_from_proxies(&self.proxies);
+                    }
+                }
             }
             super::Key::SortByDelay => {
-                self.tree.sort_by_delay = !self.tree.sort_by_delay;
-                self.tree.sorted = false;
-                self.tree.rebuild_from_proxies(&self.proxies);
+                if let Some(group_name) = self.resolve_group_for_sort(current) {
+                    if let Some(idx) = self.tree.find_folder_index(&group_name) {
+                        let new_mode = if self.tree.nodes[idx].sort_mode == SortMode::ByDelay {
+                            SortMode::None
+                        } else {
+                            SortMode::ByDelay
+                        };
+                        self.tree.nodes[idx].sort_mode = new_mode;
+                        self.tree.rebuild_from_proxies(&self.proxies);
+                    }
+                }
             }
             super::Key::ResetSort => {
-                self.tree.sorted = false;
-                self.tree.sort_by_delay = false;
+                if let Some(group_name) = self.resolve_group_for_sort(current) {
+                    if let Some(idx) = self.tree.find_folder_index(&group_name) {
+                        self.tree.nodes[idx].sort_mode = SortMode::None;
+                        self.tree.rebuild_from_proxies(&self.proxies);
+                    }
+                }
+            }
+            super::Key::GlobalSortByName => {
+                let all_by_name = self.tree.nodes.iter()
+                    .filter(|n| n.node_type == NodeType::Folder)
+                    .all(|n| n.sort_mode == SortMode::ByName);
+                let new_mode = if all_by_name { SortMode::None } else { SortMode::ByName };
+                for node in &mut self.tree.nodes {
+                    if node.node_type == NodeType::Folder {
+                        node.sort_mode = new_mode;
+                    }
+                }
+                self.tree.rebuild_from_proxies(&self.proxies);
+            }
+            super::Key::GlobalSortByDelay => {
+                let all_by_delay = self.tree.nodes.iter()
+                    .filter(|n| n.node_type == NodeType::Folder)
+                    .all(|n| n.sort_mode == SortMode::ByDelay);
+                let new_mode = if all_by_delay { SortMode::None } else { SortMode::ByDelay };
+                for node in &mut self.tree.nodes {
+                    if node.node_type == NodeType::Folder {
+                        node.sort_mode = new_mode;
+                    }
+                }
+                self.tree.rebuild_from_proxies(&self.proxies);
+            }
+            super::Key::GlobalResetSort => {
+                for node in &mut self.tree.nodes {
+                    if node.node_type == NodeType::Folder {
+                        node.sort_mode = SortMode::None;
+                    }
+                }
                 self.tree.rebuild_from_proxies(&self.proxies);
             }
             super::Key::TestDelay => {
@@ -114,6 +184,21 @@ impl Proxies {
                 }
             }
             super::Key::TestAllDelay => self.test_all_delay(task_set),
+            super::Key::Search => {
+                async move {
+                    let filter = tri!(
+                        Input::new()
+                            .with_title("Filter".to_owned())
+                            .build_and_send()
+                            .await,
+                        or_cancel
+                    );
+                    wrapper(move |content: &mut Self| {
+                        content.filter = (!filter.is_empty()).then_some(filter);
+                    })
+                }
+                .spawn_at(task_set);
+            }
             super::Key::FzfFind => {
                 let items: Vec<(String, usize)> = self.tree.nodes.iter()
                     .enumerate()

@@ -144,7 +144,13 @@ pub mod download {
         req = req.with_timeout(timeout!())
             .with_header(
                 headers::USER_AGENT,
-                CONFIG.global_ua.as_deref().unwrap_or("clash.meta"),
+                CONFIG.global_ua.as_deref().unwrap_or_else(|| {
+                    if CONFIG.core_type() == crate::config::CoreType::Singbox {
+                        "sing-box"
+                    } else {
+                        "clash.meta"
+                    }
+                }),
             );
         if let Some(auth) = auth_header {
             req = req.with_header(headers::AUTHORIZATION, auth);

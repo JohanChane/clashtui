@@ -1,7 +1,33 @@
 use anyhow::Context;
 use serde_json::Value as JsonValue;
+use std::path::PathBuf;
 
-use super::{PROXY_GROUPS, PROXY_PROVIDERS};
+use crate::config::database::ProxyProviderGroups;
+use super::resolve_template_placeholder;
+
+fn proxy_provider_cache_path(url: &str) -> PathBuf {
+    let hash = format!("{:x}", md5::compute(url.as_bytes()));
+    crate::config::singbox_proxy_providers_path().join(format!("{hash}.yaml"))
+}
+
+fn load_cached_proxies(url: &str) -> Option<Vec<JsonValue>> {
+    let path = proxy_provider_cache_path(url);
+    if !path.exists() {
+        return None;
+    }
+    let file = std::fs::File::open(&path).ok()?;
+    serde_json::from_reader(file).ok()
+}
+
+fn save_cached_proxies(url: &str, proxies: &[JsonValue]) {
+    let path = proxy_provider_cache_path(url);
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(file) = std::fs::File::create(&path) {
+        let _ = serde_json::to_writer(file, proxies);
+    }
+}
 
 fn interval_to_duration(seconds: u64) -> String {
     if seconds >= 3600 && seconds % 3600 == 0 {
@@ -13,122 +39,129 @@ fn interval_to_duration(seconds: u64) -> String {
     }
 }
 
-fn translate_rule(rule_str: &str) -> Option<JsonValue> {
-    let parts: Vec<&str> = rule_str.splitn(3, ',').collect();
-    if parts.len() < 2 {
-        return None;
-    }
-    let matcher = parts[0].trim();
-    let value = parts[1].trim();
-    let target = parts.get(2).map(|s| s.trim().to_string()).unwrap_or_default();
-
-    match matcher {
-        "DOMAIN-SUFFIX" => Some(serde_json::json!({
-            "domain_suffix": [value],
-            "outbound": target
-        })),
-        "DOMAIN-KEYWORD" => Some(serde_json::json!({
-            "domain_keyword": [value],
-            "outbound": target
-        })),
-        "DOMAIN" => Some(serde_json::json!({
-            "domain": [value],
-            "outbound": target
-        })),
-        "IP-CIDR" | "IP-CIDR6" => Some(serde_json::json!({
-            "ip_cidr": [value],
-            "outbound": target
-        })),
-        "PROCESS-NAME" => Some(serde_json::json!({
-            "process_name": [value],
-            "outbound": target
-        })),
-        "GEOSITE" => Some(serde_json::json!({
-            "rule_set": format!("geosite-{value}"),
-            "outbound": target
-        })),
-        "GEOIP" => Some(serde_json::json!({
-            "rule_set": format!("geoip-{value}"),
-            "outbound": target
-        })),
-        "MATCH" => None,
-        _ => {
-            log::warn!("Unsupported rule matcher in sing-box template: {matcher}");
-            None
-        }
-    }
-}
-
 fn download_subscription(url: &str, with_proxy: bool) -> anyhow::Result<Vec<JsonValue>> {
     let mut response =
         crate::functions::restful::download::profile(url, with_proxy)?;
     let mut buf = Vec::new();
     std::io::Read::read_to_end(&mut response, &mut buf)?;
 
-    if let Ok(values) = serde_json::from_slice::<Vec<JsonValue>>(&buf) {
-        return Ok(values);
-    }
-    if let Ok(value) = serde_json::from_slice::<JsonValue>(&buf) {
-        if let Some(arr) = value.get("proxies").and_then(|v| v.as_array()) {
-            return Ok(arr.clone());
-        }
-        if let Some(arr) = value.as_array() {
-            return Ok(arr.clone());
-        }
-        if value.is_object() {
+    let proxies: Vec<JsonValue> = if let Ok(values) = serde_json::from_slice::<Vec<JsonValue>>(&buf) {
+        values
+    } else if let Ok(value) = serde_json::from_slice::<JsonValue>(&buf) {
+        // Sing-box config: extract from outbounds
+        if let Some(arr) = value.get("outbounds").and_then(|v| v.as_array()) {
+            arr.clone()
+        } else {
+            // Single object or other — wrap as single entry
             return Ok(vec![value]);
         }
+    } else {
+        // Mihomo YAML format
+        let yaml: serde_yml::Mapping = serde_yml::from_slice(&buf)
+            .map_err(|e| anyhow::anyhow!("Failed to parse subscription as JSON or YAML: {e}"))?;
+        return Ok(yaml
+            .get("proxies")
+            .and_then(|v| v.as_sequence())
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|v| serde_json::to_value(v).unwrap_or(JsonValue::Null))
+            .filter(|v| !v.is_null())
+            .collect());
+    };
+
+    Ok(proxies)
+}
+
+/// Deduplicate proxy tags across proxy-providers for sing-box.
+fn dedup_singbox_proxy_tags(
+    providers: std::collections::HashMap<String, Vec<JsonValue>>,
+) -> std::collections::HashMap<String, Vec<JsonValue>> {
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut result: std::collections::HashMap<String, Vec<JsonValue>> =
+        std::collections::HashMap::new();
+
+    for (pp_name, proxies) in providers {
+        let mut renamed_proxies = Vec::new();
+        for mut proxy in proxies {
+            if let Some(obj) = proxy.as_object_mut() {
+                if let Some(tag) = obj.get("tag").and_then(|v| v.as_str()) {
+                    let tag_str = tag.to_string();
+                    if seen.contains(&tag_str) {
+                        let new_tag = format!("{}-{}", tag_str, pp_name);
+                        seen.insert(new_tag.clone());
+                        obj.insert("tag".to_string(), JsonValue::String(new_tag));
+                    } else {
+                        seen.insert(tag_str);
+                    }
+                }
+            }
+            renamed_proxies.push(proxy);
+        }
+        result.insert(pp_name, renamed_proxies);
     }
 
-    let yaml: serde_yml::Mapping = serde_yml::from_slice(&buf)
-        .map_err(|e| anyhow::anyhow!("Failed to parse subscription as JSON or YAML: {e}"))?;
-    let proxies: Vec<serde_yml::Value> = yaml
-        .get("proxies")
-        .and_then(|v| v.as_sequence())
-        .cloned()
-        .unwrap_or_default();
-    let json_proxies: Vec<JsonValue> = proxies
-        .into_iter()
-        .map(|v| serde_json::to_value(v).unwrap_or(JsonValue::Null))
-        .filter(|v| !v.is_null())
-        .collect();
-    Ok(json_proxies)
+    result
 }
 
 /// Expand a sing-box JSON template into a complete sing-box JSON config.
 ///
-/// The template is a sing-box-style JSON object with extra template markers:
-/// - `"tpl_param": {}` on proxy-provider objects marks them for URL expansion
-/// - `"tpl_param": {"providers": ["pvd"]}` on proxy-groups marks groups for expansion
-/// - `"<name>"` placeholders in `"outbounds"` or `"use"` lists
-/// - `"rules"` as inline string array (mihomo-style, translated to sing-box)
+/// The template is a full sing-box JSON config with template markers in `outbounds`:
+/// - `"expand_group_with": ["${PPG.<group>}"]` on an outbound marks it for expansion
+///   (one copy per proxy-provider in the group, each named `<tag>-<provider_name>`)
+/// - `"${PPG.<group>}"` in `outbounds` lists expands to all proxy-provider names in that group
+/// - `"${PPG.<group>.<provider>}"` expands to a specific provider name
+/// - `"${PGG.<name>}"` in `outbounds` lists expands to all generated group tags matching `<name>`
+///
+/// Other sections (dns, inbounds, route, experimental, log) pass through unchanged.
+/// If the template includes `rules` / `rule-providers` (mihomo-style), they are
+/// translated to sing-box native `route` rules/rule_set.
 pub async fn gen_template_singbox(
     tpl: &JsonValue,
-    template_name: &str,
-    urls: &[String],
+    _template_name: &str,
+    groups: &ProxyProviderGroups,
     with_proxy: bool,
+    force_refresh: bool,
 ) -> anyhow::Result<JsonValue> {
     use std::collections::HashMap;
-
-    let tpl_name = std::path::Path::new(template_name)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or(template_name);
 
     // --- Download subscription URLs → proxy nodes ---
     let mut provider_proxies: HashMap<String, Vec<JsonValue>> = HashMap::new();
     let mut download_handles = Vec::new();
-    for (i, url) in urls.iter().enumerate() {
-        let url = url.clone();
-        let pp_name = format!("pvd{i}");
-        download_handles.push(tokio::task::spawn_blocking(move || {
-            (pp_name, download_subscription(&url, with_proxy))
-        }));
+    for providers in groups.values() {
+        for (pp_name, url) in providers {
+            let url = url.clone();
+            let pp_name = pp_name.clone();
+            download_handles.push(tokio::task::spawn_blocking(move || {
+                if !force_refresh {
+                    if let Some(cached) = load_cached_proxies(&url) {
+                        log::info!("Using cached proxies for {pp_name} ({})", cached.len());
+                        return (pp_name, Ok(cached));
+                    }
+                }
+                match download_subscription(&url, with_proxy) {
+                    Ok(proxies) => {
+                        save_cached_proxies(&url, &proxies);
+                        (pp_name, Ok(proxies))
+                    }
+                    Err(e) => {
+                        if let Some(cached) = load_cached_proxies(&url) {
+                            log::warn!("Failed to download subscription for {pp_name}: {e}, using cache");
+                            (pp_name, Ok(cached))
+                        } else {
+                            (pp_name, Err(e))
+                        }
+                    }
+                }
+            }));
+        }
     }
+    let mut download_errors: Vec<String> = Vec::new();
     for handle in download_handles {
         let (pp_name, result) = handle.await?;
         match result {
             Ok(proxies) => {
+                // Auto-generate tags for nodes missing them
                 let tagged: Vec<JsonValue> = proxies
                     .into_iter()
                     .map(|mut proxy| {
@@ -150,11 +183,31 @@ pub async fn gen_template_singbox(
                 provider_proxies.insert(pp_name, tagged);
             }
             Err(e) => {
+                download_errors.push(format!("{pp_name}: {e}"));
                 log::warn!("Failed to download subscription for {pp_name}: {e}");
             }
         }
     }
+    if !download_errors.is_empty() {
+        anyhow::bail!(
+            "Failed to download proxy providers — profile not generated:\n{}",
+            download_errors.join("\n")
+        );
+    }
 
+    // Apply Set-based cross-provider tag deduplication
+    provider_proxies = dedup_singbox_proxy_tags(provider_proxies);
+
+    // Filter out group-type entries (selector, urltest, etc.) —
+    // only keep actual proxy nodes
+    for proxies in provider_proxies.values_mut() {
+        proxies.retain(|p| {
+            let t = p.get("type").and_then(|v| v.as_str()).unwrap_or("");
+            !matches!(t, "selector" | "urltest" | "select" | "url-test" | "fallback" | "load-balance" | "direct" | "block" | "dns" | "")
+        });
+    }
+
+    // Build tag index: provider_name → [tag, ...]
     let mut pp_tags: HashMap<String, Vec<String>> = HashMap::new();
     for (pp_name, proxies) in &provider_proxies {
         let tags: Vec<String> = proxies
@@ -164,227 +217,165 @@ pub async fn gen_template_singbox(
         pp_tags.insert(pp_name.clone(), tags);
     }
 
-    // --- Build outbounds ---
-    let mut outbounds: Vec<JsonValue> = Vec::new();
-    for proxies in provider_proxies.values() {
-        outbounds.extend(proxies.clone());
-    }
+    // --- Clone template and process outbounds ---
+    let mut output = tpl.clone();
 
-    // --- Expand proxy-groups ---
-    let pg_value = tpl
-        .get(PROXY_GROUPS)
-        .context("Missing proxy-groups section in template")?;
-    let pg_sequence = pg_value
-        .as_array()
-        .context("proxy-groups must be an array")?;
+    let tpl_outbounds = output
+        .get("outbounds")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
 
+    let mut new_outbounds: Vec<JsonValue> = Vec::new();
     let mut pg_names: HashMap<String, Vec<String>> = HashMap::new();
 
-    for the_pg_value in pg_sequence {
-        // tpl_param can be null or an object with "providers"
-        let has_tpl_param = the_pg_value.get("tpl_param").is_some_and(|v| !v.is_null());
-
-        if !has_tpl_param {
-            // Passthrough group
-            let name = the_pg_value
-                .get("name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("unknown");
-            let pg_type = the_pg_value
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("select");
-            let sb_type = match pg_type {
-                "select" => "selector",
-                "url-test" => "urltest",
-                "fallback" => "urltest",
-                "load-balance" => "selector",
-                _ => "selector",
-            };
-
-            let mut sb_group = serde_json::json!({
-                "type": sb_type,
-                "tag": name,
-            });
-
-            if let Some(us_) = the_pg_value.get("use") {
-                if let Some(use_seq) = us_.as_array() {
-                    let mut resolved: Vec<String> = Vec::new();
-                    for u in use_seq {
-                        let u_str = u.as_str().unwrap_or("");
-                        if u_str.starts_with('<') && u_str.ends_with('>') {
-                            let key = u_str.trim_matches(|c| c == '<' || c == '>');
-                            if let Some(tags) = pp_tags.get(key) {
-                                resolved.extend(tags.clone());
-                            }
-                        } else {
-                            resolved.push(u_str.to_string());
-                        }
-                    }
-                    sb_group["outbounds"] = serde_json::json!(resolved);
-                }
-            }
-
-            if let Some(proxies) = the_pg_value.get("proxies") {
-                if let Some(proxy_seq) = proxies.as_array() {
-                    let mut resolved: Vec<String> = Vec::new();
-                    for p in proxy_seq {
-                        let p_str = p.as_str().unwrap_or("");
-                        if p_str.starts_with('<') && p_str.ends_with('>') {
-                            let key = p_str.trim_matches(|c| c == '<' || c == '>');
-                            if let Some(names) = pg_names.get(key) {
-                                resolved.extend(names.clone());
-                            }
-                        } else {
-                            resolved.push(p_str.to_string());
-                        }
-                    }
-                    if !resolved.is_empty() {
-                        sb_group["outbounds"] = serde_json::json!(resolved);
-                    }
-                }
-            }
-
-            if sb_type == "urltest" {
-                if let Some(url) = the_pg_value.get("url").and_then(|v| v.as_str()) {
-                    sb_group["url"] = JsonValue::String(url.to_string());
-                }
-                if let Some(interval) = the_pg_value.get("interval").and_then(|v| v.as_u64()) {
-                    sb_group["interval"] = JsonValue::String(interval_to_duration(interval));
-                }
-            }
-
-            outbounds.push(sb_group);
+    // --- First pass: process expand_group_with outbounds to populate pg_names ---
+    for ob in &tpl_outbounds {
+        if ob.get("expand_group_with").is_none() {
             continue;
         }
 
-        // Template group — expand via tpl_param.providers
-        let pg_type = the_pg_value
-            .get("type")
+        let expand_keys = ob["expand_group_with"]
+            .as_array()
+            .context("expand_group_with must be an array")?;
+
+        let group_tag = ob
+            .get("tag")
             .and_then(|v| v.as_str())
-            .unwrap_or("select");
-        let sb_type = match pg_type {
-            "select" => "selector",
-            "url-test" => "urltest",
-            "fallback" => "urltest",
-            "load-balance" => "selector",
-            _ => "selector",
-        };
+            .context("expand_group_with outbound must have a tag")?;
 
-        let provider_keys = the_pg_value["tpl_param"]
-            .get("providers")
-            .and_then(|v| v.as_array())
-            .context("tpl_param.providers must be an array")?;
-
-        let group_name = the_pg_value
-            .get("name")
-            .and_then(|v| v.as_str())
-            .context("proxy-group must have a name")?;
-
-        for the_provider_key in provider_keys {
-            let pk_str = the_provider_key
+        for the_expand_key in expand_keys {
+            let pk_str = the_expand_key
                 .as_str()
-                .context("provider key in tpl_param.providers must be a string")?;
+                .context("expand_group_with entries must be strings")?;
+            let provider_names = resolve_template_placeholder(pk_str, &pg_names, groups)?;
 
-            for (pp_name, tags) in &pp_tags {
-                if !pp_name.starts_with(pk_str) {
+            for pp_name in &provider_names {
+                let tags = pp_tags
+                    .get(pp_name)
+                    .cloned()
+                    .unwrap_or_default();
+
+                // Skip empty providers
+                if tags.is_empty() {
                     continue;
                 }
 
-                let new_group_name = format!("{group_name}-{pp_name}");
-
-                let mut sb_group = serde_json::json!({
-                    "type": sb_type,
-                    "tag": new_group_name,
-                    "outbounds": tags.clone(),
-                });
-
-                if sb_type == "urltest" {
-                    if let Some(url) = the_pg_value.get("url").and_then(|v| v.as_str()) {
-                        sb_group["url"] = JsonValue::String(url.to_string());
-                    }
-                    if let Some(interval) = the_pg_value.get("interval").and_then(|v| v.as_u64())
-                    {
-                        sb_group["interval"] =
-                            JsonValue::String(interval_to_duration(interval));
-                    }
-                }
+                let new_tag = format!("{group_tag}-{pp_name}");
 
                 pg_names
-                    .entry(group_name.to_string())
+                    .entry(group_tag.to_string())
                     .or_default()
-                    .push(new_group_name);
-
-                outbounds.push(sb_group);
+                    .push(new_tag);
             }
         }
     }
 
-    // --- Build route section ---
-    let mut route_rules: Vec<JsonValue> = Vec::new();
-    let mut rule_sets: Vec<JsonValue> = Vec::new();
-    let mut route_final: Option<String> = None;
+    // --- Second pass: emit all outbounds with placeholders resolved ---
+    for ob in tpl_outbounds {
+        let has_expand = ob.get("expand_group_with").is_some();
 
-    if let Some(rules) = tpl.get("rules") {
-        if let Some(rules_seq) = rules.as_array() {
-            for rule in rules_seq {
-                let rule_str = rule.as_str().unwrap_or("");
-                if rule_str.starts_with("MATCH") {
-                    let target = rule_str
-                        .splitn(2, ',')
-                        .nth(1)
-                        .map(|s| s.trim())
-                        .unwrap_or("Proxy");
-                    route_final = Some(target.to_string());
-                } else if let Some(rule_json) = translate_rule(rule_str) {
-                    route_rules.push(rule_json);
+        if has_expand {
+            // --- Template group: expand one per proxy-provider in group ---
+            let ob_type = ob
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("urltest");
+            let sb_type = match ob_type {
+                "select" => "selector",
+                "url-test" | "urltest" => "urltest",
+                "fallback" => "urltest",
+                _ => "selector",
+            };
+
+            let expand_keys = ob["expand_group_with"]
+                .as_array()
+                .context("expand_group_with must be an array")?;
+
+            let group_tag = ob
+                .get("tag")
+                .and_then(|v| v.as_str())
+                .context("expand_group_with outbound must have a tag")?;
+
+            for the_expand_key in expand_keys {
+                let pk_str = the_expand_key
+                    .as_str()
+                    .context("expand_group_with entries must be strings")?;
+                let provider_names = resolve_template_placeholder(pk_str, &pg_names, groups)?;
+
+                for pp_name in &provider_names {
+                    let tags = pp_tags
+                        .get(pp_name)
+                        .cloned()
+                        .unwrap_or_default();
+
+                    // Skip empty providers
+                    if tags.is_empty() {
+                        continue;
+                    }
+
+                    let new_tag = format!("{group_tag}-{pp_name}");
+
+                    let mut sb_group = serde_json::json!({
+                        "type": sb_type,
+                        "tag": new_tag,
+                        "outbounds": tags,
+                    });
+
+                    if sb_type == "urltest" {
+                        if let Some(url) = ob.get("url").and_then(|v| v.as_str()) {
+                            sb_group["url"] = JsonValue::String(url.to_string());
+                        }
+                        if let Some(interval) = ob.get("interval").and_then(|v| v.as_str()) {
+                            sb_group["interval"] = JsonValue::String(interval.to_string());
+                        }
+                        if let Some(tolerance) = ob.get("tolerance") {
+                            sb_group["tolerance"] = tolerance.clone();
+                        }
+                    }
+                    if let Some(default) = ob.get("default") {
+                        sb_group["default"] = default.clone();
+                    }
+                    if let Some(interrupt) = ob.get("interrupt_exist_connections") {
+                        sb_group["interrupt_exist_connections"] = interrupt.clone();
+                    }
+
+                    new_outbounds.push(sb_group);
                 }
             }
-        }
-    }
-
-    if let Some(rps) = tpl.get("rule-providers") {
-        if let Some(rps_map) = rps.as_object() {
-            for (rp_name, rp_value) in rps_map {
-                let url = rp_value
-                    .get("url")
-                    .and_then(|v| v.as_str());
-
-                if let Some(url) = url {
-                    rule_sets.push(serde_json::json!({
-                        "tag": rp_name,
-                        "type": "remote",
-                        "format": "binary",
-                        "url": url,
-                    }));
-                    route_rules.push(serde_json::json!({
-                        "rule_set": rp_name,
-                        "outbound": "Proxy",
-                    }));
+        } else {
+            // --- Passthrough outbound: resolve ${} placeholders in outbounds list ---
+            let mut ob = ob.clone();
+            if let Some(outbounds_arr) = ob.get("outbounds").and_then(|v| v.as_array()) {
+                let mut resolved: Vec<String> = Vec::new();
+                for item in outbounds_arr {
+                    let item_str = item.as_str().unwrap_or("");
+                    if item_str.starts_with("${") && item_str.ends_with('}') {
+                        let names = resolve_template_placeholder(item_str, &pg_names, groups)
+                            .with_context(|| format!("Can't resolve placeholder in outbounds: {item_str}"))?;
+                        for name in names {
+                            if let Some(tags) = pp_tags.get(&name) {
+                                resolved.extend(tags.clone());
+                            } else {
+                                resolved.push(name);
+                            }
+                        }
+                    } else {
+                        resolved.push(item_str.to_string());
+                    }
                 }
+                ob["outbounds"] = serde_json::json!(resolved);
             }
+            new_outbounds.push(ob);
         }
     }
 
-    let mut output = serde_json::json!({
-        "outbounds": outbounds,
-    });
-
-    if !route_rules.is_empty() || route_final.is_some() || !rule_sets.is_empty() {
-        let mut route = serde_json::json!({});
-        if !route_rules.is_empty() {
-            route["rules"] = JsonValue::Array(route_rules);
-        }
-        if !rule_sets.is_empty() {
-            route["rule_set"] = JsonValue::Array(rule_sets);
-        }
-        if let Some(final_outbound) = route_final {
-            route["final"] = JsonValue::String(final_outbound);
-        }
-        output["route"] = route;
+    // Append downloaded proxy nodes at the end of outbounds
+    for proxies in provider_proxies.values() {
+        new_outbounds.extend(proxies.clone());
     }
 
-    output["clashtui_template_name"] = JsonValue::String(tpl_name.to_string());
+    output["outbounds"] = JsonValue::Array(new_outbounds);
 
     Ok(output)
 }

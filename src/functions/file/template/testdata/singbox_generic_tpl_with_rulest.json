@@ -1,186 +1,208 @@
 {
-  "proxy-providers": {
-    "pvd": {
-      "tpl_param": {},
-      "type": "http",
-      "interval": 3600,
-      "url": "https://example.com/subscription.yaml",
-      "health-check": {
-        "enable": true,
-        "url": "https://www.gstatic.com/generate_204",
-        "interval": 300
-      }
-    }
+  "log": {
+    "level": "info",
+    "timestamp": true
   },
-  "proxy-groups": [
+  "dns": {
+    "servers": [
+      {
+        "tag": "dns-remote",
+        "detour": "Entry",
+        "type": "https",
+        "server": "1.1.1.1"
+      },
+      {
+        "tag": "dns-direct",
+        "detour": "direct",
+        "type": "https",
+        "server": "dns.alidns.com",
+        "domain_resolver": "dns-local"
+      },
+      {
+        "tag": "dns-local",
+        "type": "local"
+      },
+      {
+        "tag": "dns-fake",
+        "type": "fakeip",
+        "inet4_range": "198.18.0.0/15"
+      }
+    ],
+    "rules": [
+      {
+        "rule_set": [
+          "geosite-geolocation-cn"
+        ],
+        "server": "dns-direct"
+      },
+      {
+        "rule_set": [
+          "geosite-google"
+        ],
+        "server": "dns-remote"
+      },
+      {
+        "query_type": [
+          "A",
+          "AAAA"
+        ],
+        "server": "dns-fake"
+      },
+      {
+        "server": "dns-direct"
+      }
+    ],
+    "final": "dns-direct",
+    "strategy": "prefer_ipv4"
+  },
+  "inbounds": [
     {
-      "name": "Entry",
-      "type": "select",
-      "proxies": ["<Auto>", "<Streaming>", "<AI>", "DIRECT", "REJECT"]
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 7890
     },
     {
-      "name": "Auto",
-      "type": "url-test",
-      "tpl_param": { "providers": ["pvd"] },
-      "url": "https://www.gstatic.com/generate_204",
-      "interval": 300,
-      "tolerance": 50
-    },
-    {
-      "name": "Streaming",
-      "type": "select",
-      "proxies": ["<StreamAuto>", "DIRECT"]
-    },
-    {
-      "name": "StreamAuto",
-      "type": "url-test",
-      "tpl_param": { "providers": ["pvd"] },
-      "url": "https://cp.cloudflare.com/generate_204",
-      "interval": 600,
-      "tolerance": 100
-    },
-    {
-      "name": "AI",
-      "type": "select",
-      "proxies": ["<AIAuto>", "<Auto>", "DIRECT"]
-    },
-    {
-      "name": "AIAuto",
-      "type": "url-test",
-      "tpl_param": { "providers": ["pvd"] },
-      "url": "https://www.gstatic.com/generate_204",
-      "interval": 600,
-      "tolerance": 50
-    },
-    {
-      "name": "Direct",
-      "type": "select",
-      "proxies": ["DIRECT"]
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.19.0.1/30"
+      ],
+      "mtu": 9000,
+      "auto_route": true,
+      "strict_route": true,
+      "auto_redirect": true,
+      "stack": "system"
     }
   ],
-  "rules": [
-    "IP-CIDR,127.0.0.0/8,Direct",
-    "IP-CIDR,10.0.0.0/8,Direct",
-    "IP-CIDR,172.16.0.0/12,Direct",
-    "IP-CIDR,192.168.0.0/16,Direct",
-    "IP-CIDR,100.64.0.0/10,Direct",
-    "IP-CIDR,224.0.0.0/4,Direct",
-    "IP-CIDR,240.0.0.0/4,Direct",
-    "IP-CIDR,169.254.0.0/16,Direct",
-    "IP-CIDR,198.18.0.0/15,Direct",
-    "GEOSITE,cn,Direct",
-    "GEOIP,CN,Direct",
-    "DOMAIN-SUFFIX,cn,Direct",
-    "DOMAIN-SUFFIX,alicdn.com,Direct",
-    "DOMAIN-SUFFIX,alipay.com,Direct",
-    "DOMAIN-SUFFIX,taobao.com,Direct",
-    "DOMAIN-SUFFIX,jd.com,Direct",
-    "DOMAIN-SUFFIX,baidu.com,Direct",
-    "DOMAIN-SUFFIX,bilibili.com,Direct",
-    "DOMAIN-SUFFIX,qq.com,Direct",
-    "DOMAIN-SUFFIX,zhihu.com,Direct",
-    "DOMAIN-SUFFIX,netflix.com,Streaming",
-    "DOMAIN-SUFFIX,nflxvideo.net,Streaming",
-    "DOMAIN-SUFFIX,disneyplus.com,Streaming",
-    "DOMAIN-SUFFIX,hulu.com,Streaming",
-    "DOMAIN-SUFFIX,hbomax.com,Streaming",
-    "DOMAIN-SUFFIX,primevideo.com,Streaming",
-    "DOMAIN-SUFFIX,spotify.com,Streaming",
-    "DOMAIN-SUFFIX,youtube.com,Streaming",
-    "DOMAIN-SUFFIX,googlevideo.com,Streaming",
-    "DOMAIN-SUFFIX,twitch.tv,Streaming",
-    "GEOSITE,youtube,Streaming",
-    "GEOSITE,netflix,Streaming",
-    "GEOSITE,disney,Streaming",
-    "GEOSITE,spotify,Streaming",
-    "DOMAIN-SUFFIX,openai.com,AI",
-    "DOMAIN-SUFFIX,chatgpt.com,AI",
-    "DOMAIN-SUFFIX,anthropic.com,AI",
-    "DOMAIN-SUFFIX,claude.ai,AI",
-    "DOMAIN-SUFFIX,gemini.google.com,AI",
-    "DOMAIN-SUFFIX,perplexity.ai,AI",
-    "DOMAIN-SUFFIX,deepseek.com,AI",
-    "GEOSITE,openai,AI",
-    "GEOSITE,google,AI",
-    "DOMAIN-SUFFIX,apple.com,Direct",
-    "DOMAIN-SUFFIX,icloud.com,Direct",
-    "DOMAIN-SUFFIX,microsoft.com,Direct",
-    "DOMAIN-SUFFIX,office.com,Direct",
-    "DOMAIN-SUFFIX,telegram.org,Auto",
-    "DOMAIN-SUFFIX,t.me,Auto",
-    "IP-CIDR,149.154.160.0/20,Auto",
-    "IP-CIDR,91.108.4.0/22,Auto",
-    "DOMAIN-SUFFIX,github.com,Auto",
-    "DOMAIN-SUFFIX,github.io,Auto",
-    "DOMAIN-SUFFIX,stackoverflow.com,Auto",
-    "DOMAIN-SUFFIX,gitlab.com,Auto",
-    "GEOSITE,geolocation-!cn,Entry",
-    "GEOIP,!CN,Entry",
-    "MATCH,Entry"
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "Entry",
+      "outbounds": [
+        "${PGG.Auto}",
+        "${PGG.Select}",
+        "${PPG.pvd}"
+      ],
+      "default": "Auto-pvd"
+    },
+    {
+      "type": "urltest",
+      "tag": "Auto",
+      "expand_group_with": [
+        "${PPG.pvd}"
+      ],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "5m",
+      "tolerance": 50
+    },
+    {
+      "type": "urltest",
+      "tag": "Select",
+      "expand_group_with": [
+        "${PPG.pvd}"
+      ],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "5m",
+      "tolerance": 50
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
+    }
   ],
-  "rule-providers": {
-    "geosite-cn": {
-      "type": "http",
-      "behavior": "domain",
-      "url": "https://github.com/SagerNet/sing-geosite/raw/refs/heads/rule-set/geosite-cn.srs",
-      "path": "./rule-providers/geosite-cn.srs",
-      "interval": 86400
+  "route": {
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "geoip-cn",
+        "format": "binary",
+        "url": "https://github.com/SagerNet/sing-geoip/raw/rule-set/geoip-cn.srs",
+        "download_detour": "direct",
+        "update_interval": "7d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-geolocation-cn",
+        "format": "binary",
+        "url": "https://github.com/SagerNet/sing-geosite/raw/rule-set/geosite-geolocation-cn.srs",
+        "download_detour": "direct",
+        "update_interval": "7d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-google",
+        "format": "binary",
+        "url": "https://github.com/SagerNet/sing-geosite/raw/rule-set/geosite-google.srs",
+        "download_detour": "direct",
+        "update_interval": "7d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-category-ads-all",
+        "format": "binary",
+        "url": "https://github.com/SagerNet/sing-geosite/raw/rule-set/geosite-category-ads-all.srs",
+        "download_detour": "direct",
+        "update_interval": "7d"
+      }
+    ],
+    "rules": [
+      {
+        "rule_set": [
+          "geosite-category-ads-all"
+        ],
+        "outbound": "block"
+      },
+      {
+        "rule_set": [
+          "geoip-cn"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "rule_set": [
+          "geosite-geolocation-cn"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "rule_set": [
+          "geosite-google"
+        ],
+        "outbound": "Entry"
+      },
+      {
+        "ip_is_private": true,
+        "outbound": "direct"
+      },
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "outbound": "Entry"
+      }
+    ],
+    "auto_detect_interface": true,
+    "final": "Entry"
+  },
+  "experimental": {
+    "clash_api": {
+      "external_controller": "127.0.0.1:9090",
+      "external_ui": "dashboard",
+      "secret": "",
+      "default_mode": "Rule"
     },
-    "geosite-geolocation-!cn": {
-      "type": "http",
-      "behavior": "domain",
-      "url": "https://github.com/SagerNet/sing-geosite/raw/refs/heads/rule-set/geosite-geolocation-!cn.srs",
-      "path": "./rule-providers/geosite-geolocation-!cn.srs",
-      "interval": 86400
-    },
-    "geosite-youtube": {
-      "type": "http",
-      "behavior": "domain",
-      "url": "https://github.com/SagerNet/sing-geosite/raw/refs/heads/rule-set/geosite-youtube.srs",
-      "path": "./rule-providers/geosite-youtube.srs",
-      "interval": 86400
-    },
-    "geosite-netflix": {
-      "type": "http",
-      "behavior": "domain",
-      "url": "https://github.com/SagerNet/sing-geosite/raw/refs/heads/rule-set/geosite-netflix.srs",
-      "path": "./rule-providers/geosite-netflix.srs",
-      "interval": 86400
-    },
-    "geosite-disney": {
-      "type": "http",
-      "behavior": "domain",
-      "url": "https://github.com/SagerNet/sing-geosite/raw/refs/heads/rule-set/geosite-disney.srs",
-      "path": "./rule-providers/geosite-disney.srs",
-      "interval": 86400
-    },
-    "geosite-spotify": {
-      "type": "http",
-      "behavior": "domain",
-      "url": "https://github.com/SagerNet/sing-geosite/raw/refs/heads/rule-set/geosite-spotify.srs",
-      "path": "./rule-providers/geosite-spotify.srs",
-      "interval": 86400
-    },
-    "geosite-openai": {
-      "type": "http",
-      "behavior": "domain",
-      "url": "https://github.com/SagerNet/sing-geosite/raw/refs/heads/rule-set/geosite-openai.srs",
-      "path": "./rule-providers/geosite-openai.srs",
-      "interval": 86400
-    },
-    "geosite-google": {
-      "type": "http",
-      "behavior": "domain",
-      "url": "https://github.com/SagerNet/sing-geosite/raw/refs/heads/rule-set/geosite-google.srs",
-      "path": "./rule-providers/geosite-google.srs",
-      "interval": 86400
-    },
-    "geoip-cn": {
-      "type": "http",
-      "behavior": "ipcidr",
-      "url": "https://github.com/SagerNet/sing-geoip/raw/refs/heads/rule-set/geoip-cn.srs",
-      "path": "./rule-providers/geoip-cn.srs",
-      "interval": 86400
+    "cache_file": {
+      "enabled": true,
+      "path": "cache.db",
+      "store_fakeip": true
     }
   }
 }

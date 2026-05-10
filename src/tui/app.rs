@@ -43,6 +43,14 @@ static GLOBAL_CHORD_SHORTCUTS: LazyLock<Vec<(KeyCombo, &str)>> = LazyLock::new(|
             KeyCombo(vec![ctrl('g'), plain('m')]),
             "Open clash config dir",
         ),
+        (
+            KeyCombo(vec![ctrl('g'), plain('f')]),
+            "Start core service",
+        ),
+        (
+            KeyCombo(vec![ctrl('g'), plain('t')]),
+            "Close all connections",
+        ),
     ]
 });
 
@@ -77,9 +85,9 @@ impl App {
     #[cfg(target_os = "linux")]
     fn check_startup_perms(&self) {
         use crate::config::CoreType;
-        let dir_str = match crate::config::CONFIG.cfg_file.core_type {
-            CoreType::Mihomo => &crate::config::CONFIG.cfg_file.basic.clash_config_dir,
-            CoreType::Singbox => &crate::config::CONFIG.cfg_file.singbox.singbox_config_dir,
+        let dir_str = match crate::config::CONFIG.core_type() {
+            CoreType::Mihomo => &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
+            CoreType::Singbox => &crate::config::CONFIG.cfg_file.singbox.core.config_dir,
         };
         let dir = std::path::Path::new(dir_str);
         if crate::functions::command::check_file_permissions(dir) {
@@ -200,9 +208,19 @@ impl App {
                     }
                     Some('m') => {
                         log::debug!("open_dir: clash config dir");
-                        let _ = crate::functions::command::open_dir(
-                            &crate::config::CONFIG.cfg_file.basic.clash_config_dir,
-                        );
+                        let dir_str = match crate::config::CONFIG.core_type() {
+                            crate::config::CoreType::Mihomo => &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
+                            crate::config::CoreType::Singbox => &crate::config::CONFIG.cfg_file.singbox.core.config_dir,
+                        };
+                        let _ = crate::functions::command::open_dir(dir_str);
+                    }
+                    Some('f') => {
+                        log::debug!("restart core service");
+                        let _ = crate::functions::command::restart_service(None);
+                    }
+                    Some('t') => {
+                        log::debug!("close all connections");
+                        let _ = crate::functions::restful::connection::terminate_all_connections();
                     }
                     _ => {}
                 }
@@ -269,8 +287,8 @@ impl App {
 
     fn render_which(&self, f: &mut ratatui::Frame) {
         use ratatui::layout::{Alignment, Constraint, Layout, Rect};
-        use ratatui::style::Stylize;
-        use ratatui::text::Line;
+        use ratatui::style::{Style, Stylize};
+        use ratatui::text::{Line, Span};
         use ratatui::widgets::{Block, Clear, Paragraph};
         use widget::chord::key_event_to_str;
 
@@ -283,7 +301,7 @@ impl App {
         let area = f.area();
         let popup_area = Rect {
             x: area.x.saturating_add(area.width.saturating_sub(total_width) / 2),
-            y: area.y.saturating_add(area.height.saturating_sub(total_height) / 2),
+            y: area.height.saturating_sub(total_height + 2),
             width: total_width.min(area.width),
             height: total_height.min(area.height),
         };
@@ -302,6 +320,8 @@ impl App {
         let col_areas = Layout::horizontal(&col_widths).split(inner);
 
         let items_per_col = (candidate_count + cols - 1) / cols;
+
+        let accent = Theme::get().popup.text;
 
         for (col_idx, col_area) in col_areas.iter().enumerate().take(cols) {
             let lines: Vec<Line> = self
@@ -317,7 +337,12 @@ impl App {
                         .map(|k| key_event_to_str(k))
                         .collect::<Vec<_>>()
                         .join(" ");
-                    Line::from(format!(" {}  {}", key_str, desc))
+                    Line::from(vec![
+                        Span::raw(" "),
+                        Span::styled(key_str, accent),
+                        Span::raw("  "),
+                        Span::styled(*desc, Style::new().dim()),
+                    ])
                 })
                 .collect();
 
@@ -327,8 +352,8 @@ impl App {
 
     fn render_global_which(&self, f: &mut ratatui::Frame) {
         use ratatui::layout::{Alignment, Constraint, Layout, Rect};
-        use ratatui::style::Stylize;
-        use ratatui::text::Line;
+        use ratatui::style::{Style, Stylize};
+        use ratatui::text::{Line, Span};
         use ratatui::widgets::{Block, Clear, Paragraph};
         use widget::chord::key_event_to_str;
 
@@ -341,7 +366,7 @@ impl App {
         let area = f.area();
         let popup_area = Rect {
             x: area.x.saturating_add(area.width.saturating_sub(total_width) / 2),
-            y: area.y.saturating_add(area.height.saturating_sub(total_height) / 2),
+            y: area.height.saturating_sub(total_height + 2),
             width: total_width.min(area.width),
             height: total_height.min(area.height),
         };
@@ -361,6 +386,8 @@ impl App {
 
         let items_per_col = (candidate_count + cols - 1) / cols;
 
+        let accent = Theme::get().popup.text;
+
         for (col_idx, col_area) in col_areas.iter().enumerate().take(cols) {
             let lines: Vec<Line> = self
                 .global_chord
@@ -375,7 +402,12 @@ impl App {
                         .map(|k| key_event_to_str(k))
                         .collect::<Vec<_>>()
                         .join(" ");
-                    Line::from(format!(" {}  {}", key_str, desc))
+                    Line::from(vec![
+                        Span::raw(" "),
+                        Span::styled(key_str, accent),
+                        Span::raw("  "),
+                        Span::styled(*desc, Style::new().dim()),
+                    ])
                 })
                 .collect();
 

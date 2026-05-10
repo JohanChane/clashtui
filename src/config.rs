@@ -1,12 +1,15 @@
 //! under the data folder:
-//! * [`BasicInfo`] mihomo/basic_clash_config.yaml
+//! * [`BasicInfo`] mihomo/core_override_config.yaml
 //! * [`ProfileManager`] clashtui.db
 //! * [`log`] clashtui.log
 //! * [`ConfigFile`] config.yaml
-//! * `Folder` mihomo/profile_yamls/
+//! * `Folder` mihomo/profiles/
 //! * `Folder` mihomo/templates/
-//! * `Folder` sing-box/profile_jsons/
+//! * `File` mihomo/template_proxy_providers
+//! * `Folder` sing-box/profiles/
 //! * `Folder` sing-box/templates/
+//! * `File` sing-box/template_proxy_providers
+//! * `Folder` sing-box/proxy-providers/
 
 use anyhow::{Context, Result, ensure};
 use core::*;
@@ -18,7 +21,7 @@ use std::{
 use util::*;
 
 mod core;
-pub use core::CoreType;
+pub use core::{CoreType, ServiceController};
 #[macro_use]
 mod util;
 pub mod database;
@@ -62,25 +65,36 @@ impl Config {
         let mut cfg_file = ConfigFile::from_file()?;
         let basic_info = BasicInfo::from_file()?;
         let mut data: ProfileManager = ProfileManager::from_file()?;
-        // migrate File → Template for mihomo profiles with clashtui marker
-        if data.migrate_file_to_template(&profile_yamls_path()) {
-            let _ = data.to_file();
-        }
         let data: Mutex<ProfileManager> = data.into();
-        cfg_file.core_type = data.lock().unwrap().core_type;
-        if !cfg_file.basic.clash_config_path.is_empty() {
-            cfg_file.basic.clash_config_path = std::path::absolute(
-                std::path::PathBuf::from(&cfg_file.basic.clash_config_path),
+        if !cfg_file.mihomo.core.config_path.is_empty() {
+            cfg_file.mihomo.core.config_path = std::path::absolute(
+                std::path::PathBuf::from(&cfg_file.mihomo.core.config_path),
             )
-            .context("Failed to resolve clash_config_path")?
+            .context("Failed to resolve mihomo config_path")?
             .display()
             .to_string();
         }
-        if !cfg_file.basic.clash_config_dir.is_empty() {
-            cfg_file.basic.clash_config_dir = std::path::absolute(
-                std::path::PathBuf::from(&cfg_file.basic.clash_config_dir),
+        if !cfg_file.mihomo.core.config_dir.is_empty() {
+            cfg_file.mihomo.core.config_dir = std::path::absolute(
+                std::path::PathBuf::from(&cfg_file.mihomo.core.config_dir),
             )
-            .context("Failed to resolve clash_config_dir")?
+            .context("Failed to resolve mihomo config_dir")?
+            .display()
+            .to_string();
+        }
+        if !cfg_file.singbox.core.config_dir.is_empty() {
+            cfg_file.singbox.core.config_dir = std::path::absolute(
+                std::path::PathBuf::from(&cfg_file.singbox.core.config_dir),
+            )
+            .context("Failed to resolve singbox config_dir")?
+            .display()
+            .to_string();
+        }
+        if !cfg_file.singbox.core.config_path.is_empty() {
+            cfg_file.singbox.core.config_path = std::path::absolute(
+                std::path::PathBuf::from(&cfg_file.singbox.core.config_path),
+            )
+            .context("Failed to resolve singbox config_path")?
             .display()
             .to_string();
         }
@@ -129,17 +143,20 @@ impl Config {
             singbox_secret,
         })
     }
+    pub fn core_type(&self) -> CoreType {
+        self.data.lock().unwrap().core_type
+    }
     pub fn save(&self) -> Result<()> {
         self.data.lock().unwrap().to_file()
     }
     pub fn controller_for_core(&self) -> &str {
-        match self.cfg_file.core_type {
+        match self.data.lock().unwrap().core_type {
             CoreType::Mihomo => &self.external_controller,
             CoreType::Singbox => &self.singbox_external_controller,
         }
     }
     pub fn secret_for_core(&self) -> Option<&str> {
-        match self.cfg_file.core_type {
+        match self.data.lock().unwrap().core_type {
             CoreType::Mihomo => self.secret.as_deref(),
             CoreType::Singbox => self.singbox_secret.as_deref(),
         }
@@ -193,9 +210,9 @@ pub fn init_config() -> Result<()> {
     fs::create_dir_all(&mihomo)?;
     fs::create_dir_all(&singbox)?;
 
-    fs::write(mihomo.join(defs::BASIC_FILE), BasicInfo::DEFAULT)?;
+    fs::write(mihomo.join(defs::CORE_OVERRIDE_FILE), BasicInfo::DEFAULT)?;
     fs::write(
-        singbox.join(defs::BASIC_SINGBOX_FILE),
+        singbox.join(defs::CORE_OVERRIDE_SINGBOX_FILE),
         DEFAULT_SINGBOX_BASIC_CONFIG,
     )?;
     ConfigFile::default().to_file()?;
@@ -205,6 +222,7 @@ pub fn init_config() -> Result<()> {
     fs::create_dir(mihomo.join(defs::PROFILE_YAMLS_DIR))?;
     fs::create_dir(singbox.join(defs::TEMPLATE_DIR))?;
     fs::create_dir(singbox.join(defs::PROFILE_JSONS_DIR))?;
+    fs::create_dir(singbox.join(defs::PROXY_PROVIDERS_DIR))?;
 
     Ok(())
 }
@@ -241,14 +259,20 @@ pub fn provider_cache_path() -> PathBuf {
     mihomo_dir().join(defs::PROVIDER_CACHE_DIR)
 }
 pub fn template_proxy_providers_path() -> PathBuf {
-    mihomo_dir().join(defs::TEMPLATE_DIR).join("template_proxy_providers")
+    mihomo_dir().join(defs::TEMPLATE_PROXY_PROVIDERS_FILE)
+}
+pub fn singbox_template_proxy_providers_path() -> PathBuf {
+    singbox_dir().join(defs::TEMPLATE_PROXY_PROVIDERS_FILE)
+}
+pub fn singbox_proxy_providers_path() -> PathBuf {
+    singbox_dir().join(defs::PROXY_PROVIDERS_DIR)
 }
 pub fn load_basic() -> anyhow::Result<serde_yml::Mapping> {
-    let fp = std::fs::File::open(mihomo_dir().join(defs::BASIC_FILE))?;
+    let fp = std::fs::File::open(mihomo_dir().join(defs::CORE_OVERRIDE_FILE))?;
     serde_yml::from_reader(fp).map_err(|e| e.into())
 }
 pub fn load_basic_singbox() -> anyhow::Result<serde_json::Value> {
-    let fp = std::fs::File::open(singbox_dir().join(defs::BASIC_SINGBOX_FILE))?;
+    let fp = std::fs::File::open(singbox_dir().join(defs::CORE_OVERRIDE_SINGBOX_FILE))?;
     serde_json::from_reader(fp).map_err(|e| e.into())
 }
 pub const DEFAULT_SINGBOX_BASIC_CONFIG: &str = r#"{
@@ -274,6 +298,6 @@ pub fn keymap_path() -> PathBuf {
     DATA_DIR.get().unwrap().join(defs::KEYMAP_FILE)
 }
 
-load_save!(BasicInfo, defs::BASIC_FILE, no_save, "mihomo");
+load_save!(BasicInfo, defs::CORE_OVERRIDE_FILE, no_save, "mihomo");
 load_save!(ConfigFile, defs::CONFIG_FILE);
 load_save!(ProfileManager, defs::DATA_FILE);

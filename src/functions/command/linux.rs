@@ -4,7 +4,7 @@ use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::PathBuf;
 
 pub fn correct_cap_for_tun() -> Result<String> {
-    let binary_path = &crate::config::CONFIG.cfg_file.basic.clash_bin_path;
+    let binary_path = &crate::config::CONFIG.cfg_file.mihomo.core.bin_path;
 
     exec("chmod", vec!["+x", binary_path])?;
     run_as_su_by_sudo(

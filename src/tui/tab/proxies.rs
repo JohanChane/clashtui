@@ -18,15 +18,21 @@ mod_agent!(
         ([KeyCode::Char('h')], Key::Parent, ""),
         ([KeyCode::Char('l')], Key::Expand, ""),
         ([KeyCode::Enter], Key::Select, ""),
+        ([KeyCode::Char('g'), KeyCode::Char('g')], Key::GoTop, "Go to top"),
+        ([KeyCode::Char('G')], Key::GoBottom, "Go to bottom"),
+        ([KeyCode::Char('/')], Key::Search, "Search/Filter"),
         ([KeyCode::Char('s'), KeyCode::Char('n')], Key::SortByName, "Sort by name"),
         ([KeyCode::Char('s'), KeyCode::Char('d')], Key::SortByDelay, "Sort by delay"),
         ([KeyCode::Char('s'), KeyCode::Char('r')], Key::ResetSort, "Reset sort"),
+        ([KeyCode::Char('S'), KeyCode::Char('n')], Key::GlobalSortByName, "Global sort by name"),
+        ([KeyCode::Char('S'), KeyCode::Char('d')], Key::GlobalSortByDelay, "Global sort by delay"),
+        ([KeyCode::Char('S'), KeyCode::Char('r')], Key::GlobalResetSort, "Global reset sort"),
         ([KeyCode::Char('a'), KeyCode::Char('f')], Key::CollapseAll, "Collapse all"),
         ([KeyCode::Char('a'), KeyCode::Char('e')], Key::ExpandAll, "Expand all"),
         ([KeyCode::Char('t')], Key::TestDelay, "Test delay"),
         ([KeyCode::Char('a'), KeyCode::Char('t')], Key::TestAllDelay, "Test all delay"),
         ([KeyCode::Char('r')], Key::Refresh, "Refresh"),
-        ([KeyCode::Char('f')], Key::FzfFind, "Fuzzy find proxy"),
+        ([KeyCode::Char('f')], Key::FzfFind, "Find proxy"),
     ]
 );
 
@@ -37,14 +43,20 @@ pub enum Key {
     Parent,
     Expand,
     Select,
+    GoTop,
+    GoBottom,
     CollapseAll,
     ExpandAll,
     SortByName,
     SortByDelay,
     ResetSort,
+    GlobalSortByName,
+    GlobalSortByDelay,
+    GlobalResetSort,
     TestDelay,
     TestAllDelay,
     Refresh,
+    Search,
     FzfFind,
 }
 
@@ -71,7 +83,13 @@ mod tests {
     use super::all_shortcuts;
 
     fn mk_key(code: KeyCode) -> TuiKey {
-        TuiKey { code, shift: false, ctrl: false, alt: false, super_: false }
+        TuiKey {
+            code,
+            shift: matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase()),
+            ctrl: false,
+            alt: false,
+            super_: false,
+        }
     }
 
     fn make_shortcuts() -> Vec<(KeyCombo, &'static str)> {
@@ -129,8 +147,8 @@ mod tests {
     }
 
     #[test]
-    fn chord_handler_sn_dispatches_sort_by_name() {
-        let s = mk_key(KeyCode::Char('s'));
+    fn chord_handler_Sn_dispatches_global_sort_by_name() {
+        let s = mk_key(KeyCode::Char('S'));
         let n = mk_key(KeyCode::Char('n'));
         let shortcuts = make_shortcuts();
         let mut ch = ChordHandler::default();
@@ -201,6 +219,135 @@ mod tests {
         let consumed = ch.handle(&j, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
         assert!(consumed);
         assert_eq!(dispatched.len(), 1);
+        assert!(!ch.is_active());
+    }
+
+    #[test]
+    fn chord_handler_gg_dispatches_go_top() {
+        let g = mk_key(KeyCode::Char('g'));
+        let shortcuts = make_shortcuts();
+        let mut ch = ChordHandler::default();
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
+        ch.handle(&g, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = ch.handle(&g, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        assert!(consumed);
+        assert_eq!(dispatched.len(), 1);
+        assert_eq!(dispatched[0].len(), 2);
+        assert!(!ch.is_active());
+    }
+
+    #[test]
+    fn single_key_G_in_agent() {
+        let kev = mk_key(KeyCode::Char('G'));
+        let key = Key::try_from(&kev);
+        assert!(matches!(key, Ok(Key::GoBottom)), "G should map to GoBottom");
+    }
+
+    #[test]
+    fn single_key_slash_in_agent() {
+        let kev = mk_key(KeyCode::Char('/'));
+        let key = Key::try_from(&kev);
+        assert!(matches!(key, Ok(Key::Search)), "/ should map to Search");
+    }
+
+    #[test]
+    fn s_initiates_chord_mode() {
+        let s_lower = mk_key(KeyCode::Char('s'));
+        let shortcuts = make_shortcuts();
+        let mut ch = ChordHandler::default();
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
+        let consumed = ch.handle(&s_lower, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        assert!(consumed, "s should initiate chord mode");
+        assert!(dispatched.is_empty(), "no dispatch on first key");
+        assert!(ch.is_active());
+        assert_eq!(ch.candidates.len(), 3, "s should have 3 candidates: group sort by name/delay/reset");
+    }
+
+    #[test]
+    fn sn_dispatches_group_sort_by_name() {
+        let s = mk_key(KeyCode::Char('s'));
+        let n = mk_key(KeyCode::Char('n'));
+        let shortcuts = make_shortcuts();
+        let mut ch = ChordHandler::default();
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
+        ch.handle(&s, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = ch.handle(&n, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        assert!(consumed);
+        assert_eq!(dispatched.len(), 1);
+        assert_eq!(dispatched[0].len(), 2);
+        assert!(!ch.is_active());
+    }
+
+    #[test]
+    fn sd_dispatches_group_sort_by_delay() {
+        let s = mk_key(KeyCode::Char('s'));
+        let d = mk_key(KeyCode::Char('d'));
+        let shortcuts = make_shortcuts();
+        let mut ch = ChordHandler::default();
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
+        ch.handle(&s, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = ch.handle(&d, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        assert!(consumed);
+        assert_eq!(dispatched.len(), 1);
+        assert_eq!(dispatched[0].len(), 2);
+        assert!(!ch.is_active());
+    }
+
+    #[test]
+    fn sr_dispatches_group_reset_sort() {
+        let s = mk_key(KeyCode::Char('s'));
+        let r = mk_key(KeyCode::Char('r'));
+        let shortcuts = make_shortcuts();
+        let mut ch = ChordHandler::default();
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
+        ch.handle(&s, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = ch.handle(&r, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        assert!(consumed);
+        assert_eq!(dispatched.len(), 1);
+        assert_eq!(dispatched[0].len(), 2);
+        assert!(!ch.is_active());
+    }
+
+    #[test]
+    fn S_initiates_chord_mode() {
+        let s_upper = mk_key(KeyCode::Char('S'));
+        let shortcuts = make_shortcuts();
+        let mut ch = ChordHandler::default();
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
+        let consumed = ch.handle(&s_upper, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        assert!(consumed, "S should initiate chord mode");
+        assert!(dispatched.is_empty(), "no dispatch on first key");
+        assert!(ch.is_active());
+        assert_eq!(ch.candidates.len(), 3, "S should have 3 candidates: global sort by name/delay/reset");
+    }
+
+    #[test]
+    fn Sd_dispatches_global_sort_by_delay() {
+        let s_upper = mk_key(KeyCode::Char('S'));
+        let d = mk_key(KeyCode::Char('d'));
+        let shortcuts = make_shortcuts();
+        let mut ch = ChordHandler::default();
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
+        ch.handle(&s_upper, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = ch.handle(&d, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        assert!(consumed);
+        assert_eq!(dispatched.len(), 1);
+        assert_eq!(dispatched[0].len(), 2);
+        assert!(!ch.is_active());
+    }
+
+    #[test]
+    fn Sr_dispatches_global_reset_sort() {
+        let s_upper = mk_key(KeyCode::Char('S'));
+        let r = mk_key(KeyCode::Char('r'));
+        let shortcuts = make_shortcuts();
+        let mut ch = ChordHandler::default();
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
+        ch.handle(&s_upper, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = ch.handle(&r, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        assert!(consumed);
+        assert_eq!(dispatched.len(), 1);
+        assert_eq!(dispatched[0].len(), 2);
         assert!(!ch.is_active());
     }
 }

@@ -1,3 +1,6 @@
+/// Group name → provider_name → URL.
+pub type ProxyProviderGroups = std::collections::HashMap<String, std::collections::BTreeMap<String, String>>;
+
 #[derive(Clone)]
 pub struct Profile {
     pub name: String,
@@ -34,7 +37,7 @@ pub enum ProfileType {
     Url(String),
     Template {
         template: String,
-        urls: Vec<String>,
+        proxy_provider_groups: ProxyProviderGroups,
     },
     Singbox,
 }
@@ -52,17 +55,17 @@ impl serde::Serialize for ProfileType {
             ProfileType::Url(url) => {
                 serializer.serialize_newtype_variant("ProfileType", 1, "Url", url)
             }
-            ProfileType::Template { template, urls } => {
+            ProfileType::Template { template, proxy_provider_groups } => {
                 #[derive(serde::Serialize)]
                 struct TplHelper<'a> {
                     template: &'a str,
-                    urls: &'a [String],
+                    proxy_provider_groups: &'a ProxyProviderGroups,
                 }
                 serializer.serialize_newtype_variant(
                     "ProfileType",
                     2,
                     "Template",
-                    &TplHelper { template, urls },
+                    &TplHelper { template, proxy_provider_groups },
                 )
             }
             ProfileType::Singbox => serializer.serialize_unit_variant("ProfileType", 3, "Singbox"),
@@ -81,12 +84,10 @@ impl<'de> serde::Deserialize<'de> for ProfileType {
             File,
             #[serde(rename = "Url")]
             Url(String),
-            #[allow(dead_code)]
             #[serde(rename = "Template")]
             Template {
                 template: String,
-                #[serde(default)]
-                urls: Vec<String>,
+                proxy_provider_groups: ProxyProviderGroups,
             },
             #[allow(dead_code)]
             #[serde(rename = "Generated")]
@@ -99,16 +100,16 @@ impl<'de> serde::Deserialize<'de> for ProfileType {
         Ok(match wire {
             Wire::File => ProfileType::File,
             Wire::Url(s) => ProfileType::Url(s),
-            Wire::Template { template, urls } => {
-                ProfileType::Template { template, urls }
+            Wire::Template { template, proxy_provider_groups } => {
+                ProfileType::Template { template, proxy_provider_groups }
             }
             Wire::Generated(name) => {
                 log::warn!(
-                    "Migrating deprecated ProfileType::Generated({name}) to Template with empty URLs."
+                    "Migrating deprecated ProfileType::Generated({name}) to Template with empty proxy-provider groups."
                 );
                 ProfileType::Template {
                     template: name,
-                    urls: Vec::new(),
+                    proxy_provider_groups: ProxyProviderGroups::new(),
                 }
             }
             Wire::Singbox => ProfileType::Singbox,
@@ -148,7 +149,17 @@ impl<'de> serde::Deserialize<'de> for ProfileData {
     }
 }
 
-type ProfileDataBase = std::collections::HashMap<String, ProfileData>;
+type ProfileDataMap = std::collections::HashMap<String, ProfileData>;
+
+#[cfg_attr(test, derive(PartialEq))]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default, Clone)]
+#[serde(default)]
+pub struct CoreProfileData {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cur_profile: Option<String>,
+    #[serde(default)]
+    pub profiles: ProfileDataMap,
+}
 
 #[cfg_attr(test, derive(PartialEq))]
 #[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
@@ -157,21 +168,17 @@ pub struct ProfileManager {
     #[serde(default)]
     pub core_type: crate::config::CoreType,
     #[serde(default)]
-    mihomo_current: String,
+    pub mihomo: CoreProfileData,
     #[serde(default)]
-    singbox_current: String,
-    #[serde(default)]
-    mihomo: ProfileDataBase,
-    #[serde(default)]
-    singbox: ProfileDataBase,
+    pub singbox: CoreProfileData,
 }
 impl ProfileManager {
     pub fn contains_in_singbox(&self, name: &str) -> bool {
-        self.singbox.contains_key(name)
+        self.singbox.profiles.contains_key(name)
     }
 
     pub fn insert<S: AsRef<str>>(&mut self, name: S, dtype: ProfileType) -> Option<Profile> {
-        let db = match dtype {
+        let db = &mut match dtype {
             ProfileType::Singbox => &mut self.singbox,
             ProfileType::Template { .. } if self.core_type == crate::config::CoreType::Singbox => {
                 &mut self.singbox
@@ -181,7 +188,7 @@ impl ProfileManager {
             }
             _ => &mut self.mihomo,
         };
-        db.insert(name.as_ref().into(), ProfileData::new(dtype))
+        db.profiles.insert(name.as_ref().into(), ProfileData::new(dtype))
             .map(|data| Profile {
                 name: name.as_ref().to_string(),
                 dtype: data.dtype,
@@ -191,9 +198,10 @@ impl ProfileManager {
     pub fn get<S: AsRef<str>>(&self, name: S) -> Option<Profile> {
         let name = name.as_ref();
         self.mihomo
+            .profiles
             .get(name)
             .cloned()
-            .or_else(|| self.singbox.get(name).cloned())
+            .or_else(|| self.singbox.profiles.get(name).cloned())
             .map(|data| Profile {
                 name: name.to_string(),
                 dtype: data.dtype,
@@ -202,20 +210,20 @@ impl ProfileManager {
     }
     /// return all profile names from both sections
     pub fn all(&self) -> Vec<String> {
-        let mut keys: Vec<String> = self.mihomo.keys().cloned().collect();
-        keys.extend(self.singbox.keys().cloned());
+        let mut keys: Vec<String> = self.mihomo.profiles.keys().cloned().collect();
+        keys.extend(self.singbox.profiles.keys().cloned());
         keys
     }
     /// return profile names for the active core only
     pub fn all_for_core(&self) -> Vec<String> {
         match self.core_type {
-            crate::config::CoreType::Mihomo => self.mihomo.keys().cloned().collect(),
-            crate::config::CoreType::Singbox => self.singbox.keys().cloned().collect(),
+            crate::config::CoreType::Mihomo => self.mihomo.profiles.keys().cloned().collect(),
+            crate::config::CoreType::Singbox => self.singbox.profiles.keys().cloned().collect(),
         }
     }
     pub fn remove<S: AsRef<str>>(&mut self, name: S) -> Option<Profile> {
         let name = name.as_ref();
-        let from_mihomo = self.mihomo.remove(name).map(|data| Profile {
+        let from_mihomo = self.mihomo.profiles.remove(name).map(|data| Profile {
             name: name.to_string(),
             dtype: data.dtype,
             no_pp: data.no_pp,
@@ -223,7 +231,7 @@ impl ProfileManager {
         if from_mihomo.is_some() {
             return from_mihomo;
         }
-        self.singbox.remove(name).map(|data| Profile {
+        self.singbox.profiles.remove(name).map(|data| Profile {
             name: name.to_string(),
             dtype: data.dtype,
             no_pp: data.no_pp,
@@ -231,8 +239,14 @@ impl ProfileManager {
     }
     pub fn get_current(&self) -> Option<Profile> {
         match self.core_type {
-            crate::config::CoreType::Mihomo => self.get(&self.mihomo_current),
-            crate::config::CoreType::Singbox => self.get(&self.singbox_current),
+            crate::config::CoreType::Mihomo => {
+                let name = self.mihomo.cur_profile.as_ref()?;
+                self.get(name)
+            }
+            crate::config::CoreType::Singbox => {
+                let name = self.singbox.cur_profile.as_ref()?;
+                self.get(name)
+            }
         }
     }
     pub fn set_current(&mut self, pf: Profile) {
@@ -242,69 +256,19 @@ impl ProfileManager {
             "Selected profile not found in database"
         );
         match self.core_type {
-            crate::config::CoreType::Mihomo => self.mihomo_current = name,
-            crate::config::CoreType::Singbox => self.singbox_current = name,
+            crate::config::CoreType::Mihomo => self.mihomo.cur_profile = Some(name),
+            crate::config::CoreType::Singbox => self.singbox.cur_profile = Some(name),
         }
     }
     pub fn set_no_pp<S: AsRef<str>>(&mut self, name: S, no_pp: bool) {
         let name = name.as_ref();
-        if let Some(data) = self.mihomo.get_mut(name) {
+        if let Some(data) = self.mihomo.profiles.get_mut(name) {
             data.no_pp = no_pp;
-        } else if let Some(data) = self.singbox.get_mut(name) {
+        } else if let Some(data) = self.singbox.profiles.get_mut(name) {
             data.no_pp = no_pp;
         }
     }
 
-    /// Migrate mihomo `File` profiles that have `clashtui` marker
-    /// in their YAML to `Template` type with empty URLs.
-    /// Returns true if any migration was performed.
-    pub fn migrate_file_to_template(
-        &mut self,
-        profile_yamls_dir: &std::path::Path,
-    ) -> bool {
-        let file_names: Vec<String> = self
-            .mihomo
-            .iter()
-            .filter(|(_, data)| data.dtype == ProfileType::File)
-            .map(|(name, _)| name.clone())
-            .collect();
-
-        if file_names.is_empty() {
-            return false;
-        }
-
-        let mut migrated = false;
-        for name in file_names {
-            let yaml_path = profile_yamls_dir.join(format!("{name}.yaml"));
-            let Ok(file) = std::fs::File::open(&yaml_path) else {
-                continue;
-            };
-            let Ok(value): std::result::Result<serde_yml::Value, _> =
-                serde_yml::from_reader(file)
-            else {
-                continue;
-            };
-            if value.get("clashtui").is_none() {
-                continue;
-            }
-            let template = value
-                .get("clashtui_template_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or(&name)
-                .to_owned();
-            if let Some(data) = self.mihomo.get_mut(&name) {
-                data.dtype = ProfileType::Template {
-                    template,
-                    urls: Vec::new(),
-                };
-                log::warn!(
-                    "Migrated profile '{name}' from File to Template (template inferred, no URLs)"
-                );
-                migrated = true;
-            }
-        }
-        migrated
-    }
 }
 
 #[cfg(test)]
@@ -312,57 +276,71 @@ mod test {
     use super::*;
     #[test]
     fn serde_template_deserialized_as_template() {
-        let yaml = r#"current_profile: ''
+        let yaml = r#"core_type: mihomo
 mihomo:
-  pf1: File
-  pf2: !Url "https://raw.com"
-  pf3: !Template {template: tpl.yaml, urls: ["https://a.com"]}
-singbox: {}
+  profiles:
+    pf1: File
+    pf2: !Url "https://raw.com"
+    pf3: !Template {template: tpl.yaml, proxy_provider_groups: {pvd: {foo: "https://a.com"}}}
+singbox:
+  profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.get("pf1").unwrap().dtype, ProfileType::File);
-        assert_eq!(db.mihomo.get("pf1").unwrap().no_pp, false);
+        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().dtype, ProfileType::File);
+        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
         assert_eq!(
-            db.mihomo.get("pf2").unwrap().dtype,
+            db.mihomo.profiles.get("pf2").unwrap().dtype,
             ProfileType::Url("https://raw.com".to_string())
         );
-        assert_eq!(db.mihomo.get("pf2").unwrap().no_pp, false);
+        assert_eq!(db.mihomo.profiles.get("pf2").unwrap().no_pp, false);
+        let expected_groups: ProxyProviderGroups = {
+            let mut m = std::collections::HashMap::new();
+            m.insert("pvd".into(), [("foo".into(), "https://a.com".into())].into());
+            m
+        };
         assert_eq!(
-            db.mihomo.get("pf3").unwrap().dtype,
+            db.mihomo.profiles.get("pf3").unwrap().dtype,
             ProfileType::Template {
                 template: "tpl.yaml".into(),
-                urls: vec!["https://a.com".into()]
+                proxy_provider_groups: expected_groups,
             }
         );
-        assert_eq!(db.mihomo.get("pf3").unwrap().no_pp, false);
+        assert_eq!(db.mihomo.profiles.get("pf3").unwrap().no_pp, false);
     }
     #[test]
     fn serde_generated_migrated_to_template() {
-        let yaml = r#"current_profile: ''
+        let yaml = r#"core_type: mihomo
 mihomo:
-  pf1: !Generated "my-tpl.yaml"
-singbox: {}
+  profiles:
+    pf1: !Generated "my-tpl.yaml"
+singbox:
+  profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
         assert_eq!(
-            db.mihomo.get("pf1").unwrap().dtype,
+            db.mihomo.profiles.get("pf1").unwrap().dtype,
             ProfileType::Template {
                 template: "my-tpl.yaml".into(),
-                urls: vec![]
+                proxy_provider_groups: ProxyProviderGroups::new(),
             }
         );
-        assert_eq!(db.mihomo.get("pf1").unwrap().no_pp, false);
+        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
     }
     #[test]
     fn serde_roundtrip_file_and_url() {
         let mut db = ProfileManager::default();
         db.insert("pf1", ProfileType::File);
         db.insert("pf2", ProfileType::Url("https://raw.com".to_string()));
+        let groups: ProxyProviderGroups = {
+            let mut m = std::collections::HashMap::new();
+            m.insert("pvd".into(), [("foo".into(), "https://a.com".into())].into());
+            m
+        };
         db.insert(
             "pf3",
             ProfileType::Template {
                 template: "my-tpl.yaml".into(),
-                urls: vec!["https://a.com".into()],
+                proxy_provider_groups: groups,
             },
         );
         let serialized = serde_yml::to_string(&db).unwrap();
@@ -371,37 +349,43 @@ singbox: {}
     }
     #[test]
     fn backward_compat_old_format_no_pp_defaults_false() {
-        let yaml = r#"current_profile: ''
+        let yaml = r#"core_type: mihomo
 mihomo:
-  pf1: File
-  pf2: !Url "https://example.com"
-singbox: {}
+  profiles:
+    pf1: File
+    pf2: !Url "https://example.com"
+singbox:
+  profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.get("pf1").unwrap().no_pp, false);
-        assert_eq!(db.mihomo.get("pf2").unwrap().no_pp, false);
+        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
+        assert_eq!(db.mihomo.profiles.get("pf2").unwrap().no_pp, false);
     }
     #[test]
     fn new_format_preserves_no_pp() {
-        let yaml = r#"current_profile: ''
+        let yaml = r#"core_type: mihomo
 mihomo:
-  pf1: {dtype: File, no_pp: true}
-  pf2: {dtype: !Url "https://example.com", no_pp: false}
-singbox: {}
+  profiles:
+    pf1: {dtype: File, no_pp: true}
+    pf2: {dtype: !Url "https://example.com", no_pp: false}
+singbox:
+  profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.get("pf1").unwrap().no_pp, true);
-        assert_eq!(db.mihomo.get("pf2").unwrap().no_pp, false);
+        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, true);
+        assert_eq!(db.mihomo.profiles.get("pf2").unwrap().no_pp, false);
     }
     #[test]
     fn new_format_missing_no_pp_defaults_false() {
-        let yaml = r#"current_profile: ''
+        let yaml = r#"core_type: mihomo
 mihomo:
-  pf1: {dtype: File}
-singbox: {}
+  profiles:
+    pf1: {dtype: File}
+singbox:
+  profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.get("pf1").unwrap().no_pp, false);
+        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
     }
     #[test]
     fn set_no_pp_toggles_and_persists() {

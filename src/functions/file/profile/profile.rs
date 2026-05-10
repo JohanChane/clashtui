@@ -7,7 +7,9 @@ impl Profile {
     pub fn load_local_profile(self) -> anyhow::Result<LocalProfile> {
         use super::super::PROFILE_JSONS_PATH;
         use super::PROFILE_YAMLS_PATH;
-        let path = if super::is_singbox_profile(&self) {
+        let path = if matches!(self.dtype, ProfileType::Singbox)
+            || crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox
+        {
             PROFILE_JSONS_PATH.join(format!("{}.json", &self.name))
         } else {
             PROFILE_YAMLS_PATH.join(format!("{}.yaml", &self.name))
@@ -60,25 +62,18 @@ impl LocalProfile {
             .ok()
             .and_then(|file| now.duration_since(file).ok())
     }
-    /// merge `basic_clash_config` to `self::content`,
-    /// all items in `basic_clash_config` will be overwritten to `self::content`
-    /// except for the value is a sequence, it will be appended to the original value
+    /// merge `core_override_config` to `self::content`,
+    /// all top-level keys in `core_override_config` overwrite the profile's values
     ///
     /// Note: need to call [`LocalProfile::sync_from_disk`] before call this
-    pub fn merge(&mut self, basic_clash_config: &serde_yml::Mapping) -> anyhow::Result<()> {
-        if self.content.is_none() || basic_clash_config.is_empty() {
+    pub fn merge(&mut self, core_override_config: &serde_yml::Mapping) -> anyhow::Result<()> {
+        if self.content.is_none() || core_override_config.is_empty() {
             log::warn!("skip merge: one of the input content is none");
             return Ok(());
         }
         let map = self.content.as_mut().unwrap();
-        for (key, value) in basic_clash_config.iter() {
-            if let Some(serde_yml::Value::Sequence(old_value)) = map.swap_remove(key) {
-                let mut v = value.as_sequence().unwrap().to_owned();
-                v.extend(old_value);
-                map.insert(key.clone(), serde_yml::Value::Sequence(v));
-            } else {
-                map.insert(key.clone(), value.clone());
-            }
+        for (key, value) in core_override_config.iter() {
+            map.insert(key.clone(), value.clone());
         }
         Ok(())
     }

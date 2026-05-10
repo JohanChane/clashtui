@@ -11,7 +11,7 @@ newtype_tab!(SettingsTab(Tab<SettingsContent>));
 mod_agent!(
     SettingsKey,
     [
-        ([KeyCode::Enter], SettingsKey::Execute, "Apply setting"),
+        ([KeyCode::Enter], SettingsKey::Execute, "Apply"),
         ([KeyCode::Esc], SettingsKey::Esc, ""),
         ([KeyCode::Up], SettingsKey::MoveUp, ""),
         ([KeyCode::Down], SettingsKey::MoveDown, ""),

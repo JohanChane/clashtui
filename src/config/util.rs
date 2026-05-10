@@ -3,16 +3,18 @@ use anyhow::{Context, Result, bail};
 pub mod defs {
     pub const CONFIG_FILE: &str = "config.yaml";
     pub const DATA_FILE: &str = "clashtui.db";
-    pub const BASIC_FILE: &str = "basic_clash_config.yaml";
-    pub const BASIC_SINGBOX_FILE: &str = "basic_singbox_config.json";
+    pub const CORE_OVERRIDE_FILE: &str = "core_override_config.yaml";
+    pub const CORE_OVERRIDE_SINGBOX_FILE: &str = "core_override_config.json";
     pub const LOG_FILE: &str = "clashtui.log";
     #[cfg(feature = "customized-theme")]
     pub const THEME_FILE: &str = "theme.yaml";
-    pub const PROFILE_YAMLS_DIR: &str = "profile_yamls";
-    pub const PROFILE_JSONS_DIR: &str = "profile_jsons";
+    pub const PROFILE_YAMLS_DIR: &str = "profiles";
+    pub const PROFILE_JSONS_DIR: &str = "profiles";
     pub const TEMPLATE_DIR: &str = "templates";
     pub const KEYMAP_FILE: &str = "keymap.yaml";
     pub const PROVIDER_CACHE_DIR: &str = "providers";
+    pub const PROXY_PROVIDERS_DIR: &str = "proxy-providers";
+    pub const TEMPLATE_PROXY_PROVIDERS_FILE: &str = "template_proxy_providers.yaml";
 }
 
 pub(super) fn load_home_dir() -> Result<std::path::PathBuf> {

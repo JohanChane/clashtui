@@ -1,5 +1,6 @@
 use super::dev::*;
 use crate::functions::restful::connection::{self, Conn};
+use crate::tui::widget::fzffind;
 use ratatui::text::Line;
 use ratatui::widgets::{Cell, Row, Table};
 use std::collections::HashMap;
@@ -15,12 +16,14 @@ mod_agent!(
         ([KeyCode::Char('j')], Key::MoveDown, ""),
         ([KeyCode::Char('G')], Key::GoBottom, ""),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::GoTop, "Go to top"),
-        ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Terminate, "Close connection"),
+        ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Terminate, "Close"),
         ([KeyCode::Char('a'), KeyCode::Char('c')], Key::TerminateAll, "Close all"),
         ([KeyCode::Char('s'), KeyCode::Char('d')], Key::SortByDownload, "Sort by DL speed"),
         ([KeyCode::Char('s'), KeyCode::Char('u')], Key::SortByUpload, "Sort by UL speed"),
         ([KeyCode::Char('s'), KeyCode::Char('r')], Key::SortReset, "Reset sort"),
         ([KeyCode::Char('/')], Key::Search, "Search/Filter"),
+        ([KeyCode::Char('p')], Key::TogglePause, "Pause/Resume"),
+        ([KeyCode::Char('f')], Key::FzfFind, "Find"),
     ]
 );
 
@@ -36,6 +39,8 @@ pub enum Key {
     SortByUpload,
     SortReset,
     Search,
+    TogglePause,
+    FzfFind,
 }
 
 impl TryFrom<&crate::tui::Key> for Key {
@@ -106,6 +111,7 @@ struct Connections {
     last_bytes: HashMap<String, (u64, u64)>,
     sort_state: SortState,
     filter: Option<String>,
+    paused: bool,
 }
 
 fn human_bytes(bytes: u64) -> String {
@@ -201,6 +207,9 @@ impl BasicTabContent for Connections {
     }
 
     fn after_sync(&self, task_set: &mut FutureSet<Self>) {
+        if self.paused {
+            return;
+        }
         async {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             let info = tri!(connection::get_connections(), or_set);
@@ -375,6 +384,26 @@ impl TabContent for Connections {
                 }
                 .spawn_at(task_set);
             }
+            Key::TogglePause => {
+                self.paused = !self.paused;
+            }
+            Key::FzfFind => {
+                self.paused = true;
+                let names: Vec<String> = self.display_rows.iter()
+                    .map(|r| format!("{} | {} | {}", r.host, r.rule, r.chains))
+                    .collect();
+                async move {
+                    let selected = tokio::task::spawn_blocking(move || {
+                        fzffind::run_fzf(&names, "Find Connection")
+                    })
+                    .await
+                    .unwrap_or(None);
+                    wrapper(move |content: &mut Connections| {
+                        content.row = selected;
+                    })
+                }
+                .spawn_at(task_set);
+            }
         }
     }
 
@@ -383,11 +412,15 @@ impl TabContent for Connections {
             .border_style(Theme::get().tab.tab_focused)
             .title(Self::TITLE);
 
-        let block = if let Some(filter) = self.filter.as_ref() {
-            block.title_bottom(Line::raw(format!(" / {filter} ")).right_aligned().reversed())
+        let mut title = if let Some(filter) = self.filter.as_ref() {
+            format!(" / {filter} ")
         } else {
-            block.title_bottom(Line::raw(" /: Search ").right_aligned().reversed())
+            " /: Search ".to_owned()
         };
+        if self.paused {
+            title.push_str(" [PAUSED]");
+        }
+        let block = block.title_bottom(Line::raw(title).right_aligned().reversed());
 
         if !self.error.as_deref().unwrap_or("").is_empty() && self.display_rows.is_empty() {
             let widget = ratatui::widgets::Paragraph::new(

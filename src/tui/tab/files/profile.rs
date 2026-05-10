@@ -1,4 +1,4 @@
-use crate::functions::command::{edit, test_config};
+use crate::functions::command::{check_config, edit, test_config};
 use crate::functions::file::profile::{db, select, update_profile};
 use crate::tui::widget::popmsg::Confirm;
 use std::cell::Cell;
@@ -27,7 +27,8 @@ mod_agent!(
         ([KeyCode::Char('a'), KeyCode::Char('u')], Key::Action(Action::UpdateAll), "Update all"),
         ([KeyCode::Char('/')], Key::Action(Action::Search), ""),
         ([KeyCode::Char('t')], Key::Action(Action::Test), ""),
-        ([KeyCode::Char('f')], Key::Action(Action::FzfFind), "Fuzzy find profile"),
+        ([KeyCode::Char('c')], Key::Action(Action::Check), "Check config"),
+        ([KeyCode::Char('f')], Key::Action(Action::FzfFind), "Find profile"),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
         ([KeyCode::Char('G')], Key::Action(Action::GoEnd), "Go to end"),
         ([KeyCode::Char('N')], Key::Action(Action::ToggleNoPp), "Toggle no proxy-provider"),
@@ -55,6 +56,7 @@ pub enum Action {
     UpdateAll,
     Search,
     Test,
+    Check,
     FzfFind,
     GoTop,
     GoEnd,
@@ -122,6 +124,8 @@ impl DualTabContent for Profile {
             Key::Select => {
                 let name = get_name!(self, state);
                 async move {
+                    let pf = tri!(db::get(&name).unwrap().load_local_profile());
+                    tri!(check_config(&pf.path));
                     tri!(select(db::get(&name).unwrap()).await);
                     sync!((Self, Self::Mate))
                 }
@@ -244,6 +248,7 @@ mod actions {
                 Self::Preview => preview(name).await,
                 Self::Update => update(name).await,
                 Self::Test => test(name).await,
+                Self::Check => check(name).await,
                 Self::ToggleNoPp => toggle_no_pp(name).await,
                 Self::FzfFind => unreachable!("FzfFind handled directly"),
                 Self::GoTop | Self::GoEnd => do_nothing(),
@@ -299,7 +304,7 @@ mod actions {
 
         let is_url = source.starts_with("http://") || source.starts_with("https://");
         let is_singbox =
-            crate::config::CONFIG.cfg_file.core_type == crate::config::CoreType::Singbox;
+            crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox;
 
         if is_singbox {
             let content: serde_json::Value = if is_url {
@@ -495,12 +500,25 @@ mod actions {
     }
 
     async fn test(name: String) -> CB {
-        let enable_geodata_mode = todo!("crate::tui::popmsg::SelectSingle");
         let pf = tri!(db::get(name).unwrap().load_local_profile());
-        let result = test_config(Some(&pf.path), enable_geodata_mode);
+        let result = test_config(Some(&pf.path), false);
         Confirm::title("Test Result".to_owned())
             .with_prompt(result)
             .build_and_send();
+
+        do_nothing()
+    }
+
+    async fn check(name: String) -> CB {
+        let pf = tri!(db::get(name).unwrap().load_local_profile());
+        match check_config(&pf.path) {
+            Ok(()) => {
+                Confirm::title("Check Passed".to_owned())
+                    .with_prompt("Configuration is valid.".to_owned())
+                    .build_and_send();
+            }
+            Err(e) => Confirm::err(e),
+        }
 
         do_nothing()
     }

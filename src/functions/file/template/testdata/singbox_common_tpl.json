@@ -1,79 +1,197 @@
 {
-  "proxy-providers": {
-    "pvd": {
-      "tpl_param": {},
-      "type": "http",
-      "interval": 3600,
-      "url": "https://example.com/subscription.yaml",
-      "health-check": {
-        "enable": true,
-        "url": "https://www.gstatic.com/generate_204",
-        "interval": 300
-      }
-    }
+  "log": {
+    "level": "info",
+    "timestamp": true
   },
-  "proxy-groups": [
+  "dns": {
+    "servers": [
+      {
+        "tag": "dns-remote",
+        "detour": "Entry",
+        "type": "https",
+        "server": "1.1.1.1"
+      },
+      {
+        "tag": "dns-direct",
+        "detour": "direct",
+        "type": "https",
+        "server": "dns.alidns.com",
+        "domain_resolver": "dns-local"
+      },
+      {
+        "tag": "dns-local",
+        "type": "local"
+      },
+      {
+        "tag": "dns-fake",
+        "type": "fakeip",
+        "inet4_range": "198.18.0.0/15"
+      }
+    ],
+    "rules": [
+      {
+        "rule_set": [
+          "geosite-geolocation-cn"
+        ],
+        "server": "dns-direct"
+      },
+      {
+        "rule_set": [
+          "geosite-google"
+        ],
+        "server": "dns-remote"
+      },
+      {
+        "query_type": [
+          "A",
+          "AAAA"
+        ],
+        "server": "dns-fake"
+      },
+      {
+        "server": "dns-direct"
+      }
+    ],
+    "final": "dns-direct",
+    "strategy": "prefer_ipv4"
+  },
+  "inbounds": [
     {
-      "name": "Proxy",
-      "type": "select",
-      "proxies": [
-        "DIRECT",
-        "<Auto>",
-        "REJECT"
-      ]
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 7890
     },
     {
-      "name": "Auto",
-      "type": "url-test",
-      "tpl_param": {
-        "providers": ["pvd"]
-      },
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.19.0.1/30"
+      ],
+      "mtu": 9000,
+      "auto_route": true,
+      "strict_route": true,
+      "auto_redirect": true,
+      "stack": "system"
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "Entry",
+      "outbounds": [
+        "${PGG.Auto}",
+        "${PPG.pvd}"
+      ],
+      "default": "Auto-pvd"
+    },
+    {
+      "type": "urltest",
+      "tag": "Auto",
+      "expand_group_with": [
+        "${PPG.pvd}"
+      ],
       "url": "https://www.gstatic.com/generate_204",
-      "interval": 300,
+      "interval": "5m",
       "tolerance": 50
     },
     {
-      "name": "Direct",
-      "type": "select",
-      "proxies": ["DIRECT"]
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "block",
+      "tag": "block"
     }
   ],
-  "rules": [
-    "IP-CIDR,127.0.0.0/8,DIRECT",
-    "IP-CIDR,10.0.0.0/8,DIRECT",
-    "IP-CIDR,172.16.0.0/12,DIRECT",
-    "IP-CIDR,192.168.0.0/16,DIRECT",
-    "IP-CIDR,100.64.0.0/10,DIRECT",
-    "IP-CIDR,224.0.0.0/4,DIRECT",
-    "DOMAIN-SUFFIX,cn,Direct",
-    "DOMAIN-KEYWORD,china,Direct",
-    "DOMAIN-SUFFIX,local,Direct",
-    "GEOSITE,cn,Direct",
-    "GEOSITE,geolocation-!cn,Proxy",
-    "GEOIP,CN,Direct",
-    "MATCH,Proxy"
-  ],
-  "rule-providers": {
-    "geosite-cn": {
-      "type": "http",
-      "behavior": "domain",
-      "url": "https://github.com/SagerNet/sing-geosite/raw/refs/heads/rule-set/geosite-cn.srs",
-      "path": "./rule-providers/geosite-cn.srs",
-      "interval": 86400
+  "route": {
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "geoip-cn",
+        "format": "binary",
+        "url": "https://github.com/SagerNet/sing-geoip/raw/rule-set/geoip-cn.srs",
+        "download_detour": "direct",
+        "update_interval": "7d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-geolocation-cn",
+        "format": "binary",
+        "url": "https://github.com/SagerNet/sing-geosite/raw/rule-set/geosite-geolocation-cn.srs",
+        "download_detour": "direct",
+        "update_interval": "7d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-google",
+        "format": "binary",
+        "url": "https://github.com/SagerNet/sing-geosite/raw/rule-set/geosite-google.srs",
+        "download_detour": "direct",
+        "update_interval": "7d"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-category-ads-all",
+        "format": "binary",
+        "url": "https://github.com/SagerNet/sing-geosite/raw/rule-set/geosite-category-ads-all.srs",
+        "download_detour": "direct",
+        "update_interval": "7d"
+      }
+    ],
+    "rules": [
+      {
+        "rule_set": [
+          "geosite-category-ads-all"
+        ],
+        "outbound": "block"
+      },
+      {
+        "rule_set": [
+          "geoip-cn"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "rule_set": [
+          "geosite-geolocation-cn"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "rule_set": [
+          "geosite-google"
+        ],
+        "outbound": "Entry"
+      },
+      {
+        "ip_is_private": true,
+        "outbound": "direct"
+      },
+      {
+        "protocol": [
+          "bittorrent"
+        ],
+        "outbound": "direct"
+      },
+      {
+        "outbound": "Entry"
+      }
+    ],
+    "auto_detect_interface": true,
+    "final": "Entry"
+  },
+  "experimental": {
+    "clash_api": {
+      "external_controller": "127.0.0.1:9090",
+      "external_ui": "dashboard",
+      "secret": "",
+      "default_mode": "Rule"
     },
-    "geosite-geolocation-!cn": {
-      "type": "http",
-      "behavior": "domain",
-      "url": "https://github.com/SagerNet/sing-geosite/raw/refs/heads/rule-set/geosite-geolocation-!cn.srs",
-      "path": "./rule-providers/geosite-geolocation-!cn.srs",
-      "interval": 86400
-    },
-    "geoip-cn": {
-      "type": "http",
-      "behavior": "ipcidr",
-      "url": "https://github.com/SagerNet/sing-geoip/raw/refs/heads/rule-set/geoip-cn.srs",
-      "path": "./rule-providers/geoip-cn.srs",
-      "interval": 86400
+    "cache_file": {
+      "enabled": true,
+      "path": "cache.db",
+      "store_fakeip": true
     }
   }
 }

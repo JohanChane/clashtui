@@ -52,7 +52,7 @@ Config files live inside this dir:
 - `config.yaml` — main config (loaded by `ConfigFile::from_file()` in `config::util.rs`)
 - `keymap.yaml` — per-tab key remappings (loaded by `agent::init()` in `src/tui/agent.rs`)
 - `theme.yaml` — custom theme (only effective with `customized-theme` feature)
-- `basic_clash_config.yaml` — clash subprocess config
+- `core_override_config.yaml` — core override config (overwrites profile top-level keys on select)
 - `clashtui.db` — profile manager database (saved on exit via `config::CONFIG.save()`)
 - `clashtui.log` — log output (writes via `env_logger` with `Pipe` target)
 

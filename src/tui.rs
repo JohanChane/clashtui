@@ -18,6 +18,18 @@ pub use key::Key;
 pub use term::hold;
 pub use theme::Theme;
 
+pub async fn prompt_sudo_password() -> Option<String> {
+    match popmsg::input::InputMasked::new()
+        .with_title("Sudo Password".to_owned())
+        .with_prompt("Sudo password:".to_owned())
+        .build_and_send()
+        .await
+    {
+        Ok(pw) => Some(pw),
+        Err(_) => None,
+    }
+}
+
 pub static EXT_PROC: AtomicBool = AtomicBool::new(false);
 
 trait TuiWidget {

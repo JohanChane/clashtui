@@ -69,8 +69,7 @@ impl Proxies {
     ) {
         let timeout = crate::config::CONFIG.cfg_file.timeout.unwrap_or(5) * 1000;
         let test_url = self.proxies.get(&name)
-            .and_then(|p| p.test_url.clone())
-            .or_else(|| crate::config::CONFIG.cfg_file.test_url.clone());
+            .and_then(|p| p.test_url.clone());
         let t_secs = crate::config::CONFIG.cfg_file.timeout.unwrap_or(5).max(1) + 3;
 
         match ntype {
@@ -212,8 +211,7 @@ impl Proxies {
             let mut all_delays: HashMap<String, u64> = HashMap::new();
             for name in &folders {
                 let url = proxies_map.get(name.as_str())
-                    .and_then(|p| p.test_url.clone())
-                    .or_else(|| crate::config::CONFIG.cfg_file.test_url.clone());
+                    .and_then(|p| p.test_url.clone());
                 let n = name.clone();
                 match tokio::time::timeout(
                     Duration::from_secs(t_secs),
@@ -229,8 +227,7 @@ impl Proxies {
             }
             for name in &files {
                 let url = proxies_map.get(name.as_str())
-                    .and_then(|p| p.test_url.clone())
-                    .or_else(|| crate::config::CONFIG.cfg_file.test_url.clone());
+                    .and_then(|p| p.test_url.clone());
                 let n = name.clone();
                 match tokio::time::timeout(
                     Duration::from_secs(t_secs),

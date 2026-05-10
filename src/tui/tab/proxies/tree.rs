@@ -1,6 +1,14 @@
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
+pub enum SortMode {
+    #[default]
+    None,
+    ByName,
+    ByDelay,
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub enum NodeType {
     Folder,
@@ -18,13 +26,12 @@ pub struct NodeItem {
     pub parent: Option<String>,
     pub expanded: bool,
     pub is_now: bool,
+    pub sort_mode: SortMode,
 }
 
 pub struct ProxyTree {
     pub nodes: Vec<NodeItem>,
     pub name_index: HashMap<String, usize>,
-    pub sorted: bool,
-    pub sort_by_delay: bool,
 }
 
 impl Default for ProxyTree {
@@ -32,8 +39,6 @@ impl Default for ProxyTree {
         Self {
             nodes: Vec::new(),
             name_index: HashMap::new(),
-            sorted: false,
-            sort_by_delay: false,
         }
     }
 }
@@ -57,6 +62,13 @@ impl ProxyTree {
             .map(|n| (n.name.clone(), true))
             .collect();
 
+        let sort_map: HashMap<String, SortMode> = self
+            .nodes
+            .iter()
+            .filter(|n| n.node_type == NodeType::Folder && n.sort_mode != SortMode::None)
+            .map(|n| (n.name.clone(), n.sort_mode))
+            .collect();
+
         let mut nodes = Vec::new();
 
         let mut top: Vec<&str> = proxies
@@ -65,7 +77,8 @@ impl ProxyTree {
             .map(|(name, _)| name.as_str())
             .collect();
 
-        if self.sorted {
+        let global_sort = sort_map.get("GLOBAL").copied().unwrap_or(SortMode::None);
+        if global_sort == SortMode::ByName {
             top.sort();
         } else if let Some(global) = proxies.get("GLOBAL") {
             if let Some(ref group_all) = global.all {
@@ -81,8 +94,9 @@ impl ProxyTree {
         }
 
         for name in &top {
+            let sort_mode = sort_map.get(*name).copied().unwrap_or(SortMode::None);
             Self::push_entry(
-                &mut nodes, name, None, None, 0, proxies, &expanded_map, self.sort_by_delay,
+                &mut nodes, name, None, None, 0, proxies, &expanded_map, sort_mode,
             );
         }
 
@@ -98,7 +112,7 @@ impl ProxyTree {
         depth: usize,
         proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,
         expanded_map: &HashMap<String, bool>,
-        sort_by_delay: bool,
+        sort_mode: SortMode,
     ) {
         let proxy = match proxies.get(name) {
             Some(p) => p,
@@ -120,19 +134,28 @@ impl ProxyTree {
             parent,
             expanded,
             is_now: parent_now == Some(name),
+            sort_mode,
         });
 
         if has_kids && expanded {
             if let Some(ref kids) = proxy.all {
                 let my_now = proxy.now.as_deref();
-                let ordered_kids: Vec<&String> = if sort_by_delay {
-                    let mut v: Vec<&String> = kids.iter().collect();
-                    v.sort_by_key(|kid| {
-                        resolve_delay(kid.as_str(), proxies).unwrap_or(u64::MAX)
-                    });
-                    v
-                } else {
-                    kids.iter().collect()
+                let ordered_kids: Vec<&String> = match sort_mode {
+                    SortMode::ByDelay => {
+                        let mut v: Vec<&String> = kids.iter().collect();
+                        v.sort_by_key(|kid| {
+                            resolve_delay(kid.as_str(), proxies)
+                                .and_then(|d| if d == 0 { None } else { Some(d) })
+                                .unwrap_or(u64::MAX)
+                        });
+                        v
+                    }
+                    SortMode::ByName => {
+                        let mut v: Vec<&String> = kids.iter().collect();
+                        v.sort();
+                        v
+                    }
+                    SortMode::None => kids.iter().collect(),
                 };
                 for kid in &ordered_kids {
                     let is_group = proxies
@@ -150,6 +173,7 @@ impl ProxyTree {
                         parent: Some(name.to_owned()),
                         expanded: false,
                         is_now: my_now == Some(kid.as_str()),
+                        sort_mode: SortMode::None,
                     });
                 }
             }
@@ -395,7 +419,7 @@ mod tests {
         let mut nodes = Vec::new();
         let mut expanded = HashMap::new();
         expanded.insert("Entry".to_string(), true);
-        ProxyTree::push_entry(&mut nodes, "Entry", None, None, 0, &proxies, &expanded, false);
+        ProxyTree::push_entry(&mut nodes, "Entry", None, None, 0, &proxies, &expanded, SortMode::None);
 
         let children: Vec<_> = nodes.iter().skip(1).filter(|n| n.depth == 1).collect();
         assert_eq!(children.len(), child_count);
@@ -453,7 +477,7 @@ mod tests {
         let mut nodes = Vec::new();
         let mut expanded = HashMap::new();
         expanded.insert("Entry".to_string(), true);
-        ProxyTree::push_entry(&mut nodes, "Entry", None, None, 0, &proxies, &expanded, false);
+        ProxyTree::push_entry(&mut nodes, "Entry", None, None, 0, &proxies, &expanded, SortMode::None);
 
         let links: Vec<_> = nodes.iter()
             .filter(|n| n.node_type == NodeType::Link && n.name == "看视频和下载不要选这个")

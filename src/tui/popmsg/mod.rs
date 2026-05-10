@@ -1,4 +1,4 @@
-mod input;
+pub(crate) mod input;
 // mod prompt;
 
 mod dev {

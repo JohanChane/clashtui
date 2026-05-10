@@ -74,7 +74,7 @@ ExecReload=/bin/kill -HUP $MAINPID
 WantedBy=multi-user.target
 EOF
 
-  sudo ln -sf $CLASHTUI_INSTALL_DIR/mihomo/clashtui_mihomo.service /etc/systemd/system/
+  sudo ln -sf $CLASHTUI_INSTALL_DIR/mihomo/clashtui_mihomo.service /usr/lib/systemd/system/
   sudo systemctl daemon-reload
 }
 
@@ -111,11 +111,17 @@ Restart=on-failure
 RestartSec=10s
 LimitNOFILE=infinity
 
+Environment="ENABLE_DEPRECATED_LEGACY_DNS_FAKEIP_OPTIONS=true"
+Environment="ENABLE_DEPRECATED_LEGACY_DNS_SERVERS=true"
+Environment="ENABLE_DEPRECATED_OUTBOUND_DNS_RULE_ITEM=true"
+Environment="ENABLE_DEPRECATED_GEOIP=true"
+Environment="ENABLE_DEPRECATED_GEOSITE=true"
+
 [Install]
 WantedBy=multi-user.target
 EOF
 
-  sudo ln -sf $CLASHTUI_INSTALL_DIR/sing-box/clashtui_singbox.service /etc/systemd/system/
+  sudo ln -sf $CLASHTUI_INSTALL_DIR/sing-box/clashtui_singbox.service /usr/lib/systemd/system/
   sudo systemctl daemon-reload
 }
 
@@ -205,15 +211,15 @@ EOF
   esac
 
   if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then
-    echo -n "Do you want to download basic_clash_config.yaml? (y/N): "
+    echo -n "Do you want to download core_override_config.yaml? (y/N): "
     read -r response
     if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
-      backup_file "$MIHOMO_USER_CONFIG_DIR/basic_clash_config.yaml"
+      backup_file "$MIHOMO_USER_CONFIG_DIR/core_override_config.yaml"
 
-      log_info "Downloading basic_clash_config.yaml..."
-      curl -o "$MIHOMO_USER_CONFIG_DIR/basic_clash_config.yaml" $INSTALL_RES_URL_PREFIX/basic_clash_config.yaml
-    elif [ ! -f "$MIHOMO_USER_CONFIG_DIR/basic_clash_config.yaml" ]; then
-      tee "$MIHOMO_USER_CONFIG_DIR/basic_clash_config.yaml" >/dev/null <<'EOF'
+      log_info "Downloading core_override_config.yaml..."
+      curl -o "$MIHOMO_USER_CONFIG_DIR/core_override_config.yaml" $INSTALL_RES_URL_PREFIX/core_override_config.yaml
+    elif [ ! -f "$MIHOMO_USER_CONFIG_DIR/core_override_config.yaml" ]; then
+      tee "$MIHOMO_USER_CONFIG_DIR/core_override_config.yaml" >/dev/null <<'EOF'
 mixed-port: 7890
 mode: rule
 log-level: info
@@ -222,7 +228,7 @@ EOF
     fi
 
     sudo mkdir -p "$MIHOMO_CONFIG_DIR"
-    sudo cp "$MIHOMO_USER_CONFIG_DIR/basic_clash_config.yaml" "${MIHOMO_CONFIG_DIR}/config.yaml"
+    sudo cp "$MIHOMO_USER_CONFIG_DIR/core_override_config.yaml" "${MIHOMO_CONFIG_DIR}/config.yaml"
   fi
 
   if [ "$core_type" = "sing-box" ] || [ "$core_type" = "all" ]; then
@@ -233,11 +239,11 @@ EOF
     mkdir -p "$MIHOMO_USER_CONFIG_DIR/profile_yamls"
     mkdir -p "$MIHOMO_USER_CONFIG_DIR/templates"
     local mihomo_template_proxy_providers_path
-    mihomo_template_proxy_providers_path="$MIHOMO_USER_CONFIG_DIR/templates/template_proxy_providers"
+    mihomo_template_proxy_providers_path="$MIHOMO_USER_CONFIG_DIR/template_proxy_providers.yaml"
     if [ ! -f "$mihomo_template_proxy_providers_path" ]; then
       tee "$mihomo_template_proxy_providers_path" >/dev/null <<'EOF'
-# This is a comment
-# Place each subscription on a separate line
+# Place each proxy-provider group with name and url under a group key
+pvd: []
 EOF
     fi
 
@@ -265,11 +271,11 @@ EOF
     mkdir -p "$SINGBOX_USER_CONFIG_DIR/profile_jsons"
     mkdir -p "$SINGBOX_USER_CONFIG_DIR/templates"
     local singbox_template_proxy_providers_path
-    singbox_template_proxy_providers_path="$SINGBOX_USER_CONFIG_DIR/templates/template_proxy_providers"
+    singbox_template_proxy_providers_path="$SINGBOX_USER_CONFIG_DIR/template_proxy_providers.yaml"
     if [ ! -f "$singbox_template_proxy_providers_path" ]; then
       tee "$singbox_template_proxy_providers_path" >/dev/null <<'EOF'
-# Proxy-provider is not supported in sing-box.
-# This template is a placeholder for future use.
+# Place each proxy-provider group with name and url under a group key
+pvd: []
 EOF
     fi
   fi
@@ -564,8 +570,8 @@ create_singbox_config() {
 EOF
 
     mkdir -p "$SINGBOX_USER_CONFIG_DIR"
-    sudo cp "$SINGBOX_CONFIG_DIR/config.json" "$SINGBOX_USER_CONFIG_DIR/basic_singbox_config.json"
-    sudo chown "$USER:$(id -gn)" "$SINGBOX_USER_CONFIG_DIR/basic_singbox_config.json"
+    sudo cp "$SINGBOX_CONFIG_DIR/config.json" "$SINGBOX_USER_CONFIG_DIR/core_override_config.json"
+    sudo chown "$USER:$(id -gn)" "$SINGBOX_USER_CONFIG_DIR/core_override_config.json"
   else
     mkdir -p "$SINGBOX_USER_CONFIG_DIR"
     log_warn "Please create $SINGBOX_CONFIG_DIR/config.json manually before starting sing-box."
@@ -625,9 +631,9 @@ uninstall() {
     return 1
   fi
 
-  sudo rm -f /etc/systemd/system/clashtui_mihomo.service
   sudo rm -f /usr/lib/systemd/system/clashtui_mihomo.service
-  sudo rm -f /etc/systemd/system/clashtui_singbox.service
+  sudo rm -f /usr/lib/systemd/system/clashtui_mihomo.service
+  sudo rm -f /usr/lib/systemd/system/clashtui_singbox.service
   sudo systemctl daemon-reload
   sudo rm -f /usr/local/bin/clashtui
   sudo rm -f /usr/bin/sing-box

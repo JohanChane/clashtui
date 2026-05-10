@@ -18,12 +18,11 @@ proxy-groups:
     type: select
     proxies:
       - DIRECT
-      - <Auto>
+      - ${PGG.Auto}
   - name: Auto
     type: url-test
-    tpl_param:
-      providers:
-        - pvd
+    expand_group_with:
+      - ${PPG.pvd}
     url: https://www.gstatic.com/generate_204
     interval: 300
   - name: Direct
