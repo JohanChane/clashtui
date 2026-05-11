@@ -320,7 +320,92 @@ pub mod connection {
 pub mod api_log {
     use super::*;
 
-    pub fn get_logs() -> Result<String> {
-        request(Method::Get, "/logs", None).and_then(|r| r.as_str().map(|s| s.to_owned()))
+    pub struct LogEntry {
+        pub type_: String,
+        pub payload: String,
+        pub time: String,
+    }
+
+    pub(crate) fn timestamp() -> String {
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        let days = secs / 86400;
+        let time_of_day = secs % 86400;
+        let hh = time_of_day / 3600;
+        let mm = (time_of_day % 3600) / 60;
+        let ss = time_of_day % 60;
+
+        let mut y: i64 = 1970;
+        let mut remaining_days = days;
+        loop {
+            let days_in_year = if is_leap(y) { 366 } else { 365 };
+            if remaining_days < days_in_year {
+                break;
+            }
+            remaining_days -= days_in_year;
+            y += 1;
+        }
+        let dims: &[i64] = if is_leap(y) {
+            &[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        } else {
+            &[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        };
+        let mut mo = 1;
+        for dim in dims {
+            if remaining_days < *dim {
+                break;
+            }
+            remaining_days -= dim;
+            mo += 1;
+        }
+        let yy = y % 100;
+        let dd = remaining_days + 1;
+        format!("{yy:02}-{mo:02}-{dd:02} {hh:02}:{mm:02}:{ss:02}")
+    }
+
+    fn is_leap(y: i64) -> bool {
+        (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
+    }
+
+    pub fn parse_log_entries(body: &str) -> Vec<LogEntry> {
+        body.lines()
+            .filter(|line| !line.is_empty())
+            .filter_map(|line| match serde_json::from_str::<serde_json::Value>(line) {
+                Ok(v) => {
+                    let type_ = v
+                        .get("type")
+                        .and_then(|t| t.as_str())
+                        .unwrap_or("unknown")
+                        .to_owned();
+                    let payload = v
+                        .get("payload")
+                        .and_then(|p| p.as_str())
+                        .unwrap_or("")
+                        .to_owned();
+                    Some(LogEntry {
+                        type_,
+                        payload,
+                        time: timestamp(),
+                    })
+                }
+                Err(_) => {
+                    log::warn!("Failed to parse log line as JSON: {line}");
+                    None
+                }
+            })
+            .collect()
+    }
+
+    pub fn get_logs(level: Option<&str>) -> Result<Vec<LogEntry>> {
+        let url = match level {
+            Some(l) if !l.is_empty() && l != "unknown" => format!("/logs?level={l}"),
+            _ => "/logs".to_owned(),
+        };
+        request(Method::Get, &url, None).and_then(|r| {
+            let body = r.as_str()?;
+            Ok(parse_log_entries(body))
+        })
     }
 }

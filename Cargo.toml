@@ -62,6 +62,7 @@ futures-lite = { version = "2.6.0", default-features = false, optional = true }
 signal-hook-tokio = { version = "0", features = ["futures-v0_3"], optional = true }
 unicode-width = { version = "0.2.0", default-features = false }
 nix = { version = "0", features = ["user", "fs"] }
+tungstenite = { version = "0.24", default-features = false, features = ["handshake", "url"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -69,7 +70,7 @@ libc = "0.2"
 [features]
 customized-theme = ["tui", "ratatui/serde"]
 migration_v0_2_3 = []
-tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-lite", "dep:signal-hook-tokio"]
+tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-lite", "dep:signal-hook-tokio", "dep:tungstenite"]
 
 default = ["customized-theme"]
 

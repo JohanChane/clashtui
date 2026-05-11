@@ -174,39 +174,3 @@ pub fn open_dir(path: &str) -> Result<()> {
         vec!["-c", CONFIG.cfg_file.extra.open_dir_cmd.replace("%s", path).as_str()],
     )
 }
-
-pub fn get_logs() -> String {
-    let (service_name, is_user) = match CONFIG.core_type() {
-        CoreType::Mihomo => {
-            let name = &CONFIG.cfg_file.mihomo.core_service.service_name;
-            (if name.is_empty() { "clashtui_mihomo" } else { name.as_str() }, CONFIG.cfg_file.mihomo.core_service.is_user)
-        }
-        CoreType::Singbox => {
-            let name = &CONFIG.cfg_file.singbox.core_service.service_name;
-            (if name.is_empty() { "clashtui_singbox" } else { name.as_str() }, CONFIG.cfg_file.singbox.core_service.is_user)
-        }
-    };
-
-    let mut args = vec!["-u", service_name, "--output=cat", "-n", "200", "--no-pager"];
-    if is_user {
-        args.insert(0, "--user");
-    }
-
-    match std::process::Command::new("journalctl")
-        .args(&args)
-        .output()
-    {
-        Ok(output) => {
-            let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-            if stdout.is_empty() && !stderr.is_empty() {
-                stderr
-            } else if stdout.is_empty() {
-                String::new()
-            } else {
-                stdout
-            }
-        }
-        Err(e) => format!("Failed to get logs: {e}"),
-    }
-}
