@@ -666,3 +666,16 @@ pvd:  # proxy-provider group name
 -   创建一个临时的集合, 然后将各个 proxy-provider 的 proxies 依次加入
 -   如果同名, 则将其改名为 `<origin_name>-<proxy_provider_name>`
 -   同时记录一条改名信息: `Set name: [{origin_name, new_name}, ...]`
+
+## 按键冲突检测设计
+
+目前有两层检验：
+1. 运行时 — 加载 keymap.yaml 时检测同一 section 内是否有重复 key，有的话只打 log::warn!，不会拒绝配置。
+2. 编译期测试 — 验证 mod_agent! 宏定义的默认按键中每个 tab 内部没有重复 key。
+
+所以如果你自定义 keymap.yaml，同一个 section 内写重复 key 会有 warn 日志，但不会阻止启动。
+
+按键冲突了, 则谁排前面就谁有效。keymap.yaml 定义的按键组合优先级比默认的高 。
+
+按键歧义:
+-   在同一作用域内, 一个按键组合与另一个按键组合相同, 或者其中一个为另一个的子集。
