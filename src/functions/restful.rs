@@ -158,6 +158,34 @@ pub mod download {
         req.send_lazy()
     }
 
+    pub fn fetch_subscription_userinfo(url: &str, with_proxy: bool) -> Result<Option<String>> {
+        let (clean_url, auth_header) = strip_userinfo(url);
+        let mut req = minreq::get(&clean_url)
+            .with_timeout(timeout!())
+            .with_header(
+                headers::USER_AGENT,
+                CONFIG.global_ua.as_deref().unwrap_or_else(|| {
+                    if CONFIG.core_type() == crate::config::CoreType::Singbox {
+                        "sing-box"
+                    } else {
+                        "clash.meta"
+                    }
+                }),
+            );
+        if with_proxy {
+            req = req.with_proxy(minreq::Proxy::new(&CONFIG.proxy_addr)?);
+        }
+        if let Some(auth) = auth_header {
+            req = req.with_header(headers::AUTHORIZATION, auth);
+        }
+        let resp = req.send()?;
+        let info: Option<String> = resp
+            .headers
+            .get("subscription-userinfo")
+            .cloned();
+        Ok(info)
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
@@ -286,5 +314,13 @@ pub mod connection {
                 s.is_empty()
             })
         })
+    }
+}
+
+pub mod api_log {
+    use super::*;
+
+    pub fn get_logs() -> Result<String> {
+        request(Method::Get, "/logs", None).and_then(|r| r.as_str().map(|s| s.to_owned()))
     }
 }

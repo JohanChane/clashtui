@@ -1,0 +1,411 @@
+# Default keymap for clashtui.
+# Only single-key bindings are loaded here. Chords (gg, dd, td, etc.) are built-in.
+#
+# crossterm KeyCode format:
+#   Unit variants: Enter, Esc, Up, Down, Left, Right
+#   Char variant:  !Char <char>
+#   shift: true for uppercase
+#
+# Action values:
+#   Simple: MoveUp, MoveDown, Select, Switch, Execute, Esc, etc.
+#   Nested: Action: Add, Action: Edit, Action: Delete, Action: Preview, etc.
+#
+# Core-specific overrides (mihomo/sing-box) use the same section structure.
+# Core-specific values override the common section.
+
+connections:
+  ? code: !Char k
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveUp
+  ? code: !Char j
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveDown
+  ? code: Up
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveUp
+  ? code: Down
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveDown
+  ? code: !Char G
+    shift: true
+    ctrl: false
+    alt: false
+    super_: false
+  : GoBottom
+  ? code: !Char /
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : Search
+  ? code: !Char p
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : TogglePause
+  ? code: !Char f
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : FzfFind
+
+file:
+  profile:
+    ? code: Left
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Switch
+    ? code: Right
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Switch
+    ? code: !Char h
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Switch
+    ? code: !Char l
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Switch
+    ? code: Down
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : MoveDown
+    ? code: Up
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : MoveUp
+    ? code: !Char j
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : MoveDown
+    ? code: !Char k
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : MoveUp
+    ? code: Enter
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Select
+    ? code: !Char i
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: Add
+    ? code: !Char e
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: Edit
+    ? code: !Char p
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: Preview
+    ? code: !Char u
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: Update
+    ? code: !Char /
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: Search
+    ? code: !Char t
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: Test
+    ? code: !Char c
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: Check
+    ? code: !Char f
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: FzfFind
+    ? code: !Char G
+      shift: true
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: GoEnd
+    ? code: !Char n
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: TrafficNext
+    ? code: !Char N
+      shift: true
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: TrafficPrev
+
+  template:
+    ? code: Left
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Switch
+    ? code: Right
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Switch
+    ? code: !Char h
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Switch
+    ? code: !Char l
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Switch
+    ? code: Down
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : MoveDown
+    ? code: Up
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : MoveUp
+    ? code: !Char j
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : MoveDown
+    ? code: !Char k
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : MoveUp
+    ? code: !Char e
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: Edit
+    ? code: !Char E
+      shift: true
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: EditProviders
+    ? code: !Char p
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: Preview
+    ? code: Enter
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: Generate
+    ? code: !Char f
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: FzfFind
+    ? code: !Char G
+      shift: true
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: GoEnd
+    ? code: !Char /
+      shift: false
+      ctrl: false
+      alt: false
+      super_: false
+    : Action: Search
+
+srvctl:
+  ? code: Enter
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : Execute
+  ? code: Esc
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : Esc
+  ? code: Up
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveUp
+  ? code: Down
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveDown
+  ? code: !Char k
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveUp
+  ? code: !Char j
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveDown
+
+settings:
+  ? code: Enter
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : Execute
+  ? code: Esc
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : Esc
+  ? code: Up
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveUp
+  ? code: Down
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveDown
+  ? code: !Char k
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveUp
+  ? code: !Char j
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveDown
+
+logs:
+  ? code: Up
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveUp
+  ? code: Down
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveDown
+  ? code: !Char k
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveUp
+  ? code: !Char j
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : MoveDown
+  ? code: !Char G
+    shift: true
+    ctrl: false
+    alt: false
+    super_: false
+  : GoBottom
+  ? code: !Char /
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : Search
+  ? code: !Char p
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : TogglePause
+  ? code: !Char f
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : FzfFind
+  ? code: !Char c
+    shift: false
+    ctrl: false
+    alt: false
+    super_: false
+  : Clear

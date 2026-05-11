@@ -32,8 +32,8 @@ macro_rules! get_name {
     };
 }
 
-mod profile;
-mod template;
+pub(crate) mod profile;
+pub(crate) mod template;
 
 newtype_tab!(
     /// This can only be [DualTab], because [Template] needs to update [Profile]
@@ -45,12 +45,14 @@ newtype_tab!(
 );
 
 pub fn agent_init(mut keymap: serde_yml::Mapping) -> anyhow::Result<()> {
-    if let Some(map) = keymap.remove("profile") {
-        let keys = serde_yml::from_value(map)?;
+    if let Some(serde_yml::Value::Mapping(map)) = keymap.remove("profile") {
+        crate::tui::agent::check_duplicate_keys("file/profile", &map);
+        let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
         profile::agent_init(keys);
     }
-    if let Some(map) = keymap.remove("template") {
-        let keys = serde_yml::from_value(map)?;
+    if let Some(serde_yml::Value::Mapping(map)) = keymap.remove("template") {
+        crate::tui::agent::check_duplicate_keys("file/template", &map);
+        let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
         template::agent_init(keys);
     }
     Ok(())

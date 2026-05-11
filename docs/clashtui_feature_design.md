@@ -103,7 +103,107 @@ ClashTui 使用 Linux 组文件权限管理 Core 的文件: User 加入每个 Co
 
 ## Mihomo 和 sing-box 配置合并设计
 
+### Mihomo 配置的合并
+
 使用 basic_core_config 的顶层 key 覆盖 profile 的顶层 key 即可。
+
+我觉得 Mihomo 的合并规则比 sing-box 更加好, 不容易污染。因为 mihomo 的顶层字段 (Section) 耦合度不高。
+
+### sing-box 配置的合并
+
+因为 sing-box 的顶层字段 (Section) 耦合度比较高, 所以使用以下的合并方式。
+
+sing-box 的合并由 demotui 自行实现递归深合并，不再依赖外部 `sing-box merge` 命令。
+
+合并算法：
+
+- 对象 (object): 递归合并。override 中存在的 key 覆盖 profile 的对应值；profile 中独有的 key 保留 (没有交集的 key)。
+- 数组 (array): 整体替换。override 中存在的数组完全替换 profile 的对应数组。可以防止出现多个 inbounds。
+- 标量 (string, number, bool, null): 直接覆盖。
+
+合并时机：用户选择 profile 时触发。流程为：
+
+1. 读取 `sing-box/profiles/<profile_name>.json` 作为 base
+2. 读取 `sing-box/core_override_config.json` 作为 overlay（如果文件不存在则跳过合并，直接使用 profile 原样）
+3. 将 overlay 递归深合并到 base 上
+4. 将合并结果写入 core config path
+5. Reload core service
+
+`core_override_config.json` 使用标准 sing-box JSON 语法，字段与 sing-box 配置文档一致。
+用户只需写需要覆盖的部分即可，例如只覆盖 inbounds + experimental + log：
+
+```json
+{
+  "experimental": {
+    "clash_api": {
+      "external_controller": "127.0.0.1:9090",
+      "secret": ""
+    }
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 7890
+    },
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "stack": "gvisor",
+      "auto_route": true,
+      "address": ["172.19.0.1/30"]
+    }
+  ],
+  "log": {
+    "level": "info"
+  }
+}
+```
+
+合并示例：
+
+```
+profile.json:                           core_override_config.json:
+{                                       {
+  "inbounds": [                           "inbounds": [
+    {"type":"mixed","port":12345},          {"type":"mixed","port":20122},
+    {"type":"http","port":8080}             {"type":"tun","stack":"gvisor"}
+  ],                                      ],
+  "route": { "rules": [...],              "log": { "level": "debug" }
+    "final": "entry" },                  }
+  "experimental": {
+    "clash_api": {
+      "external_controller": "0.0.0.0:9090"
+    }
+  }
+}
+                        ↓ 递归深合并 ↓
+结果 (config.json):
+{
+  "inbounds": [                           ← 数组整体替换
+    {"type":"mixed","port":20122},
+    {"type":"tun","stack":"gvisor"}
+  ],
+  "route": { "rules": [...],              ← 对象保留（override 未涉及）
+    "final": "entry"
+  },
+  "experimental": {                       ← 对象递归合并
+    "clash_api": {
+      "external_controller": "127.0.0.1:9090",  ← 标量覆盖
+      "secret": ""                              ← 新增
+    }
+  },
+  "log": { "level": "debug" }            ← 新增
+}
+```
+
+设计理由：
+
+- 与 Mihomo 的整顶层 key 替换不同，sing-box 需要深度合并，因为用户可能只想覆盖 inbounds 而不丢失 profile 的 route/dns/outbounds。
+- 使用标准 sing-box JSON 语法可降低学习门槛，用户查阅 sing-box 文档即可。
+- 不依赖 `sing-box merge` 可以避免外部命令的版本兼容问题，且合并逻辑完全由 demotui 控制。
+- 数组整体替换（而非元素级合并）是 GUI.for.SingBox 的一致行为，且语义明确：用户写了哪些 inbound 就是哪些。
 
 ## Profile 的管理设计
 
@@ -481,8 +581,14 @@ pvd:  # proxy-provider group name
 -   PGG: proxy-group group
 
 展开规则:
--   PPG: 展开是 proxies
--   PGG: 展开是 proxy-group group。比如: auto-pvd0, auto-pvd1, ...
+-   PPG: 展开为 proxies
+-   PGG: 展开为 proxy-group(s)
+
+For example: 展开规则
+-   "${PPG.pvd}": 展开是 proxies
+-   "${PPG.pvd.pvd0}": 展开是 `pvd0` proxy-provider 的 proxies
+-   "${PGG.auto}": 展开是 proxy-group groups。比如: `auto-pvd0, auto-pvd1, ...`
+-   "${PGG.auto.pvd0}": 代表是一个 proxy-group。e.g. `auto-pvd0`
 
 ## Mihomo 的模板例子
 

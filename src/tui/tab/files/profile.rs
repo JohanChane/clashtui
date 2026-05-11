@@ -1,11 +1,88 @@
 use crate::functions::command::{check_config, edit, test_config};
 use crate::functions::file::profile::{db, select, update_profile};
+use crate::functions::restful::download;
 use crate::tui::widget::popmsg::Confirm;
 use std::cell::Cell;
-use std::collections::HashSet;
-use std::sync::atomic::Ordering;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Mutex, atomic::Ordering};
 
 use super::*;
+
+/// Traffic usage info parsed from subscription-userinfo header.
+#[derive(Debug, Clone, Default)]
+pub struct TrafficInfo {
+    pub upload: u64,
+    pub download: u64,
+    pub total: u64,
+    pub expire: u64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+pub enum TrafficDisplayMode {
+    #[default]
+    Off,
+    Text,
+    Gauge,
+}
+
+static TRAFFIC_CACHE: std::sync::LazyLock<Mutex<HashMap<String, TrafficInfo>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Parse subscription-userinfo header value into TrafficInfo.
+/// Format: "upload=123; download=456; total=789; expire=1234567890"
+fn parse_traffic_info(header_value: &str) -> TrafficInfo {
+    let mut info = TrafficInfo::default();
+    for part in header_value.split(';') {
+        let part = part.trim();
+        if let Some((key, value)) = part.split_once('=') {
+            let value: u64 = value.trim().parse().unwrap_or(0);
+            match key.trim() {
+                "upload" => info.upload = value,
+                "download" => info.download = value,
+                "total" => info.total = value,
+                "expire" => info.expire = value,
+                _ => {}
+            }
+        }
+    }
+    info
+}
+
+pub fn fetch_traffic_for_url(url: &str, with_proxy: bool) {
+    let url = url.to_owned();
+    std::thread::spawn(move || {
+        match download::fetch_subscription_userinfo(&url, with_proxy) {
+            Ok(Some(userinfo)) => {
+                let info = parse_traffic_info(&userinfo);
+                TRAFFIC_CACHE.lock().unwrap().insert(url, info);
+            }
+            _ => {}
+        }
+    });
+}
+
+fn human_bytes(bytes: u64) -> String {
+    const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
+    let mut size = bytes as f64;
+    let mut unit_idx = 0;
+    while size >= 1024.0 && unit_idx < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit_idx += 1;
+    }
+    if unit_idx == 0 {
+        format!("{size:.0} {unit}", size = size, unit = UNITS[unit_idx])
+    } else {
+        format!("{size:.1} {unit}", size = size, unit = UNITS[unit_idx])
+    }
+}
+
+fn traffic_percentage(used: u64, total: u64) -> f64 {
+    if total == 0 {
+        0.0
+    } else {
+        (used as f64 / total as f64 * 100.0).min(100.0)
+    }
+}
 
 mod_agent!(
     Key,
@@ -31,11 +108,13 @@ mod_agent!(
         ([KeyCode::Char('f')], Key::Action(Action::FzfFind), "Find profile"),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
         ([KeyCode::Char('G')], Key::Action(Action::GoEnd), "Go to end"),
-        ([KeyCode::Char('N')], Key::Action(Action::ToggleNoPp), "Toggle no proxy-provider"),
+        (key("P"), Key::Action(Action::ToggleNoPp), "Toggle no proxy-provider"),
+        (key("n"), Key::Action(Action::TrafficNext), "Traffic display next"),
+        (key("N"), Key::Action(Action::TrafficPrev), "Traffic display prev"),
     ]
 );
 
-#[derive(Clone, Copy, serde::Deserialize)]
+#[derive(Clone, Copy)]
 pub enum Key {
     Switch,
     MoveUp,
@@ -43,6 +122,71 @@ pub enum Key {
     Select,
 
     Action(Action),
+}
+
+impl<'de> serde::Deserialize<'de> for Key {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, Visitor};
+        use std::fmt;
+
+        struct KeyVisitor;
+
+        impl<'de> Visitor<'de> for KeyVisitor {
+            type Value = Key;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a string (unit variant) or mapping (Action: <name>)")
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Key, E> {
+                match v {
+                    "Switch" => Ok(Key::Switch),
+                    "MoveUp" => Ok(Key::MoveUp),
+                    "MoveDown" => Ok(Key::MoveDown),
+                    "Select" => Ok(Key::Select),
+                    s => Err(de::Error::unknown_variant(s, &["Switch", "MoveUp", "MoveDown", "Select", "Action: ..."])),
+                }
+            }
+
+            fn visit_map<M: de::MapAccess<'de>>(self, mut map: M) -> Result<Key, M::Error> {
+                let k: String = map.next_key()?
+                    .ok_or_else(|| de::Error::missing_field("variant"))?;
+                if k == "Action" {
+                    let v: String = map.next_value()?;
+                    match v.as_str() {
+                        "Add" => Ok(Key::Action(Action::Add)),
+                        "ImportFile" => Ok(Key::Action(Action::ImportFile)),
+                        "Delete" => Ok(Key::Action(Action::Delete)),
+                        "Edit" => Ok(Key::Action(Action::Edit)),
+                        "Preview" => Ok(Key::Action(Action::Preview)),
+                        "Update" => Ok(Key::Action(Action::Update)),
+                        "UpdateAll" => Ok(Key::Action(Action::UpdateAll)),
+                        "Search" => Ok(Key::Action(Action::Search)),
+                        "Test" => Ok(Key::Action(Action::Test)),
+                        "Check" => Ok(Key::Action(Action::Check)),
+                        "FzfFind" => Ok(Key::Action(Action::FzfFind)),
+                        "GoTop" => Ok(Key::Action(Action::GoTop)),
+                        "GoEnd" => Ok(Key::Action(Action::GoEnd)),
+                        "ToggleNoPp" => Ok(Key::Action(Action::ToggleNoPp)),
+                        "TrafficNext" => Ok(Key::Action(Action::TrafficNext)),
+                        "TrafficPrev" => Ok(Key::Action(Action::TrafficPrev)),
+                        s => Err(de::Error::unknown_variant(s, &[
+                            "Add", "Edit", "Delete", "Preview", "Update", "UpdateAll",
+                            "Search", "Test", "Check", "FzfFind", "GoTop", "GoEnd",
+                            "ToggleNoPp", "TrafficNext", "TrafficPrev",
+                        ])),
+                    }
+                } else {
+                    Err(de::Error::unknown_field(&k, &["Action"]))
+                }
+            }
+        }
+
+        deserializer.deserialize_any(KeyVisitor)
+    }
 }
 
 #[derive(Clone, Copy, serde::Deserialize)]
@@ -61,6 +205,8 @@ pub enum Action {
     GoTop,
     GoEnd,
     ToggleNoPp,
+    TrafficNext,
+    TrafficPrev,
 }
 
 impl TryFrom<&crate::tui::Key> for Key {
@@ -90,6 +236,7 @@ pub struct Profile {
     filter: Option<String>,
     updating: HashSet<String>,
     jump_target: Cell<Option<usize>>,
+    traffic_display_mode: TrafficDisplayMode,
 }
 
 impl BasicTabContent for Profile {
@@ -134,6 +281,20 @@ impl DualTabContent for Profile {
             Key::Action(action) => match action {
                 Action::GoTop => state.select_first(),
                 Action::GoEnd => state.select_last(),
+                Action::TrafficNext => {
+                    self.traffic_display_mode = match self.traffic_display_mode {
+                        TrafficDisplayMode::Off => TrafficDisplayMode::Text,
+                        TrafficDisplayMode::Text => TrafficDisplayMode::Gauge,
+                        TrafficDisplayMode::Gauge => TrafficDisplayMode::Off,
+                    };
+                }
+                Action::TrafficPrev => {
+                    self.traffic_display_mode = match self.traffic_display_mode {
+                        TrafficDisplayMode::Off => TrafficDisplayMode::Gauge,
+                        TrafficDisplayMode::Text => TrafficDisplayMode::Off,
+                        TrafficDisplayMode::Gauge => TrafficDisplayMode::Text,
+                    };
+                }
                 Action::FzfFind => {
                     let items = self.items.clone();
                     actions::fzf_find(items).spawn_at(task_set)
@@ -222,6 +383,43 @@ impl DualTabContent for Profile {
                 spans.push(Span::raw(" "));
                 spans.push(Span::raw(extra.as_str()).style(Theme::get().profile_tab.update_interval));
 
+                // Traffic info
+                if self.traffic_display_mode != TrafficDisplayMode::Off {
+                    let cache = TRAFFIC_CACHE.lock().unwrap();
+                    // Look up traffic by profile name from its URL
+                    if let Some(pf) = crate::config::CONFIG
+                        .data
+                        .lock()
+                        .unwrap()
+                        .get(value.as_str())
+                    {
+                        if let crate::config::database::ProfileType::Url(ref url) = pf.dtype {
+                            if let Some(info) = cache.get(url) {
+                                let used = info.upload + info.download;
+                                match self.traffic_display_mode {
+                                    TrafficDisplayMode::Text => {
+                                        let total_str = if info.total == 0 {
+                                            "unlimited".to_owned()
+                                        } else {
+                                            format!("{} ({:.0}%)", human_bytes(info.total), traffic_percentage(used, info.total))
+                                        };
+                                        spans.push(Span::raw(format!(" [Used: {} / {}]", human_bytes(used), total_str)));
+                                    }
+                                    TrafficDisplayMode::Gauge => {
+                                        let pct = traffic_percentage(used, info.total) as usize;
+                                        let filled = pct / 5;
+                                        let bar: String = (0..20)
+                                            .map(|i| if i < filled { '=' } else { ' ' })
+                                            .collect();
+                                        spans.push(Span::raw(format!(" [{bar}] {pct}%")));
+                                    }
+                                    TrafficDisplayMode::Off => {}
+                                }
+                            }
+                        }
+                    }
+                }
+
                 ListItem::new(Line::from(spans))
             });
         let widget = List::from_iter(iter)
@@ -250,6 +448,7 @@ mod actions {
                 Self::Test => test(name).await,
                 Self::Check => check(name).await,
                 Self::ToggleNoPp => toggle_no_pp(name).await,
+                Self::TrafficNext | Self::TrafficPrev => unreachable!("traffic toggle handled in handle_key_event directly"),
                 Self::FzfFind => unreachable!("FzfFind handled directly"),
                 Self::GoTop | Self::GoEnd => do_nothing(),
                 Self::UpdateAll => unreachable!("UpdateAll handled directly in handle_key_event"),
@@ -432,6 +631,12 @@ mod actions {
 
     async fn update(name: String) -> CB {
         let with_proxy = false;
+        // Fetch traffic info before updating
+        if let Some(pf) = db::get(&name) {
+            if let crate::config::database::ProfileType::Url(ref url) = pf.dtype {
+                fetch_traffic_for_url(url, with_proxy);
+            }
+        }
         let result = update_profile(db::get(&name).unwrap(), with_proxy).await;
 
         let (names, atime) = get_profiles_with_readable_atime();

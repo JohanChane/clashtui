@@ -1,5 +1,6 @@
 use anyhow::Context;
 use serde_json::Value as JsonValue;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use crate::config::database::ProxyProviderGroups;
@@ -104,6 +105,30 @@ fn dedup_singbox_proxy_tags(
     result
 }
 
+/// Resolve a `${...}` placeholder in the context of the `default` field.
+///
+/// Resolved provider names (from `${PPG.<group>.<provider>}`) are mapped to
+/// their corresponding generated group tags (e.g. `"singbox"` → `"Select-singbox"`)
+/// by searching `pg_names` values for a suffix match.
+fn resolve_default_placeholder(
+    value: &str,
+    pg_names: &HashMap<String, Vec<String>>,
+    groups: &ProxyProviderGroups,
+) -> anyhow::Result<String> {
+    let names = resolve_template_placeholder(value, pg_names, groups)?;
+    let name = names
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("resolved placeholder returned empty for: {value}"))?;
+    let suffix = format!("-{name}");
+    for group_tags in pg_names.values() {
+        if let Some(tag) = group_tags.iter().find(|t| t.ends_with(&suffix)) {
+            return Ok(tag.clone());
+        }
+    }
+    Ok(name)
+}
+
 /// Expand a sing-box JSON template into a complete sing-box JSON config.
 ///
 /// The template is a full sing-box JSON config with template markers in `outbounds`:
@@ -111,7 +136,9 @@ fn dedup_singbox_proxy_tags(
 ///   (one copy per proxy-provider in the group, each named `<tag>-<provider_name>`)
 /// - `"${PPG.<group>}"` in `outbounds` lists expands to all proxy-provider names in that group
 /// - `"${PPG.<group>.<provider>}"` expands to a specific provider name
-/// - `"${PGG.<name>}"` in `outbounds` lists expands to all generated group tags matching `<name>`
+/// - `"${PGG.<name>}"` or `"${PGG.<name>.<provider>}"` in `outbounds` lists expands to
+///   generated group tags
+/// - Placeholders in `default` field are also resolved (provider names mapped to group tags)
 ///
 /// Other sections (dns, inbounds, route, experimental, log) pass through unchanged.
 /// If the template includes `rules` / `rule-providers` (mihomo-style), they are
@@ -365,6 +392,13 @@ pub async fn gen_template_singbox(
                     }
                 }
                 ob["outbounds"] = serde_json::json!(resolved);
+            }
+            // Resolve ${} placeholders in default field
+            if let Some(default_val) = ob.get("default").and_then(|v| v.as_str()) {
+                if default_val.starts_with("${") && default_val.ends_with('}') {
+                    let resolved_default = resolve_default_placeholder(default_val, &pg_names, groups)?;
+                    ob["default"] = JsonValue::String(resolved_default);
+                }
             }
             new_outbounds.push(ob);
         }

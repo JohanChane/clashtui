@@ -27,6 +27,73 @@ mod_agent!(
     ]
 );
 
+#[derive(Clone, Copy, Debug)]
+pub enum Key {
+    Switch,
+    MoveUp,
+    MoveDown,
+    Select,
+
+    Action(Action),
+}
+
+impl<'de> serde::Deserialize<'de> for Key {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, Visitor};
+        use std::fmt;
+
+        struct KeyVisitor;
+
+        impl<'de> Visitor<'de> for KeyVisitor {
+            type Value = Key;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("a string (unit variant) or mapping (Action: <name>)")
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<Key, E> {
+                match v {
+                    "Switch" => Ok(Key::Switch),
+                    "MoveUp" => Ok(Key::MoveUp),
+                    "MoveDown" => Ok(Key::MoveDown),
+                    "Select" => Ok(Key::Select),
+                    s => Err(de::Error::unknown_variant(s, &["Switch", "MoveUp", "MoveDown", "Select", "Action: ..."])),
+                }
+            }
+
+            fn visit_map<M: de::MapAccess<'de>>(self, mut map: M) -> Result<Key, M::Error> {
+                let k: String = map.next_key()?
+                    .ok_or_else(|| de::Error::missing_field("variant"))?;
+                if k == "Action" {
+                    let v: String = map.next_value()?;
+                    match v.as_str() {
+                        "Generate" => Ok(Key::Action(Action::Generate)),
+                        "Delete" => Ok(Key::Action(Action::Delete)),
+                        "Edit" => Ok(Key::Action(Action::Edit)),
+                        "EditProviders" => Ok(Key::Action(Action::EditProviders)),
+                        "Preview" => Ok(Key::Action(Action::Preview)),
+                        "Search" => Ok(Key::Action(Action::Search)),
+                        "FzfFind" => Ok(Key::Action(Action::FzfFind)),
+                        "GoTop" => Ok(Key::Action(Action::GoTop)),
+                        "GoEnd" => Ok(Key::Action(Action::GoEnd)),
+                        s => Err(de::Error::unknown_variant(s, &[
+                            "Generate", "Delete", "Edit", "EditProviders",
+                            "Preview", "Search", "FzfFind", "GoTop", "GoEnd",
+                        ])),
+                    }
+                } else {
+                    Err(de::Error::unknown_field(&k, &["Action"]))
+                }
+            }
+        }
+
+        deserializer.deserialize_any(KeyVisitor)
+    }
+}
+
 #[derive(Clone, Copy, Debug, serde::Deserialize)]
 pub enum Action {
     Generate,
@@ -38,16 +105,6 @@ pub enum Action {
     FzfFind,
     GoTop,
     GoEnd,
-}
-
-#[derive(Clone, Copy, Debug, serde::Deserialize)]
-pub enum Key {
-    Switch,
-    MoveUp,
-    MoveDown,
-    Select,
-
-    Action(Action),
 }
 
 impl TryFrom<&crate::tui::Key> for Key {

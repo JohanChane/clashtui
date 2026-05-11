@@ -407,45 +407,65 @@ fn rewrite_provider_paths(content: Option<&mut serde_yml::Mapping>) {
     }
 }
 
-async fn select_singbox(profile: Profile) -> anyhow::Result<()> {
-    let path = super::PROFILE_JSONS_PATH.join(format!("{}.json", &profile.name));
-    anyhow::ensure!(
-        path.exists(),
-        "Profile {} file not found: {}. Download it first.",
-        profile.name, path.display()
-    );
-
-    let mut profile_content: serde_json::Value = {
-        let file = std::fs::File::open(&path)?;
-        serde_json::from_reader(file)
-            .map_err(|e| anyhow::anyhow!("Failed to read profile JSON: {e}"))?
+fn deep_merge(base: &mut serde_json::Value, overlay: &serde_json::Value) {
+    let serde_json::Value::Object(base_map) = base else {
+        *base = overlay.clone();
+        return;
     };
-
-    match crate::config::load_basic_singbox() {
-        Ok(core_override) => {
-            if let (Some(profile_obj), Some(override_obj)) =
-                (profile_content.as_object_mut(), core_override.as_object())
-            {
-                for (key, value) in override_obj {
-                    profile_obj.insert(key.clone(), value.clone());
-                }
+    let serde_json::Value::Object(overlay_map) = overlay else {
+        *base = overlay.clone();
+        return;
+    };
+    for (key, value) in overlay_map {
+        match base_map.get_mut(key.as_str()) {
+            Some(base_value) => deep_merge(base_value, value),
+            None => {
+                base_map.insert(key.clone(), value.clone());
             }
         }
-        Err(e) => {
-            log::warn!("Failed to load core override singbox config: {e}, using profile as-is");
-        }
     }
+}
 
-    let out_path = std::path::absolute(std::path::PathBuf::from(
-        &crate::config::CONFIG.cfg_file.singbox.core.config_path,
-    ))
-    .map_err(|e| anyhow::anyhow!("Failed to resolve singbox config path: {e}"))?;
+async fn select_singbox(profile: Profile) -> anyhow::Result<()> {
+    let profile_path = super::PROFILE_JSONS_PATH.join(format!("{}.json", &profile.name));
+    anyhow::ensure!(
+        profile_path.exists(),
+        "Profile {} file not found: {}. Download it first.",
+        profile.name, profile_path.display()
+    );
+
+    let cfg = &crate::config::CONFIG.cfg_file.singbox.core;
+    let override_path = crate::config::singbox_core_override_path();
+
+    let out_path = std::path::absolute(std::path::PathBuf::from(&cfg.config_path))
+        .map_err(|e| anyhow::anyhow!("Failed to resolve singbox config path: {e}"))?;
 
     if let Some(parent) = out_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let file = std::fs::File::create(&out_path)?;
-    serde_json::to_writer(file, &profile_content)?;
+
+    let profile_content = std::fs::read_to_string(&profile_path)
+        .map_err(|e| anyhow::anyhow!("Failed to read profile {}: {e}", profile_path.display()))?;
+    let mut config: serde_json::Value = serde_json::from_str(&profile_content)
+        .map_err(|e| anyhow::anyhow!("Failed to parse profile {}: {e}", profile_path.display()))?;
+
+    if override_path.exists() {
+        let override_content = std::fs::read_to_string(&override_path)
+            .map_err(|e| anyhow::anyhow!("Failed to read core_override_config.json: {e}"))?;
+        let overlay: serde_json::Value = serde_json::from_str(&override_content)
+            .map_err(|e| anyhow::anyhow!("Failed to parse core_override_config.json: {e}"))?;
+        deep_merge(&mut config, &overlay);
+    } else {
+        log::warn!(
+            "core_override_config.json not found at {}, using profile as-is",
+            override_path.display()
+        );
+    }
+
+    let merged_content = serde_json::to_string_pretty(&config)
+        .map_err(|e| anyhow::anyhow!("Failed to serialize merged config: {e}"))?;
+    std::fs::write(&out_path, merged_content)
+        .map_err(|e| anyhow::anyhow!("Failed to write config to {}: {e}", out_path.display()))?;
 
     db::set_current(profile)?;
 
@@ -490,4 +510,121 @@ pub fn extract_domain(url: &str) -> Option<&str> {
         };
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn merge(base_json: &str, overlay_json: &str) -> serde_json::Value {
+        let mut base: serde_json::Value = serde_json::from_str(base_json).unwrap();
+        let overlay: serde_json::Value = serde_json::from_str(overlay_json).unwrap();
+        deep_merge(&mut base, &overlay);
+        base
+    }
+
+    #[test]
+    fn scalar_overwrite() {
+        let result = merge(r#"{"port": 7890}"#, r#"{"port": 20122}"#);
+        assert_eq!(result["port"], 20122);
+    }
+
+    #[test]
+    fn object_recursive_merge() {
+        let result = merge(
+            r#"{"experimental": {"clash_api": {"external_controller": "0.0.0.0:9090"}}}"#,
+            r#"{"experimental": {"clash_api": {"secret": "abc"}}}"#,
+        );
+        assert_eq!(
+            result["experimental"]["clash_api"]["external_controller"],
+            "0.0.0.0:9090"
+        );
+        assert_eq!(result["experimental"]["clash_api"]["secret"], "abc");
+    }
+
+    #[test]
+    fn array_replaced_entirely() {
+        let result = merge(
+            r#"{"inbounds": [{"type": "mixed", "port": 7890}, {"type": "http", "port": 8080}]}"#,
+            r#"{"inbounds": [{"type": "tun", "stack": "gvisor"}]}"#,
+        );
+        let inbounds = result["inbounds"].as_array().unwrap();
+        assert_eq!(inbounds.len(), 1);
+        assert_eq!(inbounds[0]["type"], "tun");
+    }
+
+    #[test]
+    fn overlay_adds_new_top_level_key() {
+        let result = merge(r#"{"route": {"final": "proxy"}}"#, r#"{"log": {"level": "debug"}}"#);
+        assert_eq!(result["route"]["final"], "proxy");
+        assert_eq!(result["log"]["level"], "debug");
+    }
+
+    #[test]
+    fn base_only_keys_preserved() {
+        let result = merge(
+            r#"{"route": {"rules": [], "final": "proxy"}, "dns": {}}"#,
+            r#"{"log": {"level": "info"}}"#,
+        );
+        assert!(result["route"]["rules"].is_array());
+        assert_eq!(result["route"]["final"], "proxy");
+        assert!(!result["dns"].is_null()); // empty object preserved
+        assert_eq!(result["log"]["level"], "info");
+    }
+
+    #[test]
+    fn overlay_object_overwrites_base_scalar() {
+        let result = merge(r#"{"log": "info"}"#, r#"{"log": {"level": "debug"}}"#);
+        assert_eq!(result["log"]["level"], "debug");
+    }
+
+    #[test]
+    fn overlay_scalar_overwrites_base_object() {
+        let result = merge(
+            r#"{"experimental": {"clash_api": {"port": 9090}}}"#,
+            r#"{"experimental": "disabled"}"#,
+        );
+        assert_eq!(result["experimental"], "disabled");
+    }
+
+    #[test]
+    fn empty_overlay_is_noop() {
+        let result = merge(r#"{"port": 7890, "tun": {"stack": "system"}}"#, r#"{}"#);
+        assert_eq!(result["port"], 7890);
+        assert_eq!(result["tun"]["stack"], "system");
+    }
+
+    #[test]
+    fn deep_nested_merge() {
+        let result = merge(
+            r#"{"a": {"b": {"c": 1, "d": 2}}}"#,
+            r#"{"a": {"b": {"c": 10, "e": 3}}}"#,
+        );
+        assert_eq!(result["a"]["b"]["c"], 10); // overwritten
+        assert_eq!(result["a"]["b"]["d"], 2); // preserved
+        assert_eq!(result["a"]["b"]["e"], 3); // added
+    }
+
+    #[test]
+    fn array_in_nested_object_is_replaced() {
+        let result = merge(
+            r#"{"a": {"b": [1, 2, 3], "c": "keep"}}"#,
+            r#"{"a": {"b": [4, 5]}}"#,
+        );
+        let b = result["a"]["b"].as_array().unwrap();
+        assert_eq!(b.len(), 2);
+        assert_eq!(b[0], 4);
+        assert_eq!(b[1], 5);
+        assert_eq!(result["a"]["c"], "keep");
+    }
+
+    #[test]
+    fn base_empty_with_overlay() {
+        let result = merge(
+            r#"{}"#,
+            r#"{"inbounds": [{"type": "mixed", "port": 20122}], "log": {"level": "info"}}"#,
+        );
+        assert_eq!(result["inbounds"].as_array().unwrap().len(), 1);
+        assert_eq!(result["log"]["level"], "info");
+    }
 }

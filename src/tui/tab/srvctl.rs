@@ -17,7 +17,7 @@ mod_agent!(
 );
 
 #[derive(Clone, Copy, serde::Deserialize)]
-pub(super) enum SrvCtlKey {
+pub(crate) enum SrvCtlKey {
     Execute,
     MoveUp,
     MoveDown,

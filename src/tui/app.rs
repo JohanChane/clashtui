@@ -72,6 +72,7 @@ impl App {
                 FileTab::default().into(),
                 ProxiesTab::default().into(),
                 ConnectionsTab::default().into(),
+                LogsTab::default().into(),
                 SettingsTab::default().into(),
                 CoreSrvCtlTab::default().into(),
             ],
@@ -420,9 +421,9 @@ impl App {
     }
     /// Global layer (4) — last resort: Tab switch, Quit, Help
     fn handle_global_kv(&mut self, kv: &Key) -> bool {
-        const TAB_COUNT: u8 = 6;
+        const TAB_COUNT: u8 = 7;
         match kv.code {
-            KeyCode::Char(c @ '1'..='6') if !kv.ctrl && !kv.alt && !kv.super_ => {
+            KeyCode::Char(c @ '1'..='7') if !kv.ctrl && !kv.alt && !kv.super_ => {
                 self.tab_index = c as u8 - '1' as u8;
                 return true;
             }

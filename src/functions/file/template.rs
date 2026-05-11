@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 ///
 /// Two domains are supported:
 /// - `PPG.<group>` or `PPG.<group>.<provider>` — proxy-provider group lookup in `ppg_data`
-/// - `PGG.<name>` — proxy-group group lookup in `pg_names`
+/// - `PGG.<name>` or `PGG.<name>.<provider>` — proxy-group group lookup in `pg_names`
 ///
 /// Returns the resolved names/tags as a Vec (may be multiple for group-level refs).
 pub fn resolve_template_placeholder(
@@ -50,10 +50,25 @@ pub fn resolve_template_placeholder(
             if path.is_empty() {
                 bail!("PGG placeholder requires a template name: ${{PGG.<name>}}");
             }
+            let mut parts: Vec<&str> = path.split('.').collect();
+            let group_name = parts.remove(0);
             let names = pg_names
-                .get(&path)
-                .with_context(|| format!("PGG template '{path}' not found in generated proxy-group names"))?;
-            Ok(names.clone())
+                .get(group_name)
+                .with_context(|| format!("PGG template '{group_name}' not found in generated proxy-group names"))?;
+            if let Some(provider_name) = parts.first() {
+                let suffix = format!("-{provider_name}");
+                let filtered: Vec<String> = names
+                    .iter()
+                    .filter(|n| n.ends_with(&suffix))
+                    .cloned()
+                    .collect();
+                if filtered.is_empty() {
+                    bail!("PGG entry ending with '{suffix}' not found in generated proxy-group names for '{group_name}'");
+                }
+                Ok(filtered)
+            } else {
+                Ok(names.clone())
+            }
         }
         _ => bail!("Unknown domain prefix '{domain}' in template placeholder. Expected PPG or PGG"),
     }
@@ -627,6 +642,15 @@ mod tests {
         pg_names.insert("auto".to_string(), vec!["auto-pvd0".to_string(), "auto-pvd1".to_string()]);
         let result = resolve_template_placeholder("${PGG.auto}", &pg_names, &ppg).unwrap();
         assert_eq!(result, vec!["auto-pvd0", "auto-pvd1"]);
+    }
+
+    #[test]
+    fn test_resolve_pgg_specific_provider() {
+        let ppg = make_ppg();
+        let mut pg_names = HashMap::new();
+        pg_names.insert("auto".to_string(), vec!["auto-pvd0".to_string(), "auto-pvd1".to_string()]);
+        let result = resolve_template_placeholder("${PGG.auto.pvd0}", &pg_names, &ppg).unwrap();
+        assert_eq!(result, vec!["auto-pvd0"]);
     }
 
     #[test]

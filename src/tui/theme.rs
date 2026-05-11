@@ -25,7 +25,28 @@ impl Theme {
         #[cfg(feature = "customized-theme")]
         if RELOAD_ON_GET.is_completed() {
             if let Ok(theme) = || -> anyhow::Result<Self> {
-                Ok(serde_yml::from_reader(std::fs::File::open(theme_path())?)?)
+                let file = std::fs::File::open(theme_path())?;
+                let mut value: serde_yml::Mapping = serde_yml::from_reader(file)?;
+                let core_type = crate::config::CONFIG.core_type();
+                let core_key = match core_type {
+                    crate::config::CoreType::Mihomo => "mihomo",
+                    crate::config::CoreType::Singbox => "sing-box",
+                };
+                if let Some(core_section) = value.remove(core_key) {
+                    if let serde_yml::Value::Mapping(core_map) = core_section {
+                        value.remove(match core_type {
+                            crate::config::CoreType::Mihomo => "sing-box",
+                            crate::config::CoreType::Singbox => "mihomo",
+                        });
+                        for (key, val) in core_map {
+                            value.insert(key, val);
+                        }
+                    }
+                } else {
+                    value.remove("mihomo");
+                    value.remove("sing-box");
+                }
+                Ok(serde_yml::from_value(serde_yml::Value::Mapping(value))?)
             }() {
                 let mut lock = GLOBAL_THEME.write().unwrap();
                 let _ = std::mem::replace(&mut *lock, theme);
@@ -45,7 +66,32 @@ impl Theme {
         };
         let path = theme_path();
         match || -> anyhow::Result<Self> {
-            Ok(serde_yml::from_reader(std::fs::File::open(&path)?)?)
+            let file = std::fs::File::open(&path)?;
+            let mut value: serde_yml::Mapping = serde_yml::from_reader(file)?;
+            let core_type = crate::config::CONFIG.core_type();
+            // Extract core-specific section
+            let core_key = match core_type {
+                crate::config::CoreType::Mihomo => "mihomo",
+                crate::config::CoreType::Singbox => "sing-box",
+            };
+            if let Some(core_section) = value.remove(core_key) {
+                if let serde_yml::Value::Mapping(core_map) = core_section {
+                    // Remove sing-box/mihomo (the other one)
+                    value.remove(match core_type {
+                        crate::config::CoreType::Mihomo => "sing-box",
+                        crate::config::CoreType::Singbox => "mihomo",
+                    });
+                    // Merge: core-specific values override common
+                    for (key, val) in core_map {
+                        value.insert(key, val);
+                    }
+                }
+            } else {
+                // Remove both core-specific sections if no core match found
+                value.remove("mihomo");
+                value.remove("sing-box");
+            }
+            Ok(serde_yml::from_value(serde_yml::Value::Mapping(value))?)
         }() {
             Ok(theme) => set(theme),
             Err(err) => {

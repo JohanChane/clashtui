@@ -21,7 +21,7 @@ mod_agent!(
 );
 
 #[derive(Clone, Copy, serde::Deserialize)]
-pub(super) enum SettingsKey {
+pub(crate) enum SettingsKey {
     Execute,
     MoveUp,
     MoveDown,

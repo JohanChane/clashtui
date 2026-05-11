@@ -267,6 +267,9 @@ pub fn singbox_template_proxy_providers_path() -> PathBuf {
 pub fn singbox_proxy_providers_path() -> PathBuf {
     singbox_dir().join(defs::PROXY_PROVIDERS_DIR)
 }
+pub fn singbox_core_override_path() -> PathBuf {
+    singbox_dir().join(defs::CORE_OVERRIDE_SINGBOX_FILE)
+}
 pub fn load_basic() -> anyhow::Result<serde_yml::Mapping> {
     let fp = std::fs::File::open(mihomo_dir().join(defs::CORE_OVERRIDE_FILE))?;
     serde_yml::from_reader(fp).map_err(|e| e.into())

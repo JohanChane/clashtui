@@ -45,7 +45,7 @@ macro_rules! tri {
 
 macro_rules! mod_agent {
     ($ident:ident, [$($tokens:tt)*]) => {
-mod agent {
+pub(crate) mod agent {
     use super::*;
     use std::collections::HashMap;
     use std::sync::OnceLock;
@@ -96,7 +96,7 @@ mod agent {
     }
 }
 
-use agent::{agent, all_shortcuts};
+pub use agent::{agent, all_shortcuts};
 pub use agent::{init as agent_init};
     };
 
@@ -183,11 +183,12 @@ pub trait TuiTab: super::TuiWidget {
     fn dispatch_shortcut(&mut self, seq: &[crate::tui::Key]);
 }
 
-mod connections;
-mod files;
+pub(crate) mod connections;
+pub(crate) mod files;
+pub(crate) mod logs;
 mod proxies;
-mod settings;
-mod srvctl;
+pub(crate) mod settings;
+pub(crate) mod srvctl;
 mod status;
 
 macro_rules! enum_dispatch {
@@ -251,6 +252,7 @@ pub mod prelude {
     pub use super::TuiTab;
     pub use super::connections::ConnectionsTab;
     pub use super::files::FileTab;
+    pub use super::logs::LogsTab;
     pub use super::proxies::ProxiesTab;
     pub use super::settings::SettingsTab;
     pub use super::srvctl::CoreSrvCtlTab;
@@ -260,6 +262,7 @@ pub mod prelude {
         use anyhow::Context;
 
         if let Ok(map) = crate::tui::agent::get(keymap, "connections") {
+            crate::tui::agent::check_duplicate_keys("connections", &map);
             let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
             super::connections::agent_init(keys);
         }
@@ -269,13 +272,21 @@ pub mod prelude {
         }
 
         if let Ok(map) = crate::tui::agent::get(keymap, "srvctl") {
+            crate::tui::agent::check_duplicate_keys("srvctl", &map);
             let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
             super::srvctl::agent_init(keys);
         }
 
         if let Ok(map) = crate::tui::agent::get(keymap, "settings") {
+            crate::tui::agent::check_duplicate_keys("settings", &map);
             let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
             super::settings::agent_init(keys);
+        }
+
+        if let Ok(map) = crate::tui::agent::get(keymap, "logs") {
+            crate::tui::agent::check_duplicate_keys("logs", &map);
+            let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
+            super::logs::agent_init(keys);
         }
 
         Ok(())
@@ -289,6 +300,7 @@ pub mod prelude {
             SettingsTab,
             CoreSrvCtlTab,
             StatusTab,
+            LogsTab,
         }
     );
 }
