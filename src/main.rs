@@ -11,8 +11,18 @@ fn main() {
         return;
     };
 
-    if let Err(e) = config::init(cmd.config_dir) {
+    if let Err(e) = config::init(cmd.config_dir.clone()) {
         eprintln!("Failed to load Config\n{e}");
+        return;
+    }
+
+    // Handle CLI subcommands (profile, service, mode, update)
+    if cmd.command.is_some() {
+        if let Err(e) = cli::handle_cli(cmd) {
+            eprintln!("Error: {e}");
+            std::process::exit(1);
+        }
+        config::CONFIG.save().unwrap();
         return;
     }
 

@@ -40,7 +40,7 @@ md5 = "0.7"
 clap = { version = "4.5.17", features = ["derive"] }
 clap_complete = "4.5.26"
 # is-root = "0.1.4"
-# self-replace = { version = "1.5.0", default-features = false }
+self-replace = { version = "1.5.0", default-features = false }
 
 # TUI
 tokio = { version = "1.48.0", features = [
