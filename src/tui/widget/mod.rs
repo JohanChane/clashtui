@@ -20,6 +20,14 @@ macro_rules! new_type_impl_tuiwidget {
             fn sync(&mut self) {
                 self.0.sync();
             }
+
+            fn on_enter(&mut self) {
+                self.0.on_enter();
+            }
+
+            fn on_leave(&mut self) {
+                self.0.on_leave();
+            }
         }
     };
 }

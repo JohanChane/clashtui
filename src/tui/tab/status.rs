@@ -44,6 +44,7 @@ struct Status {
     config: Option<ClashConfig>,
     version: Option<String>,
     error: Option<String>,
+    paused: bool,
 }
 
 impl BasicTabContent for Status {
@@ -54,6 +55,9 @@ impl BasicTabContent for Status {
     const TITLE: &str = "Status";
 
     fn after_sync(&self, task_set: &mut FutureSet<Self>) {
+        if self.paused {
+            return;
+        }
         async {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
@@ -67,11 +71,9 @@ impl BasicTabContent for Status {
         }
         .spawn_at(task_set);
     }
-}
 
-impl TabContent for Status {
-    fn init(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.error = Some("Waiting".to_owned());
+    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.paused = false;
         async {
             let version = tri!(restful::control::version());
             let config = tri!(restful::config::fetch());
@@ -82,6 +84,17 @@ impl TabContent for Status {
             })
         }
         .spawn_at(task_set);
+    }
+
+    fn on_leave(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.paused = true;
+    }
+}
+
+impl TabContent for Status {
+    fn init(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.paused = true;
+        self.error = Some("Waiting".to_owned());
     }
 
     fn handle_key_event(

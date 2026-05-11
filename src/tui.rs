@@ -36,6 +36,8 @@ trait TuiWidget {
     fn handle_key_event(&mut self, kv: &Key);
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect);
     fn sync(&mut self);
+    fn on_enter(&mut self) {}
+    fn on_leave(&mut self) {}
 }
 
 pub fn init() -> anyhow::Result<()> {

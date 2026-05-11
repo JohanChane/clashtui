@@ -14,6 +14,7 @@ pub struct Proxies {
     pub testing_since: Option<Instant>,
     pub jump_target: Cell<Option<usize>>,
     pub filter: Option<String>,
+    pub paused: bool,
 }
 
 impl Proxies {
@@ -221,6 +222,9 @@ impl BasicTabContent for Proxies {
     }
 
     fn after_sync(&self, task_set: &mut FutureSet<Self>) {
+        if self.paused {
+            return;
+        }
         async {
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             let response = tri!(proxies::fetch_proxies(), or_set);
@@ -232,11 +236,9 @@ impl BasicTabContent for Proxies {
         }
         .spawn_at(task_set);
     }
-}
 
-impl TabContent for Proxies {
-    fn init(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.error = Some("Loading proxies...".to_owned());
+    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.paused = false;
         async {
             let response = tri!(proxies::fetch_proxies());
             wrapper(|content: &mut Self| {
@@ -246,6 +248,17 @@ impl TabContent for Proxies {
             })
         }
         .spawn_at(task_set);
+    }
+
+    fn on_leave(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.paused = true;
+    }
+}
+
+impl TabContent for Proxies {
+    fn init(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.paused = true;
+        self.error = Some("Loading proxies...".to_owned());
     }
 
     fn handle_key_event(

@@ -34,6 +34,9 @@ pub trait BasicTabContent: 'static {
 
     /// Allow you to do something after one task is done
     fn after_sync(&self, _task_set: &mut FutureSet<Self>) {}
+
+    fn on_enter(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {}
+    fn on_leave(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {}
 }
 
 type CallBack<C> = Box<dyn FnOnce(&mut C) + Send>;
@@ -81,6 +84,14 @@ where
             f.unwrap()(&mut self.content);
             self.content.after_sync(&mut self.tasks);
         }
+    }
+
+    fn on_enter(&mut self) {
+        self.content.on_enter(&mut self.tasks, &mut self.state);
+    }
+
+    fn on_leave(&mut self) {
+        self.content.on_leave(&mut self.tasks, &mut self.state);
     }
 }
 

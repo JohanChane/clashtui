@@ -164,6 +164,11 @@ impl BasicTabContent for SrvCtlContent {
     fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
         agent::all_shortcuts()
     }
+
+    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.spawn_status_check(task_set, CoreType::Mihomo);
+        self.spawn_status_check(task_set, CoreType::Singbox);
+    }
 }
 
 impl TabContent for SrvCtlContent {

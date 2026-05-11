@@ -222,11 +222,9 @@ impl BasicTabContent for Connections {
         }
         .spawn_at(task_set);
     }
-}
 
-impl TabContent for Connections {
-    fn init(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.error = Some("Loading connections...".to_owned());
+    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.paused = false;
         async {
             let info = tri!(connection::get_connections(), or_set);
             wrapper(|content: &mut Self| {
@@ -237,6 +235,17 @@ impl TabContent for Connections {
             })
         }
         .spawn_at(task_set);
+    }
+
+    fn on_leave(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.paused = true;
+    }
+}
+
+impl TabContent for Connections {
+    fn init(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.paused = true;
+        self.error = Some("Loading connections...".to_owned());
     }
 
     fn handle_key_event(

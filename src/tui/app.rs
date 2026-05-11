@@ -66,7 +66,7 @@ pub struct App {
 
 impl App {
     fn new() -> Self {
-        Self {
+        let mut app = Self {
             tabs: vec![
                 StatusTab::default().into(),
                 FileTab::default().into(),
@@ -81,7 +81,9 @@ impl App {
             global_chord: ChordHandler::default(),
             help: HelpPanel::default(),
             tab_index: 0,
-        }
+        };
+        app.tabs[0].on_enter();
+        app
     }
     #[cfg(target_os = "linux")]
     fn check_startup_perms(&self) {
@@ -424,14 +426,24 @@ impl App {
         const TAB_COUNT: u8 = 7;
         match kv.code {
             KeyCode::Char(c @ '1'..='7') if !kv.ctrl && !kv.alt && !kv.super_ => {
-                self.tab_index = c as u8 - '1' as u8;
+                let new_index = c as u8 - '1' as u8;
+                if new_index != self.tab_index {
+                    self.tabs[self.tab_index as usize].on_leave();
+                    self.tab_index = new_index;
+                    self.tabs[self.tab_index as usize].on_enter();
+                }
                 return true;
             }
             KeyCode::Tab if !kv.ctrl && !kv.alt && !kv.super_ => {
+                let old_index = self.tab_index;
                 if self.tab_index == TAB_COUNT - 1 {
                     self.tab_index = 0;
                 } else {
                     self.tab_index += 1;
+                }
+                if self.tab_index != old_index {
+                    self.tabs[old_index as usize].on_leave();
+                    self.tabs[self.tab_index as usize].on_enter();
                 }
                 return true;
             }

@@ -223,6 +223,18 @@ macro_rules! enum_dispatch {
                 $(Self::$item(inner) => inner.sync(),)+
             }
         }
+
+        fn on_enter(&mut self) {
+            match self {
+                $(Self::$item(inner) => inner.on_enter(),)+
+            }
+        }
+
+        fn on_leave(&mut self) {
+            match self {
+                $(Self::$item(inner) => inner.on_leave(),)+
+            }
+        }
     }
 
     impl TuiTab for Tab {
