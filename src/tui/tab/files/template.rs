@@ -256,7 +256,7 @@ mod actions {
                 Self::Generate => generate(name).await,
                 Self::Delete => delete(name).await,
                 Self::Edit => _edit(name).await,
-                Self::EditProviders => _edit_providers().await,
+                Self::EditProviders => _edit_providers(name).await,
                 Self::Preview => preview(name).await,
                 Self::Search => search().await,
                 Self::FzfFind => unreachable!("FzfFind handled directly"),
@@ -270,12 +270,11 @@ mod actions {
 
     async fn generate(name: String) -> CB {
         let profile_name = format!("{name}.tpl");
-        let groups = tri!(read_template_proxy_providers());
         let is_singbox = crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox;
         if is_singbox {
-            tri!(apply_template_singbox(&name, &profile_name, &groups, false, false).await);
+            tri!(apply_template_singbox(&name, &profile_name, false, false).await);
         } else {
-            tri!(apply_template(&name, &profile_name, &groups));
+            tri!(apply_template(&name, &profile_name));
         }
         sync!(C)
     }
@@ -311,11 +310,14 @@ mod actions {
         do_nothing()
     }
 
-    async fn _edit_providers() -> CB {
-        let path = match crate::config::CONFIG.core_type() {
-            crate::config::CoreType::Mihomo => crate::config::template_proxy_providers_path(),
-            crate::config::CoreType::Singbox => crate::config::singbox_template_proxy_providers_path(),
+    async fn _edit_providers(_name: String) -> CB {
+        let subdir = match crate::config::CONFIG.core_type() {
+            crate::config::CoreType::Mihomo => "mihomo",
+            crate::config::CoreType::Singbox => "sing-box",
         };
+        let path = crate::config::config_dir_path()
+            .join(subdir)
+            .join("template_proxy_providers.yaml");
         log::debug!("template::_edit_providers: path={}", path.display());
         tri!(edit(path.to_str().unwrap()));
         do_nothing()

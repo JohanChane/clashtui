@@ -5,10 +5,8 @@
 //! * [`ConfigFile`] config.yaml
 //! * `Folder` mihomo/profiles/
 //! * `Folder` mihomo/templates/
-//! * `File` mihomo/template_proxy_providers
 //! * `Folder` sing-box/profiles/
 //! * `Folder` sing-box/templates/
-//! * `File` sing-box/template_proxy_providers
 //! * `Folder` sing-box/proxy-providers/
 
 use anyhow::{Context, Result, ensure};
@@ -65,6 +63,31 @@ impl Config {
         let mut cfg_file = ConfigFile::from_file()?;
         let basic_info = BasicInfo::from_file()?;
         let mut data: ProfileManager = ProfileManager::from_file()?;
+        // Flush pending legacy Template migrations: write proxy_provider_groups from
+        // old database entries into the corresponding template files.
+        {
+            let mut queue = database::PENDING_TEMPLATE_MIGRATIONS
+                .lock()
+                .unwrap();
+            for (template_name, groups) in queue.drain(..) {
+                let tpl_path = template_path().join(&template_name);
+                if tpl_path.exists() {
+                    // Only write if the template file doesn't already have clashtui.proxy_provider_groups
+                    let existing = crate::functions::file::template::read_template_ppg(&template_name).unwrap_or_default();
+                    if existing.is_empty() {
+                        if let Err(e) = crate::functions::file::template::write_template_ppg(&template_name, &groups) {
+                            log::error!("Failed to migrate proxy_provider_groups to template '{template_name}': {e}");
+                        } else {
+                            log::info!("Migrated proxy_provider_groups from database to template '{template_name}'");
+                        }
+                    } else {
+                        log::info!("Template '{template_name}' already has proxy_provider_groups, skipping migration");
+                    }
+                } else {
+                    log::warn!("Template file '{template_name}' not found for migration — groups will be dropped on next save");
+                }
+            }
+        }
         let data: Mutex<ProfileManager> = data.into();
         if !cfg_file.mihomo.core.config_path.is_empty() {
             cfg_file.mihomo.core.config_path = std::path::absolute(
@@ -257,12 +280,6 @@ pub fn profile_jsons_path() -> PathBuf {
 }
 pub fn provider_cache_path() -> PathBuf {
     mihomo_dir().join(defs::PROVIDER_CACHE_DIR)
-}
-pub fn template_proxy_providers_path() -> PathBuf {
-    mihomo_dir().join(defs::TEMPLATE_PROXY_PROVIDERS_FILE)
-}
-pub fn singbox_template_proxy_providers_path() -> PathBuf {
-    singbox_dir().join(defs::TEMPLATE_PROXY_PROVIDERS_FILE)
 }
 pub fn singbox_proxy_providers_path() -> PathBuf {
     singbox_dir().join(defs::PROXY_PROVIDERS_DIR)

@@ -216,6 +216,19 @@ pub(super) fn gen_template_with_urls(
         }
     }
 
+    // Inject clashtui.proxy_provider_groups at the front if non-empty
+    if !groups.is_empty() {
+        let mut clashtui_map = serde_yml::Mapping::new();
+        clashtui_map.insert(
+            "proxy_provider_groups".into(),
+            serde_yml::to_value(groups).unwrap_or_default(),
+        );
+        out_parsed_yaml.insert(
+            "clashtui".into(),
+            serde_yml::Value::Mapping(clashtui_map),
+        );
+    }
+
     Ok(out_parsed_yaml)
 }
 

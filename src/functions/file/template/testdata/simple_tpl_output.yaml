@@ -29,3 +29,7 @@ proxy-groups:
     type: select
     proxies:
       - DIRECT
+clashtui:
+  proxy_provider_groups:
+    pvd:
+      pvd0: https://example.com/sub1.yaml

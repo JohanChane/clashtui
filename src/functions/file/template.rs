@@ -142,19 +142,176 @@ pub fn get_all_templates() -> std::io::Result<Vec<String>> {
         })
         .collect())
 }
-pub fn read_template_proxy_providers() -> anyhow::Result<crate::config::database::ProxyProviderGroups> {
-    let path = match crate::config::CONFIG.core_type() {
-        crate::config::CoreType::Mihomo => crate::config::template_proxy_providers_path(),
-        crate::config::CoreType::Singbox => crate::config::singbox_template_proxy_providers_path(),
+/// Read `clashtui.proxy_provider_groups` from a template file in `templates/`.
+/// Falls back to the legacy `template_proxy_providers.yaml` if the template
+/// file does not have a `clashtui.proxy_provider_groups` key.
+pub fn read_template_ppg(template_name: &str) -> anyhow::Result<ProxyProviderGroups> {
+    let path = TEMPLATE_PATH.join(template_name);
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read template: {}", path.display()))?;
+    if content.trim().is_empty() {
+        return Ok(ProxyProviderGroups::new());
+    }
+    let value: serde_yml::Value = serde_yml::from_str(&content)
+        .with_context(|| format!("Failed to parse template YAML: {}", path.display()))?;
+    let groups: Option<ProxyProviderGroups> = value
+        .get("clashtui")
+        .and_then(|c| c.get("proxy_provider_groups"))
+        .map(|g| serde_yml::from_value(g.clone()))
+        .transpose()
+        .with_context(|| format!("Failed to parse clashtui.proxy_provider_groups in: {}", path.display()))?;
+
+    match groups {
+        Some(g) if !g.is_empty() => Ok(g),
+        _ => {
+            // Fall back to legacy standalone template_proxy_providers.yaml
+            read_legacy_template_proxy_providers()
+        }
+    }
+}
+
+/// Read proxy-provider groups from the legacy standalone `template_proxy_providers.yaml`.
+fn read_legacy_template_proxy_providers() -> anyhow::Result<ProxyProviderGroups> {
+    let subdir = match crate::config::CONFIG.core_type() {
+        crate::config::CoreType::Mihomo => "mihomo",
+        crate::config::CoreType::Singbox => "sing-box",
     };
+    let path = crate::config::config_dir_path()
+        .join(subdir)
+        .join("template_proxy_providers.yaml");
+    if !path.exists() {
+        return Ok(ProxyProviderGroups::new());
+    }
     let content = std::fs::read_to_string(&path)
         .with_context(|| format!("Failed to read template_proxy_providers: {}", path.display()))?;
     if content.trim().is_empty() {
-        return Ok(crate::config::database::ProxyProviderGroups::new());
+        return Ok(ProxyProviderGroups::new());
     }
-    let groups: crate::config::database::ProxyProviderGroups = serde_yml::from_str(&content)
+    let groups: ProxyProviderGroups = serde_yml::from_str(&content)
         .with_context(|| format!("Failed to parse template_proxy_providers.yaml: {}", path.display()))?;
+    log::info!(
+        "Read proxy-provider groups from legacy template_proxy_providers.yaml ({} groups)",
+        groups.len()
+    );
     Ok(groups)
+}
+
+/// Read `clashtui.proxy_provider_groups` from a generated profile file in `profiles/`.
+pub fn read_profile_ppg(profile_name: &str) -> anyhow::Result<ProxyProviderGroups> {
+    let path = PROFILE_YAMLS_PATH.join(format!("{profile_name}.yaml"));
+    if !path.exists() {
+        let json_path = PROFILE_JSONS_PATH.join(format!("{profile_name}.json"));
+        if json_path.exists() {
+            let content = std::fs::read_to_string(&json_path)
+                .with_context(|| format!("Failed to read profile: {}", json_path.display()))?;
+            if content.trim().is_empty() {
+                return Ok(ProxyProviderGroups::new());
+            }
+            let value: serde_json::Value = serde_json::from_str(&content)
+                .with_context(|| format!("Failed to parse profile JSON: {}", json_path.display()))?;
+            let groups = value
+                .get("clashtui")
+                .and_then(|c| c.get("proxy_provider_groups"))
+                .map(|g| serde_json::from_value(g.clone()))
+                .transpose()
+                .with_context(|| format!("Failed to parse clashtui.proxy_provider_groups in: {}", json_path.display()))?
+                .unwrap_or_default();
+            return Ok(groups);
+        }
+        return Ok(ProxyProviderGroups::new());
+    }
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read profile: {}", path.display()))?;
+    if content.trim().is_empty() {
+        return Ok(ProxyProviderGroups::new());
+    }
+    let value: serde_yml::Value = serde_yml::from_str(&content)
+        .with_context(|| format!("Failed to parse profile YAML: {}", path.display()))?;
+    let groups = value
+        .get("clashtui")
+        .and_then(|c| c.get("proxy_provider_groups"))
+        .map(|g| serde_yml::from_value(g.clone()))
+        .transpose()
+        .with_context(|| format!("Failed to parse clashtui.proxy_provider_groups in: {}", path.display()))?
+        .unwrap_or_default();
+    Ok(groups)
+}
+
+/// Write or update `clashtui.proxy_provider_groups` in a template file.
+/// Other keys in the file are preserved unchanged.
+pub fn write_template_ppg(template_name: &str, groups: &ProxyProviderGroups) -> anyhow::Result<()> {
+    let path = TEMPLATE_PATH.join(template_name);
+    let content = std::fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read template: {}", path.display()))?;
+    let mut value: serde_yml::Value = serde_yml::from_str(&content)
+        .with_context(|| format!("Failed to parse template YAML: {}", path.display()))?;
+
+    let clashtui = value
+        .as_mapping_mut()
+        .ok_or_else(|| anyhow::anyhow!("Template is not a YAML mapping: {}", path.display()))?
+        .entry("clashtui".into())
+        .or_insert_with(|| serde_yml::Value::Mapping(serde_yml::Mapping::new()));
+
+    clashtui
+        .as_mapping_mut()
+        .ok_or_else(|| anyhow::anyhow!("clashtui key is not a mapping in: {}", path.display()))?
+        .insert(
+            "proxy_provider_groups".into(),
+            serde_yml::to_value(groups)?,
+        );
+
+    // atomic write
+    let tmp_path = path.with_extension("yaml.tmp");
+    serde_yml::to_writer(std::fs::File::create(&tmp_path)?, &value)?;
+    std::fs::rename(&tmp_path, &path)?;
+    Ok(())
+}
+
+/// Verify that all proxy-provider files for a template profile exist.
+/// Returns an error listing missing files, or Ok(()) if all are present.
+pub fn check_template_ppg_availability(profile: &crate::config::database::Profile) -> anyhow::Result<()> {
+    let template = match &profile.dtype {
+        ProfileType::Template { template } => template,
+        _ => return Ok(()),
+    };
+
+    let groups = read_profile_ppg(&profile.name)?;
+    if groups.is_empty() {
+        return Ok(());
+    }
+
+    let is_singbox = crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox;
+    let tpl_name = std::path::Path::new(template)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(template);
+
+    let mut missing: Vec<String> = Vec::new();
+    for providers in groups.values() {
+        for (name, url) in providers {
+            let path = if is_singbox {
+                let hash = format!("{:x}", md5::compute(url.as_bytes()));
+                crate::config::singbox_proxy_providers_path().join(format!("{hash}.json"))
+            } else {
+                let cfg_dir = std::path::PathBuf::from(
+                    &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
+                );
+                cfg_dir.join(format!("proxy-providers/tpl/{}/{}.yaml", tpl_name, name))
+            };
+            if !path.exists() {
+                missing.push(format!("  {name} ({url}) -> {}", path.display()));
+            }
+        }
+    }
+
+    if !missing.is_empty() {
+        anyhow::bail!(
+            "Proxy-provider files missing for template profile '{}':\n{}\nRun update first.",
+            profile.name,
+            missing.join("\n")
+        );
+    }
+    Ok(())
 }
 
 pub fn create_template(path: String) -> anyhow::Result<Option<String>> {
@@ -187,7 +344,8 @@ pub fn create_template(path: String) -> anyhow::Result<Option<String>> {
         ),
     }
 }
-pub fn apply_template(template_name: &str, profile_name: &str, groups: &crate::config::database::ProxyProviderGroups) -> anyhow::Result<()> {
+pub fn apply_template(template_name: &str, profile_name: &str) -> anyhow::Result<()> {
+    let groups = read_template_ppg(template_name)?;
     let path = TEMPLATE_PATH.join(template_name);
     let file = std::fs::File::open(&path)
         .inspect_err(|e| log::error!("Founding template {template_name}:{e}"))?;
@@ -196,7 +354,7 @@ pub fn apply_template(template_name: &str, profile_name: &str, groups: &crate::c
         .get("clashtui_template_version")
         .and_then(|v| v.as_u64())
     {
-        None | Some(1) => version1::gen_template(map, template_name, groups)?,
+        None | Some(1) => version1::gen_template(map, template_name, &groups)?,
         Some(_) => unimplemented!(),
     };
     let output_path = PROFILE_YAMLS_PATH.join(format!("{profile_name}.yaml"));
@@ -210,7 +368,6 @@ pub fn apply_template(template_name: &str, profile_name: &str, groups: &crate::c
     let mut pm = pm!();
     pm.insert(profile_name, ProfileType::Template {
         template: template_name.to_owned(),
-        proxy_provider_groups: groups.clone(),
     });
     pm.to_file()?;
     Ok(())
@@ -219,15 +376,15 @@ pub fn apply_template(template_name: &str, profile_name: &str, groups: &crate::c
 pub async fn apply_template_singbox(
     template_name: &str,
     profile_name: &str,
-    groups: &crate::config::database::ProxyProviderGroups,
     with_proxy: bool,
     force_refresh: bool,
 ) -> anyhow::Result<()> {
+    let groups = read_template_ppg(template_name)?;
     let path = TEMPLATE_PATH.join(template_name);
     let file = std::fs::File::open(&path)
         .inspect_err(|e| log::error!("Opening template {template_name}:{e}"))?;
     let map: serde_json::Value = serde_json::from_reader(file)?;
-    let gened = singbox::gen_template_singbox(&map, template_name, groups, with_proxy, force_refresh).await?;
+    let gened = singbox::gen_template_singbox(&map, template_name, &groups, with_proxy, force_refresh).await?;
     let output_path = PROFILE_JSONS_PATH.join(format!("{profile_name}.json"));
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -240,7 +397,6 @@ pub async fn apply_template_singbox(
     let mut pm = pm!();
     pm.insert(profile_name, ProfileType::Template {
         template: template_name.to_owned(),
-        proxy_provider_groups: groups.clone(),
     });
     pm.to_file()?;
     Ok(())
@@ -251,21 +407,6 @@ const PROXY_GROUPS: &str = "proxy-groups";
 const PROXIES: &str = "proxies";
 const RULE_PROVIDERS: &str = "rule-providers";
 const RULES: &str = "rules";
-
-fn urls_to_groups(urls: &[String]) -> crate::config::database::ProxyProviderGroups {
-    use crate::config::database::ProxyProviderGroups;
-    let mut groups = ProxyProviderGroups::new();
-    if urls.is_empty() {
-        return groups;
-    }
-    let providers: std::collections::BTreeMap<String, String> = urls
-        .iter()
-        .enumerate()
-        .map(|(i, url)| (format!("pvd{i}"), url.clone()))
-        .collect();
-    groups.insert("pvd".into(), providers);
-    groups
-}
 
 /// Remove net resource sections (`proxy-providers`, `rule-providers`) and embed
 /// their remote content into the profile YAML. Also saves each downloaded

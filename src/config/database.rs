@@ -37,7 +37,6 @@ pub enum ProfileType {
     Url(String),
     Template {
         template: String,
-        proxy_provider_groups: ProxyProviderGroups,
     },
     Singbox,
 }
@@ -55,17 +54,16 @@ impl serde::Serialize for ProfileType {
             ProfileType::Url(url) => {
                 serializer.serialize_newtype_variant("ProfileType", 1, "Url", url)
             }
-            ProfileType::Template { template, proxy_provider_groups } => {
+            ProfileType::Template { template } => {
                 #[derive(serde::Serialize)]
                 struct TplHelper<'a> {
                     template: &'a str,
-                    proxy_provider_groups: &'a ProxyProviderGroups,
                 }
                 serializer.serialize_newtype_variant(
                     "ProfileType",
                     2,
                     "Template",
-                    &TplHelper { template, proxy_provider_groups },
+                    &TplHelper { template },
                 )
             }
             ProfileType::Singbox => serializer.serialize_unit_variant("ProfileType", 3, "Singbox"),
@@ -87,7 +85,8 @@ impl<'de> serde::Deserialize<'de> for ProfileType {
             #[serde(rename = "Template")]
             Template {
                 template: String,
-                proxy_provider_groups: ProxyProviderGroups,
+                #[serde(default)]
+                proxy_provider_groups: Option<ProxyProviderGroups>,
             },
             #[allow(dead_code)]
             #[serde(rename = "Generated")]
@@ -101,21 +100,36 @@ impl<'de> serde::Deserialize<'de> for ProfileType {
             Wire::File => ProfileType::File,
             Wire::Url(s) => ProfileType::Url(s),
             Wire::Template { template, proxy_provider_groups } => {
-                ProfileType::Template { template, proxy_provider_groups }
+                if let Some(groups) = proxy_provider_groups {
+                    if !groups.is_empty() {
+                        log::warn!(
+                            "Migrating legacy Template profile '{template}': proxy_provider_groups found in database, will write to template file."
+                        );
+                        PENDING_TEMPLATE_MIGRATIONS
+                            .lock()
+                            .unwrap()
+                            .push((template.clone(), groups));
+                    }
+                }
+                ProfileType::Template { template }
             }
             Wire::Generated(name) => {
                 log::warn!(
-                    "Migrating deprecated ProfileType::Generated({name}) to Template with empty proxy-provider groups."
+                    "Migrating deprecated ProfileType::Generated({name}) to Template."
                 );
                 ProfileType::Template {
                     template: name,
-                    proxy_provider_groups: ProxyProviderGroups::new(),
                 }
             }
             Wire::Singbox => ProfileType::Singbox,
         })
     }
 }
+
+/// Queue for legacy Template entries with embedded proxy_provider_groups.
+/// Drained after ProfileManager::from_file() to write groups into template files.
+pub static PENDING_TEMPLATE_MIGRATIONS: std::sync::LazyLock<std::sync::Mutex<Vec<(String, ProxyProviderGroups)>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
 
 impl serde::Serialize for ProfileData {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
@@ -281,7 +295,7 @@ mihomo:
   profiles:
     pf1: File
     pf2: !Url "https://raw.com"
-    pf3: !Template {template: tpl.yaml, proxy_provider_groups: {pvd: {foo: "https://a.com"}}}
+    pf3: !Template {template: tpl.yaml}
 singbox:
   profiles: {}
 "#;
@@ -293,16 +307,10 @@ singbox:
             ProfileType::Url("https://raw.com".to_string())
         );
         assert_eq!(db.mihomo.profiles.get("pf2").unwrap().no_pp, false);
-        let expected_groups: ProxyProviderGroups = {
-            let mut m = std::collections::HashMap::new();
-            m.insert("pvd".into(), [("foo".into(), "https://a.com".into())].into());
-            m
-        };
         assert_eq!(
             db.mihomo.profiles.get("pf3").unwrap().dtype,
             ProfileType::Template {
                 template: "tpl.yaml".into(),
-                proxy_provider_groups: expected_groups,
             }
         );
         assert_eq!(db.mihomo.profiles.get("pf3").unwrap().no_pp, false);
@@ -321,7 +329,6 @@ singbox:
             db.mihomo.profiles.get("pf1").unwrap().dtype,
             ProfileType::Template {
                 template: "my-tpl.yaml".into(),
-                proxy_provider_groups: ProxyProviderGroups::new(),
             }
         );
         assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
@@ -331,16 +338,10 @@ singbox:
         let mut db = ProfileManager::default();
         db.insert("pf1", ProfileType::File);
         db.insert("pf2", ProfileType::Url("https://raw.com".to_string()));
-        let groups: ProxyProviderGroups = {
-            let mut m = std::collections::HashMap::new();
-            m.insert("pvd".into(), [("foo".into(), "https://a.com".into())].into());
-            m
-        };
         db.insert(
             "pf3",
             ProfileType::Template {
                 template: "my-tpl.yaml".into(),
-                proxy_provider_groups: groups,
             },
         );
         let serialized = serde_yml::to_string(&db).unwrap();

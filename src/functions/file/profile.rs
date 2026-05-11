@@ -234,28 +234,66 @@ async fn update_template_profile(
 ) -> anyhow::Result<UpdateResult> {
     use crate::functions::file::net_resource::{NetResourceUpdate, ResourceSection};
 
-    let (template, groups) = match &profile.dtype {
-        ProfileType::Template { template, proxy_provider_groups } => (template.clone(), proxy_provider_groups.clone()),
+    let template = match &profile.dtype {
+        ProfileType::Template { template } => template.clone(),
         _ => anyhow::bail!("update_template_profile called on non-Template profile"),
     };
+
+    // Read proxy-provider URLs from the generated profile file
+    let groups = super::template::read_profile_ppg(&profile.name)
+        .unwrap_or_default();
 
     let is_singbox = crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox;
     let mut statuses: Vec<NetResourceUpdate> = Vec::new();
 
     if is_singbox {
-        super::template::apply_template_singbox(&template, &profile.name, &groups, with_proxy, true).await?;
-        for (_, providers) in &groups {
+        // For sing-box, download proxy-provider subscription content to proxy-providers dir
+        let mut download_handles = Vec::new();
+        for providers in groups.values() {
             for (name, url) in providers {
-                let domain = extract_domain(url).unwrap_or("unknown");
-                statuses.push(NetResourceUpdate {
-                    name: name.clone(),
-                    url: url.clone(),
-                    path: String::new(),
-                    section: ResourceSection::ProxyProvider,
-                    ok: true,
-                    error: None,
-                });
+                let url = url.clone();
+                let name = name.clone();
+                let hash = format!("{:x}", md5::compute(url.as_bytes()));
+                let path = crate::config::singbox_proxy_providers_path().join(format!("{hash}.json"));
+                download_handles.push(tokio::task::spawn_blocking(move || {
+                    match crate::functions::restful::download::profile(&url, with_proxy) {
+                        Ok(mut rdr) => {
+                            let mut buf = Vec::new();
+                            if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
+                                return (name, url, path, false, Some(e.to_string()));
+                            }
+                            if let Some(parent) = path.parent() {
+                                if let Err(e) = std::fs::create_dir_all(parent) {
+                                    return (name, url, path, false, Some(e.to_string()));
+                                }
+                            }
+                            match std::fs::write(&path, &buf) {
+                                Ok(()) => (name, url, path, true, None),
+                                Err(e) => (name, url, path, false, Some(e.to_string())),
+                            }
+                        }
+                        Err(e) => {
+                            if path.exists() {
+                                (name, url, path, true, None)
+                            } else {
+                                (name, url, path, false, Some(e.to_string()))
+                            }
+                        }
+                    }
+                }));
             }
+        }
+
+        for handle in download_handles {
+            let (name, url, path, ok, error) = handle.await?;
+            statuses.push(NetResourceUpdate {
+                name,
+                url,
+                path: path.display().to_string(),
+                section: ResourceSection::ProxyProvider,
+                ok,
+                error,
+            });
         }
     } else {
         let cfg_dir = std::path::PathBuf::from(
@@ -336,12 +374,17 @@ async fn update_template_profile(
                 })
                 .collect();
             anyhow::bail!(
-                "Failed to download proxy providers — profile not generated:\n{}",
+                "Failed to download proxy providers:\n{}",
                 failures.join("\n")
             );
         }
+    }
 
-        super::template::apply_template(&template, &profile.name, &groups)?;
+    // If the updated profile is the currently active profile, re-select
+    // so the core reloads with the newly downloaded proxy-provider files.
+    let cur = db::get_current();
+    if cur.name == profile.name {
+        let _ = select(profile.clone()).await;
     }
 
     Ok(UpdateResult {
@@ -351,7 +394,12 @@ async fn update_template_profile(
 }
 
 pub async fn select(profile: Profile) -> anyhow::Result<()> {
-    use super::template::{fetch_net_resource_statuses, update_profile_without_pp};
+    use super::template::{check_template_ppg_availability, fetch_net_resource_statuses, update_profile_without_pp};
+
+    // For Template profiles, verify proxy-provider files exist before selection
+    if matches!(profile.dtype, ProfileType::Template { .. }) {
+        check_template_ppg_availability(&profile)?;
+    }
 
     if matches!(profile.dtype, ProfileType::Singbox)
         || crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox
@@ -378,6 +426,10 @@ pub async fn select(profile: Profile) -> anyhow::Result<()> {
     rewrite_provider_paths(lprofile.content.as_mut());
 
     lprofile.merge(&crate::config::load_basic()?)?;
+    // Strip clashtui metadata before writing to core config
+    if let Some(ref mut content) = lprofile.content {
+        content.remove("clashtui");
+    }
     let out_path = std::path::absolute(std::path::PathBuf::from(&cfg.config_path))
         .map_err(|e| anyhow::anyhow!("Failed to resolve config path: {e}"))?;
     lprofile.path = out_path.clone();
@@ -448,6 +500,11 @@ async fn select_singbox(profile: Profile) -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to read profile {}: {e}", profile_path.display()))?;
     let mut config: serde_json::Value = serde_json::from_str(&profile_content)
         .map_err(|e| anyhow::anyhow!("Failed to parse profile {}: {e}", profile_path.display()))?;
+
+    // Strip clashtui metadata before merging into core config
+    if let Some(obj) = config.as_object_mut() {
+        obj.remove("clashtui");
+    }
 
     if override_path.exists() {
         let override_content = std::fs::read_to_string(&override_path)

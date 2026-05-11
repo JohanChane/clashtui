@@ -14,7 +14,6 @@ pub mod defs {
     pub const KEYMAP_FILE: &str = "keymap.yaml";
     pub const PROVIDER_CACHE_DIR: &str = "providers";
     pub const PROXY_PROVIDERS_DIR: &str = "proxy-providers";
-    pub const TEMPLATE_PROXY_PROVIDERS_FILE: &str = "template_proxy_providers.yaml";
 }
 
 pub(super) fn load_home_dir() -> Result<std::path::PathBuf> {

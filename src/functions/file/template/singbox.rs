@@ -8,7 +8,7 @@ use super::resolve_template_placeholder;
 
 fn proxy_provider_cache_path(url: &str) -> PathBuf {
     let hash = format!("{:x}", md5::compute(url.as_bytes()));
-    crate::config::singbox_proxy_providers_path().join(format!("{hash}.yaml"))
+    crate::config::singbox_proxy_providers_path().join(format!("{hash}.json"))
 }
 
 fn load_cached_proxies(url: &str) -> Option<Vec<JsonValue>> {
@@ -410,6 +410,14 @@ pub async fn gen_template_singbox(
     }
 
     output["outbounds"] = JsonValue::Array(new_outbounds);
+
+    // Inject clashtui.proxy_provider_groups if non-empty
+    if !groups.is_empty() {
+        let ppg_json = serde_json::to_value(groups).unwrap_or_default();
+        output["clashtui"] = serde_json::json!({
+            "proxy_provider_groups": ppg_json
+        });
+    }
 
     Ok(output)
 }

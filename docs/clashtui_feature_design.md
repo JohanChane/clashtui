@@ -277,7 +277,35 @@ File/Url Profile 的选择:
 
 ## Template 的管理设计
 
+概念定义:
+-   raw profile: 接近 core config 的格式。比如: file/url profile 就是 raw_profile, 而 template profile 不是 raw profile, 通过它生成的文件才是 raw profile。
+
 因为我比较喜欢将每个 proxy-providers 分组, 而不是混合在一起。所以设计了 Template 的功能。
+
+Mihomo/sing-box template profile 的生成:
+-   将 template 的内容和 template_proxy_providers (放在文件的前面) 直接合并。
+-   然后将合并后的文件放到 profiles 目录。
+
+    比如:
+
+    ```yaml
+    clashtui:
+      proxy_provider_groups:
+        pvd: # proxy-provider group name
+          foo_pvd: https://example.com
+          bar_pvd: https://example.com
+
+    # template file content
+    ...
+    ```
+
+-   clashtui.db 记录:
+
+    ```yaml
+      common_tpl.yaml.tpl:
+        dtype: !Template
+          template: common_tpl.yaml
+    ```
 
 Template 文件主要有下面几个信息:
 -   生成 proxy-provider groups。比如: pvd {pvd0, pvd1, ...}
@@ -333,47 +361,26 @@ proxy-provider 的展开:
 ```
 
 因为 sing-box 不支持 proxy-providers, 但是可以用 Template 的功能来替代它:
--   生成 Tempate type profile 时, 将 urls 存放到 clashtui.db 的 profile 字段中:
-    
-    比如:
-    ```yaml
-    mihomo_profiles:
-      common_tpl.json.tpl:
-        dtype: !Template
-          template: singbox_common_tpl.json
-          proxy_provider_group:
-            pvd:
-              foo_pvd: https://example.com
-              bar_pvd: https://example.com
-    ```
-
-    template_proxy_providers.yaml:
-    ```yaml
-    pvd:  # proxy-provider group name
-      foo_pvd: https://example.com
-      bar_pvd: https://example.com
-    ```
-
+-   生成 Tempate type profile 时, 将 urls 存放到 profile 中
 -   proxy-providers 还有 url 的文件的路径信息, 比如: 放在 `~/.config/clashtui/sing-box/proxy-providers/<url 的 md5 的值>.yaml`。 
 -   有了上面的信息就可以替代 proxy-providers 的功能了。
 
 Template type profile 的生成:
 -   前提 proxy-providers 的内容已经更新了, 如果没有内容则更新, 否则不更新。
--   上面的描述可以知道 Profile 的内容是如何生成的, 将它存放到 profiles 目录 (同理 sing-box 亦如此)
+-   上面的 "template 的生成" 可以知道 Profile 的内容是如何生成的, 将它存放到 profiles 目录 (同理 sing-box 亦如此)
 -   生成 clashtui.db 的 profile 信息
 
 Template type profile 的更新:
--   下载 clashtui.db 的 proxy_provider_urls 到 proxy-providers 目录 (选择 profile 就是用这里的文件了)
--   如果 proxy_provider_urls 有一个没有更新成功, 则不生成 profile 文件 (防止生成格式不正常的 profile)
--   为了 mihomo 和 sing-box 的统一, 重新生成 profile。
+-   下载 yaml profiles 的 proxy_provider_urls 到 proxy-providers 目录 (选择 profile 就是用这里的文件了)
+-   更新 proxy_provider_urls 到相应的路径 (sing-box 是更新到 proxy-providers 目录)
+-   不重新生成 template profile。只有 enter template 时, 才重新生成。但是如果用户的当前 profile 是这个 profile, 则要进行选择操作。
 
-Mihomo template type pofile 的选择:
--   和 File/Url profile 的选择是一样的
+Mihomo/sing-box template type pofile 的选择:
+-   如果 proxy_provider_urls 有一个没有相应的文件的, 则不用 template profile 生成 raw profile (防止生成格式不正常的 raw profile)
+-   根据模板的生成规则使用 template profile 生成的一个 raw profile (这个文件相当于 Url/File 的 profile)。
+-   和 File/Url profile 的选择是一样的, 只不过操作的对象是通过 template profile 生成的 raw profile。
 
-sing-box template type pofile 的选择:
--   和 File/Url profile 的选择是一样的
-
-*防止定入坏的文件格式, profile 和 proxy-provider 写到文件之前, 需要用 core 测试一下, 成功才写入。*
+*防止写入坏的文件格式, profile 和 proxy-provider 写到文件之前, 需要用 core 测试一下, 成功才写入。(template profile 是测试是使用 template profile 生成的 raw profile)*
 
 ## sing-box 的模板例子
 
