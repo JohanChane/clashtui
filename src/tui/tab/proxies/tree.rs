@@ -27,6 +27,8 @@ pub struct NodeItem {
     pub expanded: bool,
     pub is_now: bool,
     pub sort_mode: SortMode,
+    pub tcp: bool,
+    pub udp: bool,
 }
 
 pub struct ProxyTree {
@@ -135,6 +137,8 @@ impl ProxyTree {
             expanded,
             is_now: parent_now == Some(name),
             sort_mode,
+            tcp: proxy.tcp,
+            udp: proxy.udp,
         });
 
         if has_kids && expanded {
@@ -163,17 +167,19 @@ impl ProxyTree {
                         .map(|p| p.all.as_ref().map(|a| !a.is_empty()).unwrap_or(false))
                         .unwrap_or(false);
                     let ntype = if is_group { NodeType::Link } else { NodeType::File };
+                    let kid_proxy = proxies.get(kid.as_str());
                     nodes.push(NodeItem {
                         name: (*kid).clone(),
                         depth: depth + 1,
                         node_type: ntype,
-                        proxy_type: proxies.get(kid.as_str())
-                            .map(|p| p.proxy_type.clone()).unwrap_or_default(),
+                        proxy_type: kid_proxy.map(|p| p.proxy_type.clone()).unwrap_or_default(),
                         delay: resolve_delay(kid.as_str(), proxies),
                         parent: Some(name.to_owned()),
                         expanded: false,
                         is_now: my_now == Some(kid.as_str()),
                         sort_mode: SortMode::None,
+                        tcp: kid_proxy.map(|p| p.tcp).unwrap_or(false),
+                        udp: kid_proxy.map(|p| p.udp).unwrap_or(false),
                     });
                 }
             }
@@ -496,5 +502,101 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(resolve_now_delay("self-ref", &proxies), Some(99));
+    }
+
+    #[test]
+    fn node_item_populates_udp_and_tcp_from_proxy() {
+        let mut proxies = IndexMap::new();
+        proxies.insert("leaf".to_string(), Proxy {
+            name: "leaf".to_string(),
+            proxy_type: "Vmess".to_string(),
+            udp: true,
+            tcp: true,
+            ..Default::default()
+        });
+
+        let mut nodes = Vec::new();
+        ProxyTree::push_entry(
+            &mut nodes, "leaf", None, None, 0, &proxies,
+            &HashMap::new(), SortMode::None,
+        );
+
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].udp, true);
+        assert_eq!(nodes[0].tcp, true);
+    }
+
+    #[test]
+    fn node_item_populates_protocol_false_from_proxy() {
+        let mut proxies = IndexMap::new();
+        proxies.insert("tcp_only".to_string(), Proxy {
+            name: "tcp_only".to_string(),
+            proxy_type: "Vmess".to_string(),
+            udp: false,
+            tcp: true,
+            ..Default::default()
+        });
+        proxies.insert("none".to_string(), Proxy {
+            name: "none".to_string(),
+            proxy_type: "Direct".to_string(),
+            udp: false,
+            tcp: false,
+            ..Default::default()
+        });
+
+        let mut nodes = Vec::new();
+        ProxyTree::push_entry(
+            &mut nodes, "tcp_only", None, None, 0, &proxies,
+            &HashMap::new(), SortMode::None,
+        );
+        ProxyTree::push_entry(
+            &mut nodes, "none", None, None, 0, &proxies,
+            &HashMap::new(), SortMode::None,
+        );
+
+        assert_eq!(nodes.len(), 2);
+        assert_eq!(nodes[0].udp, false);
+        assert_eq!(nodes[0].tcp, true);
+        assert_eq!(nodes[1].udp, false);
+        assert_eq!(nodes[1].tcp, false);
+    }
+
+    #[test]
+    fn tcp_defaults_to_false_when_missing_from_json() {
+        let json = r#"{"proxies":{"node":{"name":"node","type":"Vmess","udp":true}}}"#;
+        let response: ProxiesResponse = serde_json::from_str(json).unwrap();
+        let proxy = response.proxies.get("node").unwrap();
+        assert_eq!(proxy.udp, true);
+        assert_eq!(proxy.tcp, false, "tcp should default to false when missing from JSON");
+    }
+
+    #[test]
+    fn child_link_node_copies_udp_tcp_from_referenced_proxy() {
+        let mut proxies = IndexMap::new();
+        proxies.insert("Parent".to_string(), Proxy {
+            name: "Parent".to_string(),
+            proxy_type: "Selector".to_string(),
+            all: Some(vec!["Child".to_string()]),
+            ..Default::default()
+        });
+        proxies.insert("Child".to_string(), Proxy {
+            name: "Child".to_string(),
+            proxy_type: "Vmess".to_string(),
+            udp: true,
+            tcp: false,
+            ..Default::default()
+        });
+
+        let mut nodes = Vec::new();
+        let mut expanded = HashMap::new();
+        expanded.insert("Parent".to_string(), true);
+        ProxyTree::push_entry(
+            &mut nodes, "Parent", None, None, 0, &proxies,
+            &expanded, SortMode::None,
+        );
+
+        let child = nodes.iter().find(|n| n.name == "Child").unwrap();
+        assert_eq!(child.udp, true);
+        assert_eq!(child.tcp, false);
     }
 }

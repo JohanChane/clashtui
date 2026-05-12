@@ -2,7 +2,7 @@ use super::super::dev::*;
 use super::content::Proxies;
 use super::tree::{NodeType, SortMode};
 use crate::tui::theme::Theme;
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, List, ListItem};
 
 pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListState) {
@@ -124,31 +124,46 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
                     if node.is_now { "*" } else { " " }
                 }
             };
-            let type_str = if node.proxy_type.is_empty() {
-                String::new()
-            } else {
-                format!("[{}]", node.proxy_type)
-            };
-            let delay_str = node.delay.map(|d| {
-                if d == 0 {
-                    "FAIL".to_owned()
-                } else {
-                    format!("{}ms", d)
-                }
-            }).unwrap_or_default();
-
-            let line = format!(
-                "{indent} {prefix} {}  {}  {}",
-                node.name, type_str, delay_str,
-            );
-
             let style = match node.node_type {
                 NodeType::Folder => Theme::get().tab.tab_focused,
                 NodeType::Link => ratatui::style::Style::default().fg(Color::Rgb(100, 180, 150)),
                 _ => ratatui::style::Style::default().fg(Color::Rgb(220, 220, 220)),
             };
 
-            ListItem::new(Line::styled(line, style))
+            let mut spans = vec![Span::styled(
+                format!("{indent} {prefix} {}  ", node.name),
+                style,
+            )];
+
+            if !node.proxy_type.is_empty() {
+                spans.push(Span::styled(format!("[{}]", node.proxy_type), style));
+            }
+
+            if node.node_type != NodeType::Folder {
+                if node.tcp {
+                    spans.push(Span::styled(
+                        " TCP",
+                        ratatui::style::Style::default().fg(Color::Cyan),
+                    ));
+                }
+                if node.udp {
+                    spans.push(Span::styled(
+                        " UDP",
+                        ratatui::style::Style::default().fg(Color::Yellow),
+                    ));
+                }
+            }
+
+            if let Some(d) = node.delay {
+                let delay_str = if d == 0 {
+                    "  FAIL".to_owned()
+                } else {
+                    format!("  {}ms", d)
+                };
+                spans.push(Span::styled(delay_str, style));
+            }
+
+            ListItem::new(Line::from(spans))
         })
         .collect();
 

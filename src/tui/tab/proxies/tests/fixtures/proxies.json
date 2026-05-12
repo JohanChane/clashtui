@@ -42,7 +42,8 @@
       "name": "At-pvd0",
       "now": "vmess-ipdktc33",
       "type": "URLTest",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "COMPATIBLE": {
       "alive": true,
@@ -50,7 +51,8 @@
       "history": [],
       "name": "COMPATIBLE",
       "type": "Compatible",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "DIRECT": {
       "alive": false,
@@ -89,7 +91,8 @@
       ],
       "name": "DIRECT",
       "type": "Direct",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "Entry": {
       "alive": true,
@@ -137,7 +140,8 @@
       "name": "Entry",
       "now": "看视频和下载不要选这个",
       "type": "Selector",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "Entry-LastMatch": {
       "alive": true,
@@ -174,7 +178,8 @@
       "name": "Entry-LastMatch",
       "now": "Entry",
       "type": "Selector",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "Entry-RuleMode": {
       "alive": false,
@@ -211,7 +216,8 @@
       "name": "Entry-RuleMode",
       "now": "DIRECT",
       "type": "Selector",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "FltAt-pvd0": {
       "alive": true,
@@ -255,7 +261,8 @@
       "name": "FltAt-pvd0",
       "now": "vmess-ipdktc33",
       "type": "URLTest",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "GLOBAL": {
       "alive": true,
@@ -276,7 +283,8 @@
       "name": "GLOBAL",
       "now": "Sl-pvd0",
       "type": "Selector",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "PASS": {
       "alive": true,
@@ -284,7 +292,8 @@
       "history": [],
       "name": "PASS",
       "type": "Pass",
-      "udp": true
+      "udp": true,
+      "tcp": false
     },
     "REJECT": {
       "alive": false,
@@ -315,7 +324,8 @@
       ],
       "name": "REJECT",
       "type": "Reject",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "REJECT-DROP": {
       "alive": true,
@@ -323,7 +333,8 @@
       "history": [],
       "name": "REJECT-DROP",
       "type": "RejectDrop",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "Sl-pvd0": {
       "alive": true,
@@ -367,7 +378,8 @@
       "name": "Sl-pvd0",
       "now": "vmess-ipdktc33",
       "type": "Selector",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]剩余流量：116.36 GB": {
       "alive": true,
@@ -375,7 +387,8 @@
       "history": [],
       "name": "[bak]剩余流量：116.36 GB",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]加拿大-优化": {
       "alive": true,
@@ -414,7 +427,8 @@
       ],
       "name": "[bak]加拿大-优化",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]加拿大-优化2": {
       "alive": true,
@@ -453,7 +467,8 @@
       ],
       "name": "[bak]加拿大-优化2",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]加拿大-优化3": {
       "alive": true,
@@ -492,7 +507,8 @@
       ],
       "name": "[bak]加拿大-优化3",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]印度-优化": {
       "alive": true,
@@ -531,7 +547,8 @@
       ],
       "name": "[bak]印度-优化",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]台湾-优化": {
       "alive": true,
@@ -539,7 +556,8 @@
       "history": [],
       "name": "[bak]台湾-优化",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]台湾-优化2-GPT": {
       "alive": true,
@@ -547,7 +565,8 @@
       "history": [],
       "name": "[bak]台湾-优化2-GPT",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]台湾-优化3": {
       "alive": true,
@@ -555,7 +574,8 @@
       "history": [],
       "name": "[bak]台湾-优化3",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]套餐到期：长期有效": {
       "alive": true,
@@ -563,7 +583,8 @@
       "history": [],
       "name": "[bak]套餐到期：长期有效",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]德国-优化": {
       "alive": true,
@@ -602,7 +623,8 @@
       ],
       "name": "[bak]德国-优化",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]德国-优化2": {
       "alive": true,
@@ -641,7 +663,8 @@
       ],
       "name": "[bak]德国-优化2",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]新加坡-优化-Gemini-GPT": {
       "alive": true,
@@ -680,7 +703,8 @@
       ],
       "name": "[bak]新加坡-优化-Gemini-GPT",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]新加坡-优化2-Gemini-GPT": {
       "alive": true,
@@ -719,7 +743,8 @@
       ],
       "name": "[bak]新加坡-优化2-Gemini-GPT",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]新加坡-优化3-Gemini": {
       "alive": true,
@@ -758,7 +783,8 @@
       ],
       "name": "[bak]新加坡-优化3-Gemini",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]日本-优化": {
       "alive": true,
@@ -797,7 +823,8 @@
       ],
       "name": "[bak]日本-优化",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]日本-优化2": {
       "alive": true,
@@ -836,7 +863,8 @@
       ],
       "name": "[bak]日本-优化2",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]日本-优化3": {
       "alive": true,
@@ -875,7 +903,8 @@
       ],
       "name": "[bak]日本-优化3",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]美国LA-优化-GPT": {
       "alive": true,
@@ -914,7 +943,8 @@
       ],
       "name": "[bak]美国LA-优化-GPT",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]美国LA-优化2-GPT": {
       "alive": true,
@@ -953,7 +983,8 @@
       ],
       "name": "[bak]美国LA-优化2-GPT",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]美国LA-优化3-GPT": {
       "alive": true,
@@ -992,7 +1023,8 @@
       ],
       "name": "[bak]美国LA-优化3-GPT",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]英国-优化-GPT": {
       "alive": true,
@@ -1031,7 +1063,8 @@
       ],
       "name": "[bak]英国-优化-GPT",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]英国-优化2": {
       "alive": true,
@@ -1070,7 +1103,8 @@
       ],
       "name": "[bak]英国-优化2",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]英国-优化3": {
       "alive": true,
@@ -1109,7 +1143,8 @@
       ],
       "name": "[bak]英国-优化3",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]过滤掉15条线路": {
       "alive": false,
@@ -1148,7 +1183,8 @@
       ],
       "name": "[bak]过滤掉15条线路",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]香港-优化-Gemini": {
       "alive": true,
@@ -1156,7 +1192,8 @@
       "history": [],
       "name": "[bak]香港-优化-Gemini",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]香港-优化2-Gemini": {
       "alive": true,
@@ -1164,7 +1201,8 @@
       "history": [],
       "name": "[bak]香港-优化2-Gemini",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]香港-优化3-Gemini": {
       "alive": true,
@@ -1172,7 +1210,8 @@
       "history": [],
       "name": "[bak]香港-优化3-Gemini",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]香港WAP-优化-Gemini": {
       "alive": true,
@@ -1180,7 +1219,8 @@
       "history": [],
       "name": "[bak]香港WAP-优化-Gemini",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]香港WAP-优化2-Gemini": {
       "alive": true,
@@ -1188,7 +1228,8 @@
       "history": [],
       "name": "[bak]香港WAP-优化2-Gemini",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "[bak]香港WAP-优化3-Gemini": {
       "alive": true,
@@ -1196,7 +1237,8 @@
       "history": [],
       "name": "[bak]香港WAP-优化3-Gemini",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "vmess-ipdktc33": {
       "alive": true,
@@ -1235,7 +1277,8 @@
       ],
       "name": "vmess-ipdktc33",
       "type": "Vmess",
-      "udp": true
+      "udp": true,
+        "tcp": true
     },
     "看视频和下载不要选这个": {
       "alive": false,
@@ -1297,7 +1340,8 @@
       "name": "看视频和下载不要选这个",
       "now": "[bak]日本-优化2",
       "type": "Selector",
-      "udp": true
+      "udp": true,
+        "tcp": true
     }
   }
 }

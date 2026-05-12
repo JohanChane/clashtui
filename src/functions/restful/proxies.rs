@@ -49,6 +49,8 @@ pub struct Proxy {
     pub provider_name: Option<String>,
     #[serde(default)]
     pub udp: bool,
+    #[serde(default)]
+    pub tcp: bool,
 }
 
 #[derive(Debug, Clone)]
