@@ -4,11 +4,16 @@ use super::*;
 use crossterm::event::KeyCode;
 
 /// Used to display message without reply
-pub struct Confirm;
+pub struct Confirm {
+    dismiss_on_any_key: bool,
+}
 
 impl Confirm {
     pub fn title(title: String) -> MsgBuilder<Self> {
-        MsgBuilder::new(Self, title)
+        MsgBuilder::new(Self { dismiss_on_any_key: false }, title)
+    }
+    pub fn dismiss_any(title: String) -> MsgBuilder<Self> {
+        MsgBuilder::new(Self { dismiss_on_any_key: true }, title)
     }
     pub fn err(e: impl std::fmt::Display) {
         Self::title("Error".to_owned())
@@ -21,6 +26,9 @@ impl Msg for Confirm {
     type Result = ();
 
     fn match_key_event(&mut self, kv: &Key) -> Route {
+        if self.dismiss_on_any_key {
+            return Route::Send;
+        }
         if matches!(kv.code, KeyCode::Enter | KeyCode::Char(' ')) {
             Route::Send
         } else if matches!(kv.code, KeyCode::Esc) {

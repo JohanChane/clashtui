@@ -332,33 +332,67 @@ impl TabContent for SrvCtlContent {
                                 CoreType::Singbox => "sing-box",
                             };
 
-                            // stop all core services before switching
-                            let _ = crate::functions::command::stop_all_services(pw_ref);
+                            // stop all core services first
+                            let stop_result = crate::functions::command::stop_all_services(pw_ref);
 
                             match (|| -> anyhow::Result<()> {
                                 crate::config::CONFIG.data.lock().unwrap().core_type = new_type;
                                 crate::config::CONFIG.save()
                             })() {
                                 Ok(()) => {
+                                    // start the target core
+                                    let start_result =
+                                        crate::functions::command::start_core_service(
+                                            pw_ref, new_type,
+                                        );
+
+                                    let status_msg = format!(
+                                        "Core switched to {new_label}\n\n\
+                                         Stop all services: {stop}\n\
+                                         Start {new_label}: {start}",
+                                        stop = stop_result
+                                            .as_ref()
+                                            .map(|s| s.as_str())
+                                            .unwrap_or("?")
+                                            .trim(),
+                                        start = start_result
+                                            .as_ref()
+                                            .map(|s| s.as_str())
+                                            .unwrap_or("?")
+                                            .trim(),
+                                    );
+
                                     let update_label = wrapper(move |c: &mut SrvCtlContent| {
                                         c.core_label = new_label.to_owned();
-                                        c.status = "inactive".to_owned();
-                                        c.mihomo_status = "inactive".to_owned();
-                                        c.singbox_status = "inactive".to_owned();
+                                        if start_result.is_ok() {
+                                            match new_type {
+                                                CoreType::Mihomo => {
+                                                    c.mihomo_status = "active".to_owned();
+                                                    c.singbox_status = "inactive".to_owned();
+                                                }
+                                                CoreType::Singbox => {
+                                                    c.mihomo_status = "inactive".to_owned();
+                                                    c.singbox_status = "active".to_owned();
+                                                }
+                                            }
+                                        }
+                                        c.status = match new_type {
+                                            CoreType::Mihomo => c.mihomo_status.clone(),
+                                            CoreType::Singbox => c.singbox_status.clone(),
+                                        };
                                     });
-                                    let rx = crate::tui::widget::popmsg::Confirm::title(
-                                        "Core changed".to_owned(),
+
+                                    let _ = crate::tui::widget::popmsg::Confirm::dismiss_any(
+                                        "Core Switched".to_owned(),
                                     )
-                                    .with_prompt(format!(
-                                        "Core changed to {new_label}. Restart demotui for changes to take effect.\n\nEnter to quit now, Esc to continue."
-                                    ))
-                                    .build_and_send();
-                                    if rx.await.is_ok() {
-                                        crate::tui::app::QUIT.store(
-                                            true,
-                                            std::sync::atomic::Ordering::Relaxed,
-                                        );
-                                    }
+                                    .with_prompt(status_msg)
+                                    .build_and_send()
+                                    .await;
+
+                                    crate::tui::app::QUIT.store(
+                                        true,
+                                        std::sync::atomic::Ordering::Relaxed,
+                                    );
                                     update_label
                                 }
                                 Err(e) => {
@@ -385,7 +419,10 @@ impl TabContent for SrvCtlContent {
                 CoreType::Mihomo => "mihomo",
                 CoreType::Singbox => "sing-box",
             },
-            self.status
+            match crate::config::CONFIG.core_type() {
+                CoreType::Mihomo => &self.mihomo_status,
+                CoreType::Singbox => &self.singbox_status,
+            }
         );
         let other_core_label = format!(
             "  {}: {}",

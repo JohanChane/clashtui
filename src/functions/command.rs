@@ -129,6 +129,10 @@ pub fn stop_core_service(password: Option<&str>, core_type: CoreType) -> Result<
     svc_operation("stop", password, Some(core_type))
 }
 
+pub fn start_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
+    svc_operation("start", password, Some(core_type))
+}
+
 pub fn restart_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
     svc_operation("restart", password, Some(core_type))
 }
