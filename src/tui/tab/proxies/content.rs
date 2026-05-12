@@ -225,6 +225,9 @@ impl BasicTabContent for Proxies {
         if self.paused {
             return;
         }
+        if crate::config::is_core_mismatch() {
+            return;
+        }
         async {
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             let response = tri!(proxies::fetch_proxies(), or_set);
@@ -239,6 +242,12 @@ impl BasicTabContent for Proxies {
 
     fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         self.paused = false;
+        if crate::config::is_core_mismatch() {
+            self.proxies = IndexMap::new();
+            self.tree = ProxyTree::default();
+            self.error = Some("API data mismatch with configured core".to_owned());
+            return;
+        }
         async {
             let response = tri!(proxies::fetch_proxies());
             wrapper(|content: &mut Self| {

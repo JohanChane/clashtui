@@ -203,8 +203,19 @@ impl BasicTabContent for Logs {
         agent::all_shortcuts()
     }
 
+    fn on_enter(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        if crate::config::is_core_mismatch() {
+            self.buffer.clear();
+            self.error = Some("API data mismatch with configured core".to_owned());
+            self.paused = true;
+        }
+    }
+
     fn after_sync(&self, task_set: &mut FutureSet<Self>) {
         if self.paused {
+            return;
+        }
+        if crate::config::is_core_mismatch() {
             return;
         }
         match CONFIG.core_type() {
@@ -279,6 +290,9 @@ impl TabContent for Logs {
                 async {
                     let cfg = tri!(config::fetch(), or_set);
                     wrapper(move |content: &mut Self| {
+                        if crate::config::is_core_mismatch() {
+                            return;
+                        }
                         content.current_log_level = cfg
                             .log_level
                             .as_ref()
@@ -295,6 +309,9 @@ impl TabContent for Logs {
                 async {
                     let cfg = tri!(config::fetch(), or_set);
                     wrapper(move |content: &mut Self| {
+                        if crate::config::is_core_mismatch() {
+                            return;
+                        }
                         content.current_log_level = cfg
                             .log_level
                             .as_ref()
@@ -308,6 +325,9 @@ impl TabContent for Logs {
                 async {
                     let result = api_log::get_logs(None);
                     wrapper(move |content: &mut Self| {
+                        if crate::config::is_core_mismatch() {
+                            return;
+                        }
                         match result {
                             Ok(entries) => {
                                 for entry in entries {
@@ -469,6 +489,9 @@ impl TabContent for Logs {
 
 impl Logs {
     fn toggle_log_level(&mut self, level: &str, task_set: &mut FutureSet<Self>) {
+        if crate::config::is_core_mismatch() {
+            return;
+        }
         let level = level.to_owned();
         async move {
             let payload = serde_json::json!({"log-level": &level}).to_string();

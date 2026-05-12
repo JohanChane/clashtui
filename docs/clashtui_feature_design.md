@@ -679,3 +679,51 @@ pvd:  # proxy-provider group name
 
 按键歧义:
 -   在同一作用域内, 一个按键组合与另一个按键组合相同, 或者其中一个为另一个的子集。
+
+## api 数据与当前 core 不匹配时
+
+以 `clashtui.db` 中的 `core_type` 为准。若 api 返回的内核数据与配置不符，该数据无效，不得使用——否则用户会因面板展示的数据来源不明而困惑。
+
+### 不匹配场景
+
+- 用户在 clashtui 外部启动了另一内核的 service
+- 两个内核恰好监听同一端口，API 请求返回的数据来自错误内核
+- CoreSrvCtl 切换内核后未重启 clashtui（当前设计）
+
+### 检测方案
+
+**通过 `/version` 的 `version` 字段识别内核**：
+
+- sing-box 返回 `"version": "sing-box 1.13.11"` → 含 `"sing-box"` 子串
+- mihomo 返回 `"version": "v1.18.10"` → 不含
+
+> 注意：sing-box ≥ 1.13 在 clash API 模拟中也返回 `"meta": true`，该字段不可靠。
+
+### 架构
+
+**两层防护**：
+
+| 层 | 位置 | 机制 |
+|----|------|------|
+| 面板层 | 各 Tab 的 `on_enter` / `after_sync` | 阻止 spawn async task 或清空已有数据 |
+| API 层 | `request()` 函数入口 | 统一拒绝非 `/version` 的请求，返回 `"core mismatch"` |
+
+**全局标志**：
+
+`config.rs` 中维护 `static CORE_MISMATCH: AtomicBool`：
+
+- `set_core_mismatch(bool)` — 写入（仅 StatusTab）
+- `is_core_mismatch() -> bool` — 读取（所有面板 + `request()`）
+
+**检测时机**：
+
+`StatusTab.on_enter()` 中**同步**调用 `detect_core_type()`（localhost HTTP，<10ms），
+在其他面板首次取数据前设置好 `CORE_MISMATCH`。`after_sync` 中继续异步轮询检测（`or_set` 静默）。
+
+**弹窗**：
+
+首次检测到 mismatch 时（`detected_core_type` 从 `None` 变为非匹配值），弹出 Confirm 提示用户。后续不再弹窗。
+
+### 恢复正常
+
+`after_sync` 持续检测，当 `detected == configured` 时自动清空 `CORE_MISMATCH` 标志。用户切换到各面板时正常发起 API 请求，数据恢复展示。

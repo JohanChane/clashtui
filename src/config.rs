@@ -15,6 +15,7 @@ use database::*;
 use std::{
     path::PathBuf,
     sync::{Mutex, OnceLock},
+    sync::atomic::{AtomicBool, Ordering},
 };
 use util::*;
 
@@ -28,6 +29,20 @@ pub mod v0_2_3;
 
 /// Load using [init]
 pub const CONFIG: Wrapper = Wrapper;
+
+static CORE_MISMATCH: AtomicBool = AtomicBool::new(false);
+
+/// Set when StatusTab detects the API is serving data from a different core
+/// than the configured one.
+pub fn set_core_mismatch(mismatch: bool) {
+    CORE_MISMATCH.store(mismatch, Ordering::Release);
+}
+
+/// True when the running core does not match the configured core type.
+/// Tabs should skip displaying API data when this returns true.
+pub fn is_core_mismatch() -> bool {
+    CORE_MISMATCH.load(Ordering::Acquire)
+}
 
 static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 static CONFIG_ROOT: OnceLock<PathBuf> = OnceLock::new();
@@ -329,3 +344,21 @@ pub fn keymap_path() -> PathBuf {
 load_save!(BasicInfo, defs::CORE_OVERRIDE_FILE, no_save, "mihomo");
 load_save!(ConfigFile, defs::CONFIG_FILE);
 load_save!(ProfileManager, defs::DATA_FILE);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn core_mismatch_flag_defaults_false() {
+        assert!(!is_core_mismatch());
+    }
+
+    #[test]
+    fn core_mismatch_flag_toggle() {
+        set_core_mismatch(true);
+        assert!(is_core_mismatch());
+        set_core_mismatch(false);
+        assert!(!is_core_mismatch());
+    }
+}

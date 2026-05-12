@@ -2,7 +2,7 @@ use super::dev::*;
 use ratatui::{
     layout::{Constraint, Layout},
     text::{Line, Span},
-    widgets::{Clear, ListItem},
+    widgets::{Clear, ListItem, Paragraph},
 };
 use strum::VariantArray;
 
@@ -83,6 +83,13 @@ impl BasicTabContent for SettingsContent {
     fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
         agent::all_shortcuts()
     }
+
+    fn on_enter(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+        if crate::config::is_core_mismatch() {
+            self.current_mode = "core mismatch".to_owned();
+            self.current_log_level = "core mismatch".to_owned();
+        }
+    }
 }
 
 impl TabContent for SettingsContent {
@@ -94,6 +101,11 @@ impl TabContent for SettingsContent {
         self.log_level_selector_state.select(Some(0));
         if !self.ops.is_empty() {
             state.select(Some(0));
+        }
+        if crate::config::is_core_mismatch() {
+            self.current_mode = "core mismatch".to_owned();
+            self.current_log_level = "core mismatch".to_owned();
+            return;
         }
 
         async move {
@@ -147,6 +159,9 @@ impl TabContent for SettingsContent {
                         let mode = *mode;
                         self.mode_selector_visible = false;
                         async move {
+                            if crate::config::is_core_mismatch() {
+                                return do_nothing();
+                            }
                             let payload =
                                 serde_json::json!({"mode": mode.to_string()})
                                     .to_string();
@@ -206,6 +221,9 @@ impl TabContent for SettingsContent {
                         let level = *level;
                         self.log_level_selector_visible = false;
                         async move {
+                            if crate::config::is_core_mismatch() {
+                                return do_nothing();
+                            }
                             let payload = serde_json::json!(
                                 {"log-level": level.to_string()}
                             )
@@ -265,6 +283,12 @@ impl TabContent for SettingsContent {
         let block = Block::bordered()
             .border_style(Theme::get().tab.tab_focused)
             .title(Self::TITLE);
+
+        if crate::config::is_core_mismatch() {
+            let widget = Paragraph::new("API data mismatch with configured core").block(block);
+            f.render_widget(widget, area);
+            return;
+        }
 
         let value_style = Theme::get().profile_tab.update_interval;
 

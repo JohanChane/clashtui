@@ -2,6 +2,7 @@ use crate::config::CONFIG;
 use minreq::Method;
 
 pub mod config_struct;
+pub mod core_detect;
 #[macro_use]
 mod utils;
 

@@ -13,6 +13,14 @@ impl Default for CoreType {
         Self::Mihomo
     }
 }
+impl std::fmt::Display for CoreType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CoreType::Mihomo => write!(f, "mihomo"),
+            CoreType::Singbox => write!(f, "sing-box"),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default)]

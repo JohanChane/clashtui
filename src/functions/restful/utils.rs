@@ -11,6 +11,12 @@ pub fn request(
     sub_url: &str,
     payload: Option<String>,
 ) -> Result<minreq::Response> {
+    if sub_url != "/version" && crate::config::is_core_mismatch() {
+        return Err(minreq::Error::IoError(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "core mismatch",
+        )));
+    }
     let controller = CONFIG.controller_for_core();
     let mut req = minreq::Request::new(method, format!("{controller}{sub_url}"));
     if let Some(kv) = payload {

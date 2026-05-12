@@ -210,6 +210,9 @@ impl BasicTabContent for Connections {
         if self.paused {
             return;
         }
+        if crate::config::is_core_mismatch() {
+            return;
+        }
         async {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             let info = tri!(connection::get_connections(), or_set);
@@ -225,6 +228,12 @@ impl BasicTabContent for Connections {
 
     fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         self.paused = false;
+        if crate::config::is_core_mismatch() {
+            self.conns = Vec::new();
+            self.display_rows = Vec::new();
+            self.error = Some("API data mismatch with configured core".to_owned());
+            return;
+        }
         async {
             let info = tri!(connection::get_connections(), or_set);
             wrapper(|content: &mut Self| {
