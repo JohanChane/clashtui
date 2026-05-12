@@ -2,8 +2,10 @@ use std::env;
 use std::process::Command;
 
 fn get_version() -> String {
-    let branch_name = match Command::new("git")
-        .args(["rev-parse", "--abbrev-ref", "HEAD"])
+    let cargo_pkg_version = env::var("CARGO_PKG_VERSION").unwrap();
+
+    let git_short_hash = match Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
         .output()
     {
         Ok(v) => String::from_utf8(v.stdout)
@@ -12,47 +14,28 @@ fn get_version() -> String {
             .to_string(),
         Err(err) => {
             eprintln!("`git rev-parse` err: {}", err);
-            "".to_string()
+            "unknown".to_string()
         }
     };
 
-    let git_describe = match Command::new("git")
-        .args(["describe", "--always", "--tags"])
+    let dirty = match Command::new("git")
+        .args(["status", "--short"])
         .output()
     {
-        Ok(v) => String::from_utf8(v.stdout)
-            .expect("failed to read stdout")
-            .trim_end()
-            .to_string(),
-        Err(err) => {
-            eprintln!("`git describe` err: {}", err);
-            "".to_string()
-        }
-    };
-
-    let cargo_pkg_version = env::var("CARGO_PKG_VERSION").unwrap();
-
-    let build_type = if env::var("DEBUG").unwrap().parse().unwrap() {
-        "-debug"
-    } else {
-        ""
-    };
-
-    let git_status = match Command::new("git").args(["status", "--short"]).output() {
         Ok(v) => {
             if v.stdout.is_empty() {
-                "".to_owned()
+                String::new()
             } else {
-                "-dirty".to_owned()
+                "-dirty".to_string()
             }
         }
         Err(e) => {
             eprintln!("`git status --short` err: {e}");
-            "".to_owned()
+            String::new()
         }
     };
 
-    format!("v{cargo_pkg_version}-{branch_name}-{git_describe}{build_type}{git_status}")
+    format!("{cargo_pkg_version}-{git_short_hash}{dirty}")
 }
 
 fn main() {
