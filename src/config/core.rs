@@ -60,8 +60,28 @@ pub struct ConfigFile {
 impl Default for ConfigFile {
     fn default() -> Self {
         Self {
-            mihomo: Default::default(),
-            singbox: Default::default(),
+            mihomo: MihomoSection {
+                core: CoreConfig {
+                    config_dir: "/opt/clashtui/mihomo/config".into(),
+                    bin_path: "/opt/clashtui/mihomo/mihomo".into(),
+                    config_path: "/opt/clashtui/mihomo/config/config.yaml".into(),
+                },
+                core_service: CoreServiceConfig {
+                    service_name: "clashtui_mihomo".into(),
+                    is_user: false,
+                },
+            },
+            singbox: SingboxSection {
+                core: CoreConfig {
+                    config_dir: "/opt/clashtui/sing-box/config".into(),
+                    bin_path: "/opt/clashtui/sing-box/sing-box".into(),
+                    config_path: "/opt/clashtui/sing-box/config/config.json".into(),
+                },
+                core_service: CoreServiceConfig {
+                    service_name: "clashtui_singbox".into(),
+                    is_user: false,
+                },
+            },
             timeout: Default::default(),
             extra: Default::default(),
         }
@@ -76,7 +96,13 @@ pub struct Extra {
 }
 impl Default for Extra {
     fn default() -> Self {
-        let common_cmd = if cfg!(windows) { "start %s" } else { "open %s" };
+        let common_cmd = if cfg!(windows) {
+            "start %s"
+        } else if cfg!(target_os = "macos") {
+            "open %s"
+        } else {
+            "xdg-open %s"
+        };
         Self {
             edit_cmd: common_cmd.to_owned(),
             open_dir_cmd: common_cmd.to_owned(),
@@ -137,7 +163,7 @@ pub struct BasicInfo {
 
 impl BasicInfo {
     const LOCALHOST: &str = "127.0.0.1";
-    pub const DEFAULT: &str = "external-controller:127.0.0.1:9090\nmixed-port:7890";
+    pub const DEFAULT: &str = "external-controller: 127.0.0.1:9090\nmixed-port: 7890";
 
     pub fn get_external_controller(&self) -> String {
         let str = match self.external_controller.strip_prefix("http://") {

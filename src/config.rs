@@ -193,13 +193,11 @@ pub fn init(base_path: Option<PathBuf>) -> Result<()> {
         } else {
             load_home_dir()?
         };
-        ensure!(path.exists(), "{} does NOT exists", path.display());
+        if !path.exists() {
+            std::fs::create_dir_all(&path)
+                .with_context(|| format!("Failed to create config directory: {}", path.display()))?;
+        }
         ensure!(path.is_dir(), "{} is not a dir", path.display());
-        ensure!(
-            path.read_dir().is_ok_and(|dir| dir.count() != 0),
-            "{} is an empty dir",
-            path.display()
-        );
 
         let path = path
             .canonicalize()
@@ -207,13 +205,23 @@ pub fn init(base_path: Option<PathBuf>) -> Result<()> {
         std::path::absolute(&path).context(format!("{} is not an absolute path", path.display()))?
     };
 
+    let is_first_run = !config_root.join(defs::CONFIG_FILE).exists();
+
     std::fs::create_dir_all(config_root.join("mihomo"))
         .context("Failed to create mihomo data directory")?;
     std::fs::create_dir_all(config_root.join("sing-box"))
         .context("Failed to create sing-box data directory")?;
 
     CONFIG_ROOT.set(config_root.clone()).ok();
-    if DATA_DIR.set(config_root).is_err() || _CONFIG.set(Config::load()?).is_err() {
+    if DATA_DIR.set(config_root).is_err() {
+        unreachable!("init twice")
+    }
+
+    if is_first_run {
+        init_config()?;
+    }
+
+    if _CONFIG.set(Config::load()?).is_err() {
         unreachable!("init twice")
     }
 
