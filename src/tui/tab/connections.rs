@@ -296,17 +296,7 @@ impl TabContent for Connections {
                 let Some(row) = self.row else { return };
                 let Some(display_row) = self.display_rows.get(row) else { return };
                 let id = display_row.id.clone();
-                let host = display_row.host.clone();
                 async move {
-                    let rx = crate::tui::widget::popmsg::Confirm::title(
-                        format!("Terminate connection?"),
-                    )
-                    .with_prompt(format!("{host}\nEnter to confirm, Esc to cancel"))
-                    .build_and_send();
-                    if rx.await.is_err() {
-                        // Cancelled
-                        return do_nothing();
-                    }
                     let _ = connection::terminate_connection(Some(id));
                     let info = tri!(connection::get_connections(), or_cancel);
                     wrapper(move |content: &mut Connections| {
@@ -349,15 +339,7 @@ impl TabContent for Connections {
                     return;
                 }
 
-                let prompt = format!("Close {count} connection(s)");
                 async move {
-                    let rx = crate::tui::widget::popmsg::Confirm::title(prompt)
-                        .with_prompt("Enter to confirm, Esc to cancel".to_owned())
-                        .build_and_send();
-                    if rx.await.is_err() {
-                        // Cancelled
-                        return do_nothing();
-                    }
                     if use_bulk {
                         let _ = connection::terminate_all_connections();
                     } else {
