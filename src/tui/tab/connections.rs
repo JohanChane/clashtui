@@ -18,8 +18,13 @@ mod_agent!(
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::GoTop, "Go to top"),
         ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Terminate, "Close"),
         ([KeyCode::Char('a'), KeyCode::Char('c')], Key::TerminateAll, "Close all"),
-        ([KeyCode::Char('s'), KeyCode::Char('d')], Key::SortByDownload, "Sort by DL speed"),
-        ([KeyCode::Char('s'), KeyCode::Char('u')], Key::SortByUpload, "Sort by UL speed"),
+        ([KeyCode::Char('s'), KeyCode::Char('h')], Key::SortByHost, "Sort by Host"),
+        ([KeyCode::Char('s'), KeyCode::Char('l')], Key::SortByRule, "Sort by Rule"),
+        ([KeyCode::Char('s'), KeyCode::Char('c')], Key::SortByChains, "Sort by Chains"),
+        ([KeyCode::Char('s'), KeyCode::Char('n')], Key::SortByDownload, "Sort by Download"),
+        ([KeyCode::Char('s'), KeyCode::Char('u')], Key::SortByUpload, "Sort by Upload"),
+        ([KeyCode::Char('s'), KeyCode::Char('d')], Key::SortByDlSpeed, "Sort by DL Speed"),
+        ([KeyCode::Char('s'), KeyCode::Char('s')], Key::SortByUlSpeed, "Sort by UL Speed"),
         ([KeyCode::Char('s'), KeyCode::Char('r')], Key::SortReset, "Reset sort"),
         ([KeyCode::Char('/')], Key::Search, "Search/Filter"),
         ([KeyCode::Char('p')], Key::TogglePause, "Pause/Resume"),
@@ -35,8 +40,13 @@ pub enum Key {
     GoBottom,
     Terminate,
     TerminateAll,
+    SortByHost,
+    SortByRule,
+    SortByChains,
     SortByDownload,
     SortByUpload,
+    SortByDlSpeed,
+    SortByUlSpeed,
     SortReset,
     Search,
     TogglePause,
@@ -83,12 +93,28 @@ macro_rules! tri {
     };
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SortColumn {
+    Host,
+    Rule,
+    Chains,
+    Download,
+    Upload,
+    DlSpeed,
+    UlSpeed,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Default)]
-enum SortState {
+enum SortDirection {
     #[default]
-    Default,
-    ByDownload,
-    ByUpload,
+    Descending,
+    Ascending,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
+struct SortState {
+    column: Option<SortColumn>,
+    direction: SortDirection,
 }
 
 struct DisplayRow {
@@ -195,6 +221,15 @@ const DL_COL: &str = "Download";
 const UL_COL: &str = "Upload";
 const DLSPD_COL: &str = "DL Speed";
 const ULSPD_COL: &str = "UL Speed";
+
+fn sort_header(sort_state: SortState, column: SortColumn, base: &str) -> String {
+    if sort_state.column == Some(column) {
+        let arrow = if sort_state.direction == SortDirection::Descending { "▼" } else { "▲" };
+        format!("{base} {arrow}")
+    } else {
+        base.to_owned()
+    }
+}
 
 impl BasicTabContent for Connections {
     type Key = Key;
@@ -357,16 +392,15 @@ impl TabContent for Connections {
                 }
                 .spawn_at(task_set);
             }
-            Key::SortByDownload => {
-                self.sort_state = SortState::ByDownload;
-                self.apply_sort();
-            }
-            Key::SortByUpload => {
-                self.sort_state = SortState::ByUpload;
-                self.apply_sort();
-            }
+            Key::SortByHost => self.toggle_sort(SortColumn::Host),
+            Key::SortByRule => self.toggle_sort(SortColumn::Rule),
+            Key::SortByChains => self.toggle_sort(SortColumn::Chains),
+            Key::SortByDownload => self.toggle_sort(SortColumn::Download),
+            Key::SortByUpload => self.toggle_sort(SortColumn::Upload),
+            Key::SortByDlSpeed => self.toggle_sort(SortColumn::DlSpeed),
+            Key::SortByUlSpeed => self.toggle_sort(SortColumn::UlSpeed),
             Key::SortReset => {
-                self.sort_state = SortState::Default;
+                self.sort_state = SortState::default();
                 self.apply_sort();
             }
             Key::Search => {
@@ -430,10 +464,20 @@ impl TabContent for Connections {
             return;
         }
 
-        let sort_indicator = match self.sort_state {
-            SortState::ByDownload => " (DL ▼)",
-            SortState::ByUpload => " (UL ▼)",
-            SortState::Default => "",
+        let sort_indicator = if let Some(col) = self.sort_state.column {
+            let dir = if self.sort_state.direction == SortDirection::Descending { "▼" } else { "▲" };
+            let name = match col {
+                SortColumn::Host => "Host",
+                SortColumn::Rule => "Rule",
+                SortColumn::Chains => "Chains",
+                SortColumn::Download => "Dn",
+                SortColumn::Upload => "Up",
+                SortColumn::DlSpeed => "DL",
+                SortColumn::UlSpeed => "UL",
+            };
+            format!(" ({name} {dir})")
+        } else {
+            String::new()
         };
 
         let filtered_count: usize = self.display_rows.iter()
@@ -457,26 +501,15 @@ impl TabContent for Connections {
             )
         };
 
-        let dl_speed_header = if self.sort_state == SortState::ByDownload {
-            "DL Speed ▼"
-        } else {
-            DLSPD_COL
-        };
-        let ul_speed_header = if self.sort_state == SortState::ByUpload {
-            "UL Speed ▼"
-        } else {
-            ULSPD_COL
-        };
-
         let header_style = Theme::get().tab.tab_focused;
         let header_cells = [
-            HOST_COL,
-            RULE_COL,
-            CHAINS_COL,
-            DL_COL,
-            UL_COL,
-            dl_speed_header,
-            ul_speed_header,
+            sort_header(self.sort_state, SortColumn::Host, HOST_COL),
+            sort_header(self.sort_state, SortColumn::Rule, RULE_COL),
+            sort_header(self.sort_state, SortColumn::Chains, CHAINS_COL),
+            sort_header(self.sort_state, SortColumn::Download, DL_COL),
+            sort_header(self.sort_state, SortColumn::Upload, UL_COL),
+            sort_header(self.sort_state, SortColumn::DlSpeed, DLSPD_COL),
+            sort_header(self.sort_state, SortColumn::UlSpeed, ULSPD_COL),
         ]
         .into_iter()
         .map(|h| Cell::from(h).style(header_style));
@@ -561,21 +594,79 @@ impl Connections {
         }
     }
 
+    fn toggle_sort(&mut self, column: SortColumn) {
+        if self.sort_state.column == Some(column) {
+            match self.sort_state.direction {
+                SortDirection::Descending => self.sort_state.direction = SortDirection::Ascending,
+                SortDirection::Ascending => self.sort_state = SortState::default(),
+            }
+        } else {
+            self.sort_state = SortState {
+                column: Some(column),
+                direction: SortDirection::Descending,
+            };
+        }
+        self.apply_sort();
+    }
+
     fn apply_sort(&mut self) {
-        match self.sort_state {
-            SortState::ByDownload => {
-                self.display_rows
-                    .sort_by(|a, b| b.dl_speed.cmp(&a.dl_speed));
+        let Some(column) = self.sort_state.column else {
+            let orig_ids: Vec<String> = self.conns.iter().map(|c| c.id.clone()).collect();
+            self.display_rows.sort_by_key(|r| {
+                orig_ids.iter().position(|id| *id == r.id).unwrap_or(usize::MAX)
+            });
+            return;
+        };
+        let descending = self.sort_state.direction == SortDirection::Descending;
+        match column {
+            SortColumn::Host => {
+                if descending {
+                    self.display_rows.sort_by(|a, b| b.host.cmp(&a.host));
+                } else {
+                    self.display_rows.sort_by(|a, b| a.host.cmp(&b.host));
+                }
             }
-            SortState::ByUpload => {
-                self.display_rows
-                    .sort_by(|a, b| b.ul_speed.cmp(&a.ul_speed));
+            SortColumn::Rule => {
+                if descending {
+                    self.display_rows.sort_by(|a, b| b.rule.cmp(&a.rule));
+                } else {
+                    self.display_rows.sort_by(|a, b| a.rule.cmp(&b.rule));
+                }
             }
-            SortState::Default => {
-                let orig_ids: Vec<String> = self.conns.iter().map(|c| c.id.clone()).collect();
-                self.display_rows.sort_by_key(|r| {
-                    orig_ids.iter().position(|id| *id == r.id).unwrap_or(usize::MAX)
-                });
+            SortColumn::Chains => {
+                if descending {
+                    self.display_rows.sort_by(|a, b| b.chains.cmp(&a.chains));
+                } else {
+                    self.display_rows.sort_by(|a, b| a.chains.cmp(&b.chains));
+                }
+            }
+            SortColumn::Download => {
+                if descending {
+                    self.display_rows.sort_by(|a, b| b.download.cmp(&a.download));
+                } else {
+                    self.display_rows.sort_by(|a, b| a.download.cmp(&b.download));
+                }
+            }
+            SortColumn::Upload => {
+                if descending {
+                    self.display_rows.sort_by(|a, b| b.upload.cmp(&a.upload));
+                } else {
+                    self.display_rows.sort_by(|a, b| a.upload.cmp(&b.upload));
+                }
+            }
+            SortColumn::DlSpeed => {
+                if descending {
+                    self.display_rows.sort_by(|a, b| b.dl_speed.cmp(&a.dl_speed));
+                } else {
+                    self.display_rows.sort_by(|a, b| a.dl_speed.cmp(&b.dl_speed));
+                }
+            }
+            SortColumn::UlSpeed => {
+                if descending {
+                    self.display_rows.sort_by(|a, b| b.ul_speed.cmp(&a.ul_speed));
+                } else {
+                    self.display_rows.sort_by(|a, b| a.ul_speed.cmp(&b.ul_speed));
+                }
             }
         }
     }
