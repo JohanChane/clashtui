@@ -350,4 +350,58 @@ mod tests {
         assert_eq!(dispatched[0].len(), 2);
         assert!(!ch.is_active());
     }
+
+    #[test]
+    fn expand_all_preserves_selected_node() {
+        use crate::functions::restful::proxies::ProxiesResponse;
+        use crate::tui::tab::proxies::tree::{NodeType, ProxyTree};
+        use crate::tui::widget::tab::FutureSet;
+        use ratatui::widgets::ListState;
+
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/tui/tab/proxies/tests/fixtures/proxies.json"
+        );
+        let data = std::fs::read_to_string(path).unwrap();
+        let response: ProxiesResponse = serde_json::from_str(&data).unwrap();
+        let proxies = response.proxies;
+
+        let mut content = Proxies {
+            tree: ProxyTree::build(ProxiesResponse { proxies: proxies.clone() }),
+            proxies: proxies.clone(),
+            ..Default::default()
+        };
+
+        let mut state = ListState::default();
+        let mut tasks: FutureSet<Proxies> = tokio::task::JoinSet::new();
+
+        // Select a middle folder
+        let folder_name = "Sl-pvd0";
+        let folder_idx = content.tree.nodes.iter()
+            .position(|n| n.node_type == NodeType::Folder && n.name == folder_name)
+            .unwrap();
+        state.select(Some(folder_idx));
+
+        let num_before = content.tree.len();
+        let saved = content.selection_key(&state).unwrap();
+
+        // Expand all
+        content.dispatch_key(Key::ExpandAll, &mut tasks, &mut state);
+
+        let num_after = content.tree.len();
+        assert!(
+            num_after > num_before,
+            "expand_all should increase the tree size"
+        );
+
+        let new_idx = state.selected().unwrap();
+        let node = content.tree.node_at(new_idx).unwrap();
+        assert_eq!(
+            (node.name.as_str(), &node.parent, &node.node_type),
+            (saved.0.as_str(), &saved.1, &saved.2),
+            "ExpandAll should preserve the selected node identity"
+        );
+        assert_eq!(node.node_type, NodeType::Folder);
+        assert_eq!(node.name, folder_name);
+    }
 }

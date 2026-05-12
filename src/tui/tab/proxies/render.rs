@@ -145,7 +145,7 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
             let style = match node.node_type {
                 NodeType::Folder => Theme::get().tab.tab_focused,
                 NodeType::Link => ratatui::style::Style::default().fg(Color::Rgb(100, 180, 150)),
-                _ => ratatui::style::Style::default(),
+                _ => ratatui::style::Style::default().fg(Color::Rgb(220, 220, 220)),
             };
 
             ListItem::new(Line::styled(line, style))

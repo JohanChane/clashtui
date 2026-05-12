@@ -17,12 +17,32 @@ pub struct Proxies {
     pub paused: bool,
 }
 
+type SelectionKey = (String, Option<String>, NodeType);
+
 impl Proxies {
     fn resolve_group_for_sort(&self, cursor: usize) -> Option<String> {
         let node = self.tree.node_at(cursor)?;
         match node.node_type {
             NodeType::Folder => Some(node.name.clone()),
             NodeType::Link | NodeType::File => node.parent.clone(),
+        }
+    }
+
+    pub(crate) fn selection_key(&self, state: &ListState) -> Option<SelectionKey> {
+        state
+            .selected()
+            .and_then(|i| self.tree.node_at(i))
+            .map(|n| (n.name.clone(), n.parent.clone(), n.node_type.clone()))
+    }
+
+    pub(crate) fn restore_selection(&self, key: Option<SelectionKey>, state: &mut ListState) {
+        state.select(None);
+        if let Some((name, parent, ntype)) = key {
+            if let Some(idx) = self.tree.nodes.iter().position(|n| {
+                n.name == name && n.parent == parent && n.node_type == ntype
+            }) {
+                state.select(Some(idx));
+            }
         }
     }
 
@@ -108,8 +128,16 @@ impl Proxies {
                     }
                 }
             }
-            super::Key::CollapseAll => self.tree.collapse_all(&self.proxies),
-            super::Key::ExpandAll => self.tree.expand_all(&self.proxies),
+            super::Key::CollapseAll => {
+                let key = self.selection_key(state);
+                self.tree.collapse_all(&self.proxies);
+                self.restore_selection(key, state);
+            }
+            super::Key::ExpandAll => {
+                let key = self.selection_key(state);
+                self.tree.expand_all(&self.proxies);
+                self.restore_selection(key, state);
+            }
             super::Key::Refresh => self.refresh(task_set),
             super::Key::SortByName => {
                 if let Some(group_name) = self.resolve_group_for_sort(current) {
@@ -120,7 +148,9 @@ impl Proxies {
                             SortMode::ByName
                         };
                         self.tree.nodes[idx].sort_mode = new_mode;
+                        let key = self.selection_key(state);
                         self.tree.rebuild_from_proxies(&self.proxies);
+                        self.restore_selection(key, state);
                     }
                 }
             }
@@ -133,7 +163,9 @@ impl Proxies {
                             SortMode::ByDelay
                         };
                         self.tree.nodes[idx].sort_mode = new_mode;
+                        let key = self.selection_key(state);
                         self.tree.rebuild_from_proxies(&self.proxies);
+                        self.restore_selection(key, state);
                     }
                 }
             }
@@ -141,7 +173,9 @@ impl Proxies {
                 if let Some(group_name) = self.resolve_group_for_sort(current) {
                     if let Some(idx) = self.tree.find_folder_index(&group_name) {
                         self.tree.nodes[idx].sort_mode = SortMode::None;
+                        let key = self.selection_key(state);
                         self.tree.rebuild_from_proxies(&self.proxies);
+                        self.restore_selection(key, state);
                     }
                 }
             }
@@ -155,7 +189,9 @@ impl Proxies {
                         node.sort_mode = new_mode;
                     }
                 }
+                let key = self.selection_key(state);
                 self.tree.rebuild_from_proxies(&self.proxies);
+                self.restore_selection(key, state);
             }
             super::Key::GlobalSortByDelay => {
                 let all_by_delay = self.tree.nodes.iter()
@@ -167,7 +203,9 @@ impl Proxies {
                         node.sort_mode = new_mode;
                     }
                 }
+                let key = self.selection_key(state);
                 self.tree.rebuild_from_proxies(&self.proxies);
+                self.restore_selection(key, state);
             }
             super::Key::GlobalResetSort => {
                 for node in &mut self.tree.nodes {
@@ -175,7 +213,9 @@ impl Proxies {
                         node.sort_mode = SortMode::None;
                     }
                 }
+                let key = self.selection_key(state);
                 self.tree.rebuild_from_proxies(&self.proxies);
+                self.restore_selection(key, state);
             }
             super::Key::TestDelay => {
                 let info = self.tree.node_at(current)
