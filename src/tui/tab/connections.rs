@@ -10,11 +10,11 @@ newtype_tab!(ConnectionsTab(Tab<Connections>));
 mod_agent!(
     Key,
     [
-        ([KeyCode::Up], Key::MoveUp, ""),
-        ([KeyCode::Down], Key::MoveDown, ""),
-        ([KeyCode::Char('k')], Key::MoveUp, ""),
-        ([KeyCode::Char('j')], Key::MoveDown, ""),
-        ([KeyCode::Char('G')], Key::GoBottom, ""),
+        ([KeyCode::Up], Key::MoveUp, "Move up"),
+        ([KeyCode::Down], Key::MoveDown, "Move down"),
+        ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
+        ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
+        ([KeyCode::Char('G')], Key::GoBottom, "Go to bottom"),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::GoTop, "Go to top"),
         ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Terminate, "Close"),
         ([KeyCode::Char('a'), KeyCode::Char('c')], Key::TerminateAll, "Close all"),
@@ -32,7 +32,7 @@ mod_agent!(
     ]
 );
 
-#[derive(Clone, Copy, serde::Deserialize)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum Key {
     MoveUp,
     MoveDown,
@@ -442,8 +442,10 @@ impl TabContent for Connections {
     }
 
     fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State) {
+        let theme = Theme::get();
+        let section = theme.section("connections");
         let block = Block::bordered()
-            .border_style(Theme::get().tab.tab_focused)
+            .border_style(section.border)
             .title(Self::TITLE);
 
         let mut title = if let Some(filter) = self.filter.as_ref() {
@@ -501,7 +503,7 @@ impl TabContent for Connections {
             )
         };
 
-        let header_style = Theme::get().tab.tab_focused;
+        let header_style = section.border;
         let header_cells = [
             sort_header(self.sort_state, SortColumn::Host, HOST_COL),
             sort_header(self.sort_state, SortColumn::Rule, RULE_COL),
@@ -551,7 +553,7 @@ impl TabContent for Connections {
             })
             .collect();
 
-        let highlight_style = Theme::get().tab.item_highlighted;
+        let highlight_style = section.highlight;
         let table = Table::new(rows, widths)
             .header(header)
             .block(block.title_bottom(Line::raw(count_text).right_aligned()))

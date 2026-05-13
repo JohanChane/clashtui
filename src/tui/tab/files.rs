@@ -47,13 +47,15 @@ newtype_tab!(
 pub fn agent_init(mut keymap: serde_yml::Mapping) -> anyhow::Result<()> {
     if let Some(serde_yml::Value::Mapping(map)) = keymap.remove("profile") {
         crate::tui::agent::check_duplicate_keys("file/profile", &map);
-        let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
+        let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
         profile::agent_init(keys);
+        profile::init_descs(descs);
     }
     if let Some(serde_yml::Value::Mapping(map)) = keymap.remove("template") {
         crate::tui::agent::check_duplicate_keys("file/template", &map);
-        let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
+        let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
         template::agent_init(keys);
+        template::init_descs(descs);
     }
     Ok(())
 }

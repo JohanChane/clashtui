@@ -481,17 +481,17 @@ fn render_tabbar(
     use ratatui::text::Line;
     use ratatui::widgets::{Block, Tabs};
 
+    let theme = Theme::get();
     let block = Block::bordered()
-        .style(Theme::get().bars.block)
         .title(" Clashtui ")
         .title_bottom(Line::raw(" Tab or num ").right_aligned().reversed());
     let titles = titles
         .into_iter()
         .enumerate()
-        .map(|(idx, s)| format!("{} {s}", idx + 1).set_style(Theme::get().bars.tabbar_text));
+        .map(|(idx, s)| format!("{} {s}", idx + 1).set_style(theme.tabbar.text));
     let widget = Tabs::new(titles)
         .block(block)
-        .highlight_style(Theme::get().bars.tabbar_highlight)
+        .highlight_style(theme.tabbar.highlight)
         .select(Some(selected as usize));
     f.render_widget(widget, area);
 }

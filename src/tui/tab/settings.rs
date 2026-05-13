@@ -12,15 +12,15 @@ mod_agent!(
     SettingsKey,
     [
         ([KeyCode::Enter], SettingsKey::Execute, "Apply"),
-        ([KeyCode::Esc], SettingsKey::Esc, ""),
-        ([KeyCode::Up], SettingsKey::MoveUp, ""),
-        ([KeyCode::Down], SettingsKey::MoveDown, ""),
-        ([KeyCode::Char('k')], SettingsKey::MoveUp, ""),
-        ([KeyCode::Char('j')], SettingsKey::MoveDown, ""),
+        ([KeyCode::Esc], SettingsKey::Esc, "Back"),
+        ([KeyCode::Up], SettingsKey::MoveUp, "Move up"),
+        ([KeyCode::Down], SettingsKey::MoveDown, "Move down"),
+        ([KeyCode::Char('k')], SettingsKey::MoveUp, "Move up"),
+        ([KeyCode::Char('j')], SettingsKey::MoveDown, "Move down"),
     ]
 );
 
-#[derive(Clone, Copy, serde::Deserialize)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub(crate) enum SettingsKey {
     Execute,
     MoveUp,
@@ -281,7 +281,7 @@ impl TabContent for SettingsContent {
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State) {
         let block = Block::bordered()
-            .border_style(Theme::get().tab.tab_focused)
+            .border_style(Theme::get().section("settings").border)
             .title(Self::TITLE);
 
         if crate::config::is_core_mismatch() {
@@ -290,7 +290,7 @@ impl TabContent for SettingsContent {
             return;
         }
 
-        let value_style = Theme::get().profile_tab.update_interval;
+        let value_style = Theme::get().section("settings").secondary;
 
         let items: Vec<ListItem> = self
             .ops
@@ -311,7 +311,7 @@ impl TabContent for SettingsContent {
             })
             .collect();
 
-        let highlight_style = Theme::get().tab.item_highlighted;
+        let highlight_style = Theme::get().section("settings").highlight;
         let list = List::new(items)
             .block(block)
             .highlight_style(highlight_style);
@@ -328,7 +328,7 @@ impl TabContent for SettingsContent {
             let mode_list = List::new(mode_items)
                 .block(
                     Block::bordered()
-                        .border_style(Theme::get().tab.tab_focused)
+                        .border_style(Theme::get().section("settings").border)
                         .title("Mode"),
                 )
                 .highlight_style(highlight_style);
@@ -350,7 +350,7 @@ impl TabContent for SettingsContent {
             let level_list = List::new(level_items)
                 .block(
                     Block::bordered()
-                        .border_style(Theme::get().tab.tab_focused)
+                        .border_style(Theme::get().section("settings").border)
                         .title("Log Level"),
                 )
                 .highlight_style(highlight_style);

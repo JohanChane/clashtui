@@ -158,7 +158,7 @@ impl TabContent for Status {
 
     fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State) {
         let block = Block::bordered()
-            .border_style(Theme::get().tab.tab_focused)
+            .border_style(Theme::get().section("status").border)
             .title(Self::TITLE);
         let mut lines: Vec<String> = vec![];
         let configured = CONFIG.core_type();

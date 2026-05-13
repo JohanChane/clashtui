@@ -11,11 +11,11 @@ newtype_tab!(LogsTab(Tab<Logs>));
 mod_agent!(
     Key,
     [
-        ([KeyCode::Up], Key::MoveUp, ""),
-        ([KeyCode::Down], Key::MoveDown, ""),
-        ([KeyCode::Char('k')], Key::MoveUp, ""),
-        ([KeyCode::Char('j')], Key::MoveDown, ""),
-        ([KeyCode::Char('G')], Key::GoBottom, ""),
+        ([KeyCode::Up], Key::MoveUp, "Move up"),
+        ([KeyCode::Down], Key::MoveDown, "Move down"),
+        ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
+        ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
+        ([KeyCode::Char('G')], Key::GoBottom, "Go to bottom"),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::GoTop, "Go to top"),
         ([KeyCode::Char('/')], Key::Search, "Search/Filter"),
         ([KeyCode::Char('p')], Key::TogglePause, "Pause/Resume"),
@@ -29,7 +29,7 @@ mod_agent!(
     ]
 );
 
-#[derive(Clone, Copy, serde::Deserialize)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum Key {
     MoveUp,
     MoveDown,
@@ -435,7 +435,7 @@ impl TabContent for Logs {
 
     fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State) {
         let block = Block::bordered()
-            .border_style(Theme::get().tab.tab_focused)
+            .border_style(Theme::get().section("logs").border)
             .title(Self::TITLE);
 
         let mut title_parts = Vec::new();
@@ -476,7 +476,7 @@ impl TabContent for Logs {
             .map(|line| ListItem::new(Line::raw(line)))
             .collect();
 
-        let highlight_style = Theme::get().tab.item_highlighted;
+        let highlight_style = Theme::get().section("logs").highlight;
         let list = List::new(visible_lines)
             .block(block)
             .highlight_style(highlight_style);

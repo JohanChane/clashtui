@@ -16,7 +16,7 @@ mod widget;
 pub use app::App;
 pub use key::Key;
 pub use term::hold;
-pub use theme::Theme;
+pub(crate) use theme::Theme;
 
 pub async fn prompt_sudo_password() -> Option<String> {
     match popmsg::input::InputMasked::new()

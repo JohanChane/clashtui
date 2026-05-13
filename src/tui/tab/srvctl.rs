@@ -1,5 +1,6 @@
 use super::dev::*;
 use crate::config::CoreType;
+use ratatui::style::Color;
 use ratatui::widgets::ListItem;
 
 newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
@@ -8,15 +9,15 @@ mod_agent!(
     SrvCtlKey,
     [
         ([KeyCode::Enter], SrvCtlKey::Execute, "Execute"),
-        ([KeyCode::Esc], SrvCtlKey::Esc, ""),
-        ([KeyCode::Up], SrvCtlKey::MoveUp, ""),
-        ([KeyCode::Down], SrvCtlKey::MoveDown, ""),
-        ([KeyCode::Char('k')], SrvCtlKey::MoveUp, ""),
-        ([KeyCode::Char('j')], SrvCtlKey::MoveDown, ""),
+        ([KeyCode::Esc], SrvCtlKey::Esc, "Back"),
+        ([KeyCode::Up], SrvCtlKey::MoveUp, "Move up"),
+        ([KeyCode::Down], SrvCtlKey::MoveDown, "Move down"),
+        ([KeyCode::Char('k')], SrvCtlKey::MoveUp, "Move up"),
+        ([KeyCode::Char('j')], SrvCtlKey::MoveDown, "Move down"),
     ]
 );
 
-#[derive(Clone, Copy, serde::Deserialize)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub(crate) enum SrvCtlKey {
     Execute,
     MoveUp,
@@ -412,6 +413,7 @@ impl TabContent for SrvCtlContent {
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State) {
         let user_tag = if self.is_user { " (user)" } else { "" };
         let theme = Theme::get();
+        let section = theme.section("srvctl");
 
         let current_core_label = format!(
             "► {}: {}",
@@ -437,7 +439,7 @@ impl TabContent for SrvCtlContent {
         );
 
         let block = Block::bordered()
-            .border_style(theme.tab.tab_focused)
+            .border_style(section.border)
             .title(format!(
                 "{} — {} (core: {}){}",
                 Self::TITLE, self.service_name, self.core_label, user_tag
@@ -446,11 +448,11 @@ impl TabContent for SrvCtlContent {
                 ratatui::text::Line::from(vec![
                     ratatui::text::Span::styled(
                         format!(" {} ", current_core_label),
-                        theme.tab.tab_focused,
+                        section.border,
                     ),
                     ratatui::text::Span::styled(
                         format!(" {} ", other_core_label),
-                        theme.tab.dualtab_unfocused,
+                        section.border.fg(Color::Rgb(100, 100, 100)),
                     ),
                 ])
                 .right_aligned(),
@@ -462,7 +464,7 @@ impl TabContent for SrvCtlContent {
             .map(|op| ListItem::new(format!("  {}", op.as_str())))
             .collect();
 
-        let highlight_style = theme.tab.item_highlighted;
+        let highlight_style = section.highlight;
         let list = List::new(items)
             .block(block)
             .highlight_style(highlight_style);

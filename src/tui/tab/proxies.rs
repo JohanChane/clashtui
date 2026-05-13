@@ -11,13 +11,13 @@ newtype_tab!(ProxiesTab(Tab<Proxies>));
 mod_agent!(
     Key,
     [
-        ([KeyCode::Up], Key::MoveUp, ""),
-        ([KeyCode::Down], Key::MoveDown, ""),
-        ([KeyCode::Char('k')], Key::MoveUp, ""),
-        ([KeyCode::Char('j')], Key::MoveDown, ""),
-        ([KeyCode::Char('h')], Key::Parent, ""),
-        ([KeyCode::Char('l')], Key::Expand, ""),
-        ([KeyCode::Enter], Key::Select, ""),
+        ([KeyCode::Up], Key::MoveUp, "Move up"),
+        ([KeyCode::Down], Key::MoveDown, "Move down"),
+        ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
+        ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
+        ([KeyCode::Char('h')], Key::Parent, "Go to parent"),
+        ([KeyCode::Char('l')], Key::Expand, "Expand"),
+        ([KeyCode::Enter], Key::Select, "Select"),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::GoTop, "Go to top"),
         ([KeyCode::Char('G')], Key::GoBottom, "Go to bottom"),
         ([KeyCode::Char('/')], Key::Search, "Search/Filter"),
@@ -36,7 +36,7 @@ mod_agent!(
     ]
 );
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum Key {
     MoveUp,
     MoveDown,

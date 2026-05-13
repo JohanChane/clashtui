@@ -1,10 +1,11 @@
 use crate::tui::tab::TuiTab;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
-use ratatui::style::Stylize;
-use ratatui::text::Line;
+use ratatui::style::{Style, Stylize};
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 use std::rc::Rc;
 
+use crate::tui::theme::Theme;
 use super::chord::key_event_to_str;
 use super::tab::KeyCombo;
 
@@ -34,15 +35,18 @@ pub fn render_help(f: &mut ratatui::Frame, tab: &impl TuiTab) {
     let tab_title = tab.title();
 
     let global_shortcuts: Rc<[(KeyCombo, &str)]> = Rc::new([
-        (KeyCombo(vec![]), "Switch tab 1-6"),
+        (KeyCombo(vec![]), "Switch tab 1-7"),
         (KeyCombo(vec![]), "Cycle tabs"),
         (KeyCombo(vec![]), "Toggle help"),
         (KeyCombo(vec![]), "Quit"),
+        (KeyCombo(vec![]), "Quit"),
         (KeyCombo(vec![]), "Open app config dir"),
         (KeyCombo(vec![]), "Open clash config dir"),
+        (KeyCombo(vec![]), "Start core service"),
+        (KeyCombo(vec![]), "Close all connections"),
     ]);
 
-    let global_labels: &[&str] = &["1-6", "<Tab>", "?", "q", "C-g c", "C-g m"];
+    let global_labels: &[&str] = &["1-7", "<Tab>", "?", "q", "C-c", "C-g c", "C-g m", "C-g f", "C-g t"];
 
     let tab_entries = shortcuts.len();
     let global_entries = global_shortcuts.len();
@@ -133,6 +137,8 @@ fn render_shortcut_section(
         return;
     }
 
+    let accent = Theme::get().popup.text;
+
     let body_area = Rect {
         y: area.y + 1,
         height: area.height.saturating_sub(1),
@@ -154,7 +160,7 @@ fn render_shortcut_section(
             .enumerate()
             .map(|(i, (combo, desc))| {
                 let key_str: String = if let Some(labels) = custom_labels {
-                    labels[i].to_owned()
+                    labels[col_idx * items_per_col + i].to_owned()
                 } else {
                     combo
                         .iter()
@@ -162,7 +168,12 @@ fn render_shortcut_section(
                         .collect::<Vec<_>>()
                         .join(" ")
                 };
-                Line::from(format!(" {}  {}", key_str, desc))
+                Line::from(vec![
+                    Span::raw(" "),
+                    Span::styled(key_str, Style::new().dim()),
+                    Span::raw("  "),
+                    Span::styled(*desc, accent),
+                ])
             })
             .collect();
 

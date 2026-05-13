@@ -31,7 +31,7 @@ impl<C: Msg> Wrapper for Instance<C> {
 
     fn render(&mut self, f: &mut Frame) {
         let base_block = Block::bordered()
-            .border_style(Theme::get().popup.block)
+            .border_style(Theme::get().popup.border)
             .title(self.title.as_str());
 
         if let Some(prompt) = self.prompt.as_mut() {
@@ -44,7 +44,7 @@ impl<C: Msg> Wrapper for Instance<C> {
             });
             let content_block = Block::bordered()
                 .borders(Borders::ALL & !Borders::TOP)
-                .border_style(Theme::get().popup.block);
+                .border_style(Theme::get().popup.border);
 
             let areas = {
                 let (content_width, content_height) = self.content.size();

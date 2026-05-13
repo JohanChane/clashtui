@@ -2,24 +2,24 @@ use super::*;
 use crate::functions::command::edit;
 use crate::functions::file::template::*;
 use crate::tui::widget::popmsg::Confirm;
+use ratatui::style::Style;
 use std::cell::Cell;
 
 mod_agent!(
     Key,
     [
-        ([KeyCode::Left], Key::Switch, ""),
-        ([KeyCode::Right], Key::Switch, ""),
-        ([KeyCode::Char('h')], Key::Switch, ""),
-        ([KeyCode::Char('l')], Key::Switch, ""),
-        ([KeyCode::Down], Key::MoveDown, ""),
-        ([KeyCode::Up], Key::MoveUp, ""),
-        ([KeyCode::Char('j')], Key::MoveDown, ""),
-        ([KeyCode::Char('k')], Key::MoveUp, ""),
+        ([KeyCode::Left], Key::Switch, "Switch pane"),
+        ([KeyCode::Right], Key::Switch, "Switch pane"),
+        ([KeyCode::Char('h')], Key::Switch, "Switch pane"),
+        ([KeyCode::Char('l')], Key::Switch, "Switch pane"),
+        ([KeyCode::Down], Key::MoveDown, "Move down"),
+        ([KeyCode::Up], Key::MoveUp, "Move up"),
+        ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
+        ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
         ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Action(Action::Delete), "Delete template"),
-        ([KeyCode::Char('e')], Key::Action(Action::Edit), ""),
-        ([KeyCode::Char('E')], Key::Action(Action::EditProviders), "Edit providers file"),
-        ([KeyCode::Char('p')], Key::Action(Action::Preview), ""),
-        ([KeyCode::Enter], Key::Action(Action::Generate), ""),
+        ([KeyCode::Char('e')], Key::Action(Action::Edit), "Edit"),
+        ([KeyCode::Char('p')], Key::Action(Action::Preview), "Preview"),
+        ([KeyCode::Enter], Key::Action(Action::Generate), "Generate"),
         ([KeyCode::Char('f')], Key::Action(Action::FzfFind), "Find template"),
         ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
         ([KeyCode::Char('G')], Key::Action(Action::GoEnd), "Go to end"),
@@ -35,6 +35,23 @@ pub enum Key {
     Select,
 
     Action(Action),
+}
+
+impl serde::Serialize for Key {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Key::Switch => serializer.serialize_str("Switch"),
+            Key::MoveUp => serializer.serialize_str("MoveUp"),
+            Key::MoveDown => serializer.serialize_str("MoveDown"),
+            Key::Select => serializer.serialize_str("Select"),
+            Key::Action(action) => {
+                use serde::ser::SerializeMap;
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("Action", action)?;
+                map.end()
+            }
+        }
+    }
 }
 
 impl<'de> serde::Deserialize<'de> for Key {
@@ -94,7 +111,7 @@ impl<'de> serde::Deserialize<'de> for Key {
     }
 }
 
-#[derive(Clone, Copy, Debug, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Action {
     Generate,
     Delete,
@@ -212,11 +229,16 @@ impl DualTabContentMate for Template {
             state.select(Some(0));
         }
 
+        let theme = Theme::get();
+        let section = theme.section("file");
+        let unfocused_border = section.border.fg(Color::Rgb(100, 100, 100));
+        let unfocused_highlight = Style::new();
+
         let block = Block::bordered()
             .border_style(if is_focused {
-                Theme::get().tab.tab_focused
+                section.border
             } else {
-                Theme::get().tab.dualtab_unfocused
+                unfocused_border
             })
             .title(Self::TITLE);
 
@@ -239,9 +261,9 @@ impl DualTabContentMate for Template {
         let widget = List::from_iter(iter)
             .block(block)
             .highlight_style(if is_focused {
-                Theme::get().tab.item_highlighted
+                section.highlight
             } else {
-                Theme::get().tab.item_unhighlighted
+                unfocused_highlight
             });
         f.render_stateful_widget(widget, area, state);
     }

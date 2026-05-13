@@ -8,7 +8,7 @@ mod dev {
     pub use ratatui::widgets::{Block, List, ListState, StatefulWidget};
 
     pub use crate::tui::popmsg::prelude::*;
-    pub use crate::tui::theme::Theme;
+    pub(crate) use crate::tui::theme::Theme;
 }
 
 use crate::tui::widget::tab::KeyCombo;
@@ -85,19 +85,36 @@ pub(crate) mod agent {
         }
     }
 
+    static DESC_OVERRIDES: OnceLock<HashMap<crate::tui::Key, String>> = OnceLock::new();
+
+    pub fn init_descs(map: HashMap<crate::tui::Key, String>) {
+        if !map.is_empty() {
+            let _ = DESC_OVERRIDES.set(map);
+        }
+    }
+
     static SHORTCUTS: OnceLock<Vec<(KeyCombo, $ident, &'static str)>> = OnceLock::new();
 
     pub fn all_shortcuts() -> &'static [(KeyCombo, $ident, &'static str)] {
         SHORTCUTS.get_or_init(|| {
             let mut v = Vec::new();
             mod_agent!(@shortcuts v, $($tokens)*);
+            if let Some(overrides) = DESC_OVERRIDES.get() {
+                for (combo, _, desc) in &mut v {
+                    if combo.len() == 1 {
+                        if let Some(d) = overrides.get(&combo[0]) {
+                            *desc = Box::leak(d.clone().into_boxed_str());
+                        }
+                    }
+                }
+            }
             v
         })
     }
 }
 
 pub use agent::{agent, all_shortcuts};
-pub use agent::{init as agent_init};
+pub use agent::{init as agent_init, init_descs};
     };
 
     // ---- tt-muncher: agent (only single-key shortcuts) ----
@@ -186,7 +203,7 @@ pub trait TuiTab: super::TuiWidget {
 pub(crate) mod connections;
 pub(crate) mod files;
 pub(crate) mod logs;
-mod proxies;
+pub(crate) mod proxies;
 pub(crate) mod settings;
 pub(crate) mod srvctl;
 mod status;
@@ -275,8 +292,9 @@ pub mod prelude {
 
         if let Ok(map) = crate::tui::agent::get(keymap, "connections") {
             crate::tui::agent::check_duplicate_keys("connections", &map);
-            let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
+            let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
             super::connections::agent_init(keys);
+            super::connections::init_descs(descs);
         }
 
         if let Ok(map) = crate::tui::agent::get(keymap, "file") {
@@ -285,20 +303,23 @@ pub mod prelude {
 
         if let Ok(map) = crate::tui::agent::get(keymap, "srvctl") {
             crate::tui::agent::check_duplicate_keys("srvctl", &map);
-            let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
+            let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
             super::srvctl::agent_init(keys);
+            super::srvctl::init_descs(descs);
         }
 
         if let Ok(map) = crate::tui::agent::get(keymap, "settings") {
             crate::tui::agent::check_duplicate_keys("settings", &map);
-            let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
+            let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
             super::settings::agent_init(keys);
+            super::settings::init_descs(descs);
         }
 
         if let Ok(map) = crate::tui::agent::get(keymap, "logs") {
             crate::tui::agent::check_duplicate_keys("logs", &map);
-            let keys = serde_yml::from_value(serde_yml::Value::Mapping(map))?;
+            let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
             super::logs::agent_init(keys);
+            super::logs::init_descs(descs);
         }
 
         Ok(())

@@ -5,11 +5,17 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Key {
 	pub code:   KeyCode,
+	#[serde(default, skip_serializing_if = "is_false")]
 	pub shift:  bool,
+	#[serde(default, skip_serializing_if = "is_false")]
 	pub ctrl:   bool,
+	#[serde(default, skip_serializing_if = "is_false")]
 	pub alt:    bool,
+	#[serde(default, skip_serializing_if = "is_false")]
 	pub super_: bool,
 }
+
+fn is_false(b: &bool) -> bool { !*b }
 
 impl Key {
 	pub fn plain(&self) -> Option<char> {

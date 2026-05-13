@@ -6,6 +6,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, List, ListItem};
 
 pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListState) {
+    let theme = Theme::get();
+    let section = theme.section("proxies");
+
     // Clamp cursor to valid range
     if let Some(idx) = state.selected() {
         let len = content.tree.len();
@@ -19,7 +22,7 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
     }
 
     let block = Block::bordered()
-        .border_style(Theme::get().tab.tab_focused)
+        .border_style(section.border)
         .title(Proxies::TITLE);
 
     let spinner_str = content.testing_since.map(|since| {
@@ -125,9 +128,9 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
                 }
             };
             let style = match node.node_type {
-                NodeType::Folder => Theme::get().tab.tab_focused,
-                NodeType::Link => ratatui::style::Style::default().fg(Color::Rgb(100, 180, 150)),
-                _ => ratatui::style::Style::default().fg(Color::Rgb(220, 220, 220)),
+                NodeType::Folder => section.border,
+                NodeType::Link => section.extra.get("node_link").copied().unwrap_or(section.text),
+                _ => section.extra.get("node_file").copied().unwrap_or(section.text),
             };
 
             let mut spans = vec![Span::styled(
@@ -143,13 +146,13 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
                 if node.tcp {
                     spans.push(Span::styled(
                         " TCP",
-                        ratatui::style::Style::default().fg(Color::Cyan),
+                        section.extra.get("node_tcp").copied().unwrap_or(section.text),
                     ));
                 }
                 if node.udp {
                     spans.push(Span::styled(
                         " UDP",
-                        ratatui::style::Style::default().fg(Color::Yellow),
+                        section.extra.get("node_udp").copied().unwrap_or(section.text),
                     ));
                 }
             }
@@ -182,7 +185,7 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
 
     let list = List::new(items)
         .block(block)
-        .highlight_style(Theme::get().tab.item_highlighted);
+        .highlight_style(section.highlight);
 
     f.render_stateful_widget(list, area, state);
 }

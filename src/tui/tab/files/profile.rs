@@ -6,6 +6,8 @@ use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, atomic::Ordering};
 
+use ratatui::style::Style;
+
 use super::*;
 
 /// Traffic usage info parsed from subscription-userinfo header.
@@ -87,23 +89,21 @@ fn traffic_percentage(used: u64, total: u64) -> f64 {
 mod_agent!(
     Key,
     [
-        ([KeyCode::Left], Key::Switch, ""),
-        ([KeyCode::Right], Key::Switch, ""),
-        ([KeyCode::Char('h')], Key::Switch, ""),
-        ([KeyCode::Char('l')], Key::Switch, ""),
-        ([KeyCode::Down], Key::MoveDown, ""),
-        ([KeyCode::Up], Key::MoveUp, ""),
-        ([KeyCode::Char('j')], Key::MoveDown, ""),
-        ([KeyCode::Char('k')], Key::MoveUp, ""),
-        ([KeyCode::Enter], Key::Select, ""),
+        ([KeyCode::Left], Key::Switch, "Switch pane"),
+        ([KeyCode::Right], Key::Switch, "Switch pane"),
+        ([KeyCode::Char('h')], Key::Switch, "Switch pane"),
+        ([KeyCode::Char('l')], Key::Switch, "Switch pane"),
+        ([KeyCode::Down], Key::MoveDown, "Move down"),
+        ([KeyCode::Up], Key::MoveUp, "Move up"),
+        ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
+        ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
+        ([KeyCode::Enter], Key::Select, "Select"),
         ([KeyCode::Char('i')], Key::Action(Action::Add), "Import (URL or file)"),
-        ([KeyCode::Char('e')], Key::Action(Action::Edit), ""),
-        ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Action(Action::Delete), "Delete profile"),
-        ([KeyCode::Char('p')], Key::Action(Action::Preview), ""),
-        ([KeyCode::Char('u')], Key::Action(Action::Update), ""),
-        ([KeyCode::Char('a'), KeyCode::Char('u')], Key::Action(Action::UpdateAll), "Update all"),
-        ([KeyCode::Char('/')], Key::Action(Action::Search), ""),
-        ([KeyCode::Char('t')], Key::Action(Action::Test), ""),
+        ([KeyCode::Char('e')], Key::Action(Action::Edit), "Edit"),
+        ([KeyCode::Char('p')], Key::Action(Action::Preview), "Preview"),
+        ([KeyCode::Char('u')], Key::Action(Action::Update), "Update"),
+        ([KeyCode::Char('/')], Key::Action(Action::Search), "Search/Filter"),
+        ([KeyCode::Char('t')], Key::Action(Action::Test), "Test"),
         ([KeyCode::Char('c')], Key::Action(Action::Check), "Check config"),
         ([KeyCode::Char('C'), KeyCode::Char('u')], Key::Action(Action::CopyUrl), "Copy URL"),
         ([KeyCode::Char('f')], Key::Action(Action::FzfFind), "Find profile"),
@@ -123,6 +123,23 @@ pub enum Key {
     Select,
 
     Action(Action),
+}
+
+impl serde::Serialize for Key {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Key::Switch => serializer.serialize_str("Switch"),
+            Key::MoveUp => serializer.serialize_str("MoveUp"),
+            Key::MoveDown => serializer.serialize_str("MoveDown"),
+            Key::Select => serializer.serialize_str("Select"),
+            Key::Action(action) => {
+                use serde::ser::SerializeMap;
+                let mut map = serializer.serialize_map(Some(1))?;
+                map.serialize_entry("Action", action)?;
+                map.end()
+            }
+        }
+    }
 }
 
 impl<'de> serde::Deserialize<'de> for Key {
@@ -190,7 +207,7 @@ impl<'de> serde::Deserialize<'de> for Key {
     }
 }
 
-#[derive(Clone, Copy, serde::Deserialize)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub enum Action {
     Add,
     ImportFile,
@@ -338,11 +355,16 @@ impl DualTabContent for Profile {
             state.select(Some(0));
         }
 
+        let theme = Theme::get();
+        let section = theme.section("file");
+        let unfocused_border = section.border.fg(Color::Rgb(100, 100, 100));
+        let unfocused_highlight = Style::new();
+
         let block = Block::bordered()
             .border_style(if is_focused {
-                Theme::get().tab.tab_focused
+                section.border
             } else {
-                Theme::get().tab.dualtab_unfocused
+                unfocused_border
             })
             .title(Self::TITLE);
 
@@ -375,7 +397,7 @@ impl DualTabContent for Profile {
                     spans.push(Span::raw(format!("{} ", spinner_chars[spinner_idx])));
                 } else if value == current.as_str() {
                     spans.push(
-                        Span::raw("* ").style(Theme::get().tab.tab_focused),
+                        Span::raw("* ")                .style(section.border),
                     );
                 } else {
                     spans.push(Span::raw("  "));
@@ -383,7 +405,7 @@ impl DualTabContent for Profile {
 
                 spans.push(Span::raw(value.as_str()));
                 spans.push(Span::raw(" "));
-                spans.push(Span::raw(extra.as_str()).style(Theme::get().profile_tab.update_interval));
+                spans.push(Span::raw(extra.as_str()).style(section.secondary));
 
                 // Traffic info
                 if self.traffic_display_mode != TrafficDisplayMode::Off {
@@ -427,9 +449,9 @@ impl DualTabContent for Profile {
         let widget = List::from_iter(iter)
             .block(block)
             .highlight_style(if is_focused {
-                Theme::get().tab.item_highlighted
+                section.highlight
             } else {
-                Theme::get().tab.item_unhighlighted
+                unfocused_highlight
             });
         f.render_stateful_widget(widget, area, state);
     }
