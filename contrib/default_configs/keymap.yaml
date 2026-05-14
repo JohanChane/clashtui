@@ -1,0 +1,261 @@
+# Clashtui default keymap
+# Copy this file to ~/.config/clashtui/keymap.yaml to customize key bindings.
+# Only single-key shortcuts can be remapped here. Chords (e.g. "gg", "dd") are hardcoded.
+# Press ? in the TUI to see current bindings.
+# Core-specific sections (mihomo / sing-box) override common sections.
+
+connections:
+  ? code: Up
+  :
+    action: MoveUp
+    desc: Move up
+  ? code: Down
+  :
+    action: MoveDown
+    desc: Move down
+  ? code: !Char k
+  :
+    action: MoveUp
+    desc: Move up
+  ? code: !Char j
+  :
+    action: MoveDown
+    desc: Move down
+  ? code: !Char G
+    shift: true
+  :
+    action: GoBottom
+    desc: Go to bottom
+  ? code: !Char /
+  :
+    action: Search
+    desc: Search/Filter
+  ? code: !Char p
+  :
+    action: TogglePause
+    desc: Pause/Resume
+  ? code: !Char f
+  :
+    action: FzfFind
+    desc: Find
+
+proxies:
+  ? code: Up
+  :
+    action: MoveUp
+    desc: Move up
+  ? code: Down
+  :
+    action: MoveDown
+    desc: Move down
+  ? code: !Char k
+  :
+    action: MoveUp
+    desc: Move up
+  ? code: !Char j
+  :
+    action: MoveDown
+    desc: Move down
+  ? code: !Char h
+  :
+    action: Parent
+    desc: Go to parent
+  ? code: !Char l
+  :
+    action: Expand
+    desc: Expand
+  ? code: Enter
+  :
+    action: Select
+    desc: Select
+  ? code: !Char G
+    shift: true
+  :
+    action: GoBottom
+    desc: Go to bottom
+  ? code: !Char /
+  :
+    action: Search
+    desc: Search/Filter
+  ? code: !Char t
+  :
+    action: TestDelay
+    desc: Test delay
+  ? code: !Char r
+  :
+    action: Refresh
+    desc: Refresh
+  ? code: !Char f
+  :
+    action: FzfFind
+    desc: Find proxy
+
+file:
+  profile:
+    ? code: Left
+            : Switch
+    ? code: Right
+            : Switch
+    ? code: !Char h
+            : Switch
+    ? code: !Char l
+            : Switch
+    ? code: Up
+            : MoveUp
+    ? code: Down
+            : MoveDown
+    ? code: !Char k
+            : MoveUp
+    ? code: !Char j
+            : MoveDown
+    ? code: Enter
+            : Select
+    ? code: !Char i
+            : Action: Add
+    ? code: !Char e
+            : Action: Edit
+    ? code: !Char p
+            : Action: Preview
+    ? code: !Char u
+            : Action: Update
+    ? code: !Char /
+            : Action: Search
+    ? code: !Char t
+            : Action: Test
+    ? code: !Char c
+            : Action: Check
+    ? code: !Char f
+            : Action: FzfFind
+    ? code: !Char G
+      shift: true
+          : Action: GoEnd
+    ? code: !Char P
+      shift: true
+          : Action: ToggleNoPp
+    ? code: !Char n
+            : Action: TrafficNext
+    ? code: !Char N
+      shift: true
+          : Action: TrafficPrev
+
+  template:
+    ? code: Left
+            : Switch
+    ? code: Right
+            : Switch
+    ? code: !Char h
+            : Switch
+    ? code: !Char l
+            : Switch
+    ? code: Up
+            : MoveUp
+    ? code: Down
+            : MoveDown
+    ? code: !Char k
+            : MoveUp
+    ? code: !Char j
+            : MoveDown
+    ? code: Enter
+            : Action: Generate
+    ? code: !Char e
+            : Action: Edit
+    ? code: !Char p
+            : Action: Preview
+    ? code: !Char f
+            : Action: FzfFind
+    ? code: !Char G
+      shift: true
+          : Action: GoEnd
+    ? code: !Char /
+            : Action: Search
+
+srvctl:
+  ? code: Enter
+  :
+    action: Execute
+    desc: Execute
+  ? code: Esc
+  :
+    action: Esc
+    desc: Back
+  ? code: Up
+  :
+    action: MoveUp
+    desc: Move up
+  ? code: Down
+  :
+    action: MoveDown
+    desc: Move down
+  ? code: !Char k
+  :
+    action: MoveUp
+    desc: Move up
+  ? code: !Char j
+  :
+    action: MoveDown
+    desc: Move down
+
+settings:
+  ? code: Enter
+  :
+    action: Execute
+    desc: Apply
+  ? code: Esc
+  :
+    action: Esc
+    desc: Back
+  ? code: Up
+  :
+    action: MoveUp
+    desc: Move up
+  ? code: Down
+  :
+    action: MoveDown
+    desc: Move down
+  ? code: !Char k
+  :
+    action: MoveUp
+    desc: Move up
+  ? code: !Char j
+  :
+    action: MoveDown
+    desc: Move down
+
+logs:
+  ? code: Up
+  :
+    action: MoveUp
+    desc: Move up
+  ? code: Down
+  :
+    action: MoveDown
+    desc: Move down
+  ? code: !Char k
+  :
+    action: MoveUp
+    desc: Move up
+  ? code: !Char j
+  :
+    action: MoveDown
+    desc: Move down
+  ? code: !Char G
+    shift: true
+  :
+    action: GoBottom
+    desc: Go to bottom
+  ? code: !Char /
+  :
+    action: Search
+    desc: Search/Filter
+  ? code: !Char p
+  :
+    action: TogglePause
+    desc: Pause/Resume
+  ? code: !Char f
+  :
+    action: FzfFind
+    desc: Find
+  ? code: !Char c
+  :
+    action: Clear
+    desc: Clear logs
