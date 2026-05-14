@@ -82,8 +82,7 @@
       "outbounds": [
         "${PGG.Auto}",
         "${PGG.Select}"
-      ],
-      "default": "${PGG.Auto.pvd0}"
+      ]
     },
     {
       "type": "selector",

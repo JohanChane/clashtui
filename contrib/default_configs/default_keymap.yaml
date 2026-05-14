@@ -159,6 +159,9 @@ file:
             : Action: Generate
     ? code: !Char e
             : Action: Edit
+    ? code: !Char E
+      shift: true
+          : Action: EditProviders
     ? code: !Char p
             : Action: Preview
     ? code: !Char f
