@@ -1,0 +1,32 @@
+{
+  "experimental": {
+    "cache_file": {
+      "enabled": true,
+      "store_fakeip": true
+    },
+    "clash_api": {
+      "external_controller": "127.0.0.1:9090",
+      "external_ui": "dashboard",
+      "default_mode": "Rule"
+    }
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": "172.19.0.1/30",
+      "auto_route": true,
+      "strict_route": true,
+      "stack": "mixed"
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "0.0.0.0",
+      "listen_port": 2080
+    }
+  ],
+  "log": {
+    "level": "info"
+  }
+}

@@ -1,0 +1,66 @@
+proxy-anchor:
+  - delay_test: &pa_dt {url: https://www.gstatic.com/generate_204, interval: 300}
+  - proxy_provider: &pa_pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
+
+proxy-groups:
+  - name: "Entry"
+    type: select
+    proxies:
+      - <At>                    # 使用 proxy-groups 中的 `At` 模板代理组。
+      - <Sl>                    # 与 `<At>` 同理。
+
+  - name: "Sl"                  # 定义名称是 `Sl` (名称可自定义) 的模板代理组。根据模板代理提供者 `pvd`, 会生成 `Sl-pvd0`, `Sl-pvd1`, ...
+    tpl_param:
+      providers: ["pvd"]        # 表示使用名称是 `pvd` 的模板代理提供者。
+    type: select
+
+  - name: "At"                  # 与 `Sl` 同理。
+    tpl_param:
+      providers: ["pvd"]
+    type: url-test
+    <<: *pa_dt
+
+  - name: "Entry-RuleMode"        # 类似于黑白名单模式。用于控制有无代理都可以访问的网站使用代理或直连。
+    type: select
+    proxies:
+      - DIRECT
+      - Entry
+
+  - name: "Entry-LastMatch"       # 设置不匹配规则的连接的入口。
+    type: select
+    proxies:
+      - Entry
+      - DIRECT
+
+proxy-providers:
+  pvd:             # 定义名称是 `pvd` (名称可自定义) 的模板代理提供者。会生成 `pvd0`, `pvd1`, ...
+    tpl_param:
+    type: http    # type 字段要放在此处, 不能放入 pp。原因是要用于更新资源。
+    <<: *pa_pp
+
+rules:
+  #- IN-TYPE,INNER,DIRECT       # 设置 mihomo 内部的网络连接(比如: 更新 proxy-providers, rule-providers 等)是直连。
+  #- DOMAIN-SUFFIX,cn.bing.com,DIRECT
+  #- DOMAIN-SUFFIX,bing.com,Entry
+  #- DOMAIN,aur.archlinux.org,Entry
+
+  - GEOIP,lan,DIRECT,no-resolve
+  - GEOSITE,github,Entry
+  - GEOSITE,twitter,Entry
+  - GEOSITE,youtube,Entry
+  - GEOSITE,google,Entry
+  - GEOSITE,telegram,Entry
+  - GEOSITE,netflix,Entry
+  - GEOSITE,bilibili,Entry-RuleMode
+  - GEOSITE,bahamut,Entry
+  - GEOSITE,spotify,Entry
+  - GEOSITE,steam@cn,Entry-RuleMode
+  - GEOSITE,category-games@cn,Entry-RuleMode
+  - GEOSITE,CN,Entry-RuleMode
+  - GEOSITE,geolocation-!cn,Entry
+  - GEOIP,google,Entry
+  - GEOIP,netflix,Entry
+  - GEOIP,telegram,Entry
+  - GEOIP,twitter,Entry
+  - GEOIP,CN,Entry-RuleMode
+  - MATCH,Entry-LastMatch

@@ -1,0 +1,69 @@
+# 随意配置的, 仅供参考。
+mixed-port: 7890
+ipv6: false
+allow-lan: false
+log-level: silent
+unified-delay: true
+tcp-concurrent: true    # 域名有多个IP 时，就并发尝试所有IP连接的TCP握手。有一个成功即可。
+
+secret: ""
+external-controller: 127.0.0.1:9090
+external-ui: uis/metacubexd
+external-ui-url: https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip
+
+#geodata-mode: true
+#geox-url:
+#  geoip: "https://mirror.ghproxy.com/https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip-lite.dat"
+#  geosite: "https://mirror.ghproxy.com/https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat"
+#  mmdb: "https://mirror.ghproxy.com/https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/country-lite.mmdb"
+#  asn: "https://mirror.ghproxy.com/https://github.com/xishang0128/geoip/releases/download/latest/GeoLite2-ASN.mmdb"
+
+geo-auto-update: true
+geo-update-interval: 7
+
+#find-process-mode: strict
+#global-client-fingerprint: chrome
+
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+dns:
+  enable: true
+  prefer-h3: true
+  #listen: :1053       # for redirect/tproxy
+  ipv6: false
+  respect-rules: true
+  enhanced-mode: fake-ip
+  fake-ip-filter:
+    - "*"
+    - "+.lan"
+    - "+.local"
+    - "auth-6441.wifi.com"
+  nameserver:
+    - https://120.53.53.53/dns-query
+    - https://223.5.5.5/dns-query
+  proxy-server-nameserver:
+    - https://120.53.53.53/dns-query
+    - https://223.5.5.5/dns-query
+  nameserver-policy:
+    "auth-6441.wifi.com": "system://"       # 使用系统 DNS 查询
+    geosite:cn,private:
+      #- 114.114.114.114
+      #- 223.5.5.5
+      - https://120.53.53.53/dns-query
+      - https://223.5.5.5/dns-query
+    geosite:geolocation-!cn:
+      #- 8.8.8.8
+      - https://dns.cloudflare.com/dns-query
+      - https://dns.google/dns-query
+
+tun:
+  enable: true
+  stack: system
+  dns-hijack:
+    - "any:53"
+    - "tcp://any:53"
+  auto-route: true
+  auto-redirect: true
+  auto-detect-interface: true

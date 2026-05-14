@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 
-CLASHTUI_CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/clashtui
-MIHOMO_USER_CONFIG_DIR=${CLASHTUI_CONFIG_DIR}/mihomo
-SINGBOX_USER_CONFIG_DIR=${CLASHTUI_CONFIG_DIR}/sing-box
-CLASHTUI_INSTALL_DIR=/opt/clashtui
-MIHOMO_CONFIG_DIR=${CLASHTUI_INSTALL_DIR}/mihomo/config
-SINGBOX_CONFIG_DIR=${CLASHTUI_INSTALL_DIR}/sing-box/config
-INSTALL_RES_URL_PREFIX=https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/InstallRes
+# --- Configurable options ---
+IS_USER=false
+REPO="JohanChane/clashtui"
+BRANCH="main"
+CORE_TYPE="all"
+
+# --- Constants (canonical upstreams) ---
+MIHOMO_UPSTREAM="MetaCubeX/mihomo"
+SINGBOX_UPSTREAM="SagerNet/sing-box"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 log_info() {
   echo -e "${GREEN}[INFO]${NC} $1"
@@ -30,15 +32,310 @@ command_exists() {
 }
 
 backup_file() {
-    [ -e "$1" ] || return 1
-    local i=1
-    while [ -e "${1}_$i" ]; do
-        ((i++))
-    done
-    mv "$1" "${1}_$i"
+  [ -e "$1" ] || return 1
+  local i=1
+  while [ -e "${1}_$i" ]; do
+    ((i++))
+  done
+  mv "$1" "${1}_$i"
 }
 
+# --- Resolve all paths based on current options ---
+resolve_paths() {
+  if $IS_USER; then
+    INSTALL_DIR="$HOME/.local/clashtui"
+    INSTALL_DIR_MIHOMO="$INSTALL_DIR/mihomo"
+    INSTALL_DIR_SINGBOX="$INSTALL_DIR/sing-box"
+    MIHOMO_CONFIG_DIR="$INSTALL_DIR_MIHOMO/config"
+    SINGBOX_CONFIG_DIR="$INSTALL_DIR_SINGBOX/config"
+    SUDO=""
+    SYSTEMCTL_FLAGS="--user"
+    UNIT_DIR="$HOME/.config/systemd/user"
+    SYSTEMD_RELOAD="systemctl --user daemon-reload"
+    UNIT_WANTED_BY="default.target"
+    SERVICE_IS_USER=true
+  else
+    INSTALL_DIR="/opt/clashtui"
+    INSTALL_DIR_MIHOMO="$INSTALL_DIR/mihomo"
+    INSTALL_DIR_SINGBOX="$INSTALL_DIR/sing-box"
+    MIHOMO_CONFIG_DIR="$INSTALL_DIR_MIHOMO/config"
+    SINGBOX_CONFIG_DIR="$INSTALL_DIR_SINGBOX/config"
+    SUDO="sudo"
+    SYSTEMCTL_FLAGS=""
+    UNIT_DIR="/usr/lib/systemd/system"
+    SYSTEMD_RELOAD="sudo systemctl daemon-reload"
+    UNIT_WANTED_BY="multi-user.target"
+    SERVICE_IS_USER=false
+  fi
+
+  CLASHTUI_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/clashtui"
+  MIHOMO_USER_CONFIG_DIR="$CLASHTUI_CONFIG_DIR/mihomo"
+  SINGBOX_USER_CONFIG_DIR="$CLASHTUI_CONFIG_DIR/sing-box"
+
+  INSTALL_BIN="$INSTALL_DIR/bin"
+  CLASHTUI_BIN="$INSTALL_BIN/clashtui"
+
+  SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+  if [ -d "$SCRIPT_DIR/contrib" ]; then
+    CONTRIB_SOURCE="local"
+    CONTRIB_DIR="$SCRIPT_DIR/contrib"
+  else
+    CONTRIB_SOURCE="remote"
+    CONTRIB_DIR=""
+  fi
+
+  CONTRIB_URL_PREFIX="https://raw.githubusercontent.com/${REPO}/refs/heads/${BRANCH}/contrib"
+}
+
+# --- copy_contrib: copy from local contrib or download from remote ---
+# Usage: copy_contrib <relative_path_in_contrib> <destination_path>
+copy_contrib() {
+  local rel_path="$1"
+  local dest="$2"
+  local src
+
+  if [ "$CONTRIB_SOURCE" = "local" ]; then
+    src="$CONTRIB_DIR/$rel_path"
+    if [ -f "$src" ]; then
+      cp "$src" "$dest"
+      return 0
+    fi
+    log_warn "Local file not found: $src, falling back to remote"
+  fi
+
+  local remote_url="${CONTRIB_URL_PREFIX}/${rel_path}"
+  curl -sSL --fail -o "$dest" "$remote_url" || {
+    log_error "Failed to download: $remote_url"
+    return 1
+  }
+  return 0
+}
+
+# --- CPU / OS detection ---
+detect_architecture() {
+  local arch
+  arch=$(uname -m)
+  case "$arch" in
+  x86_64 | amd64) echo "amd64" ;;
+  aarch64 | arm64) echo "arm64" ;;
+  armv7l | armhf) echo "armv7" ;;
+  armv6l) echo "armv6" ;;
+  i386 | i686) echo "386" ;;
+  *) echo "unsupported" ;;
+  esac
+}
+
+detect_os() {
+  local os
+  os=$(uname -s | tr '[:upper:]' '[:lower:]')
+  case "$os" in
+  linux) echo "linux" ;;
+  darwin) echo "darwin" ;;
+  freebsd) echo "freebsd" ;;
+  *) echo "unsupported" ;;
+  esac
+}
+
+detect_cpu_level_using_proc() {
+  local flags=$(grep -m 1 '^flags' /proc/cpuinfo 2>/dev/null | awk '{print $0}')
+  if [ -z "$flags" ] || ! echo "$flags" | grep -q ' lm '; then
+    echo ""
+    return
+  fi
+  local v1_required="cmov cx8 fpu fxsr mmx osfxsr sce sse sse2"
+  local v2_required="cx16 lahf_lm popcnt sse3 sse4_1 sse4_2 ssse3"
+  local v3_required="avx avx2 bmi1 bmi2 f16c fma lzcnt movbe osxsave"
+  local check_flags
+  check_flags() {
+    local required="$1"
+    for flag in $required; do
+      if ! echo " $flags " | grep -q " $flag "; then
+        return 1
+      fi
+    done
+    return 0
+  }
+  if check_flags "$v1_required" && check_flags "$v2_required" && check_flags "$v3_required"; then
+    echo "v3"
+  elif check_flags "$v1_required" && check_flags "$v2_required"; then
+    echo "v2"
+  elif check_flags "$v1_required"; then
+    echo "v1"
+  else
+    echo ""
+  fi
+}
+
+detect_cpu_level_using_ld() {
+  local ld_path="/lib64/ld-linux-x86-64.so.2"
+  if [ ! -x "$ld_path" ]; then
+    echo ""
+    return 0
+  fi
+  local levels=$("$ld_path" --help 2>/dev/null | grep -oP 'x86-64-v\d+(?=.*\(supported, searched\))' | sort -u)
+  if [ -z "$levels" ]; then
+    echo ""
+    return 0
+  fi
+  local highest_level=""
+  for level in $levels; do
+    case $level in
+    x86-64-v3)
+      highest_level="v3"
+      break
+      ;;
+    x86-64-v2) highest_level="v2" ;;
+    x86-64-v1) highest_level="v1" ;;
+    x86-64-v4) highest_level="v3" ;;
+    esac
+  done
+  echo "$highest_level"
+  return 0
+}
+
+detect_cpu_level() {
+  local level=$(detect_cpu_level_using_ld)
+  if [ -z "$level" ]; then
+    level=$(detect_cpu_level_using_proc)
+  fi
+  if [ -n "$level" ]; then
+    echo "-$level"
+  else
+    echo ""
+  fi
+}
+
+# --- Core download helpers ---
+download_mihomo() {
+  local base_arch=$(detect_architecture)
+  local arch=$([ "$base_arch" = "amd64" ] && echo "${base_arch}$(detect_cpu_level)" || echo "$base_arch")
+  local os=$(detect_os)
+  local temp_dir=$(mktemp -d)
+  local latest_version=$(curl -s "https://api.github.com/repos/${MIHOMO_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  local download_url
+
+  if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
+    log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  download_url="https://github.com/${MIHOMO_UPSTREAM}/releases/latest/download/mihomo-${os}-${arch}-${latest_version}.gz"
+  log_info "Detected: OS=$os, Arch=$arch, LatestVersion=$latest_version"
+  log_info "Downloading: $download_url"
+
+  curl -L "$download_url" -o "$temp_dir/mihomo.gz" || {
+    log_error "Download failed"
+    rm -rf "$temp_dir"
+    return 1
+  }
+  gunzip -c "$temp_dir/mihomo.gz" >"$temp_dir/mihomo"
+
+  local binary_path
+  if [ -f "$temp_dir/mihomo" ]; then
+    binary_path="$temp_dir/mihomo"
+  else
+    log_error "Could not find binary in the downloaded archive"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  $SUDO mkdir -p "$INSTALL_DIR_MIHOMO"
+  $SUDO install -m 755 "$binary_path" "$INSTALL_DIR_MIHOMO/mihomo"
+  log_info "Successfully installed mihomo to: $INSTALL_DIR_MIHOMO/mihomo"
+  rm -rf "$temp_dir"
+}
+
+download_singbox() {
+  local arch=$(detect_architecture)
+  local os=$(detect_os)
+  local temp_dir=$(mktemp -d)
+  local latest_version=$(curl -s "https://api.github.com/repos/${SINGBOX_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  local download_url
+
+  if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
+    log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  download_url="https://github.com/${SINGBOX_UPSTREAM}/releases/latest/download/sing-box-${latest_version}-${os}-${arch}.tar.gz"
+  log_info "Detected: OS=$os, Arch=$arch, LatestVersion=$latest_version"
+  log_info "Downloading: $download_url"
+
+  curl -L "$download_url" -o "$temp_dir/sing-box.tar.gz" || {
+    log_error "Download failed"
+    rm -rf "$temp_dir"
+    return 1
+  }
+  tar -xzf "$temp_dir/sing-box.tar.gz" -C "$temp_dir"
+
+  local binary_path
+  binary_path=$(find "$temp_dir" -name "sing-box" -type f | head -1)
+
+  if [ -f "$binary_path" ]; then
+    $SUDO mkdir -p "$INSTALL_DIR_SINGBOX"
+    $SUDO install -m 755 "$binary_path" "$INSTALL_DIR_SINGBOX/sing-box"
+    if ! $IS_USER; then
+      $SUDO ln -sf "$INSTALL_DIR_SINGBOX/sing-box" /usr/bin/sing-box
+    fi
+    log_info "Successfully installed sing-box to: $INSTALL_DIR_SINGBOX/sing-box"
+  else
+    log_error "Could not find sing-box binary in the downloaded archive"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  rm -rf "$temp_dir"
+}
+
+download_clashtui() {
+  local arch=$(detect_architecture)
+  local os=$(detect_os)
+  local temp_dir=$(mktemp -d)
+  local latest_version=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  local download_url
+
+  if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
+    log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  download_url="https://github.com/${REPO}/releases/latest/download/clashtui-${os}-${arch}-${latest_version}.gz"
+  log_info "Detected: OS=$os, Arch=$arch, LatestVersion=$latest_version"
+  log_info "Downloading: $download_url"
+
+  curl -L "$download_url" -o "$temp_dir/clashtui.gz" || {
+    log_error "Download failed"
+    rm -rf "$temp_dir"
+    return 1
+  }
+  gunzip -c "$temp_dir/clashtui.gz" >"$temp_dir/clashtui"
+
+  local binary_path
+  if [ -f "$temp_dir/clashtui" ]; then
+    binary_path="$temp_dir/clashtui"
+  else
+    log_error "Could not find binary in the downloaded archive"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  $SUDO mkdir -p "$INSTALL_BIN"
+  $SUDO install -m 755 "$binary_path" "$CLASHTUI_BIN"
+  if ! $IS_USER; then
+    $SUDO ln -sf "$CLASHTUI_BIN" /usr/local/bin/clashtui
+  fi
+  log_info "Successfully installed clashtui to: $CLASHTUI_BIN"
+  rm -rf "$temp_dir"
+}
+
+# --- User/group creation (system mode only) ---
 create_mihomo_user() {
+  if $IS_USER; then
+    return 0
+  fi
   if ! id "mihomo" &>/dev/null; then
     log_info "Creating mihomo user and group..."
     sudo groupadd --system mihomo
@@ -48,11 +345,51 @@ create_mihomo_user() {
   fi
 }
 
+create_singbox_user() {
+  if $IS_USER; then
+    return 0
+  fi
+  if ! id "sing-box" &>/dev/null; then
+    log_info "Creating sing-box user and group..."
+    sudo groupadd --system sing-box
+    sudo useradd --system --no-create-home --gid sing-box --shell /bin/false sing-box
+  else
+    log_info "sing-box user already exists"
+  fi
+}
+
+# --- Systemd unit creation ---
 create_mihomo_systemd_unit() {
   log_info "Creating mihomo systemd unit..."
 
-  sudo mkdir -p "$CLASHTUI_INSTALL_DIR/mihomo"
-  sudo tee "$CLASHTUI_INSTALL_DIR/mihomo/clashtui_mihomo.service" >/dev/null <<'EOF'
+  local service_name="clashtui_mihomo"
+  local unit_path
+
+  if $IS_USER; then
+    mkdir -p "$UNIT_DIR"
+    unit_path="$UNIT_DIR/${service_name}.service"
+    cat >"$unit_path" <<EOF
+[Unit]
+Description=mihomo Daemon, Another Clash Kernel.
+After=network.target
+
+[Service]
+Type=simple
+LimitNPROC=500
+LimitNOFILE=1000000
+Restart=always
+ExecStartPre=/usr/bin/sleep 1s
+ExecStart=${INSTALL_DIR_MIHOMO}/mihomo -d ${MIHOMO_CONFIG_DIR}
+ExecReload=/bin/kill -HUP \$MAINPID
+
+[Install]
+WantedBy=${UNIT_WANTED_BY}
+EOF
+    log_info "Created user unit: $unit_path"
+  else
+    $SUDO mkdir -p "$INSTALL_DIR_MIHOMO"
+    unit_path="$INSTALL_DIR_MIHOMO/${service_name}.service"
+    $SUDO tee "$unit_path" >/dev/null <<EOF
 [Unit]
 Description=mihomo Daemon, Another Clash Kernel.
 After=network.target NetworkManager.service systemd-networkd.service iwd.service
@@ -67,32 +404,52 @@ CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SYS_TIM
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SYS_TIME CAP_SYS_PTRACE CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
 Restart=always
 ExecStartPre=/usr/bin/sleep 1s
-ExecStart=/opt/clashtui/mihomo/mihomo -d /opt/clashtui/mihomo/config
-ExecReload=/bin/kill -HUP $MAINPID
+ExecStart=${INSTALL_DIR_MIHOMO}/mihomo -d ${MIHOMO_CONFIG_DIR}
+ExecReload=/bin/kill -HUP \$MAINPID
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=${UNIT_WANTED_BY}
 EOF
-
-  sudo ln -sf $CLASHTUI_INSTALL_DIR/mihomo/clashtui_mihomo.service /usr/lib/systemd/system/
-  sudo systemctl daemon-reload
-}
-
-create_singbox_user() {
-  if ! id "sing-box" &>/dev/null; then
-    log_info "Creating sing-box user and group..."
-    sudo groupadd --system sing-box
-    sudo useradd --system --no-create-home --gid sing-box --shell /bin/false sing-box
-  else
-    log_info "sing-box user already exists"
+    $SUDO ln -sf "$unit_path" "$UNIT_DIR/"
   fi
+
+  $SYSTEMD_RELOAD
 }
 
 create_singbox_systemd_unit() {
-  log_info "Creating singbox systemd unit..."
+  log_info "Creating sing-box systemd unit..."
 
-  sudo mkdir -p "$CLASHTUI_INSTALL_DIR/sing-box"
-  sudo tee "$CLASHTUI_INSTALL_DIR/sing-box/clashtui_singbox.service" >/dev/null <<'EOF'
+  local service_name="clashtui_singbox"
+  local unit_path
+
+  if $IS_USER; then
+    mkdir -p "$UNIT_DIR"
+    unit_path="$UNIT_DIR/${service_name}.service"
+    cat >"$unit_path" <<EOF
+[Unit]
+Description=sing-box Daemon, The universal proxy platform.
+After=network.target
+
+[Service]
+Type=simple
+LimitNOFILE=infinity
+Restart=on-failure
+RestartSec=10s
+ExecStartPre=/usr/bin/sleep 1s
+ExecStart=/usr/bin/sing-box -D ${SINGBOX_CONFIG_DIR} -c ${SINGBOX_CONFIG_DIR}/config.json run
+ExecReload=/bin/kill -HUP \$MAINPID
+
+[Install]
+WantedBy=${UNIT_WANTED_BY}
+EOF
+    # In user mode, sing-box binary is at INSTALL_DIR_SINGBOX rather than /usr/bin
+    # So use that path directly
+    sed -i "s|/usr/bin/sing-box|${INSTALL_DIR_SINGBOX}/sing-box|" "$unit_path"
+    log_info "Created user unit: $unit_path"
+  else
+    $SUDO mkdir -p "$INSTALL_DIR_SINGBOX"
+    unit_path="$INSTALL_DIR_SINGBOX/${service_name}.service"
+    $SUDO tee "$unit_path" >/dev/null <<EOF
 [Unit]
 Description=sing-box Daemon, The universal proxy platform.
 After=network.target NetworkManager.service systemd-networkd.service iwd.service
@@ -105,523 +462,272 @@ StateDirectory=sing-box
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
 ExecStartPre=/usr/bin/sleep 1s
-ExecStart=/usr/bin/sing-box -D /opt/clashtui/sing-box/config -c /opt/clashtui/sing-box/config/config.json run
-ExecReload=/bin/kill -HUP $MAINPID
+ExecStart=/usr/bin/sing-box -D ${SINGBOX_CONFIG_DIR} -c ${SINGBOX_CONFIG_DIR}/config.json run
+ExecReload=/bin/kill -HUP \$MAINPID
 Restart=on-failure
 RestartSec=10s
 LimitNOFILE=infinity
 
-Environment="ENABLE_DEPRECATED_LEGACY_DNS_FAKEIP_OPTIONS=true"
-Environment="ENABLE_DEPRECATED_LEGACY_DNS_SERVERS=true"
-Environment="ENABLE_DEPRECATED_OUTBOUND_DNS_RULE_ITEM=true"
-Environment="ENABLE_DEPRECATED_GEOIP=true"
-Environment="ENABLE_DEPRECATED_GEOSITE=true"
-
 [Install]
-WantedBy=multi-user.target
+WantedBy=${UNIT_WANTED_BY}
 EOF
+    $SUDO ln -sf "$unit_path" "$UNIT_DIR/"
+  fi
 
-  sudo ln -sf $CLASHTUI_INSTALL_DIR/sing-box/clashtui_singbox.service /usr/lib/systemd/system/
-  sudo systemctl daemon-reload
+  $SYSTEMD_RELOAD
 }
 
+# --- Core config creation ---
+create_core_configs() {
+  local core_type="$1"
+  log_info "Creating core config files..."
+
+  if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then
+    $SUDO mkdir -p "$MIHOMO_CONFIG_DIR"
+
+    local mihomo_cfg_src
+    if $IS_USER; then
+      mihomo_cfg_src="default_configs/mihomo/core_override_config_no_tun.yaml"
+    else
+      mihomo_cfg_src="default_configs/mihomo/core_override_config.yaml"
+    fi
+
+    # Copy core override config via contrib helper
+    copy_contrib "$mihomo_cfg_src" "${MIHOMO_CONFIG_DIR}/config.yaml"
+    log_info "Mihomo core config written to: ${MIHOMO_CONFIG_DIR}/config.yaml"
+
+    if ! $IS_USER; then
+      $SUDO chown mihomo:mihomo "${MIHOMO_CONFIG_DIR}/config.yaml"
+      $SUDO chmod g+r "${MIHOMO_CONFIG_DIR}/config.yaml"
+    fi
+  fi
+
+  if [ "$core_type" = "sing-box" ] || [ "$core_type" = "all" ]; then
+    $SUDO mkdir -p "$SINGBOX_CONFIG_DIR"
+
+    local singbox_cfg_src
+    if $IS_USER; then
+      singbox_cfg_src="default_configs/sing-box/core_override_config_no_tun.json"
+    else
+      singbox_cfg_src="default_configs/sing-box/core_override_config.json"
+    fi
+
+    copy_contrib "$singbox_cfg_src" "${SINGBOX_CONFIG_DIR}/config.json"
+    log_info "Sing-box core config written to: ${SINGBOX_CONFIG_DIR}/config.json"
+
+    if ! $IS_USER; then
+      $SUDO chown sing-box:sing-box "${SINGBOX_CONFIG_DIR}/config.json"
+      $SUDO chmod g+r "${SINGBOX_CONFIG_DIR}/config.json"
+    fi
+  fi
+}
+
+# --- Clashtui user config generation ---
 create_clashtui_config() {
   local core_type="$1"
   log_info "Creating clashtui config..."
 
-  case "$core_type" in
-  mihomo)
-    mkdir -p "$MIHOMO_USER_CONFIG_DIR"
+  mkdir -p "$CLASHTUI_CONFIG_DIR"
 
-    # backup config.yaml
-    backup_file "$MIHOMO_USER_CONFIG_DIR/config.yaml"
-
-    tee "$MIHOMO_USER_CONFIG_DIR/config.yaml" >/dev/null <<'EOF'
-core-type: mihomo
-basic:
-  clash_config_dir: '/opt/clashtui/mihomo/config'
-  clash_bin_path: '/opt/clashtui/mihomo/mihomo'
-  clash_config_path: '/opt/clashtui/mihomo/config/config.yaml'
-  timeout: null
-service:
-  clash_srv_name: 'clashtui_mihomo'
-  is_user: false
-extra:
-  edit_cmd:
-  open_dir_cmd:
-EOF
-    ;;
-  sing-box)
-    mkdir -p "$SINGBOX_USER_CONFIG_DIR"
-
-    # backup config.yaml
-    backup_file "$SINGBOX_USER_CONFIG_DIR/config.yaml"
-
-    tee "$SINGBOX_USER_CONFIG_DIR/config.yaml" >/dev/null <<'EOF'
-core-type: sing-box
-singbox:
-  singbox_bin_path: '/opt/clashtui/sing-box/sing-box'
-  singbox_config_dir: '/opt/clashtui/sing-box/config'
-  singbox_config_path: '/opt/clashtui/sing-box/config/config.json'
-service:
-  singbox_srv_name: 'clashtui_singbox'
-  is_user: false
-extra:
-  edit_cmd:
-  open_dir_cmd:
-EOF
-    ;;
-  all)
-    mkdir -p "$MIHOMO_USER_CONFIG_DIR"
-    mkdir -p "$SINGBOX_USER_CONFIG_DIR"
-
-    # backup config.yaml for both cores
-    backup_file "$MIHOMO_USER_CONFIG_DIR/config.yaml"
-    backup_file "$SINGBOX_USER_CONFIG_DIR/config.yaml"
-
-    tee "$MIHOMO_USER_CONFIG_DIR/config.yaml" >/dev/null <<'EOF'
-core-type: mihomo
-basic:
-  clash_config_dir: '/opt/clashtui/mihomo/config'
-  clash_bin_path: '/opt/clashtui/mihomo/mihomo'
-  clash_config_path: '/opt/clashtui/mihomo/config/config.yaml'
-  timeout: null
-service:
-  clash_srv_name: 'clashtui_mihomo'
-  is_user: false
-extra:
-  edit_cmd:
-  open_dir_cmd:
-EOF
-
-    tee "$SINGBOX_USER_CONFIG_DIR/config.yaml" >/dev/null <<'EOF'
-core-type: sing-box
-singbox:
-  singbox_bin_path: '/opt/clashtui/sing-box/sing-box'
-  singbox_config_dir: '/opt/clashtui/sing-box/config'
-  singbox_config_path: '/opt/clashtui/sing-box/config/config.json'
-service:
-  singbox_srv_name: 'clashtui_singbox'
-  is_user: false
-extra:
-  edit_cmd:
-  open_dir_cmd:
-EOF
-    ;;
-  esac
+  # Copy contrib default configs (config.yaml, keymap.yaml, theme.yaml)
+  copy_contrib "default_configs/config.yaml" "$CLASHTUI_CONFIG_DIR/config.yaml"
+  copy_contrib "default_configs/keymap.yaml" "$CLASHTUI_CONFIG_DIR/keymap.yaml"
+  copy_contrib "default_configs/theme.yaml" "$CLASHTUI_CONFIG_DIR/theme.yaml"
+  log_info "Copied default configs to: $CLASHTUI_CONFIG_DIR"
 
   if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then
-    echo -n "Do you want to download core_override_config.yaml? (y/N): "
-    read -r response
-    if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
-      backup_file "$MIHOMO_USER_CONFIG_DIR/core_override_config.yaml"
+    mkdir -p "$MIHOMO_USER_CONFIG_DIR"
 
-      log_info "Downloading core_override_config.yaml..."
-      curl -o "$MIHOMO_USER_CONFIG_DIR/core_override_config.yaml" $INSTALL_RES_URL_PREFIX/core_override_config.yaml
-    elif [ ! -f "$MIHOMO_USER_CONFIG_DIR/core_override_config.yaml" ]; then
-      tee "$MIHOMO_USER_CONFIG_DIR/core_override_config.yaml" >/dev/null <<'EOF'
-mixed-port: 7890
-mode: rule
-log-level: info
-external-controller: 127.0.0.1:9090
+    # backup config.yaml
+    backup_file "$MIHOMO_USER_CONFIG_DIR/config.yaml"
+
+    # Generate service config with is_user flag
+    cat >"$MIHOMO_USER_CONFIG_DIR/config.yaml" <<EOF
+mihomo:
+  core:
+    config_dir: ${MIHOMO_CONFIG_DIR}
+    bin_path: ${INSTALL_DIR_MIHOMO}/mihomo
+    config_path: ${MIHOMO_CONFIG_DIR}/config.yaml
+  core_service:
+    service_name: clashtui_mihomo
+    is_user: ${SERVICE_IS_USER}
+timeout:
+extra:
+  edit_cmd:
+  open_dir_cmd:
+EOF
+
+    log_info "Mihomo service config written to: $MIHOMO_USER_CONFIG_DIR/config.yaml"
+
+    # Generate template_proxy_providers.yaml (commented version)
+    if [ ! -f "$MIHOMO_USER_CONFIG_DIR/template_proxy_providers.yaml" ]; then
+      cat >"$MIHOMO_USER_CONFIG_DIR/template_proxy_providers.yaml" <<'EOF'
+# Define proxy-provider subscription URLs here, organized by group.
+# In templates use ${PPG.<group>} to reference all providers in a group,
+# or ${PPG.<group>.<provider>} for a specific one.
+#
+# Format:
+#   <group-name>:
+#     <provider-name>: "<subscription-url>"
+#
+# Clashtui's built-in templates only use the group level
+# (e.g. ${PPG.pvd}, not ${PPG.pvd.pvd0}). Provider names
+# (pvd0, pvd1, ...) are freely defined by the user.
+#
+# Example (following clashtui convention):
+#   pvd:
+#     pvd0: "https://example.com/sub1.yaml"
+#     pvd1: "https://example.com/sub2.yaml"
 EOF
     fi
-
-    sudo mkdir -p "$MIHOMO_CONFIG_DIR"
-    sudo cp "$MIHOMO_USER_CONFIG_DIR/core_override_config.yaml" "${MIHOMO_CONFIG_DIR}/config.yaml"
   fi
 
   if [ "$core_type" = "sing-box" ] || [ "$core_type" = "all" ]; then
-    create_singbox_config
-  fi
+    mkdir -p "$SINGBOX_USER_CONFIG_DIR"
 
-  if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then
-    mkdir -p "$MIHOMO_USER_CONFIG_DIR/profile_yamls"
-    mkdir -p "$MIHOMO_USER_CONFIG_DIR/templates"
-    local mihomo_template_proxy_providers_path
-    mihomo_template_proxy_providers_path="$MIHOMO_USER_CONFIG_DIR/template_proxy_providers.yaml"
-    if [ ! -f "$mihomo_template_proxy_providers_path" ]; then
-      tee "$mihomo_template_proxy_providers_path" >/dev/null <<'EOF'
-# Place each proxy-provider group with name and url under a group key
-pvd: []
+    backup_file "$SINGBOX_USER_CONFIG_DIR/config.yaml"
+
+    cat >"$SINGBOX_USER_CONFIG_DIR/config.yaml" <<EOF
+singbox:
+  core:
+    bin_path: ${INSTALL_DIR_SINGBOX}/sing-box
+    config_dir: ${SINGBOX_CONFIG_DIR}
+    config_path: ${SINGBOX_CONFIG_DIR}/config.json
+  core_service:
+    service_name: clashtui_singbox
+    is_user: ${SERVICE_IS_USER}
+timeout:
+extra:
+  edit_cmd:
+  open_dir_cmd:
+EOF
+
+    log_info "Sing-box service config written to: $SINGBOX_USER_CONFIG_DIR/config.yaml"
+
+    if [ ! -f "$SINGBOX_USER_CONFIG_DIR/template_proxy_providers.yaml" ]; then
+      cat >"$SINGBOX_USER_CONFIG_DIR/template_proxy_providers.yaml" <<'EOF'
+# Define proxy-provider subscription URLs here, organized by group.
+# In templates use ${PPG.<group>} to reference all providers in a group,
+# or ${PPG.<group>.<provider>} for a specific one.
+#
+# Format:
+#   <group-name>:
+#     <provider-name>: "<subscription-url>"
+#
+# Clashtui's built-in templates only use the group level
+# (e.g. ${PPG.pvd}, not ${PPG.pvd.pvd0}). Provider names
+# (pvd0, pvd1, ...) are freely defined by the user.
+#
+# Example (following clashtui convention):
+#   pvd:
+#     pvd0: "https://example.com/sub1.yaml"
+#     pvd1: "https://example.com/sub2.yaml"
 EOF
     fi
+  fi
 
+  # Create profiles and templates directories
+  if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then
+    mkdir -p "$MIHOMO_USER_CONFIG_DIR/profiles"
+    mkdir -p "$MIHOMO_USER_CONFIG_DIR/templates"
+  fi
+  if [ "$core_type" = "sing-box" ] || [ "$core_type" = "all" ]; then
+    mkdir -p "$SINGBOX_USER_CONFIG_DIR/profiles"
+    mkdir -p "$SINGBOX_USER_CONFIG_DIR/templates"
+  fi
+}
+
+# --- Optional downloads: templates and rules-dat ---
+prompt_templates_and_rules() {
+  if [ "$CORE_TYPE" = "mihomo" ] || [ "$CORE_TYPE" = "all" ]; then
     echo -n "Do you want to download templates for mihomo? (y/N): "
     read -r response
     if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
       log_info "Downloading mihomo templates..."
-      curl -o "$MIHOMO_USER_CONFIG_DIR/templates/common_tpl.yaml" $INSTALL_RES_URL_PREFIX/templates/common_tpl.yaml
-      curl -o "$MIHOMO_USER_CONFIG_DIR/templates/generic_tpl.yaml" $INSTALL_RES_URL_PREFIX/templates/generic_tpl.yaml
-      curl -o "$MIHOMO_USER_CONFIG_DIR/templates/generic_tpl_with_all.yaml" $INSTALL_RES_URL_PREFIX/templates/generic_tpl_with_all.yaml
-      curl -o "$MIHOMO_USER_CONFIG_DIR/templates/generic_tpl_with_filter.yaml" $INSTALL_RES_URL_PREFIX/templates/generic_tpl_with_filter.yaml
-      curl -o "$MIHOMO_USER_CONFIG_DIR/templates/generic_tpl_with_rulest.yaml" $INSTALL_RES_URL_PREFIX/templates/generic_tpl_with_ruleset.yaml
+      copy_contrib "templates/mihomo/common_tpl.yaml" "$MIHOMO_USER_CONFIG_DIR/templates/common_tpl.yaml"
+      copy_contrib "templates/mihomo/generic_tpl.yaml" "$MIHOMO_USER_CONFIG_DIR/templates/generic_tpl.yaml"
+      copy_contrib "templates/mihomo/generic_tpl_with_all.yaml" "$MIHOMO_USER_CONFIG_DIR/templates/generic_tpl_with_all.yaml"
+      copy_contrib "templates/mihomo/generic_tpl_with_filter.yaml" "$MIHOMO_USER_CONFIG_DIR/templates/generic_tpl_with_filter.yaml"
+      copy_contrib "templates/mihomo/generic_tpl_with_ruleset.yaml" "$MIHOMO_USER_CONFIG_DIR/templates/generic_tpl_with_ruleset.yaml"
     fi
 
     echo -n "Do you want to download rules-dat? (y/N): "
     read -r response
     if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
       log_info "Downloading rules-dat..."
-      curl -Lo  "${MIHOMO_CONFIG_DIR}/geoip.metadb" "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb"
-      curl -Lo  "${MIHOMO_CONFIG_DIR}/GeoSite.dat" "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat"
+      curl -Lo "${MIHOMO_CONFIG_DIR}/geoip.metadb" "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb"
+      curl -Lo "${MIHOMO_CONFIG_DIR}/GeoSite.dat" "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat"
     fi
   fi
 
-  if [ "$core_type" = "sing-box" ] || [ "$core_type" = "all" ]; then
-    mkdir -p "$SINGBOX_USER_CONFIG_DIR/profile_jsons"
-    mkdir -p "$SINGBOX_USER_CONFIG_DIR/templates"
-    local singbox_template_proxy_providers_path
-    singbox_template_proxy_providers_path="$SINGBOX_USER_CONFIG_DIR/template_proxy_providers.yaml"
-    if [ ! -f "$singbox_template_proxy_providers_path" ]; then
-      tee "$singbox_template_proxy_providers_path" >/dev/null <<'EOF'
-# Place each proxy-provider group with name and url under a group key
-pvd: []
-EOF
+  if [ "$CORE_TYPE" = "sing-box" ] || [ "$CORE_TYPE" = "all" ]; then
+    echo -n "Do you want to download templates for sing-box? (y/N): "
+    read -r response
+    if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
+      log_info "Downloading sing-box templates..."
+      copy_contrib "templates/sing-box/common_tpl.json" "$SINGBOX_USER_CONFIG_DIR/templates/common_tpl.json"
     fi
   fi
 }
 
-detect_architecture() {
-  local arch
-  arch=$(uname -m)
-
-  case "$arch" in
-  x86_64 | amd64)
-    echo "amd64"
-    ;;
-  aarch64 | arm64)
-    echo "arm64"
-    ;;
-  armv7l | armhf)
-    echo "armv7"
-    ;;
-  armv6l)
-    echo "armv6"
-    ;;
-  i386 | i686)
-    echo "386"
-    ;;
-  *)
-    echo "unsupported"
-    ;;
-  esac
-}
-
-detect_os() {
-  local os
-  os=$(uname -s | tr '[:upper:]' '[:lower:]')
-
-  case "$os" in
-  linux)
-    echo "linux"
-    ;;
-  darwin)
-    echo "darwin"
-    ;;
-  freebsd)
-    echo "freebsd"
-    ;;
-  *)
-    echo "unsupported"
-    ;;
-  esac
-}
-
-# Detect CPU instruction set level using /proc/cpuinfo (mask v4, maximum to v3)
-detect_cpu_level_using_proc() {
-  # Get CPU instruction set (flags field) from /proc/cpuinfo
-  local flags=$(grep -m 1 '^flags' /proc/cpuinfo | awk '{print $0}')
-
-  # Check if it's amd64 (x86-64) architecture (basic requirement)
-  if ! echo "$flags" | grep -q ' lm '; then
-    echo "" # Non-amd64 architecture, output empty
-    return
-  fi
-
-  # Define instruction sets required for each level (maximum to v3)
-  # x86-64-v1 basic instruction set
-  local v1_required="cmov cx8 fpu fxsr mmx osfxsr sce sse sse2"
-  # x86-64-v2 extended instruction set (based on v1)
-  local v2_required="cx16 lahf_lm popcnt sse3 sse4_1 sse4_2 ssse3"
-  # x86-64-v3 advanced instruction set (based on v2)
-  local v3_required="avx avx2 bmi1 bmi2 f16c fma lzcnt movbe osxsave"
-  # x86-64-v4 flagship instruction set (based on v3)
-  local v4_required="avx512f avx512bw avx512cd avx512dq avx512vl"
-
-  # Check if all instruction sets are satisfied
-  local check_flags
-  check_flags() {
-    local required="$1"
-    for flag in $required; do
-      # Exact match instruction set (with spaces before and after to avoid partial matches)
-      if ! echo " $flags " | grep -q " $flag "; then
-        return 1
-      fi
-    done
-    return 0
-  }
-
-  # Determine from highest level (v3 -> v2 -> v1)
-  # if check_flags "$v1_required" && check_flags "$v2_required" && check_flags "$v3_required" && check_flags "$v4_required"; then
-  #     echo "v4"
-  # el
-  if check_flags "$v1_required" && check_flags "$v2_required" && check_flags "$v3_required"; then
-    echo "v3"
-  elif check_flags "$v1_required" && check_flags "$v2_required"; then
-    echo "v2"
-  elif check_flags "$v1_required"; then
-    echo "v1"
-  else
-    echo "" # Does not meet v1 basic requirements, output empty
-  fi
-}
-
-# Detect CPU instruction set level using dynamic linker (mask v4, maximum to v3)
-detect_cpu_level_using_ld() {
-  local ld_path="/lib64/ld-linux-x86-64.so.2"
-
-  # Check if the dynamic linker exists and is executable (may not exist on non-amd64 architectures)
-  if [ ! -x "$ld_path" ]; then
-    echo "" # Non-amd64 architecture, output empty
-    return 0
-  fi
-
-  # Get levels marked with "(supported, searched)" in the dynamic linker help information
-  local levels=$("$ld_path" --help 2>/dev/null | grep -oP 'x86-64-v\d+(?=.*\(supported, searched\))' | sort -u)
-
-  # Return empty if no supported level information is found
-  if [ -z "$levels" ]; then
-    echo ""
-    return 0
-  fi
-
-  # Find the highest supported level (maximum to v3)
-  local highest_level=""
-  for level in $levels; do
-    case $level in
-    x86-64-v3)
-      highest_level="v3"
-      break
-      ;; # Highest level is v3
-    x86-64-v2) highest_level="v2" ;;
-    x86-64-v1) highest_level="v1" ;;
-    x86-64-v4) highest_level="v3" ;; # Mask v4, treat as v3
-    esac
-  done
-
-  echo "$highest_level"
-  return 0
-}
-
-# Main function: Handle output format
-detect_cpu_level() {
-  # First try using the dynamic linker method
-  local level=$(detect_cpu_level_using_ld)
-
-  # Use proc method if dynamic linker method returns empty
-  if [ -z "$level" ]; then
-    level=$(detect_cpu_level_using_proc)
-  fi
-
-  # Handle output format: output empty if empty, add prefix - if there is a value
-  if [ -n "$level" ]; then
-    echo "-$level"
-  else
-    echo ""
-  fi
-}
-
-download_mihomo() {
-  # First get the base architecture value
-  local base_arch=$(detect_architecture)
-  # When the base architecture is amd64, concatenate the cpu_level value; otherwise, use the base architecture value directly
-  local arch=$([ "$base_arch" = "amd64" ] && echo "${base_arch}$(detect_cpu_level)" || echo "$base_arch")
-  local os=$(detect_os)
-  local download_url
-  local temp_dir=$(mktemp -d)
-  local latest_version=$(curl -s "https://api.github.com/repos/MetaCubeX/mihomo/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-
-  if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
-    log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
-    rm -rf "$temp_dir"
-    return 1
-  fi
-
-  download_url="https://github.com/MetaCubeX/mihomo/releases/latest/download/mihomo-${os}-${arch}-${latest_version}.gz"
-
-  log_info "Detected: OS=$os, Arch=$arch, LatestVersion=$latest_version, download_url=$download_url"
-
-  curl -L "$download_url" -o "$temp_dir/mihomo.gz"
-  gunzip -c "$temp_dir/mihomo.gz" >"$temp_dir/mihomo"
-
-  local binary_path
-  if [ -f "$temp_dir/mihomo" ]; then
-    binary_path="$temp_dir/mihomo"
-  else
-    log_error "Could not find binary in the downloaded archive"
-    rm -rf "$temp_dir"
-    return 1
-  fi
-
-  sudo mkdir -p "$CLASHTUI_INSTALL_DIR/mihomo"
-  sudo install -m 755 "$binary_path" "$CLASHTUI_INSTALL_DIR/mihomo/mihomo"
-  log_info "Successfully installed mihomo to: $CLASHTUI_INSTALL_DIR/mihomo/mihomo"
-  rm -rf "$temp_dir"
-}
-
+# --- Install core ---
 install_mihomo() {
   if command_exists mihomo; then
-    sudo mkdir -p "$CLASHTUI_INSTALL_DIR/mihomo"
-    sudo ln -sf "$(which mihomo)" $CLASHTUI_INSTALL_DIR/mihomo/mihomo
+    $SUDO mkdir -p "$INSTALL_DIR_MIHOMO"
+    $SUDO ln -sf "$(which mihomo)" "$INSTALL_DIR_MIHOMO/mihomo"
   elif command_exists clash-meta; then
-    sudo mkdir -p "$CLASHTUI_INSTALL_DIR/mihomo"
-    sudo ln -sf "$(which clash-meta)" $CLASHTUI_INSTALL_DIR/mihomo/mihomo
+    $SUDO mkdir -p "$INSTALL_DIR_MIHOMO"
+    $SUDO ln -sf "$(which clash-meta)" "$INSTALL_DIR_MIHOMO/mihomo"
   else
     download_mihomo
   fi
 
   create_mihomo_user
-  sudo gpasswd -a $USER mihomo
 
-  sudo chown mihomo:mihomo "$MIHOMO_CONFIG_DIR"
+  if ! $IS_USER; then
+    sudo gpasswd -a "$USER" mihomo
+    $SUDO chown -R mihomo:mihomo "$INSTALL_DIR_MIHOMO"
+    $SUDO chmod g+rwxs "$MIHOMO_CONFIG_DIR"
+  fi
+
   create_mihomo_systemd_unit
-}
-
-download_singbox() {
-  local arch=$(detect_architecture)
-  local os=$(detect_os)
-  local download_url
-  local temp_dir=$(mktemp -d)
-  local latest_version=$(curl -s "https://api.github.com/repos/SagerNet/sing-box/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-
-  if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
-    log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
-    rm -rf "$temp_dir"
-    return 1
-  fi
-
-  download_url="https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-${latest_version}-${os}-${arch}.tar.gz"
-
-  log_info "Detected: OS=$os, Arch=$arch, LatestVersion=$latest_version, download_url=$download_url"
-
-  curl -L "$download_url" -o "$temp_dir/sing-box.tar.gz"
-  tar -xzf "$temp_dir/sing-box.tar.gz" -C "$temp_dir"
-
-  local binary_path
-  binary_path=$(find "$temp_dir" -name "sing-box" -type f | head -1)
-
-  if [ -f "$binary_path" ]; then
-    sudo mkdir -p "$CLASHTUI_INSTALL_DIR/sing-box"
-    sudo install -m 755 "$binary_path" "$CLASHTUI_INSTALL_DIR/sing-box/sing-box"
-    sudo ln -sf "$CLASHTUI_INSTALL_DIR/sing-box/sing-box" /usr/bin/sing-box
-    log_info "Successfully installed sing-box to: $CLASHTUI_INSTALL_DIR/sing-box/sing-box"
-  else
-    log_error "Could not find sing-box binary in the downloaded archive"
-    rm -rf "$temp_dir"
-    return 1
-  fi
-
-  rm -rf "$temp_dir"
 }
 
 install_singbox() {
   if command_exists sing-box; then
-    sudo mkdir -p "$CLASHTUI_INSTALL_DIR/sing-box"
-    sudo ln -sf "$(which sing-box)" $CLASHTUI_INSTALL_DIR/sing-box/sing-box
-    sudo ln -sf "$CLASHTUI_INSTALL_DIR/sing-box/sing-box" /usr/bin/sing-box
+    $SUDO mkdir -p "$INSTALL_DIR_SINGBOX"
+    $SUDO ln -sf "$(which sing-box)" "$INSTALL_DIR_SINGBOX/sing-box"
+    if ! $IS_USER; then
+      $SUDO ln -sf "$INSTALL_DIR_SINGBOX/sing-box" /usr/bin/sing-box
+    fi
   else
     download_singbox
   fi
 
   create_singbox_user
-  sudo gpasswd -a $USER sing-box
 
-  sudo chown sing-box:sing-box "$SINGBOX_CONFIG_DIR"
-  create_singbox_systemd_unit
-}
-
-create_singbox_config() {
-  echo -n "Do you want to download sing-box config.json? (y/N): "
-  read -r response
-  if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
-    log_info "Creating sing-box config.json..."
-
-    sudo mkdir -p "$SINGBOX_CONFIG_DIR"
-    sudo tee "$SINGBOX_CONFIG_DIR/config.json" >/dev/null <<'EOF'
-{
-  "experimental": {
-    "clash_api": {
-      "external_controller": "127.0.0.1:9090",
-      "secret": ""
-    }
-  },
-  "inbounds": [
-    {
-      "type": "mixed",
-      "tag": "mixed-in",
-      "listen": "::",
-      "listen_port": 7890
-    }
-  ],
-  "log": {
-    "level": "info"
-  }
-}
-EOF
-
-    mkdir -p "$SINGBOX_USER_CONFIG_DIR"
-    sudo cp "$SINGBOX_CONFIG_DIR/config.json" "$SINGBOX_USER_CONFIG_DIR/core_override_config.json"
-    sudo chown "$USER:$(id -gn)" "$SINGBOX_USER_CONFIG_DIR/core_override_config.json"
-  else
-    mkdir -p "$SINGBOX_USER_CONFIG_DIR"
-    log_warn "Please create $SINGBOX_CONFIG_DIR/config.json manually before starting sing-box."
+  if ! $IS_USER; then
+    sudo gpasswd -a "$USER" sing-box
+    $SUDO chown -R sing-box:sing-box "$INSTALL_DIR_SINGBOX"
+    $SUDO chmod g+rwxs "$SINGBOX_CONFIG_DIR"
   fi
+
+  create_singbox_systemd_unit
 }
 
 install_clashtui() {
   local core_type="$1"
-  if ! command_exists clashtui; then
+  if command_exists clashtui; then
+    $SUDO mkdir -p "$INSTALL_BIN"
+    $SUDO ln -sf "$(which clashtui)" "$CLASHTUI_BIN"
+  else
     download_clashtui
   fi
 
   create_clashtui_config "$core_type"
 }
 
-download_clashtui() {
-  local arch=$(detect_architecture)
-  local os=$(detect_os)
-  local download_url
-  local temp_dir=$(mktemp -d)
-  local latest_version=$(curl -s "https://api.github.com/repos/JohanChane/clashtui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-
-  if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
-    log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
-    rm -rf "$temp_dir"
-    return 1
-  fi
-
-  download_url="https://github.com/JohanChane/clashtui/releases/latest/download/clashtui-${os}-${arch}-${latest_version}.gz"
-
-  log_info "Detected: OS=$os, Arch=$arch, LatestVersion=$latest_version, download_url=$download_url"
-
-  curl -L "$download_url" -o "$temp_dir/clashtui.gz"
-  gunzip -c "$temp_dir/clashtui.gz" >"$temp_dir/clashtui"
-
-  local binary_path
-  if [ -f "$temp_dir/clashtui" ]; then
-    binary_path="$temp_dir/clashtui"
-  else
-    log_error "Could not find binary in the downloaded archive"
-    rm -rf "$temp_dir"
-    return 1
-  fi
-
-  sudo install -m 755 "$binary_path" "$CLASHTUI_INSTALL_DIR/clashtui"
-  sudo ln -sf "$CLASHTUI_INSTALL_DIR/clashtui" /usr/local/bin/clashtui
-  log_info "Successfully installed clashtui to: $CLASHTUI_INSTALL_DIR/clashtui"
-  rm -rf "$temp_dir"
-}
-
+# --- Uninstall ---
 uninstall() {
   echo "Please make sure the mihomo and sing-box daemons have been stopped before uninstallation."
   echo -n "Continue with uninstallation? (y/N): "
@@ -631,24 +737,32 @@ uninstall() {
     return 1
   fi
 
-  sudo rm -f /usr/lib/systemd/system/clashtui_mihomo.service
-  sudo rm -f /usr/lib/systemd/system/clashtui_mihomo.service
-  sudo rm -f /usr/lib/systemd/system/clashtui_singbox.service
-  sudo systemctl daemon-reload
-  sudo rm -f /usr/local/bin/clashtui
-  sudo rm -f /usr/bin/sing-box
-  sudo rm -rf /opt/clashtui
+  if $IS_USER; then
+    rm -f "$UNIT_DIR/clashtui_mihomo.service"
+    rm -f "$UNIT_DIR/clashtui_singbox.service"
+    systemctl --user daemon-reload
+    rm -f "$HOME/.local/bin/clashtui"
+    rm -rf "$INSTALL_DIR"
+  else
+    sudo rm -f /usr/lib/systemd/system/clashtui_mihomo.service
+    sudo rm -f /usr/lib/systemd/system/clashtui_singbox.service
+    sudo systemctl daemon-reload
+    sudo rm -f /usr/local/bin/clashtui
+    sudo rm -f /usr/bin/sing-box
+    sudo rm -rf /opt/clashtui
 
-  echo "[Optional] Delete the mihomo user and group"
-  echo "  sudo gpasswd -d $USER mihomo"
-  echo "  sudo userdel mihomo"
-  echo "[Optional] Delete the sing-box user and group"
-  echo "  sudo gpasswd -d $USER sing-box"
-  echo "  sudo userdel sing-box"
+    echo "[Optional] Delete the mihomo user and group"
+    echo "  sudo gpasswd -d $USER mihomo"
+    echo "  sudo userdel mihomo"
+    echo "[Optional] Delete the sing-box user and group"
+    echo "  sudo gpasswd -d $USER sing-box"
+    echo "  sudo userdel sing-box"
+  fi
+
+  log_info "Uninstallation complete."
 }
 
-CORE_TYPE="all"
-
+# --- Help ---
 show_help() {
   echo "Usage: $0 [OPTION]"
   echo "Install or uninstall clashtui"
@@ -656,21 +770,52 @@ show_help() {
   echo "Options:"
   echo "  -h, --help       Show this help message and exit"
   echo "  -u, --uninstall  Uninstall clashtui"
-  echo "  --core <TYPE>    Select core to install: mihomo, sing-box, or all (default: all)"
+  echo "  --is-user        Install to ~/.local/clashtui (user mode, no root required)"
+  echo "  --repo <R>       GitHub repo for clashtui and contrib (default: $REPO)"
+  echo "  --branch <B>     Branch for contrib resources (default: $BRANCH)"
+  echo "  --core <TYPE>    Select core: mihomo, sing-box, or all (default: all)"
   echo
-  echo "If no options are provided, the script will install clashtui with all cores."
+  echo "When --is-user is set:"
+  echo "  - Installs to ~/.local/clashtui"
+  echo "  - Uses user-scoped systemd units (systemctl --user)"
+  echo "  - Uses no-TUN core configs (TUN requires root capabilities)"
+  echo "  - Skips creating system users/groups"
+  echo
+  echo "If no options are provided, the script will install clashtui with all cores"
+  echo "to /opt/clashtui (system mode)."
 }
 
+# --- Main ---
 main() {
   while [[ $# -gt 0 ]]; do
     case $1 in
     -u | --uninstall)
+      resolve_paths
       uninstall
       return 0
       ;;
     -h | --help)
       show_help
       return 0
+      ;;
+    --is-user)
+      IS_USER=true
+      ;;
+    --repo)
+      if [ -z "$2" ]; then
+        log_error "--repo requires a value (e.g., owner/repo)"
+        exit 1
+      fi
+      REPO="$2"
+      shift
+      ;;
+    --branch)
+      if [ -z "$2" ]; then
+        log_error "--branch requires a value"
+        exit 1
+      fi
+      BRANCH="$2"
+      shift
       ;;
     --core)
       if [ -z "$2" ]; then
@@ -683,13 +828,13 @@ main() {
         shift
         ;;
       *)
-        log_error "Invalid core type: $2. Valid values: mihomo, sing-box, all" >&2
+        log_error "Invalid core type: $2. Valid values: mihomo, sing-box, all"
         exit 1
         ;;
       esac
       ;;
     *)
-      log_error "Unknown option"
+      log_error "Unknown option: $1"
       show_help
       return 1
       ;;
@@ -697,14 +842,24 @@ main() {
     shift
   done
 
+  # Resolve all paths based on parsed options
+  resolve_paths
+
+  log_info "Install mode: $([ "$IS_USER" = "true" ] && echo "user (~/.local/clashtui)" || echo "system (/opt/clashtui)")"
+  log_info "Core type: $CORE_TYPE"
+  log_info "Repo: $REPO"
+  log_info "Branch: $BRANCH"
+
+  # Create necessary directories
   if [ "$CORE_TYPE" = "mihomo" ] || [ "$CORE_TYPE" = "all" ]; then
-    sudo mkdir -p "$MIHOMO_CONFIG_DIR"
+    $SUDO mkdir -p "$MIHOMO_CONFIG_DIR"
   fi
   if [ "$CORE_TYPE" = "sing-box" ] || [ "$CORE_TYPE" = "all" ]; then
-    sudo mkdir -p "$SINGBOX_CONFIG_DIR"
+    $SUDO mkdir -p "$SINGBOX_CONFIG_DIR"
   fi
   mkdir -p "$CLASHTUI_CONFIG_DIR"
 
+  # Install cores
   case "$CORE_TYPE" in
   mihomo)
     install_mihomo
@@ -718,10 +873,23 @@ main() {
     ;;
   esac
 
+  # Install clashtui (binary + config)
   install_clashtui "$CORE_TYPE"
 
+  # Create core configs (no-TUN when is-user)
+  create_core_configs "$CORE_TYPE"
+
+  # Optional downloads
+  prompt_templates_and_rules
+
   log_info "Installed cores: $CORE_TYPE"
-  log_warn 'Please log out and log back in for the group file permissions to take effect'
+
+  if $IS_USER; then
+    log_warn "User mode: services run under systemctl --user"
+    log_warn "To keep services running after logout, run: loginctl enable-linger"
+  else
+    log_warn "Please log out and log back in for the group file permissions to take effect"
+  fi
 }
 
 main "$@"

@@ -1,0 +1,170 @@
+proxy-anchor:
+  - delay_test: &pa_dt {url: https://www.gstatic.com/generate_204, interval: 300}
+  - proxy_provider: &pa_pp {interval: 3600, intehealth-check: {enable: true, url: https://www.gstatic.com/generate_204, interval: 300}}
+
+proxy-groups:
+  - name: "Entry"
+    type: select
+    proxies:
+      - <At>
+      - <Sl>
+
+  - name: "Sl"
+    tpl_param:
+      providers: ["pvd"]
+    type: select
+
+  - name: "At"
+    tpl_param:
+      providers: ["pvd"]
+    type: url-test
+    <<: *pa_dt
+
+  - name: "Entry-RuleMode"
+    type: select
+    proxies:
+      - DIRECT
+      - Entry
+
+  - name: "Entry-LastMatch"
+    type: select
+    proxies:
+      - Entry
+      - DIRECT
+
+proxy-providers:
+  pvd:
+    tpl_param:
+    type: http
+    <<: *pa_pp
+
+rule-anchor:
+  ip: &ra_ip {interval: 86400, behavior: ipcidr, format: yaml}
+  domain: &ra_domain {interval: 86400, behavior: domain, format: yaml}
+
+rule-providers:
+  private:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/private.yaml"
+    type: http
+    path: ./rule-providers/geosite/private.yaml
+    <<: *ra_domain
+  cn_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.yaml"
+    type: http
+    path: ./rule-providers/geosite/cn.yaml
+    <<: *ra_domain
+  biliintl_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/biliintl.yaml"
+    type: http
+    path: ./rule-providers/geosite/biliintl.yaml
+    <<: *ra_domain
+  ehentai_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/ehentai.yaml"
+    type: http
+    path: ./rule-providers/geosite/ehentai.yaml
+    <<: *ra_domain
+  github_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/github.yaml"
+    type: http
+    path: ./rule-providers/geosite/github.yaml
+    <<: *ra_domain
+  twitter_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/twitter.yaml"
+    type: http
+    path: ./rule-providers/geosite/twitter.yaml
+    <<: *ra_domain
+  youtube_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/youtube.yaml"
+    type: http
+    path: ./rule-providers/geosite/youtube.yaml
+    <<: *ra_domain
+  google_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/google.yaml"
+    type: http
+    path: ./rule-providers/geosite/google.yaml
+    <<: *ra_domain
+  telegram_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/telegram.yaml"
+    type: http
+    path: ./rule-providers/geosite/telegram.yaml
+    <<: *ra_domain
+  netflix_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/netflix.yaml"
+    type: http
+    path: ./rule-providers/geosite/netflix.yaml
+    <<: *ra_domain
+  bilibili_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/bilibili.yaml"
+    type: http
+    path: ./rule-providers/geosite/bilibili.yaml
+    <<: *ra_domain
+  bahamut_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/bahamut.yaml"
+    type: http
+    path: ./rule-providers/geosite/bahamut.yaml
+    <<: *ra_domain
+  spotify_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/spotify.yaml"
+    type: http
+    path: ./rule-providers/geosite/spotify.yaml
+    <<: *ra_domain
+  pixiv_domain:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/pixiv.yaml"
+    type: http
+    path: ./rule-providers/geosite/pixiv.yaml
+    <<: *ra_domain
+  geolocation-!cn:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/geolocation-!cn.yaml"
+    type: http
+    path: ./rule-providers/geosite/geolocation-notcn.yaml
+    <<: *ra_domain
+
+  cn_ip:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/cn.yaml"
+    type: http
+    path: ./rule-providers/geoip/cn.yaml
+    <<: *ra_ip
+  google_ip:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/google.yaml"
+    type: http
+    path: ./rule-providers/geoip/google.yaml
+    <<: *ra_ip
+  netflix_ip:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/netflix.yaml"
+    type: http
+    path: ./rule-providers/geoip/netflix.yaml
+    <<: *ra_ip
+  twitter_ip:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/twitter.yaml"
+    type: http
+    path: ./rule-providers/geoip/twitter.yaml
+    <<: *ra_ip
+  telegram_ip:
+    url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/telegram.yaml"
+    type: http
+    path: ./rule-providers/geoip/telegram.yaml
+    <<: *ra_ip
+
+rules:
+  - GEOIP,lan,DIRECT,no-resolve
+  - RULE-SET,biliintl_domain,Entry
+  - RULE-SET,ehentai_domain,Entry
+  - RULE-SET,github_domain,Entry
+  - RULE-SET,twitter_domain,Entry
+  - RULE-SET,youtube_domain,Entry
+  - RULE-SET,google_domain,Entry
+  - RULE-SET,telegram_domain,Entry
+  - RULE-SET,netflix_domain,Entry
+  - RULE-SET,bilibili_domain,Entry-RuleMode
+  - RULE-SET,bahamut_domain,Entry
+  - RULE-SET,spotify_domain,Entry
+  - RULE-SET,pixiv_domain,Entry
+  - RULE-SET,geolocation-!cn,Entry
+  - RULE-SET,google_ip,Entry
+  - RULE-SET,netflix_ip,Entry
+  - RULE-SET,telegram_ip,Entry
+  - RULE-SET,twitter_ip,Entry
+
+  - RULE-SET,cn_domain,Entry-RuleMode
+  - RULE-SET,cn_ip,Entry-RuleMode
+  - MATCH,Entry-LastMatch
