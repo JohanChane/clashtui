@@ -405,7 +405,7 @@ impl DualTabContent for Profile {
 
                 spans.push(Span::raw(value.as_str()));
                 spans.push(Span::raw(" "));
-                spans.push(Span::raw(extra.as_str()).style(section.secondary));
+                spans.push(Span::raw(extra.as_str()).style(section.muted));
 
                 // Traffic info
                 if self.traffic_display_mode != TrafficDisplayMode::Off {

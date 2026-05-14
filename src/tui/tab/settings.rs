@@ -290,7 +290,7 @@ impl TabContent for SettingsContent {
             return;
         }
 
-        let value_style = Theme::get().section("settings").secondary;
+        let value_style = Theme::get().section("settings").muted;
 
         let items: Vec<ListItem> = self
             .ops

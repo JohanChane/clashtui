@@ -1,0 +1,59 @@
+# Clashtui default theme
+# Copy this file to ~/.config/clashtui/theme.yaml to customize colors.
+# Core-specific sections (mihomo / sing-box) allow different palettes per core.
+
+# ---- Tabbar (top tab bar) ----
+tabbar:
+  text: { fg: "#009999" }
+  highlight: { fg: "#2ecc71" }
+
+# ---- Popup (modal dialogs) ----
+popup:
+  border: { fg: "#006666" }
+  text: { fg: "#2ecc71" }
+
+# ---- Default palette (fallback for all sections) ----
+default:
+  border: { fg: "#00cc99" }
+  highlight: { fg: "#ffffff", bg: "#404040", bold: true }
+  text: {}
+  muted: { fg: "#808080" }
+  title: { fg: "#00cc99", bold: true }
+  # Extra named styles (used by Proxies tab)
+  node_link: { fg: "#64b496" }
+  node_file: { fg: "#dcdcdc" }
+  node_tcp: { fg: "#00ffff" }
+  node_udp: { fg: "#ffff00" }
+
+# ---- Per-section overrides (all optional - inherit from default) ----
+# The "file" section is NOT configurable — it always inherits from default.
+
+# connections:
+#   border: { fg: "#ff6600" }
+
+# proxies:
+#   border: { fg: "#ff6600" }
+
+# settings:
+#   muted: { fg: "#ffaa00", bold: true }
+
+# srvctl:
+#   border: { fg: "#aa00ff" }
+
+# logs:
+#   border: { fg: "#ff6600" }
+
+# status:
+#   border: { fg: "#cccccc" }
+
+# ---- Core-specific overrides (optional) ----
+# When core_type is Mihomo, values under "mihomo" are merged in and "sing-box" is discarded.
+# When core_type is Singbox, the reverse happens.
+
+# mihomo:
+#   default:
+#     border: { fg: "#00cc99" }
+
+# sing-box:
+#   default:
+#     border: { fg: "#4488ff" }

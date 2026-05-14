@@ -41,8 +41,8 @@ struct SectionPaletteDef {
     pub border: Option<StyleDef>,
     pub highlight: Option<StyleDef>,
     pub text: Option<StyleDef>,
-    pub secondary: Option<StyleDef>,
-    pub accent: Option<StyleDef>,
+    pub muted: Option<StyleDef>,
+    pub title: Option<StyleDef>,
     #[serde(flatten)]
     pub extra: HashMap<String, StyleDef>,
 }
@@ -82,8 +82,8 @@ pub(crate) struct ComputedSectionTheme {
     pub border: Style,
     pub highlight: Style,
     pub text: Style,
-    pub secondary: Style,
-    pub accent: Style,
+    pub muted: Style,
+    pub title: Style,
     pub extra: HashMap<String, Style>,
 }
 
@@ -99,8 +99,8 @@ impl ComputedSectionTheme {
             border: resolve(&palette.border, &default.border),
             highlight: resolve(&palette.highlight, &default.highlight),
             text: resolve(&palette.text, &default.text),
-            secondary: resolve(&palette.secondary, &default.secondary),
-            accent: resolve(&palette.accent, &default.accent),
+            muted: resolve(&palette.muted, &default.muted),
+            title: resolve(&palette.title, &default.title),
             extra: {
                 let mut merged = HashMap::new();
                 for (k, v) in &default.extra {
@@ -167,8 +167,8 @@ fn make_default_palette() -> SectionPaletteDef {
         border: Some(StyleDef { fg: Some(Color::Rgb(0, 204, 153)), bg: None, bold: false }),
         highlight: Some(StyleDef { fg: None, bg: Some(Color::Rgb(64, 64, 64)), bold: true }),
         text: None,
-        secondary: Some(StyleDef { fg: Some(Color::Red), bg: None, bold: false }),
-        accent: None,
+        muted: Some(StyleDef { fg: Some(Color::Rgb(128, 128, 128)), bg: None, bold: false }),
+        title: Some(StyleDef { fg: Some(Color::Rgb(0, 204, 153)), bg: None, bold: true }),
         extra,
     }
 }
@@ -340,8 +340,8 @@ mod tests {
             border: Some(StyleDef { fg: Some(Color::Red), bg: None, bold: false }),
             highlight: Some(StyleDef { fg: Some(Color::White), bg: Some(Color::Black), bold: true }),
             text: Some(StyleDef { fg: Some(Color::Green), bg: None, bold: false }),
-            secondary: None,
-            accent: None,
+            muted: None,
+            title: None,
             extra: HashMap::new(),
         };
         let palette = SectionPaletteDef::default();
