@@ -99,6 +99,7 @@ mod_agent!(
         ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
         ([KeyCode::Enter], Key::Select, "Select"),
         ([KeyCode::Char('i')], Key::Action(Action::Add), "Import (URL or file)"),
+        ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Action(Action::Delete), "Delete profile"),
         ([KeyCode::Char('e')], Key::Action(Action::Edit), "Edit"),
         ([KeyCode::Char('p')], Key::Action(Action::Preview), "Preview"),
         ([KeyCode::Char('u')], Key::Action(Action::Update), "Update"),
