@@ -8,7 +8,7 @@
       {
         "tag": "dns-remote",
         "type": "tls",
-        "server": "1.1.1.1",
+        "server": "8.8.8.8",
         "detour": "Entry"
       },
       {
@@ -19,13 +19,13 @@
       },
       {
         "tag": "dns-local",
-        "type": "udp",
-        "server": "223.5.5.5"
+        "type": "local"
       },
       {
         "tag": "dns-fake",
         "type": "fakeip",
-        "inet4_range": "198.18.0.0/15"
+        "inet4_range": "198.18.0.0/15",
+        "inet6_range": "fc00::/18"
       }
     ],
     "rules": [
@@ -36,10 +36,22 @@
         "server": "dns-direct"
       },
       {
-        "rule_set": [
-          "geosite-google"
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "rule_set": [
+              "geosite-geolocation-!cn"
+            ],
+            "invert": true
+          },
+          {
+            "rule_set": [
+              "geoip-cn"
+            ]
+          }
         ],
-        "server": "dns-remote"
+        "server": "dns-direct"
       },
       {
         "query_type": [
@@ -53,6 +65,7 @@
       }
     ],
     "final": "dns-direct",
+    "independent_cache": true,
     "strategy": "prefer_ipv4"
   },
   "inbounds": [
@@ -66,7 +79,8 @@
       "type": "tun",
       "tag": "tun-in",
       "address": [
-        "172.19.0.1/30"
+        "172.19.0.1/30",
+        "fdfe:dcba:9876::1/126"
       ],
       "mtu": 9000,
       "auto_route": true,
@@ -130,6 +144,14 @@
       },
       {
         "type": "remote",
+        "tag": "geosite-geolocation-!cn",
+        "format": "binary",
+        "url": "https://github.com/SagerNet/sing-geosite/raw/rule-set/geosite-geolocation-!cn.srs",
+        "download_detour": "direct",
+        "update_interval": "7d"
+      },
+      {
+        "type": "remote",
         "tag": "geosite-google",
         "format": "binary",
         "url": "https://github.com/SagerNet/sing-geosite/raw/rule-set/geosite-google.srs",
@@ -161,13 +183,25 @@
       },
       {
         "rule_set": [
-          "geoip-cn"
+          "geosite-geolocation-cn"
         ],
         "outbound": "direct"
       },
       {
-        "rule_set": [
-          "geosite-geolocation-cn"
+        "type": "logical",
+        "mode": "and",
+        "rules": [
+          {
+            "rule_set": [
+              "geoip-cn"
+            ]
+          },
+          {
+            "rule_set": [
+              "geosite-geolocation-!cn"
+            ],
+            "invert": true
+          }
         ],
         "outbound": "direct"
       },
@@ -202,7 +236,8 @@
     "cache_file": {
       "enabled": true,
       "path": "cache.db",
-      "store_fakeip": true
+      "store_fakeip": true,
+      "store_rdrc": true
     }
   }
 }
