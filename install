@@ -496,6 +496,11 @@ create_core_configs() {
     copy_contrib "$mihomo_cfg_src" "${MIHOMO_CONFIG_DIR}/config.yaml"
     log_info "Mihomo core config written to: ${MIHOMO_CONFIG_DIR}/config.yaml"
 
+    # Also copy to clashtui config dir for profile management
+    mkdir -p "$MIHOMO_USER_CONFIG_DIR"
+    copy_contrib "$mihomo_cfg_src" "${MIHOMO_USER_CONFIG_DIR}/core_override_config.yaml"
+    log_info "Mihomo core override written to: ${MIHOMO_USER_CONFIG_DIR}/core_override_config.yaml"
+
     if ! $IS_USER; then
       $SUDO chown mihomo:mihomo "${MIHOMO_CONFIG_DIR}/config.yaml"
       $SUDO chmod g+r "${MIHOMO_CONFIG_DIR}/config.yaml"
@@ -515,6 +520,11 @@ create_core_configs() {
     copy_contrib "$singbox_cfg_src" "${SINGBOX_CONFIG_DIR}/config.json"
     log_info "Sing-box core config written to: ${SINGBOX_CONFIG_DIR}/config.json"
 
+    # Also copy to clashtui config dir for profile management
+    mkdir -p "$SINGBOX_USER_CONFIG_DIR"
+    copy_contrib "$singbox_cfg_src" "${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
+    log_info "Sing-box core override written to: ${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
+
     if ! $IS_USER; then
       $SUDO chown sing-box:sing-box "${SINGBOX_CONFIG_DIR}/config.json"
       $SUDO chmod g+r "${SINGBOX_CONFIG_DIR}/config.json"
@@ -529,20 +539,15 @@ create_clashtui_config() {
 
   mkdir -p "$CLASHTUI_CONFIG_DIR"
 
-  # Copy contrib default configs (config.yaml, keymap.yaml, theme.yaml)
-  copy_contrib "default_configs/config.yaml" "$CLASHTUI_CONFIG_DIR/config.yaml"
-  copy_contrib "default_configs/keymap.yaml" "$CLASHTUI_CONFIG_DIR/keymap.yaml"
-  copy_contrib "default_configs/theme.yaml" "$CLASHTUI_CONFIG_DIR/theme.yaml"
+  # Copy contrib default_keymap.yaml and default_theme.yaml
+  copy_contrib "default_configs/default_keymap.yaml" "$CLASHTUI_CONFIG_DIR/default_keymap.yaml"
+  copy_contrib "default_configs/default_theme.yaml" "$CLASHTUI_CONFIG_DIR/default_theme.yaml"
   log_info "Copied default configs to: $CLASHTUI_CONFIG_DIR"
 
-  if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then
-    mkdir -p "$MIHOMO_USER_CONFIG_DIR"
+  # Generate single config.yaml with both core sections
+  backup_file "$CLASHTUI_CONFIG_DIR/config.yaml"
 
-    # backup config.yaml
-    backup_file "$MIHOMO_USER_CONFIG_DIR/config.yaml"
-
-    # Generate service config with is_user flag
-    cat >"$MIHOMO_USER_CONFIG_DIR/config.yaml" <<EOF
+  cat >"$CLASHTUI_CONFIG_DIR/config.yaml" <<EOF
 mihomo:
   core:
     config_dir: ${MIHOMO_CONFIG_DIR}
@@ -551,15 +556,26 @@ mihomo:
   core_service:
     service_name: clashtui_mihomo
     is_user: ${SERVICE_IS_USER}
+singbox:
+  core:
+    bin_path: ${INSTALL_DIR_SINGBOX}/sing-box
+    config_dir: ${SINGBOX_CONFIG_DIR}
+    config_path: ${SINGBOX_CONFIG_DIR}/config.json
+  core_service:
+    service_name: clashtui_singbox
+    is_user: ${SERVICE_IS_USER}
 timeout:
 extra:
   edit_cmd:
   open_dir_cmd:
 EOF
 
-    log_info "Mihomo service config written to: $MIHOMO_USER_CONFIG_DIR/config.yaml"
+  log_info "Config written to: $CLASHTUI_CONFIG_DIR/config.yaml"
 
-    # Generate template_proxy_providers.yaml (commented version)
+  # Generate per-core template_proxy_providers.yaml and directories
+  if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then
+    mkdir -p "$MIHOMO_USER_CONFIG_DIR"
+
     if [ ! -f "$MIHOMO_USER_CONFIG_DIR/template_proxy_providers.yaml" ]; then
       cat >"$MIHOMO_USER_CONFIG_DIR/template_proxy_providers.yaml" <<'EOF'
 # Define proxy-provider subscription URLs here, organized by group.
@@ -584,25 +600,6 @@ EOF
 
   if [ "$core_type" = "sing-box" ] || [ "$core_type" = "all" ]; then
     mkdir -p "$SINGBOX_USER_CONFIG_DIR"
-
-    backup_file "$SINGBOX_USER_CONFIG_DIR/config.yaml"
-
-    cat >"$SINGBOX_USER_CONFIG_DIR/config.yaml" <<EOF
-singbox:
-  core:
-    bin_path: ${INSTALL_DIR_SINGBOX}/sing-box
-    config_dir: ${SINGBOX_CONFIG_DIR}
-    config_path: ${SINGBOX_CONFIG_DIR}/config.json
-  core_service:
-    service_name: clashtui_singbox
-    is_user: ${SERVICE_IS_USER}
-timeout:
-extra:
-  edit_cmd:
-  open_dir_cmd:
-EOF
-
-    log_info "Sing-box service config written to: $SINGBOX_USER_CONFIG_DIR/config.yaml"
 
     if [ ! -f "$SINGBOX_USER_CONFIG_DIR/template_proxy_providers.yaml" ]; then
       cat >"$SINGBOX_USER_CONFIG_DIR/template_proxy_providers.yaml" <<'EOF'
