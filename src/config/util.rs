@@ -47,8 +47,11 @@ macro_rules! load_save {
     ($id:ident, $name:expr) => {
         impl $id {
             pub fn to_file(&self) -> Result<()> {
-                let fp = std::fs::File::create(DATA_DIR.get().unwrap().join($name))?;
-                Ok(serde_yml::to_writer(fp, &self)?)
+                let path = DATA_DIR.get().unwrap().join($name);
+                let fp = std::fs::File::create(&path)
+                    .with_context(|| format!("Failed to create {}", path.display()))?;
+                Ok(serde_yml::to_writer(fp, &self)
+                    .with_context(|| format!("Failed to write {}", path.display()))?)
             }
         }
         load_save!($id, $name, no_save);
@@ -56,16 +59,22 @@ macro_rules! load_save {
     ($id:ident, $name:expr, no_save) => {
         impl $id {
             pub fn from_file() -> Result<Self> {
-                let fp = std::fs::File::open(DATA_DIR.get().unwrap().join($name))?;
-                Ok(serde_yml::from_reader(fp)?)
+                let path = DATA_DIR.get().unwrap().join($name);
+                let fp = std::fs::File::open(&path)
+                    .with_context(|| format!("Failed to open {}", path.display()))?;
+                Ok(serde_yml::from_reader(fp)
+                    .with_context(|| format!("Failed to parse {}", path.display()))?)
             }
         }
     };
     ($id:ident, $name:expr, no_save, $subdir:expr) => {
         impl $id {
             pub fn from_file() -> Result<Self> {
-                let fp = std::fs::File::open(DATA_DIR.get().unwrap().join($subdir).join($name))?;
-                Ok(serde_yml::from_reader(fp)?)
+                let path = DATA_DIR.get().unwrap().join($subdir).join($name);
+                let fp = std::fs::File::open(&path)
+                    .with_context(|| format!("Failed to open {}", path.display()))?;
+                Ok(serde_yml::from_reader(fp)
+                    .with_context(|| format!("Failed to parse {}", path.display()))?)
             }
         }
     };

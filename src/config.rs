@@ -236,6 +236,27 @@ pub fn init(base_path: Option<PathBuf>) -> Result<()> {
         init_config()?;
     }
 
+    // Fill in files that may be missing from old install scripts or partial setups
+    {
+        use std::fs;
+        let path = DATA_DIR.get().unwrap();
+
+        let mihomo_override = path.join("mihomo").join(defs::CORE_OVERRIDE_FILE);
+        if !mihomo_override.exists() {
+            fs::write(&mihomo_override, BasicInfo::DEFAULT)
+                .with_context(|| format!("Failed to write {}", mihomo_override.display()))?;
+        }
+        let singbox_override = path.join("sing-box").join(defs::CORE_OVERRIDE_SINGBOX_FILE);
+        if !singbox_override.exists() {
+            fs::write(&singbox_override, DEFAULT_SINGBOX_BASIC_CONFIG)
+                .with_context(|| format!("Failed to write {}", singbox_override.display()))?;
+        }
+        let db = path.join(defs::DATA_FILE);
+        if !db.exists() {
+            ProfileManager::default().to_file()?;
+        }
+    }
+
     if _CONFIG.set(Config::load()?).is_err() {
         unreachable!("init twice")
     }

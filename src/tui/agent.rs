@@ -39,9 +39,18 @@ pub fn extract_keymap_with_descs<K: serde::de::DeserializeOwned>(
 pub fn init() -> Result<()> {
     let path = crate::config::keymap_path();
 
-    let file = std::fs::File::open(&path)
-        .map_err(|e| anyhow::anyhow!("failed to open keymap file at {}: {e}", path.display()))?;
-    let mut value: serde_yml::Mapping = serde_yml::from_reader(file)?;
+    let mut value: serde_yml::Mapping = match std::fs::File::open(&path) {
+        Ok(file) => serde_yml::from_reader(file)?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            serde_yml::Mapping::new()
+        }
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "failed to open keymap file at {}: {e}",
+                path.display()
+            ));
+        }
+    };
 
     let (mut common, core_specific) = split_sections(&mut value);
 

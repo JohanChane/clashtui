@@ -18,6 +18,7 @@ mod_agent!(
         ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
         ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Action(Action::Delete), "Delete template"),
         ([KeyCode::Char('e')], Key::Action(Action::Edit), "Edit"),
+        ([KeyCode::Char('E')], Key::Action(Action::EditProviders), "Edit proxy providers"),
         ([KeyCode::Char('p')], Key::Action(Action::Preview), "Preview"),
         ([KeyCode::Enter], Key::Action(Action::Generate), "Generate"),
         ([KeyCode::Char('f')], Key::Action(Action::FzfFind), "Find template"),
