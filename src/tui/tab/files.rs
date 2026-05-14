@@ -45,17 +45,47 @@ newtype_tab!(
 );
 
 pub fn agent_init(mut keymap: serde_yml::Mapping) -> anyhow::Result<()> {
-    if let Some(serde_yml::Value::Mapping(map)) = keymap.remove("profile") {
-        crate::tui::agent::check_duplicate_keys("file/profile", &map);
-        let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
-        profile::agent_init(keys);
-        profile::init_descs(descs);
+    if let Some(val) = keymap.remove("profile") {
+        match val {
+            serde_yml::Value::Mapping(map) => {
+                crate::tui::agent::check_duplicate_keys("file/profile", &map);
+                let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
+                profile::agent_init(keys);
+                profile::init_descs(descs);
+            }
+            serde_yml::Value::Sequence(seq) => {
+                let entries: Vec<crate::tui::agent::Entry> =
+                    serde_yml::from_value(serde_yml::Value::Sequence(seq))?;
+                crate::tui::agent::check_duplicate_keys_list("file/profile", &entries);
+                let (keys, descs, chords) =
+                    crate::tui::agent::extract_keymap_list(entries)?;
+                profile::agent_init(keys);
+                profile::init_descs(descs);
+                profile::init_chords(chords);
+            }
+            _ => anyhow::bail!("file/profile is neither Mapping nor Sequence"),
+        }
     }
-    if let Some(serde_yml::Value::Mapping(map)) = keymap.remove("template") {
-        crate::tui::agent::check_duplicate_keys("file/template", &map);
-        let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
-        template::agent_init(keys);
-        template::init_descs(descs);
+    if let Some(val) = keymap.remove("template") {
+        match val {
+            serde_yml::Value::Mapping(map) => {
+                crate::tui::agent::check_duplicate_keys("file/template", &map);
+                let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
+                template::agent_init(keys);
+                template::init_descs(descs);
+            }
+            serde_yml::Value::Sequence(seq) => {
+                let entries: Vec<crate::tui::agent::Entry> =
+                    serde_yml::from_value(serde_yml::Value::Sequence(seq))?;
+                crate::tui::agent::check_duplicate_keys_list("file/template", &entries);
+                let (keys, descs, chords) =
+                    crate::tui::agent::extract_keymap_list(entries)?;
+                template::agent_init(keys);
+                template::init_descs(descs);
+                template::init_chords(chords);
+            }
+            _ => anyhow::bail!("file/template is neither Mapping nor Sequence"),
+        }
     }
     Ok(())
 }

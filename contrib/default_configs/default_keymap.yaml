@@ -1,264 +1,374 @@
-# Clashtui default keymap
-# Copy this file to ~/.config/clashtui/keymap.yaml to customize key bindings.
-# Only single-key shortcuts can be remapped here. Chords (e.g. "gg", "dd") are hardcoded.
-# Press ? in the TUI to see current bindings.
-# Core-specific sections (mihomo / sing-box) override common sections.
+# Default keymap for clashtui (yazi-style list format)
+# Uses the new list-based YAML format.
+# Single key:    on: "j"
+# Chord:         on: ["g", "g"]
+# Modifier:      on: "<C-u>", on: "<Enter>", on: "<Up>"
+# Shift:         on: "G"  (uppercase = shift)
+# Nested action: action:\n  Action: Edit
+# Description:   desc: "Optional description"
 
 connections:
-  ? code: Up
-  :
+  - on: "<Up>"
     action: MoveUp
     desc: Move up
-  ? code: Down
-  :
+  - on: "<Down>"
     action: MoveDown
     desc: Move down
-  ? code: !Char k
-  :
+  - on: "k"
     action: MoveUp
     desc: Move up
-  ? code: !Char j
-  :
+  - on: "j"
     action: MoveDown
     desc: Move down
-  ? code: !Char G
-    shift: true
-  :
+  - on: "G"
     action: GoBottom
     desc: Go to bottom
-  ? code: !Char /
-  :
+  - on: ["g", "g"]
+    action: GoTop
+    desc: Go to top
+  - on: ["d", "d"]
+    action: Terminate
+    desc: Close
+  - on: ["a", "c"]
+    action: TerminateAll
+    desc: Close all
+  - on: ["s", "h"]
+    action: SortByHost
+    desc: Sort by Host
+  - on: ["s", "l"]
+    action: SortByRule
+    desc: Sort by Rule
+  - on: ["s", "c"]
+    action: SortByChains
+    desc: Sort by Chains
+  - on: ["s", "n"]
+    action: SortByDownload
+    desc: Sort by Download
+  - on: ["s", "u"]
+    action: SortByUpload
+    desc: Sort by Upload
+  - on: ["s", "d"]
+    action: SortByDlSpeed
+    desc: Sort by DL Speed
+  - on: ["s", "s"]
+    action: SortByUlSpeed
+    desc: Sort by UL Speed
+  - on: ["s", "r"]
+    action: SortReset
+    desc: Reset sort
+  - on: "/"
     action: Search
     desc: Search/Filter
-  ? code: !Char p
-  :
+  - on: "p"
     action: TogglePause
     desc: Pause/Resume
-  ? code: !Char f
-  :
+  - on: "f"
     action: FzfFind
     desc: Find
 
+file:
+  profile:
+    - on: "<Left>"
+      action: Switch
+      desc: Switch pane
+    - on: "<Right>"
+      action: Switch
+      desc: Switch pane
+    - on: "h"
+      action: Switch
+      desc: Switch pane
+    - on: "l"
+      action: Switch
+      desc: Switch pane
+    - on: "<Down>"
+      action: MoveDown
+      desc: Move down
+    - on: "<Up>"
+      action: MoveUp
+      desc: Move up
+    - on: "j"
+      action: MoveDown
+      desc: Move down
+    - on: "k"
+      action: MoveUp
+      desc: Move up
+    - on: "<Enter>"
+      action: Select
+      desc: Select
+    - on: "i"
+      action:
+        Action: Add
+      desc: Import (URL or file)
+    - on: ["d", "d"]
+      action:
+        Action: Delete
+      desc: Delete profile
+    - on: "e"
+      action:
+        Action: Edit
+      desc: Edit
+    - on: "p"
+      action:
+        Action: Preview
+      desc: Preview
+    - on: "u"
+      action:
+        Action: Update
+      desc: Update
+    - on: "/"
+      action:
+        Action: Search
+      desc: Search/Filter
+    - on: "t"
+      action:
+        Action: Test
+      desc: Test
+    - on: "c"
+      action:
+        Action: Check
+      desc: Check config
+    - on: ["C", "u"]
+      action:
+        Action: CopyUrl
+      desc: Copy URL
+    - on: "f"
+      action:
+        Action: FzfFind
+      desc: Find profile
+    - on: ["g", "g"]
+      action:
+        Action: GoTop
+      desc: Go to top
+    - on: "G"
+      action:
+        Action: GoEnd
+      desc: Go to end
+    - on: "P"
+      action:
+        Action: ToggleNoPp
+      desc: Toggle no proxy-provider
+    - on: "n"
+      action:
+        Action: TrafficNext
+      desc: Traffic display next
+    - on: "N"
+      action:
+        Action: TrafficPrev
+      desc: Traffic display prev
+
+  template:
+    - on: "<Left>"
+      action: Switch
+      desc: Switch pane
+    - on: "<Right>"
+      action: Switch
+      desc: Switch pane
+    - on: "h"
+      action: Switch
+      desc: Switch pane
+    - on: "l"
+      action: Switch
+      desc: Switch pane
+    - on: "<Down>"
+      action: MoveDown
+      desc: Move down
+    - on: "<Up>"
+      action: MoveUp
+      desc: Move up
+    - on: "j"
+      action: MoveDown
+      desc: Move down
+    - on: "k"
+      action: MoveUp
+      desc: Move up
+    - on: ["d", "d"]
+      action:
+        Action: Delete
+      desc: Delete template
+    - on: "e"
+      action:
+        Action: Edit
+      desc: Edit
+    - on: "E"
+      action:
+        Action: EditProviders
+      desc: Edit proxy providers
+    - on: "p"
+      action:
+        Action: Preview
+      desc: Preview
+    - on: "<Enter>"
+      action:
+        Action: Generate
+      desc: Generate
+    - on: "f"
+      action:
+        Action: FzfFind
+      desc: Find template
+    - on: ["g", "g"]
+      action:
+        Action: GoTop
+      desc: Go to top
+    - on: "G"
+      action:
+        Action: GoEnd
+      desc: Go to end
+    - on: "/"
+      action:
+        Action: Search
+      desc: Search/Filter
+
 proxies:
-  ? code: Up
-  :
+  - on: "<Up>"
     action: MoveUp
     desc: Move up
-  ? code: Down
-  :
+  - on: "<Down>"
     action: MoveDown
     desc: Move down
-  ? code: !Char k
-  :
+  - on: "k"
     action: MoveUp
     desc: Move up
-  ? code: !Char j
-  :
+  - on: "j"
     action: MoveDown
     desc: Move down
-  ? code: !Char h
-  :
+  - on: "h"
     action: Parent
     desc: Go to parent
-  ? code: !Char l
-  :
+  - on: "l"
     action: Expand
     desc: Expand
-  ? code: Enter
-  :
+  - on: "<Enter>"
     action: Select
     desc: Select
-  ? code: !Char G
-    shift: true
-  :
+  - on: ["g", "g"]
+    action: GoTop
+    desc: Go to top
+  - on: "G"
     action: GoBottom
     desc: Go to bottom
-  ? code: !Char /
-  :
+  - on: "/"
     action: Search
     desc: Search/Filter
-  ? code: !Char t
-  :
+  - on: ["s", "n"]
+    action: SortByName
+    desc: Sort by name
+  - on: ["s", "d"]
+    action: SortByDelay
+    desc: Sort by delay
+  - on: ["s", "r"]
+    action: ResetSort
+    desc: Reset sort
+  - on: ["S", "n"]
+    action: GlobalSortByName
+    desc: Global sort by name
+  - on: ["S", "d"]
+    action: GlobalSortByDelay
+    desc: Global sort by delay
+  - on: ["S", "r"]
+    action: GlobalResetSort
+    desc: Global reset sort
+  - on: ["a", "f"]
+    action: CollapseAll
+    desc: Collapse all
+  - on: ["a", "e"]
+    action: ExpandAll
+    desc: Expand all
+  - on: "t"
     action: TestDelay
     desc: Test delay
-  ? code: !Char r
-  :
+  - on: ["a", "t"]
+    action: TestAllDelay
+    desc: Test all delay
+  - on: "r"
     action: Refresh
     desc: Refresh
-  ? code: !Char f
-  :
+  - on: "f"
     action: FzfFind
     desc: Find proxy
 
-file:
-  profile:
-    ? code: Left
-            : Switch
-    ? code: Right
-            : Switch
-    ? code: !Char h
-            : Switch
-    ? code: !Char l
-            : Switch
-    ? code: Up
-            : MoveUp
-    ? code: Down
-            : MoveDown
-    ? code: !Char k
-            : MoveUp
-    ? code: !Char j
-            : MoveDown
-    ? code: Enter
-            : Select
-    ? code: !Char i
-            : Action: Add
-    ? code: !Char e
-            : Action: Edit
-    ? code: !Char p
-            : Action: Preview
-    ? code: !Char u
-            : Action: Update
-    ? code: !Char /
-            : Action: Search
-    ? code: !Char t
-            : Action: Test
-    ? code: !Char c
-            : Action: Check
-    ? code: !Char f
-            : Action: FzfFind
-    ? code: !Char G
-      shift: true
-          : Action: GoEnd
-    ? code: !Char P
-      shift: true
-          : Action: ToggleNoPp
-    ? code: !Char n
-            : Action: TrafficNext
-    ? code: !Char N
-      shift: true
-          : Action: TrafficPrev
-
-  template:
-    ? code: Left
-            : Switch
-    ? code: Right
-            : Switch
-    ? code: !Char h
-            : Switch
-    ? code: !Char l
-            : Switch
-    ? code: Up
-            : MoveUp
-    ? code: Down
-            : MoveDown
-    ? code: !Char k
-            : MoveUp
-    ? code: !Char j
-            : MoveDown
-    ? code: Enter
-            : Action: Generate
-    ? code: !Char e
-            : Action: Edit
-    ? code: !Char E
-      shift: true
-          : Action: EditProviders
-    ? code: !Char p
-            : Action: Preview
-    ? code: !Char f
-            : Action: FzfFind
-    ? code: !Char G
-      shift: true
-          : Action: GoEnd
-    ? code: !Char /
-            : Action: Search
-
 srvctl:
-  ? code: Enter
-  :
+  - on: "<Enter>"
     action: Execute
     desc: Execute
-  ? code: Esc
-  :
+  - on: "<Esc>"
     action: Esc
     desc: Back
-  ? code: Up
-  :
+  - on: "<Up>"
     action: MoveUp
     desc: Move up
-  ? code: Down
-  :
+  - on: "<Down>"
     action: MoveDown
     desc: Move down
-  ? code: !Char k
-  :
+  - on: "k"
     action: MoveUp
     desc: Move up
-  ? code: !Char j
-  :
+  - on: "j"
     action: MoveDown
     desc: Move down
 
 settings:
-  ? code: Enter
-  :
+  - on: "<Enter>"
     action: Execute
     desc: Apply
-  ? code: Esc
-  :
+  - on: "<Esc>"
     action: Esc
     desc: Back
-  ? code: Up
-  :
+  - on: "<Up>"
     action: MoveUp
     desc: Move up
-  ? code: Down
-  :
+  - on: "<Down>"
     action: MoveDown
     desc: Move down
-  ? code: !Char k
-  :
+  - on: "k"
     action: MoveUp
     desc: Move up
-  ? code: !Char j
-  :
+  - on: "j"
     action: MoveDown
     desc: Move down
 
 logs:
-  ? code: Up
-  :
+  - on: "<Up>"
     action: MoveUp
     desc: Move up
-  ? code: Down
-  :
+  - on: "<Down>"
     action: MoveDown
     desc: Move down
-  ? code: !Char k
-  :
+  - on: "k"
     action: MoveUp
     desc: Move up
-  ? code: !Char j
-  :
+  - on: "j"
     action: MoveDown
     desc: Move down
-  ? code: !Char G
-    shift: true
-  :
+  - on: "G"
     action: GoBottom
     desc: Go to bottom
-  ? code: !Char /
-  :
+  - on: ["g", "g"]
+    action: GoTop
+    desc: Go to top
+  - on: "/"
     action: Search
     desc: Search/Filter
-  ? code: !Char p
-  :
+  - on: "p"
     action: TogglePause
     desc: Pause/Resume
-  ? code: !Char f
-  :
+  - on: "f"
     action: FzfFind
     desc: Find
-  ? code: !Char c
-  :
+  - on: "c"
     action: Clear
     desc: Clear logs
+  - on: ["t", "d"]
+    action: ToggleDebug
+    desc: Toggle debug
+  - on: ["t", "i"]
+    action: ToggleInfo
+    desc: Toggle info
+  - on: ["t", "w"]
+    action: ToggleWarning
+    desc: Toggle warning
+  - on: ["t", "e"]
+    action: ToggleError
+    desc: Toggle error
+  - on: ["t", "s"]
+    action: ToggleSilent
+    desc: Toggle silent

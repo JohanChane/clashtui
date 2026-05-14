@@ -93,12 +93,51 @@ pub(crate) mod agent {
         }
     }
 
+    static USER_CHORDS: OnceLock<Vec<(KeyCombo, $ident, String)>> = OnceLock::new();
+
+    pub fn init_chords(chords: Vec<(KeyCombo, $ident, String)>) {
+        if !chords.is_empty() {
+            let _ = USER_CHORDS.set(chords);
+        }
+    }
+
     static SHORTCUTS: OnceLock<Vec<(KeyCombo, $ident, &'static str)>> = OnceLock::new();
 
     pub fn all_shortcuts() -> &'static [(KeyCombo, $ident, &'static str)] {
         SHORTCUTS.get_or_init(|| {
+            // Build default shortcuts from macro tokens
+            let mut default_v: Vec<(KeyCombo, $ident, &'static str)> = Vec::new();
+            mod_agent!(@shortcuts default_v, $($tokens)*);
+
+            // Build default desc map for single-key entries
+            let default_descs: HashMap<crate::tui::Key, &'static str> = default_v
+                .iter()
+                .filter(|(c, _, _)| c.len() == 1)
+                .map(|(c, _, d)| (c[0], *d))
+                .collect();
+
             let mut v = Vec::new();
-            mod_agent!(@shortcuts v, $($tokens)*);
+
+            // If user config was loaded (init() already called), replace
+            // single-key shortcuts with entries from the user's agent,
+            // keeping chord shortcuts from defaults.
+            if let Some(agent) = AGENT.get() {
+                // Keep chord shortcuts from defaults
+                for (combo, action, desc) in &default_v {
+                    if combo.len() != 1 {
+                        v.push((combo.clone(), *action, *desc));
+                    }
+                }
+                // Add single-key entries from the user's agent
+                for (key, action) in agent.iter() {
+                    let desc = default_descs.get(key).copied().unwrap_or("");
+                    v.push((KeyCombo(vec![*key]), *action, desc));
+                }
+            } else {
+                v = default_v;
+            }
+
+            // Apply desc overrides from YAML
             if let Some(overrides) = DESC_OVERRIDES.get() {
                 for (combo, _, desc) in &mut v {
                     if combo.len() == 1 {
@@ -108,13 +147,21 @@ pub(crate) mod agent {
                     }
                 }
             }
+
+            // Add user-defined chords
+            if let Some(user_chords) = USER_CHORDS.get() {
+                for (combo, key, desc) in user_chords {
+                    v.push((combo.clone(), *key, Box::leak(desc.clone().into_boxed_str())));
+                }
+            }
+
             v
         })
     }
 }
 
 pub use agent::{agent, all_shortcuts};
-pub use agent::{init as agent_init, init_descs};
+pub use agent::{init as agent_init, init_descs, init_chords};
     };
 
     // ---- tt-muncher: agent (only single-key shortcuts) ----
@@ -290,36 +337,67 @@ pub mod prelude {
     pub fn agent_init(keymap: &mut serde_yml::Mapping) -> anyhow::Result<()> {
         use anyhow::Context;
 
-        if let Ok(map) = crate::tui::agent::get(keymap, "connections") {
-            crate::tui::agent::check_duplicate_keys("connections", &map);
-            let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
-            super::connections::agent_init(keys);
-            super::connections::init_descs(descs);
+        // Helper: dispatch Mapping (old) vs Sequence (new list-format)
+        macro_rules! init_section {
+            ($keymap:expr, $section:literal, $tab:ident) => {
+                if let Some(section_val) =
+                    crate::tui::agent::take_section($keymap, $section)
+                {
+                    match section_val {
+                        serde_yml::Value::Mapping(map) => {
+                            crate::tui::agent::check_duplicate_keys($section, &map);
+                            let (keys, descs) =
+                                crate::tui::agent::extract_keymap_with_descs(map)?;
+                            super::$tab::agent_init(keys);
+                            super::$tab::init_descs(descs);
+                        }
+                        serde_yml::Value::Sequence(seq) => {
+                            let entries: Vec<crate::tui::agent::Entry> = serde_yml::from_value(
+                                serde_yml::Value::Sequence(seq),
+                            )
+                            .context(concat!(
+                                "parsing ",
+                                $section,
+                                " entries"
+                            ))?;
+                            crate::tui::agent::check_duplicate_keys_list(
+                                $section,
+                                &entries,
+                            );
+                            let (keys, descs, chords) =
+                                crate::tui::agent::extract_keymap_list(entries)?;
+                            super::$tab::agent_init(keys);
+                            super::$tab::init_descs(descs);
+                            super::$tab::init_chords(chords);
+                        }
+                        _ => {
+                            anyhow::bail!(
+                                "Section `{}` is neither Mapping nor Sequence",
+                                $section
+                            );
+                        }
+                    }
+                }
+            };
         }
 
-        if let Ok(map) = crate::tui::agent::get(keymap, "file") {
-            super::files::agent_init(map).context("Loading FileTab KeyMap")?;
-        }
+        init_section!(keymap, "connections", connections);
+        init_section!(keymap, "proxies", proxies);
+        init_section!(keymap, "srvctl", srvctl);
+        init_section!(keymap, "settings", settings);
+        init_section!(keymap, "logs", logs);
 
-        if let Ok(map) = crate::tui::agent::get(keymap, "srvctl") {
-            crate::tui::agent::check_duplicate_keys("srvctl", &map);
-            let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
-            super::srvctl::agent_init(keys);
-            super::srvctl::init_descs(descs);
-        }
-
-        if let Ok(map) = crate::tui::agent::get(keymap, "settings") {
-            crate::tui::agent::check_duplicate_keys("settings", &map);
-            let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
-            super::settings::agent_init(keys);
-            super::settings::init_descs(descs);
-        }
-
-        if let Ok(map) = crate::tui::agent::get(keymap, "logs") {
-            crate::tui::agent::check_duplicate_keys("logs", &map);
-            let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
-            super::logs::agent_init(keys);
-            super::logs::init_descs(descs);
+        // FileTab has nested sections — delegate to files::agent_init
+        if let Some(section_val) = crate::tui::agent::take_section(keymap, "file") {
+            match section_val {
+                serde_yml::Value::Mapping(map) => {
+                    super::files::agent_init(map)
+                        .context("Loading FileTab KeyMap")?;
+                }
+                _ => {
+                    anyhow::bail!("`file` section only supports Mapping format (nested profile/template)");
+                }
+            }
         }
 
         Ok(())

@@ -1,11 +1,124 @@
 use anyhow::Result;
 use crate::config::CoreType;
+use crate::tui::widget::tab::KeyCombo;
 use std::collections::HashMap;
+use std::str::FromStr;
 
 /// Round-trip through YAML string to handle tagged values (e.g. `!Char`)
 fn from_value_robust<T: serde::de::DeserializeOwned>(val: &serde_yml::Value) -> Result<T> {
     let s = serde_yml::to_string(val)?;
     Ok(serde_yml::from_str(&s)?)
+}
+
+// ---- list-based format (yazi-style) ----
+
+struct OnVisitor;
+
+impl<'de> serde::de::Visitor<'de> for OnVisitor {
+    type Value = Vec<crate::tui::Key>;
+
+    fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("a key string or list of key strings (e.g. \"j\" or [\"g\", \"g\"])")
+    }
+
+    fn visit_str<E: serde::de::Error>(self, v: &str) -> Result<Self::Value, E> {
+        let key = crate::tui::Key::from_str(v).map_err(serde::de::Error::custom)?;
+        Ok(vec![key])
+    }
+
+    fn visit_string<E: serde::de::Error>(self, v: String) -> Result<Self::Value, E> {
+        let key = crate::tui::Key::from_str(&v).map_err(serde::de::Error::custom)?;
+        Ok(vec![key])
+    }
+
+    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        let mut keys = Vec::new();
+        while let Some(s) = seq.next_element::<String>()? {
+            let key = crate::tui::Key::from_str(&s).map_err(serde::de::Error::custom)?;
+            keys.push(key);
+        }
+        Ok(keys)
+    }
+}
+
+fn deserialize_on<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<crate::tui::Key>, D::Error> {
+    d.deserialize_any(OnVisitor)
+}
+
+#[derive(serde::Deserialize)]
+pub struct Entry {
+    #[serde(deserialize_with = "deserialize_on")]
+    on: Vec<crate::tui::Key>,
+    action: serde_yml::Value,
+    #[serde(default)]
+    desc: Option<String>,
+}
+
+pub fn extract_keymap_list<K: serde::de::DeserializeOwned>(
+    entries: Vec<Entry>,
+) -> Result<(
+    HashMap<crate::tui::Key, K>,
+    HashMap<crate::tui::Key, String>,
+    Vec<(KeyCombo, K, String)>,
+)> {
+    let mut agent = HashMap::new();
+    let mut descs = HashMap::new();
+    let mut chords = Vec::new();
+
+    for entry in entries {
+        let action: K = deserialize_action_value(entry.action)?;
+        if entry.on.len() == 1 {
+            let key = entry.on[0];
+            agent.insert(key, action);
+            if let Some(desc) = entry.desc {
+                if !desc.is_empty() {
+                    descs.insert(key, desc);
+                }
+            }
+        } else {
+            chords.push((KeyCombo(entry.on), action, entry.desc.unwrap_or_default()));
+        }
+    }
+
+    Ok((agent, descs, chords))
+}
+
+/// Deserialize a serde_yml::Value into K.
+/// serde_yml::from_value on a Value::Mapping fails for externally-tagged enums,
+/// so we embed the value in a container struct to trigger YAML document deserialization.
+fn deserialize_action_value<K: serde::de::DeserializeOwned>(
+    val: serde_yml::Value,
+) -> Result<K> {
+    if !matches!(val, serde_yml::Value::Mapping(_)) {
+        return Ok(serde_yml::from_value(val)?);
+    }
+    let s = serde_yml::to_string(&val)?;
+    let container = format!("value:\n  {s}");
+    #[derive(serde::Deserialize)]
+    struct Container<K> {
+        value: K,
+    }
+    let c: Container<K> = serde_yml::from_str(&container)?;
+    Ok(c.value)
+}
+
+pub fn check_duplicate_keys_list(section: &str, entries: &[Entry]) {
+    use std::collections::HashSet;
+    let mut seen = HashSet::new();
+    for entry in entries {
+        if entry.on.len() == 1 {
+            let k = entry.on[0];
+            if !seen.insert(k) {
+                log::warn!("duplicate key `{k}` in [{section}] keymap — later binding overwrites earlier");
+            }
+        }
+    }
+}
+
+// ---- helpers ----
+
+pub fn take_section(value: &mut serde_yml::Mapping, idx: &str) -> Option<serde_yml::Value> {
+    value.remove(idx)
 }
 
 pub fn extract_keymap_with_descs<K: serde::de::DeserializeOwned>(
@@ -361,4 +474,113 @@ fn test_no_duplicate_keys_in_default_agents() {
     }
 }
 
+#[derive(serde::Deserialize, Debug, PartialEq)]
+enum TestAction {
+    MoveDown,
+    MoveUp,
+    GoTop,
+    Select,
+    Edit,
+    ToggleNoPp,
+}
+
+#[test]
+fn test_list_format_single_key() -> anyhow::Result<()> {
+    let yaml = r#"
+- on: "j"
+  action: MoveDown
+"#;
+    let entries: Vec<Entry> = serde_yml::from_str(yaml)?;
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].on.len(), 1);
+    let (keys, _, chords) = extract_keymap_list::<TestAction>(entries)?;
+    assert_eq!(keys.len(), 1);
+    assert!(chords.is_empty());
+    let j = crate::tui::Key { code: crossterm::event::KeyCode::Char('j'), shift: false, ctrl: false, alt: false, super_: false };
+    assert_eq!(keys.get(&j), Some(&TestAction::MoveDown));
+    Ok(())
+}
+
+#[test]
+fn test_list_format_modifier_key() -> anyhow::Result<()> {
+    let yaml = r#"
+- on: "<C-u>"
+  action: MoveUp
+"#;
+    let entries: Vec<Entry> = serde_yml::from_str(yaml)?;
+    assert_eq!(entries.len(), 1);
+    let (keys, _, _) = extract_keymap_list::<TestAction>(entries)?;
+    let ctrl_u = crate::tui::Key { code: crossterm::event::KeyCode::Char('u'), shift: false, ctrl: true, alt: false, super_: false };
+    assert_eq!(keys.get(&ctrl_u), Some(&TestAction::MoveUp));
+    Ok(())
+}
+
+#[test]
+fn test_list_format_chord() -> anyhow::Result<()> {
+    let yaml = r#"
+- on: ["g", "g"]
+  action: GoTop
+"#;
+    let entries: Vec<Entry> = serde_yml::from_str(yaml)?;
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].on.len(), 2);
+    let (keys, _, chords) = extract_keymap_list::<TestAction>(entries)?;
+    assert!(keys.is_empty());
+    assert_eq!(chords.len(), 1);
+    assert_eq!(chords[0].0.len(), 2);
+    assert_eq!(chords[0].1, TestAction::GoTop);
+    Ok(())
+}
+
+#[test]
+fn test_list_format_desc() -> anyhow::Result<()> {
+    let yaml = r#"
+- on: "j"
+  action: MoveDown
+  desc: Move cursor down
+"#;
+    let entries: Vec<Entry> = serde_yml::from_str(yaml)?;
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].desc.as_deref(), Some("Move cursor down"));
+    let (_, descs, _) = extract_keymap_list::<TestAction>(entries)?;
+    assert_eq!(descs.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn test_list_format_nested_action() -> anyhow::Result<()> {
+    // Use the real profile::Key type which has a custom Deserialize impl
+    // that handles "Action: Edit" format correctly
+    use crate::tui::tab::files::profile::Key;
+    let yaml = r#"
+- on: "e"
+  action:
+    Action: Edit
+"#;
+    let entries: Vec<Entry> = serde_yml::from_str(yaml)?;
+    let (keys, _, _) = extract_keymap_list::<Key>(entries)?;
+    let e = crate::tui::Key { code: crossterm::event::KeyCode::Char('e'), shift: false, ctrl: false, alt: false, super_: false };
+    assert!(matches!(keys.get(&e), Some(Key::Action(_))));
+    Ok(())
+}
+
+#[test]
+fn test_list_format_multiple_same_action() -> anyhow::Result<()> {
+    let yaml = r#"
+- on: "j"
+  action: MoveDown
+- on: "<Down>"
+  action: MoveDown
+"#;
+    let entries: Vec<Entry> = serde_yml::from_str(yaml)?;
+    assert_eq!(entries.len(), 2);
+    let (keys, _, chords) = extract_keymap_list::<TestAction>(entries)?;
+    assert_eq!(keys.len(), 2);
+    assert!(chords.is_empty());
+    let j = crate::tui::Key { code: crossterm::event::KeyCode::Char('j'), shift: false, ctrl: false, alt: false, super_: false };
+    let down = crate::tui::Key { code: crossterm::event::KeyCode::Down, shift: false, ctrl: false, alt: false, super_: false };
+    assert_eq!(keys.get(&j), Some(&TestAction::MoveDown));
+    assert_eq!(keys.get(&down), Some(&TestAction::MoveDown));
+    Ok(())
+}
 

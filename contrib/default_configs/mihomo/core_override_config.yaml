@@ -1,10 +1,10 @@
-# 随意配置的, 仅供参考。
+# Arbitrary configuration, for reference only.
 mixed-port: 7890
 ipv6: false
 allow-lan: false
 log-level: silent
 unified-delay: true
-tcp-concurrent: true    # 域名有多个IP 时，就并发尝试所有IP连接的TCP握手。有一个成功即可。
+tcp-concurrent: true    # When domain has multiple IPs, attempt TCP handshake concurrently. One success is enough.
 
 secret: ""
 external-controller: 127.0.0.1:9090
@@ -47,7 +47,7 @@ dns:
     - https://120.53.53.53/dns-query
     - https://223.5.5.5/dns-query
   nameserver-policy:
-    "auth-6441.wifi.com": "system://"       # 使用系统 DNS 查询
+    "auth-6441.wifi.com": "system://"       # use system DNS resolver
     geosite:cn,private:
       #- 114.114.114.114
       #- 223.5.5.5

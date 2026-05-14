@@ -186,6 +186,7 @@ impl<'de> serde::Deserialize<'de> for Key {
                         "Search" => Ok(Key::Action(Action::Search)),
                         "Test" => Ok(Key::Action(Action::Test)),
                         "Check" => Ok(Key::Action(Action::Check)),
+                        "CopyUrl" => Ok(Key::Action(Action::CopyUrl)),
                         "FzfFind" => Ok(Key::Action(Action::FzfFind)),
                         "GoTop" => Ok(Key::Action(Action::GoTop)),
                         "GoEnd" => Ok(Key::Action(Action::GoEnd)),
@@ -193,8 +194,8 @@ impl<'de> serde::Deserialize<'de> for Key {
                         "TrafficNext" => Ok(Key::Action(Action::TrafficNext)),
                         "TrafficPrev" => Ok(Key::Action(Action::TrafficPrev)),
                         s => Err(de::Error::unknown_variant(s, &[
-                            "Add", "Edit", "Delete", "Preview", "Update", "UpdateAll",
-                            "Search", "Test", "Check", "FzfFind", "GoTop", "GoEnd",
+                            "Add", "ImportFile", "Delete", "Edit", "Preview", "Update", "UpdateAll",
+                            "Search", "Test", "Check", "CopyUrl", "FzfFind", "GoTop", "GoEnd",
                             "ToggleNoPp", "TrafficNext", "TrafficPrev",
                         ])),
                     }
