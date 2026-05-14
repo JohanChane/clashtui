@@ -1,0 +1,49 @@
+# Clashtui custom theme — Dracula-inspired palette
+# ~/.config/clashtui/theme.yaml
+
+# ---- Tabbar (top tab bar) ----
+tabbar:
+  text: { fg: "#6272a4" }
+  highlight: { fg: "#50fa7b", bold: true }
+
+# ---- Popup (modal dialogs) ----
+popup:
+  border: { fg: "#bd93f9" }
+  text: { fg: "#ffb86c" }
+
+# ---- Default palette (base for all sections) ----
+default:
+  border: { fg: "#bd93f9" }
+  highlight: { fg: "#f8f8f2", bg: "#44475a", bold: true }
+  text: { fg: "#f8f8f2" }
+  muted: { fg: "#6272a4" }
+  title: { fg: "#ff79c6", bold: true }
+  node_link: { fg: "#bd93f9" }
+  node_file: { fg: "#f1fa8c" }
+  node_tcp: { fg: "#8be9fd" }
+  node_udp: { fg: "#50fa7b" }
+
+# ---- Per-section border accents (each tab gets a distinct color) ----
+connections:
+  border: { fg: "#ffb86c" }
+  title: { fg: "#ffb86c", bold: true }
+
+proxies:
+  border: { fg: "#8be9fd" }
+  title: { fg: "#8be9fd", bold: true }
+
+settings:
+  border: { fg: "#f1fa8c" }
+  title: { fg: "#f1fa8c", bold: true }
+
+srvctl:
+  border: { fg: "#bd93f9" }
+  title: { fg: "#bd93f9", bold: true }
+
+logs:
+  border: { fg: "#50fa7b" }
+  title: { fg: "#50fa7b", bold: true }
+
+status:
+  border: { fg: "#f8f8f2" }
+  title: { fg: "#f8f8f2", bold: true }

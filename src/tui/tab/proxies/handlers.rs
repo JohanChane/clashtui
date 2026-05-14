@@ -36,7 +36,14 @@ impl Proxies {
         self.error = Some(format!("Switching to {node}..."));
         self.testing_since = Some(Instant::now());
         async move {
-            let _ = tri!(proxies::select_proxy(&group, &node), or_cancel);
+            let _ = tri!(
+                tokio::task::spawn_blocking(move || {
+                    proxies::select_proxy(&group, &node)
+                })
+                .await
+                .unwrap(),
+                or_cancel
+            );
             let response = match tokio::time::timeout(
                 Duration::from_secs(t_secs),
                 tokio::task::spawn_blocking(|| proxies::fetch_proxies()),
@@ -276,7 +283,12 @@ impl Proxies {
 
     pub fn refresh(&mut self, task_set: &mut FutureSet<Self>) {
         async {
-            let response = tri!(proxies::fetch_proxies(), or_set);
+            let response = tri!(
+                tokio::task::spawn_blocking(proxies::fetch_proxies)
+                    .await
+                    .unwrap(),
+                or_set
+            );
             wrapper(move |content: &mut Self| {
                 content.proxies = response.proxies;
                 content.tree.rebuild_from_proxies(&content.proxies);

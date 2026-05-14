@@ -160,7 +160,7 @@ impl std::fmt::Display for TunConfig {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, strum::VariantArray)]
 pub enum TunStack {
     #[serde(alias = "Mixed")]
     Mixed,

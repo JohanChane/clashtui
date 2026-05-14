@@ -53,6 +53,24 @@ pub mod control {
     }
 }
 
+pub mod cache {
+    use super::*;
+
+    /// Flush fake-IP cache
+    ///
+    /// API: POST /cache/fakeip/flush
+    pub fn flush_fakeip() -> Result<()> {
+        request(Method::Post, "/cache/fakeip/flush", None).map(|_| ())
+    }
+
+    /// Flush DNS cache
+    ///
+    /// API: POST /cache/dns/flush
+    pub fn flush_dns() -> Result<()> {
+        request(Method::Post, "/cache/dns/flush", None).map(|_| ())
+    }
+}
+
 pub mod config {
     use super::*;
 

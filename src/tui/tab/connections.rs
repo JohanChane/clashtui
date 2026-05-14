@@ -250,7 +250,12 @@ impl BasicTabContent for Connections {
         }
         async {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            let info = tri!(connection::get_connections(), or_set);
+            let info = tri!(
+                tokio::task::spawn_blocking(connection::get_connections)
+                    .await
+                    .unwrap(),
+                or_set
+            );
             wrapper(|content: &mut Self| {
                 let conns = info.connections.unwrap_or_default();
                 content.conns = conns;
@@ -270,7 +275,12 @@ impl BasicTabContent for Connections {
             return;
         }
         async {
-            let info = tri!(connection::get_connections(), or_set);
+            let info = tri!(
+                tokio::task::spawn_blocking(connection::get_connections)
+                    .await
+                    .unwrap(),
+                or_set
+            );
             wrapper(|content: &mut Self| {
                 let conns = info.connections.unwrap_or_default();
                 content.conns = conns;
@@ -332,8 +342,13 @@ impl TabContent for Connections {
                 let Some(display_row) = self.display_rows.get(row) else { return };
                 let id = display_row.id.clone();
                 async move {
-                    let _ = connection::terminate_connection(Some(id));
-                    let info = tri!(connection::get_connections(), or_cancel);
+                    let result = tokio::task::spawn_blocking(move || {
+                        let _ = connection::terminate_connection(Some(id));
+                        connection::get_connections()
+                    })
+                    .await
+                    .unwrap();
+                    let info = tri!(result, or_cancel);
                     wrapper(move |content: &mut Connections| {
                         content.conns = info.connections.unwrap_or_default();
                         content.error = None;
@@ -375,14 +390,19 @@ impl TabContent for Connections {
                 }
 
                 async move {
-                    if use_bulk {
-                        let _ = connection::terminate_all_connections();
-                    } else {
-                        for id in &ids {
-                            let _ = connection::terminate_connection(Some(id.clone()));
+                    let result = tokio::task::spawn_blocking(move || {
+                        if use_bulk {
+                            let _ = connection::terminate_all_connections();
+                        } else {
+                            for id in &ids {
+                                let _ = connection::terminate_connection(Some(id.clone()));
+                            }
                         }
-                    }
-                    let info = tri!(connection::get_connections(), or_cancel);
+                        connection::get_connections()
+                    })
+                    .await
+                    .unwrap();
+                    let info = tri!(result, or_cancel);
                     wrapper(move |content: &mut Connections| {
                         content.conns = info.connections.unwrap_or_default();
                         content.error = None;

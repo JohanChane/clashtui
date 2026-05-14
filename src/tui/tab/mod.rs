@@ -150,6 +150,12 @@ pub(crate) mod agent {
 
             // Add user-defined chords
             if let Some(user_chords) = USER_CHORDS.get() {
+                if !user_chords.is_empty() {
+                    // Remove default chords whose key sequence conflicts with user chords
+                    let user_combos: std::collections::HashSet<KeyCombo> =
+                        user_chords.iter().map(|(c, _, _)| c.clone()).collect();
+                    v.retain(|(combo, _, _)| combo.len() == 1 || !user_combos.contains(combo));
+                }
                 for (combo, key, desc) in user_chords {
                     v.push((combo.clone(), *key, Box::leak(desc.clone().into_boxed_str())));
                 }

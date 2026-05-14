@@ -64,9 +64,24 @@ impl BasicTabContent for Status {
         async {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
-            let version = tri!(restful::control::version(), or_set);
-            let config = tri!(restful::config::fetch(), or_set);
-            let detected = tri!(restful::core_detect::detect_core_type(), or_set);
+            let version = tri!(
+                tokio::task::spawn_blocking(restful::control::version)
+                    .await
+                    .unwrap(),
+                or_set
+            );
+            let config = tri!(
+                tokio::task::spawn_blocking(restful::config::fetch)
+                    .await
+                    .unwrap(),
+                or_set
+            );
+            let detected = tri!(
+                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
+                    .await
+                    .unwrap(),
+                or_set
+            );
 
             wrapper(move |content: &mut Self| {
                 let configured = CONFIG.core_type();
@@ -115,9 +130,21 @@ impl BasicTabContent for Status {
         }
 
         async {
-            let version = tri!(restful::control::version());
-            let config = tri!(restful::config::fetch());
-            let detected = tri!(restful::core_detect::detect_core_type());
+            let version = tri!(
+                tokio::task::spawn_blocking(restful::control::version)
+                    .await
+                    .unwrap()
+            );
+            let config = tri!(
+                tokio::task::spawn_blocking(restful::config::fetch)
+                    .await
+                    .unwrap()
+            );
+            let detected = tri!(
+                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
+                    .await
+                    .unwrap()
+            );
 
             wrapper(move |content: &mut Self| {
                 let configured = CONFIG.core_type();

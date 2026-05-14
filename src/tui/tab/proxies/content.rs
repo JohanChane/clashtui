@@ -270,7 +270,12 @@ impl BasicTabContent for Proxies {
         }
         async {
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let response = tri!(proxies::fetch_proxies(), or_set);
+            let response = tri!(
+                tokio::task::spawn_blocking(proxies::fetch_proxies)
+                    .await
+                    .unwrap(),
+                or_set
+            );
             wrapper(|content: &mut Self| {
                 content.proxies = response.proxies;
                 content.tree.rebuild_from_proxies(&content.proxies);
@@ -289,7 +294,11 @@ impl BasicTabContent for Proxies {
             return;
         }
         async {
-            let response = tri!(proxies::fetch_proxies());
+            let response = tri!(
+                tokio::task::spawn_blocking(proxies::fetch_proxies)
+                    .await
+                    .unwrap()
+            );
             wrapper(|content: &mut Self| {
                 content.proxies = response.proxies.clone();
                 content.tree = ProxyTree::build(response);
