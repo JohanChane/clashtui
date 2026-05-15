@@ -23,16 +23,36 @@ ClashTui is a terminal user interface (TUI) proxy management tool supporting bot
 
 ## Installation
 
-With root access (for TUN mode):
+### With root access (for TUN mode)
+
+1. \[Optional\] Install mihomo and clashtui from your package repository:
 
 ```sh
-./install
+sudo pacman -S mihomo sing-box clashtui  # ArchLinux. (Note: the latest clashtui may not be uploaded yet — please build and install it manually)
 ```
 
-Without root access (no TUN):
+This step ensures mihomo, sing-box, and clashtui are available in your environment so the install script will skip downloading them. You can also download them manually and run `which mihomo sing-box clashtui` to verify they are correctly configured.
+
+2. Run the install script:
 
 ```sh
-./install --is-user
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install)"
+```
+
+Tip: The install script downloads resources from GitHub. If downloads keep failing, try enabling a proxy before running the script.
+
+3. \[Optional\] Enable `clashtui_mihomo.service` / `clashtui_singbox.service` on boot:
+
+```sh
+sudo systemctl enable clashtui_mihomo.service
+# OR
+sudo systemctl enable clashtui_singbox.service
+```
+
+### Without root access (no TUN)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --is-user
 ```
 
 ## Documentation

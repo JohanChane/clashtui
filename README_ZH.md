@@ -22,16 +22,36 @@ ClashTui 是一个终端用户界面（TUI）代理管理工具，支持 **Mihom
 
 ## 安装
 
-想开启 tun 并有 root 权限:
+### 想开启 tun 并有 root 权限
+
+1. \[可选\] 从仓库中安装 mihomo 和 clashtui:
 
 ```sh
-./install
+sudo pacman -S mihomo sing-box clashtui  # ArchLinux. (目前 clashtui 还没有上传最新的, 请手动编译安装 clashtui)
 ```
 
-没有 root 权限 (不开启 tun):
+这一步的目的是保证当前环境中包含 mihomo, sing-box 和 clashtui，这样安装脚本会跳过安装它们的步骤。你也可以手动下载这两个工具，然后运行 which mihomo sing-box clashtui 来检查是否已正确配置。
+
+2. 运行安装脚本
 
 ```sh
-./install --is-user
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install)"
+```
+
+提示：由于安装脚本使用的资源是从 GitHub 上下载的，所以如果总是下载失败，可以先开启代理再运行脚本。
+
+3. \[可选\] 将 `clashtui_mihomo.service/clashtui_singbox.service` 设置为开机启动
+
+```sh
+sudo systemctl enable clashtui_mihomo.service
+# OR
+sudo systemctl enable clashtui_singbox.service
+```
+
+### 没有 root 权限 (不开启 tun)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --is-user
 ```
 
 ## 文档
