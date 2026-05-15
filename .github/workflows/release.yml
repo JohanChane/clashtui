@@ -57,14 +57,14 @@ jobs:
           cargo zigbuild --target aarch64-unknown-linux-gnu.2.17 --release --locked
 
       - name: Build Version
-        run: ./target/x86_64-unknown-linux-gnu/release/clashtui -v >> version.txt
+        run: ./target/x86_64-unknown-linux-gnu/release/clashtui --version | awk '{print $2}' > version.txt
 
       - name: Pre Upload
         run: |
           mkdir artifacts
           mv ./target/x86_64-unknown-linux-gnu/release/clashtui    ./artifacts/clashtui-amd64
-          mv ./target/aarch64-unknown-linux-gnu/release/clashtui  ./artifacts/clashtui-arm64
-          mv version.txt                                          ./artifacts/version.txt
+          mv ./target/aarch64-unknown-linux-gnu/release/clashtui    ./artifacts/clashtui-arm64
+          mv version.txt                                            ./artifacts/version.txt
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
