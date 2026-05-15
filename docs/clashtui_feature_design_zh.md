@@ -113,7 +113,7 @@ ClashTui 使用 Linux 组文件权限管理 Core 的文件: User 加入每个 Co
 
 因为 sing-box 的顶层字段 (Section) 耦合度比较高, 所以使用以下的合并方式。
 
-sing-box 的合并由 demotui 自行实现递归深合并，不再依赖外部 `sing-box merge` 命令。
+sing-box 的合并由 clashtui 自行实现递归深合并，不再依赖外部 `sing-box merge` 命令。
 
 合并算法：
 
@@ -202,7 +202,7 @@ profile.json:                           core_override_config.json:
 
 - 与 Mihomo 的整顶层 key 替换不同，sing-box 需要深度合并，因为用户可能只想覆盖 inbounds 而不丢失 profile 的 route/dns/outbounds。
 - 使用标准 sing-box JSON 语法可降低学习门槛，用户查阅 sing-box 文档即可。
-- 不依赖 `sing-box merge` 可以避免外部命令的版本兼容问题，且合并逻辑完全由 demotui 控制。
+- 不依赖 `sing-box merge` 可以避免外部命令的版本兼容问题，且合并逻辑完全由 clashtui 控制。
 - 数组整体替换（而非元素级合并）是 GUI.for.SingBox 的一致行为，且语义明确：用户写了哪些 inbound 就是哪些。
 
 ## Profile 的管理设计

@@ -734,18 +734,19 @@ uninstall() {
     return 1
   fi
 
+  rm -rf ~/.cache/clashtui
   if $IS_USER; then
     rm -f "$UNIT_DIR/clashtui_mihomo.service"
     rm -f "$UNIT_DIR/clashtui_singbox.service"
     systemctl --user daemon-reload
-    rm -f "$HOME/.local/bin/clashtui"
+    #rm -f "$HOME/.local/bin/clashtui"
     rm -rf "$INSTALL_DIR"
   else
     sudo rm -f /usr/lib/systemd/system/clashtui_mihomo.service
     sudo rm -f /usr/lib/systemd/system/clashtui_singbox.service
     sudo systemctl daemon-reload
-    sudo rm -f /usr/local/bin/clashtui
-    sudo rm -f /usr/bin/sing-box
+    #sudo rm -f /usr/local/bin/clashtui
+    #sudo rm -f /usr/bin/sing-box
     sudo rm -rf /opt/clashtui
 
     echo "[Optional] Delete the mihomo user and group"
