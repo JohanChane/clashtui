@@ -1,20 +1,20 @@
 [package]
-name = "demotui"
-# 发布相关的通用配置
-version = "0.1.0"
+name = "clashtui"
+# General release configuration
+version = "0.3.0"
 edition = "2024"
-description = "A demo TUI application"
+description = "A Clash/sing-box TUI application"
 license = "MIT OR Apache-2.0"
-keywords = ["tui", "demo", "terminal"]
+keywords = ["tui", "clash", "mihomo", "sing-box", "terminal"]
 categories = ["command-line-utilities", "terminal"]
 readme = "README.md"
-homepage = "https://github.com/yourusername/demotui"
-repository = "https://github.com/yourusername/demotui"
+homepage = "https://github.com/JohanChane/clashtui"
+repository = "https://github.com/JohanChane/clashtui"
 
 [package.metadata.release]
-# 发布时是否执行 cargo test
+# Whether to run cargo test before release
 pre-release-commands = ["cargo test"]
-# 发布后是否执行 cargo publish
+# Whether to run cargo publish after release
 publish = true
 
 [dependencies]
@@ -74,12 +74,11 @@ tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-lite", "dep:sig
 
 default = ["customized-theme"]
 
-
-# 工作空间的 release 配置
+# Workspace release profile
 [profile.release]
 codegen-units = 1
 lto = true
 strip = true
 panic = "abort"
 incremental = false
-opt-level = "z"     # 优化大小，也可以用 "s" 或 "3"
+opt-level = "z"     # Optimize for size; "s" or "3" are alternatives
