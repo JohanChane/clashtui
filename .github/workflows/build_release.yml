@@ -35,10 +35,10 @@ jobs:
             ci-${{ runner.os }}-
 
       - name: Download Dependencies
-        run: cd clashtui && cargo fetch
+        run: cargo fetch
 
       - name: Run tests
-        run: cd clashtui && cargo test --all
+        run: cargo test --all
       
       - name: Build linux amd64
         run: |
@@ -58,7 +58,7 @@ jobs:
 
       - name: Build Version
         run: |
-          cd clashtui && cargo run --release -- -v >> version.txt
+          cargo run --release -- -v >> version.txt
 
       - name: Pre Upload
         run: |
