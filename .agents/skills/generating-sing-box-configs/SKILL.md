@@ -26,7 +26,7 @@ Ask: "是否需要生成 clashtui 的 sing-box 模板配置?"
 
 Clashtui templates use `${PPG.<group>}` and `${PGG.<name>}` placeholders for dynamic outbound expansion. If yes, follow the clashtui template section below.
 
-If unsure about clashtui, see the demotui project source for reference templates (e.g. `src/functions/file/template/testdata/singbox_common_tpl.json`).
+If unsure about clashtui, see the clashtui project source for reference templates (e.g. `src/functions/file/template/testdata/singbox_common_tpl.json`).
 
 ## Config Patterns by Focus
 
@@ -196,7 +196,7 @@ Template pattern — place these in `outbounds`:
   "url": "https://www.gstatic.com/generate_204", "interval": "5m", "tolerance": 50 }
 ```
 
-Reference full template from the demotui project source code (e.g. `src/functions/file/template/testdata/singbox_common_tpl.json`)
+Reference full template from the clashtui project source code (e.g. `src/functions/file/template/testdata/singbox_common_tpl.json`)
 
 Templates go in `sing-box/templates/`, proxy-providers in `sing-box/template_proxy_providers`.
 
