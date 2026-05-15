@@ -36,7 +36,7 @@ This step ensures mihomo, sing-box, and clashtui are available in your environme
 2. Run the install script:
 
 ```sh
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install)"
+curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --repo JohanChane/clashtui --branch demotui --core all
 ```
 
 Tip: The install script downloads resources from GitHub. If downloads keep failing, try enabling a proxy before running the script.
@@ -52,7 +52,7 @@ sudo systemctl enable clashtui_singbox.service
 ### Without root access (no TUN)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --is-user
+curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --repo JohanChane/clashtui --branch demotui --core all --is-user
 ```
 
 ## Documentation

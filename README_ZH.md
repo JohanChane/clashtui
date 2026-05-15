@@ -35,7 +35,7 @@ sudo pacman -S mihomo sing-box clashtui  # ArchLinux. (目前 clashtui 还没有
 2. 运行安装脚本
 
 ```sh
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install)"
+curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --repo JohanChane/clashtui --branch demotui --core all
 ```
 
 提示：由于安装脚本使用的资源是从 GitHub 上下载的，所以如果总是下载失败，可以先开启代理再运行脚本。
@@ -51,7 +51,7 @@ sudo systemctl enable clashtui_singbox.service
 ### 没有 root 权限 (不开启 tun)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --is-user
+curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --repo JohanChane/clashtui --branch demotui --core all --is-user
 ```
 
 ## 文档
