@@ -1,11 +1,15 @@
-# Clashtui
+# ClashTui
 
-Clashtui 是一个终端用户界面（TUI）代理管理工具，支持 **Mihomo**（Clash.Meta）和 **sing-box** 两种代理核心。你可以在终端里完成切换节点、更新订阅、管理连接和控制服务启停等操作。
+<img width="2254" height="1254" alt="demo" src="https://github.com/user-attachments/assets/4059d70c-c7d8-4835-b177-0a768c32d91b" />
+
+Language: [English](./README.md) | [中文](./README_ZH.md)
+
+ClashTui 是一个终端用户界面（TUI）代理管理工具，支持 **Mihomo**（Clash.Meta）和 **sing-box** 两种代理核心。你可以在终端里完成切换节点、更新订阅、管理连接和控制服务启停等操作。
 
 ## 特性
 
 - **双核心支持** — 同时兼容 Mihomo 和 sing-box，可在界面中随时切换
-- **订阅管理** — 支持 File、URL、Template (clashtui 的 template) 三种 profiles。
+- **订阅管理** — 支持 File、URL、Template (ClashTui 的 template) 三种 profiles。
 - **代理切换** — 按组/按节点切换，支持延迟测试
 - **连接监控** — 实时查看所有活动连接，可关闭单个或全部连接
 - **服务控制** — 通过 systemd 管理核心的启动、停止和重启
@@ -35,7 +39,7 @@ Clashtui 是一个终端用户界面（TUI）代理管理工具，支持 **Mihom
 | 文档 | 说明 |
 |------|------|
 | [使用指南](docs/getting_started_zh.md) | 详细使用教程：界面操作、命令行、订阅管理、配置说明、常见问题 |
-| [功能设计](docs/clashtui_feature_design_zh.md) | 功能设计文档：配置结构、订阅管理、Template 展开、sing-box 合并算法 |
+| [功能设计](docs/ClashTui_feature_design_zh.md) | 功能设计文档：配置结构、订阅管理、Template 展开、sing-box 合并算法 |
 | [架构](docs/architecture_zh.md) | 代码架构文档：模块结构、启动流程、TUI 事件循环、Tab 体系 |
 
 ## 参与开发
@@ -43,5 +47,5 @@ Clashtui 是一个终端用户界面（TUI）代理管理工具，支持 **Mihom
 欢迎提交 Issue 和 Pull Request。
 
 快速了解项目, 加入开发:
-1.  docs/clashtui_feature_design_zh.md
+1.  docs/ClashTui_feature_design_zh.md
 2.  docs/architecture_zh.md
