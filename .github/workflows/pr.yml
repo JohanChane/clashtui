@@ -1,0 +1,39 @@
+name: Pull Request
+
+on:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  CLASHTUI_VERSION: ${{ github.head_ref }}
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Dependencies
+        run: cd clashtui && cargo fetch
+
+      - name: Build
+        run: cd clashtui && cargo build --verbose
+
+      - name: Run tests
+        run: cd clashtui && cargo test --all --verbose
+
+      - name: Build Version
+        run: cd clashtui && cargo r -- -v
+
+      - name: Pre Upload
+        run: |
+          mkdir artifacts
+          mv ./clashtui/target/debug/clashtui ./artifacts/clashtui.debug
+
+      - name: upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux_Build
+          path: artifacts
+          retention-days: 5
