@@ -31,7 +31,7 @@ jobs:
         run: cargo test --all --verbose
 
       - name: Build Version
-        run: cargo r -- -v
+        run: cargo run -- --version
 
       - name: Pre Upload
         run: |
