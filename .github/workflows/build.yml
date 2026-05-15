@@ -1,0 +1,69 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - demotui
+    paths:
+      - '.github/workflows/build.yml'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'build.rs'
+
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: goto-bus-stop/setup-zig@v2
+
+      - name: Cache Target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./target
+            ~/.cargo
+          key: ci-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ci-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+            ci-${{ runner.os }}-
+
+      - name: Download Dependencies
+        run: cargo fetch
+
+      - name: Run tests
+        run: cargo test --all
+
+      - name: Build linux amd64
+        run: |
+          rustup target add x86_64-unknown-linux-gnu
+          cargo install cargo-zigbuild
+          cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --locked
+
+      - name: Build linux arm64
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          cargo install cargo-zigbuild
+          cargo zigbuild --target aarch64-unknown-linux-gnu.2.17 --locked
+
+      - name: Pre Upload
+        run: |
+          mkdir artifacts
+          mv ./target/x86_64-unknown-linux-gnu/debug/clashtui    ./artifacts/clashtui-amd64-debug
+          mv ./target/aarch64-unknown-linux-gnu/debug/clashtui    ./artifacts/clashtui-arm64-debug
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux_Build
+          path: artifacts
+          retention-days: 5

@@ -187,6 +187,35 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d728cc89cf3aee9ff92b05e62b19ee65a02b5702cff7d5a377e32c6ae29d8d"
 
 [[package]]
+name = "clashtui"
+version = "0.3.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "clap_complete",
+ "crossterm",
+ "env_logger",
+ "fastrand",
+ "futures-lite",
+ "indexmap",
+ "libc",
+ "log",
+ "md5",
+ "minreq",
+ "nix",
+ "ratatui",
+ "self-replace",
+ "serde",
+ "serde_json",
+ "serde_yml",
+ "signal-hook-tokio",
+ "strum",
+ "tokio",
+ "tungstenite",
+ "unicode-width 0.2.0",
+]
+
+[[package]]
 name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -293,35 +322,6 @@ name = "data-encoding"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4ae5f15dda3c708c0ade84bfee31ccab44a3da4f88015ed22f63732abe300c8"
-
-[[package]]
-name = "demotui"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "clap_complete",
- "crossterm",
- "env_logger",
- "fastrand",
- "futures-lite",
- "indexmap",
- "libc",
- "log",
- "md5",
- "minreq",
- "nix",
- "ratatui",
- "self-replace",
- "serde",
- "serde_json",
- "serde_yml",
- "signal-hook-tokio",
- "strum",
- "tokio",
- "tungstenite",
- "unicode-width 0.2.0",
-]
 
 [[package]]
 name = "digest"
