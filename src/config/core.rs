@@ -118,7 +118,7 @@ impl Default for Extra {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum ServiceController {
     Systemd,
     Nssm,
@@ -307,5 +307,74 @@ profiles:
         assert_eq!(data.cur_profile.as_deref(), Some("my"));
         assert_eq!(data.profiles.get("pf1").unwrap().no_pp, true);
         assert_eq!(data.profiles.get("pf2").unwrap().no_pp, false);
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn extra_default_macos_uses_open() {
+        let extra = Extra::default();
+        assert_eq!(extra.edit_cmd, "open %s");
+        assert_eq!(extra.open_dir_cmd, "open %s");
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn extra_default_non_macos_not_open() {
+        let extra = Extra::default();
+        // On non-macOS platforms, the default should NOT be "open %s"
+        assert_ne!(extra.edit_cmd, "open %s");
+        assert_ne!(extra.open_dir_cmd, "open %s");
+    }
+
+    #[test]
+    fn service_controller_bin_name() {
+        assert_eq!(ServiceController::Launchd.bin_name(), "launchctl");
+        assert_eq!(ServiceController::Systemd.bin_name(), "systemctl");
+        assert_eq!(ServiceController::Nssm.bin_name(), "nssm");
+        assert_eq!(ServiceController::OpenRc.bin_name(), "rc-service");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn service_controller_default_macos_is_launchd() {
+        assert_eq!(ServiceController::default(), ServiceController::Launchd);
+    }
+
+    #[test]
+    fn service_controller_args_nssm() {
+        let args = ServiceController::Nssm.args("start", "svc", false);
+        assert_eq!(args, vec!["start", "svc"]);
+    }
+
+    #[test]
+    fn service_controller_args_systemd_user() {
+        let args = ServiceController::Systemd.args("stop", "svc", true);
+        assert_eq!(args, vec!["--user", "stop", "svc"]);
+    }
+
+    #[test]
+    fn service_controller_args_systemd_system() {
+        let args = ServiceController::Systemd.args("stop", "svc", false);
+        assert_eq!(args, vec!["stop", "svc"]);
+    }
+
+    #[test]
+    fn service_controller_args_openrc_user() {
+        let args = ServiceController::OpenRc.args("restart", "svc", true);
+        assert_eq!(args, vec!["svc", "restart", "--user"]);
+    }
+
+    #[test]
+    fn service_controller_args_openrc_system() {
+        let args = ServiceController::OpenRc.args("restart", "svc", false);
+        assert_eq!(args, vec!["svc", "restart"]);
+    }
+
+    #[test]
+    fn service_controller_args_launchd_is_empty() {
+        let args = ServiceController::Launchd.args("start", "svc", false);
+        assert!(args.is_empty());
+        let args = ServiceController::Launchd.args("restart", "svc", true);
+        assert!(args.is_empty());
     }
 }
