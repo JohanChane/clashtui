@@ -27,9 +27,16 @@ ClashTui is a terminal user interface (TUI) proxy management tool supporting bot
 - **Config Override** — Override final config via `core_override_config` without modifying original subscription files
 - **Template System** — Auto-generate config files using templates + proxy node groups, with variable expansion (recommended for sing-box to avoid configuration version issues)
 - **Custom Key Bindings** — Customize shortcuts for each tab via `keymap.yaml`
-- **fzf Support** — Fuzzy finding support
+- **Custom themes** - user-definable via theme.yaml
+- **which panel** - convenient for user operations
+- **Supports fzf** - users can use fzf for selection
 
 ## Installation
+
+### Requirements
+
+-   sudo
+-   fzf
 
 ### With root access (for TUN mode)
 
@@ -44,7 +51,7 @@ This step ensures mihomo, sing-box, and clashtui are available in your environme
 2. Run the install script:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --repo JohanChane/clashtui --branch demotui --core all
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install) --repo JohanChane/clashtui --branch demotui --core all
 ```
 
 Tip: The install script downloads resources from GitHub. If downloads keep failing, try enabling a proxy before running the script.
@@ -60,7 +67,7 @@ sudo systemctl enable clashtui_singbox.service
 ### Without root access (no TUN)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --repo JohanChane/clashtui --branch demotui --core all --is-user
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install) --repo JohanChane/clashtui --branch demotui --core all --is-user
 ```
 
 ## Documentation
