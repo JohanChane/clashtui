@@ -1,3 +1,11 @@
+> **Important Notice**
+>
+> clashtui v0.3.0 is now pre-released. Barring any critical issues, it will go into full release after May 23. The following changes will be made to the repository:
+> - The `main` and `dev` branches will be renamed to `archive/main` and `archive/dev`, respectively. They have been tagged as `archive/v0.2.3` and `archive/v0.2.3-dev`.
+> - The `demotui` branch will be renamed to `main`, and a new `dev` branch will be created.
+>
+> ***Package maintainers, please take note.***
+
 # ClashTui
 
 <img width="2254" height="1254" alt="demo" src="https://github.com/user-attachments/assets/4059d70c-c7d8-4835-b177-0a768c32d91b" />

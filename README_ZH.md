@@ -1,3 +1,8 @@
+> **重要通知**
+> clashtui v0.3.0 已经 pre-release 了, 如果没有什么严重的问题, 则会在 5 月 23 号之后, 将发布 release。整个仓库会做如下改动:
+> -   `main` 和 `dev` branch 会分别改名为 `archive/main` 和 `archive/dev`。它们已经 tag 为 `archive/v0.2.3` 和 `archive/v0.2.3-dev`
+> -   `demotui` branch 会改名为 `main` 并基于它创建 `dev` branch
+
 # ClashTui
 
 <img width="2254" height="1254" alt="demo" src="https://github.com/user-attachments/assets/4059d70c-c7d8-4835-b177-0a768c32d91b" />
