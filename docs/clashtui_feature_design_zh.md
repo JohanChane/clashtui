@@ -12,7 +12,7 @@
 
 ## ClashTui 的文件结构设计
 
-ClashTui 配置的文件结构:
+ClashTui 配置的文件结构 (e.g. `~/.config/clashtui`):
 
 ```
 .
@@ -32,7 +32,7 @@ ClashTui 配置的文件结构:
     └── templates
 ```
 
-ClashTui Core 的文件结构设计:
+ClashTui Core 的文件结构设计 (e.g. `/opt/clashtui`):
 
 ```
 .
@@ -101,8 +101,8 @@ singbox:
     is_user: false
 timeout: null
 extra:
-  edit_cmd: kitty -e nvim "%s"
-  open_dir_cmd: kitty -e yazi "%s"
+  edit_cmd: ghostty -e nvim -- "%s"
+  open_dir_cmd: ghostty -e yazi -- "%s"
 ```
 
 设计原则: Mihomo 和 sing-box 不能共同使用的, 分别放在 mihomo 和 sing-box section。
@@ -750,6 +750,8 @@ pvd:  # proxy-provider group name
 
 ### macOS Core 文件结构 (launchd)
 
+ClashTui Core 的文件结构设计 (e.g. `/usr/local/opt/clashtui`):
+
 ```
 .
 ├── bin
@@ -769,6 +771,8 @@ launchd plist (独立存放):
   System Mode: /Library/LaunchDaemons/clashtui_mihomo.plist
                /Library/LaunchDaemons/clashtui_singbox.plist
 ```
+
+user mode 的 ClashTui Core 的默认路径是 `~/.local/clashtui`。和 Linux 一样。
 
 ### systemd vs launchd 对比
 
