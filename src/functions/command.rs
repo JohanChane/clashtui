@@ -234,3 +234,55 @@ pub fn open_dir(path: &str) -> Result<()> {
         vec!["-c", CONFIG.cfg_file.extra.open_dir_cmd.replace("%s", path).as_str()],
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_launchd_plist_path_user() {
+        let path = launchd_plist_path("com.example.service", true);
+        assert!(path.contains("Library/LaunchAgents"));
+        assert!(path.contains("com.example.service.plist"));
+        assert!(
+            !path.starts_with("/Library/"),
+            "user path should use HOME, not system /Library: {path}"
+        );
+    }
+
+    #[test]
+    fn test_launchd_plist_path_system() {
+        let path = launchd_plist_path("com.example.service", false);
+        assert_eq!(path, "/Library/LaunchDaemons/com.example.service.plist");
+    }
+
+    #[test]
+    fn test_service_controller_args_launchd() {
+        let args = ServiceController::Launchd.args("start", "my_service", false);
+        assert!(args.is_empty(), "Launchd args should be empty (handled inline)");
+    }
+
+    #[test]
+    fn test_service_controller_args_launchd_user() {
+        let args = ServiceController::Launchd.args("stop", "my_service", true);
+        assert!(args.is_empty(), "Launchd user args should also be empty");
+    }
+
+    #[test]
+    fn test_service_controller_bin_name_launchd() {
+        assert_eq!(ServiceController::Launchd.bin_name(), "launchctl");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn test_service_controller_default_is_launchd_on_macos() {
+        assert_eq!(ServiceController::default(), ServiceController::Launchd);
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    #[test]
+    fn test_service_controller_default_not_macos() {
+        // On non-macOS, the default should NOT be Launchd
+        assert_ne!(ServiceController::default(), ServiceController::Launchd);
+    }
+}
