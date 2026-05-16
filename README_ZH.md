@@ -1,3 +1,8 @@
+> **重要通知**
+> clashtui v0.3.0 已经 pre-release 了, 如果没有什么严重的问题, 则会在 5 月 23 号之后, 将发布 release。整个仓库会做如下改动:
+> -   `main` 和 `dev` branch 会分别改名为 `archive/main` 和 `archive/dev`。它们已经 tag 为 `archive/v0.2.3` 和 `archive/v0.2.3-dev`
+> -   `demotui` branch 会改名为 `main` 并基于它创建 `dev` branch
+
 # ClashTui
 
 <img width="2254" height="1254" alt="demo" src="https://github.com/user-attachments/assets/4059d70c-c7d8-4835-b177-0a768c32d91b" />
@@ -35,7 +40,7 @@ sudo pacman -S mihomo sing-box clashtui  # ArchLinux. (目前 clashtui 还没有
 2. 运行安装脚本
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --repo JohanChane/clashtui --branch demotui --core all
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install) --repo JohanChane/clashtui --branch demotui --core all
 ```
 
 提示：由于安装脚本使用的资源是从 GitHub 上下载的，所以如果总是下载失败，可以先开启代理再运行脚本。
@@ -51,7 +56,7 @@ sudo systemctl enable clashtui_singbox.service
 ### 没有 root 权限 (不开启 tun)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install | bash -s -- --repo JohanChane/clashtui --branch demotui --core all --is-user
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/install) --repo JohanChane/clashtui --branch demotui --core all --is-user
 ```
 
 ## 文档
