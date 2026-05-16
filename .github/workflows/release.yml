@@ -66,7 +66,7 @@ jobs:
           fetch-depth: 0
 
       - uses: goto-bus-stop/setup-zig@v2
-        if: matrix.zig-target != ''
+        if: matrix.zig-target
 
       - name: Cache Target
         uses: actions/cache@v4
@@ -82,14 +82,14 @@ jobs:
         run: cargo fetch
 
       - name: Build (zig + glibc 2.17)
-        if: matrix.zig-target != ''
+        if: matrix.zig-target
         run: |
           rustup target add ${{ matrix.target }}
           cargo install cargo-zigbuild
           cargo zigbuild --target ${{ matrix.zig-target }} --release --locked
 
       - name: Build (native)
-        if: matrix.zig-target == ''
+        if: ${{ !matrix.zig-target }}
         run: |
           rustup target add ${{ matrix.target }}
           cargo build --release --locked --target ${{ matrix.target }}
