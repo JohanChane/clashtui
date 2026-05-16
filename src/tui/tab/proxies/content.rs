@@ -247,6 +247,19 @@ impl Proxies {
                     .collect();
                 self.fzf_find(items, task_set);
             }
+            super::Key::GroupSelect => {
+                let parent = self.tree.node_at(current)
+                    .map(|n| n.parent.clone())
+                    .flatten();
+                let items: Vec<(String, usize)> = self.tree.nodes.iter()
+                    .enumerate()
+                    .filter(|(_, n)| n.parent == parent)
+                    .map(|(i, n)| (n.name.clone(), i))
+                    .collect();
+                if !items.is_empty() {
+                    self.fzf_find(items, task_set);
+                }
+            }
         }
     }
 }
