@@ -26,7 +26,7 @@ pub fn migrate() -> anyhow::Result<()> {
     let service = super::Service {
         #[cfg(any(target_os = "linux", target_os = "windows"))]
         clash_service_name: clash_srv_name,
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         is_user,
     };
     let extra = super::Extra {

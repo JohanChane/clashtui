@@ -89,7 +89,7 @@ pub(crate) enum ArgCommand {
         #[command(subcommand)]
         command: ProfileCommand,
     },
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
     /// service related
     Service {
         #[command(subcommand)]

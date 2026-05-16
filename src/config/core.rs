@@ -123,11 +123,14 @@ pub enum ServiceController {
     Systemd,
     Nssm,
     OpenRc,
+    Launchd,
 }
 impl Default for ServiceController {
     fn default() -> Self {
         if cfg!(windows) {
             ServiceController::Nssm
+        } else if cfg!(target_os = "macos") {
+            ServiceController::Launchd
         } else {
             ServiceController::Systemd
         }
@@ -146,6 +149,8 @@ impl ServiceController {
             ServiceController::OpenRc if is_user => vec![service_name, work_type, "--user"],
             ServiceController::OpenRc => vec![service_name, work_type],
             ServiceController::Nssm => vec![work_type, service_name],
+            // Launchd args are constructed inline in svc_operation
+            ServiceController::Launchd => vec![],
         }
     }
     pub fn bin_name(&self) -> &'static str {
@@ -153,6 +158,7 @@ impl ServiceController {
             ServiceController::Systemd => "systemctl",
             ServiceController::Nssm => "nssm",
             ServiceController::OpenRc => "rc-service",
+            ServiceController::Launchd => "launchctl",
         }
     }
 }

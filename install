@@ -42,6 +42,8 @@ backup_file() {
 
 # --- Resolve all paths based on current options ---
 resolve_paths() {
+  detect_is_macos
+
   if $IS_USER; then
     INSTALL_DIR="$HOME/.local/clashtui"
     INSTALL_DIR_MIHOMO="$INSTALL_DIR/mihomo"
@@ -49,22 +51,46 @@ resolve_paths() {
     MIHOMO_CONFIG_DIR="$INSTALL_DIR_MIHOMO/config"
     SINGBOX_CONFIG_DIR="$INSTALL_DIR_SINGBOX/config"
     SUDO=""
-    SYSTEMCTL_FLAGS="--user"
-    UNIT_DIR="$HOME/.config/systemd/user"
-    SYSTEMD_RELOAD="systemctl --user daemon-reload"
-    UNIT_WANTED_BY="default.target"
     SERVICE_IS_USER=true
+    if $IS_MACOS; then
+      UNIT_DIR="$HOME/Library/LaunchAgents"
+      SERVICE_LOAD_CMD="launchctl load -w"
+      SERVICE_UNLOAD_CMD="launchctl unload"
+      SERVICE_ENABLE_CMD="launchctl load -w"
+      LAUNCHD_DOMAIN="gui/\$(id -u)"
+    else
+      SYSTEMCTL_FLAGS="--user"
+      UNIT_DIR="$HOME/.config/systemd/user"
+      SYSTEMD_RELOAD="systemctl --user daemon-reload"
+      UNIT_WANTED_BY="default.target"
+      SERVICE_LOAD_CMD=""
+      SERVICE_UNLOAD_CMD=""
+      SERVICE_ENABLE_CMD="systemctl --user enable"
+    fi
   else
-    INSTALL_DIR="/opt/clashtui"
+    if $IS_MACOS; then
+      INSTALL_DIR="/usr/local/opt/clashtui"
+      UNIT_DIR="/Library/LaunchDaemons"
+      SUDO="sudo"
+      SERVICE_LOAD_CMD="sudo launchctl load -w"
+      SERVICE_UNLOAD_CMD="sudo launchctl unload"
+      SERVICE_ENABLE_CMD="sudo launchctl load -w"
+      LAUNCHD_DOMAIN="system"
+    else
+      INSTALL_DIR="/opt/clashtui"
+      UNIT_DIR="/usr/lib/systemd/system"
+      SUDO="sudo"
+      SYSTEMCTL_FLAGS=""
+      SYSTEMD_RELOAD="sudo systemctl daemon-reload"
+      UNIT_WANTED_BY="multi-user.target"
+      SERVICE_LOAD_CMD=""
+      SERVICE_UNLOAD_CMD=""
+      SERVICE_ENABLE_CMD="sudo systemctl enable"
+    fi
     INSTALL_DIR_MIHOMO="$INSTALL_DIR/mihomo"
     INSTALL_DIR_SINGBOX="$INSTALL_DIR/sing-box"
     MIHOMO_CONFIG_DIR="$INSTALL_DIR_MIHOMO/config"
     SINGBOX_CONFIG_DIR="$INSTALL_DIR_SINGBOX/config"
-    SUDO="sudo"
-    SYSTEMCTL_FLAGS=""
-    UNIT_DIR="/usr/lib/systemd/system"
-    SYSTEMD_RELOAD="sudo systemctl daemon-reload"
-    UNIT_WANTED_BY="multi-user.target"
     SERVICE_IS_USER=false
   fi
 
@@ -136,6 +162,11 @@ detect_os() {
   esac
 }
 
+IS_MACOS=false
+detect_is_macos() {
+  [ "$(detect_os)" = "darwin" ] && IS_MACOS=true || IS_MACOS=false
+}
+
 detect_cpu_level_using_proc() {
   local flags=$(grep -m 1 '^flags' /proc/cpuinfo 2>/dev/null | awk '{print $0}')
   if [ -z "$flags" ] || ! echo "$flags" | grep -q ' lm '; then
@@ -193,7 +224,31 @@ detect_cpu_level_using_ld() {
   return 0
 }
 
+detect_cpu_level_using_sysctl() {
+  # macOS: detect Apple Silicon vs Intel AVX2
+  local brand=$(sysctl -n machdep.cpu.brand_string 2>/dev/null)
+  if [[ "$brand" == *"Apple"* ]]; then
+    echo ""
+    return 0
+  fi
+  local features=$(sysctl -n machdep.cpu.features 2>/dev/null)
+  if [ -n "$features" ] && echo "$features" | grep -qw "AVX2"; then
+    echo "v3"
+  else
+    echo ""
+  fi
+}
+
 detect_cpu_level() {
+  if $IS_MACOS; then
+    local level=$(detect_cpu_level_using_sysctl)
+    if [ -n "$level" ]; then
+      echo "-$level"
+    else
+      echo ""
+    fi
+    return 0
+  fi
   local level=$(detect_cpu_level_using_ld)
   if [ -z "$level" ]; then
     level=$(detect_cpu_level_using_proc)
@@ -333,7 +388,7 @@ download_clashtui() {
 
 # --- User/group creation (system mode only) ---
 create_mihomo_user() {
-  if $IS_USER; then
+  if $IS_USER || $IS_MACOS; then
     return 0
   fi
   if ! id "mihomo" &>/dev/null; then
@@ -346,7 +401,7 @@ create_mihomo_user() {
 }
 
 create_singbox_user() {
-  if $IS_USER; then
+  if $IS_USER || $IS_MACOS; then
     return 0
   fi
   if ! id "sing-box" &>/dev/null; then
@@ -358,17 +413,61 @@ create_singbox_user() {
   fi
 }
 
-# --- Systemd unit creation ---
-create_mihomo_systemd_unit() {
-  log_info "Creating mihomo systemd unit..."
-
+# --- Service unit creation (systemd or launchd) ---
+create_mihomo_unit() {
   local service_name="clashtui_mihomo"
-  local unit_path
 
-  if $IS_USER; then
-    mkdir -p "$UNIT_DIR"
-    unit_path="$UNIT_DIR/${service_name}.service"
-    cat >"$unit_path" <<EOF
+  if $IS_MACOS; then
+    # ── macOS: launchd plist ──
+    local plist_path="$UNIT_DIR/${service_name}.plist"
+    local log_dir
+    $SUDO mkdir -p "$UNIT_DIR"
+    if $IS_USER; then
+      log_dir="$HOME/Library/Logs"
+      mkdir -p "$log_dir"
+    else
+      log_dir="/usr/local/var/log"
+      $SUDO mkdir -p "$log_dir"
+    fi
+    log_info "Creating mihomo launchd plist..."
+    $SUDO tee "$plist_path" >/dev/null <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${service_name}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${INSTALL_DIR_MIHOMO}/mihomo</string>
+        <string>-d</string>
+        <string>${MIHOMO_CONFIG_DIR}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>${log_dir}/${service_name}.log</string>
+    <key>StandardErrorPath</key>
+    <string>${log_dir}/${service_name}.log</string>
+    <key>WorkingDirectory</key>
+    <string>${MIHOMO_CONFIG_DIR}</string>
+</dict>
+</plist>
+EOF
+    log_info "Created launchd plist: $plist_path"
+    # Load and start the service
+    $SERVICE_LOAD_CMD "$plist_path"
+  else
+    # ── Linux: systemd unit ──
+    log_info "Creating mihomo systemd unit..."
+    local unit_path
+
+    if $IS_USER; then
+      mkdir -p "$UNIT_DIR"
+      unit_path="$UNIT_DIR/${service_name}.service"
+      cat >"$unit_path" <<EOF
 [Unit]
 Description=mihomo Daemon, Another Clash Kernel.
 After=network.target
@@ -385,11 +484,11 @@ ExecReload=/bin/kill -HUP \$MAINPID
 [Install]
 WantedBy=${UNIT_WANTED_BY}
 EOF
-    log_info "Created user unit: $unit_path"
-  else
-    $SUDO mkdir -p "$INSTALL_DIR_MIHOMO"
-    unit_path="$INSTALL_DIR_MIHOMO/${service_name}.service"
-    $SUDO tee "$unit_path" >/dev/null <<EOF
+      log_info "Created user unit: $unit_path"
+    else
+      $SUDO mkdir -p "$INSTALL_DIR_MIHOMO"
+      unit_path="$INSTALL_DIR_MIHOMO/${service_name}.service"
+      $SUDO tee "$unit_path" >/dev/null <<EOF
 [Unit]
 Description=mihomo Daemon, Another Clash Kernel.
 After=network.target NetworkManager.service systemd-networkd.service iwd.service
@@ -410,22 +509,70 @@ ExecReload=/bin/kill -HUP \$MAINPID
 [Install]
 WantedBy=${UNIT_WANTED_BY}
 EOF
-    $SUDO ln -sf "$unit_path" "$UNIT_DIR/"
-  fi
+      $SUDO ln -sf "$unit_path" "$UNIT_DIR/"
+    fi
 
-  $SYSTEMD_RELOAD
+    $SYSTEMD_RELOAD
+  fi
 }
 
-create_singbox_systemd_unit() {
-  log_info "Creating sing-box systemd unit..."
-
+create_singbox_unit() {
   local service_name="clashtui_singbox"
-  local unit_path
 
-  if $IS_USER; then
-    mkdir -p "$UNIT_DIR"
-    unit_path="$UNIT_DIR/${service_name}.service"
-    cat >"$unit_path" <<EOF
+  if $IS_MACOS; then
+    # ── macOS: launchd plist ──
+    local plist_path="$UNIT_DIR/${service_name}.plist"
+    local log_dir
+    local singbox_bin="${INSTALL_DIR_SINGBOX}/sing-box"
+    $SUDO mkdir -p "$UNIT_DIR"
+    if $IS_USER; then
+      log_dir="$HOME/Library/Logs"
+      mkdir -p "$log_dir"
+    else
+      log_dir="/usr/local/var/log"
+      $SUDO mkdir -p "$log_dir"
+    fi
+    log_info "Creating sing-box launchd plist..."
+    $SUDO tee "$plist_path" >/dev/null <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${service_name}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${singbox_bin}</string>
+        <string>-D</string>
+        <string>${SINGBOX_CONFIG_DIR}</string>
+        <string>-c</string>
+        <string>${SINGBOX_CONFIG_DIR}/config.json</string>
+        <string>run</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>${log_dir}/${service_name}.log</string>
+    <key>StandardErrorPath</key>
+    <string>${log_dir}/${service_name}.log</string>
+    <key>WorkingDirectory</key>
+    <string>${SINGBOX_CONFIG_DIR}</string>
+</dict>
+</plist>
+EOF
+    log_info "Created launchd plist: $plist_path"
+    $SERVICE_LOAD_CMD "$plist_path"
+  else
+    # ── Linux: systemd unit ──
+    log_info "Creating sing-box systemd unit..."
+    local unit_path
+
+    if $IS_USER; then
+      mkdir -p "$UNIT_DIR"
+      unit_path="$UNIT_DIR/${service_name}.service"
+      cat >"$unit_path" <<EOF
 [Unit]
 Description=sing-box Daemon, The universal proxy platform.
 After=network.target
@@ -442,14 +589,14 @@ ExecReload=/bin/kill -HUP \$MAINPID
 [Install]
 WantedBy=${UNIT_WANTED_BY}
 EOF
-    # In user mode, sing-box binary is at INSTALL_DIR_SINGBOX rather than /usr/bin
-    # So use that path directly
-    sed -i "s|/usr/bin/sing-box|${INSTALL_DIR_SINGBOX}/sing-box|" "$unit_path"
-    log_info "Created user unit: $unit_path"
-  else
-    $SUDO mkdir -p "$INSTALL_DIR_SINGBOX"
-    unit_path="$INSTALL_DIR_SINGBOX/${service_name}.service"
-    $SUDO tee "$unit_path" >/dev/null <<EOF
+      # In user mode, sing-box binary is at INSTALL_DIR_SINGBOX rather than /usr/bin
+      # So use that path directly
+      sed -i "s|/usr/bin/sing-box|${INSTALL_DIR_SINGBOX}/sing-box|" "$unit_path"
+      log_info "Created user unit: $unit_path"
+    else
+      $SUDO mkdir -p "$INSTALL_DIR_SINGBOX"
+      unit_path="$INSTALL_DIR_SINGBOX/${service_name}.service"
+      $SUDO tee "$unit_path" >/dev/null <<EOF
 [Unit]
 Description=sing-box Daemon, The universal proxy platform.
 After=network.target NetworkManager.service systemd-networkd.service iwd.service
@@ -471,10 +618,11 @@ LimitNOFILE=infinity
 [Install]
 WantedBy=${UNIT_WANTED_BY}
 EOF
-    $SUDO ln -sf "$unit_path" "$UNIT_DIR/"
-  fi
+      $SUDO ln -sf "$unit_path" "$UNIT_DIR/"
+    fi
 
-  $SYSTEMD_RELOAD
+    $SYSTEMD_RELOAD
+  fi
 }
 
 # --- Core config creation ---
@@ -685,20 +833,20 @@ install_mihomo() {
 
   create_mihomo_user
 
-  if ! $IS_USER; then
+  if ! $IS_USER && ! $IS_MACOS; then
     sudo gpasswd -a "$USER" mihomo
     $SUDO chown -R mihomo:mihomo "$INSTALL_DIR_MIHOMO"
     $SUDO chmod g+rwxs "$MIHOMO_CONFIG_DIR"
   fi
 
-  create_mihomo_systemd_unit
+  create_mihomo_unit
 }
 
 install_singbox() {
   if command_exists sing-box; then
     $SUDO mkdir -p "$INSTALL_DIR_SINGBOX"
     $SUDO ln -sf "$(which sing-box)" "$INSTALL_DIR_SINGBOX/sing-box"
-    if ! $IS_USER; then
+    if ! $IS_USER && ! $IS_MACOS; then
       $SUDO ln -sf "$INSTALL_DIR_SINGBOX/sing-box" /usr/bin/sing-box
     fi
   else
@@ -707,13 +855,13 @@ install_singbox() {
 
   create_singbox_user
 
-  if ! $IS_USER; then
+  if ! $IS_USER && ! $IS_MACOS; then
     sudo gpasswd -a "$USER" sing-box
     $SUDO chown -R sing-box:sing-box "$INSTALL_DIR_SINGBOX"
     $SUDO chmod g+rwxs "$SINGBOX_CONFIG_DIR"
   fi
 
-  create_singbox_systemd_unit
+  create_singbox_unit
 }
 
 install_clashtui() {
@@ -740,25 +888,40 @@ uninstall() {
 
   rm -rf ~/.cache/clashtui
   if $IS_USER; then
-    rm -f "$UNIT_DIR/clashtui_mihomo.service"
-    rm -f "$UNIT_DIR/clashtui_singbox.service"
-    systemctl --user daemon-reload
-    #rm -f "$HOME/.local/bin/clashtui"
+    if $IS_MACOS; then
+      launchctl unload "$UNIT_DIR/clashtui_mihomo.plist" 2>/dev/null
+      launchctl unload "$UNIT_DIR/clashtui_singbox.plist" 2>/dev/null
+      rm -f "$UNIT_DIR/clashtui_mihomo.plist"
+      rm -f "$UNIT_DIR/clashtui_singbox.plist"
+    else
+      rm -f "$UNIT_DIR/clashtui_mihomo.service"
+      rm -f "$UNIT_DIR/clashtui_singbox.service"
+      systemctl --user daemon-reload
+    fi
     rm -rf "$INSTALL_DIR"
   else
-    sudo rm -f /usr/lib/systemd/system/clashtui_mihomo.service
-    sudo rm -f /usr/lib/systemd/system/clashtui_singbox.service
-    sudo systemctl daemon-reload
-    #sudo rm -f /usr/local/bin/clashtui
-    #sudo rm -f /usr/bin/sing-box
-    sudo rm -rf /opt/clashtui
+    if $IS_MACOS; then
+      sudo launchctl unload "$UNIT_DIR/clashtui_mihomo.plist" 2>/dev/null
+      sudo launchctl unload "$UNIT_DIR/clashtui_singbox.plist" 2>/dev/null
+      sudo rm -f "$UNIT_DIR/clashtui_mihomo.plist"
+      sudo rm -f "$UNIT_DIR/clashtui_singbox.plist"
+      sudo rm -rf "$INSTALL_DIR"
+      echo "[Optional] Remove log files"
+      echo "  sudo rm -f /usr/local/var/log/clashtui_mihomo.log"
+      echo "  sudo rm -f /usr/local/var/log/clashtui_singbox.log"
+    else
+      sudo rm -f /usr/lib/systemd/system/clashtui_mihomo.service
+      sudo rm -f /usr/lib/systemd/system/clashtui_singbox.service
+      sudo systemctl daemon-reload
+      sudo rm -rf /opt/clashtui
 
-    echo "[Optional] Delete the mihomo user and group"
-    echo "  sudo gpasswd -d $USER mihomo"
-    echo "  sudo userdel mihomo"
-    echo "[Optional] Delete the sing-box user and group"
-    echo "  sudo gpasswd -d $USER sing-box"
-    echo "  sudo userdel sing-box"
+      echo "[Optional] Delete the mihomo user and group"
+      echo "  sudo gpasswd -d $USER mihomo"
+      echo "  sudo userdel mihomo"
+      echo "[Optional] Delete the sing-box user and group"
+      echo "  sudo gpasswd -d $USER sing-box"
+      echo "  sudo userdel sing-box"
+    fi
   fi
 
   log_info "Uninstallation complete."
@@ -779,12 +942,20 @@ show_help() {
   echo
   echo "When --is-user is set:"
   echo "  - Installs to ~/.local/clashtui"
-  echo "  - Uses user-scoped systemd units (systemctl --user)"
+  if $IS_MACOS; then
+    echo "  - Uses user-scoped launchd plists (~/Library/LaunchAgents)"
+  else
+    echo "  - Uses user-scoped systemd units (systemctl --user)"
+  fi
   echo "  - Uses no-TUN core configs (TUN requires root capabilities)"
   echo "  - Skips creating system users/groups"
   echo
   echo "If no options are provided, the script will install clashtui with all cores"
-  echo "to /opt/clashtui (system mode)."
+  if $IS_MACOS; then
+    echo "to /usr/local/opt/clashtui (system mode)."
+  else
+    echo "to /opt/clashtui (system mode)."
+  fi
 }
 
 # --- Main ---
@@ -847,10 +1018,11 @@ main() {
   # Resolve all paths based on parsed options
   resolve_paths
 
-  log_info "Install mode: $([ "$IS_USER" = "true" ] && echo "user (~/.local/clashtui)" || echo "system (/opt/clashtui)")"
+  log_info "Install mode: $([ "$IS_USER" = "true" ] && echo "user (~/.local/clashtui)" || echo "system ($INSTALL_DIR)")"
   log_info "Core type: $CORE_TYPE"
   log_info "Repo: $REPO"
   log_info "Branch: $BRANCH"
+  log_info "OS: $(detect_os)"
 
   # Create necessary directories
   if [ "$CORE_TYPE" = "mihomo" ] || [ "$CORE_TYPE" = "all" ]; then
@@ -887,10 +1059,19 @@ main() {
   log_info "Installed cores: $CORE_TYPE"
 
   if $IS_USER; then
-    log_warn "User mode: services run under systemctl --user"
-    log_warn "To keep services running after logout, run: loginctl enable-linger"
+    if $IS_MACOS; then
+      log_info "User mode: services are loaded via launchd (~/Library/LaunchAgents)"
+      log_warn "Services will stop when you log out. To keep them running, keep the session active."
+    else
+      log_warn "User mode: services run under systemctl --user"
+      log_warn "To keep services running after logout, run: loginctl enable-linger"
+    fi
   else
-    log_warn "Please log out and log back in for the group file permissions to take effect"
+    if $IS_MACOS; then
+      log_info "System mode: services are loaded via launchd (/Library/LaunchDaemons)"
+    else
+      log_warn "Please log out and log back in for the group file permissions to take effect"
+    fi
   fi
 }
 

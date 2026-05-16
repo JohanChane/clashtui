@@ -50,6 +50,22 @@ ClashTui Core 的文件结构设计:
     └── sing-box -> /usr/bin/sing-box
 ```
 
+## ServiceController (服务控制器)
+
+ClashTui 支持多种服务管理器，在编译时根据平台自动选择默认值:
+
+| Controller | 平台          | bin_name    | 说明                        |
+|------------|---------------|-------------|----------------------------|
+| Systemd    | Linux (默认)   | `systemctl` | systemd 服务管理             |
+| OpenRc     | Linux (可选)   | `rc-service`| OpenRC 服务管理              |
+| Nssm       | Windows (默认) | `nssm`      | Windows 服务管理             |
+| Launchd    | macOS (默认)   | `launchctl` | launchd 服务管理             |
+
+各平台编译时默认:
+- `cfg!(windows)` → Nssm
+- `cfg!(target_os = "macos")` → Launchd
+- 其他 → Systemd
+
 ## ClashTui 的 clashtui.db 格式设计
 
 ```yaml
@@ -729,3 +745,61 @@ pvd:  # proxy-provider group name
 ### 恢复正常
 
 `after_sync` 持续检测，当 `detected == configured` 时自动清空 `CORE_MISMATCH` 标志。用户切换到各面板时正常发起 API 请求，数据恢复展示。
+
+## Support macOS
+
+### macOS Core 文件结构 (launchd)
+
+```
+.
+├── bin
+│   └── clashtui -> /usr/local/bin/clashtui
+├── mihomo
+│   ├── config                        # Core Config Dir
+│   │   └── config.yaml               # Core Config Path
+│   └── mihomo -> /usr/local/bin/mihomo
+└── sing-box
+    ├── config                        # Core Config Dir
+    │   └── config.json               # Core Config Path
+    └── sing-box -> /usr/local/bin/sing-box
+
+launchd plist (独立存放):
+  User Mode:   ~/Library/LaunchAgents/clashtui_mihomo.plist
+               ~/Library/LaunchAgents/clashtui_singbox.plist
+  System Mode: /Library/LaunchDaemons/clashtui_mihomo.plist
+               /Library/LaunchDaemons/clashtui_singbox.plist
+```
+
+### systemd vs launchd 对比
+
+| 操作          | Linux (systemd)                          | macOS (launchd)                                    |
+|---------------|------------------------------------------|----------------------------------------------------|
+| **User Mode** |                                          |                                                    |
+| unit 位置     | `~/.config/systemd/user/<name>.service`  | `~/Library/LaunchAgents/<name>.plist`              |
+| 启动服务      | `systemctl --user start <name>`          | `launchctl load -w <plist>`                        |
+| 停止服务      | `systemctl --user stop <name>`           | `launchctl unload <plist>`                         |
+| 查看状态      | `systemctl --user is-active <name>`      | `launchctl print gui/$UID/<name>`                  |
+| 开机自启      | `systemctl --user enable <name>`         | `RunAtLoad=true` (写入 plist 后即生效)              |
+| 登出后存活    | `loginctl enable-linger` (支持)           | 不支持 (登出即停止)                                  |
+| 崩溃重启      | `systemd service Restart=always`         | plist `KeepAlive=true`                             |
+| **System Mode** |                                        |                                                    |
+| unit 位置     | `/usr/lib/systemd/system/<name>.service` | `/Library/LaunchDaemons/<name>.plist`              |
+| 启动服务      | `sudo systemctl start <name>`            | `sudo launchctl load -w <plist>`                   |
+| 停止服务      | `sudo systemctl stop <name>`             | `sudo launchctl unload <plist>`                    |
+| 查看状态      | `systemctl is-active <name>`             | `sudo launchctl print system/<name>`               |
+| 开机自启      | `sudo systemctl enable <name>`           | `RunAtLoad=true` (放入 /Library/LaunchDaemons/ 即自启) |
+| 运行身份      | 专用用户 (mihomo / sing-box)              | root (launchd system daemon)                       |
+| TUN 权限      | Linux capabilities (setcap)              | sudo / root 直接运行                                |
+
+关键差异:
+- **enable/disable 概念**: systemd 的 `enable` 只设开机自启，`start` 立即启动。launchd 的 `load -w` 同时完成"写入 plist + 开机自启 + 立即启动"，`unload` 同时停止并禁用。
+- **登出行为**: launchd 的 `LaunchAgents` 在用户登出时全部停止，无法通过配置改变。`LaunchDaemons` (system mode) 在 boot 时启动，不受登入/登出影响。
+- **TUN 权限**: Linux 用 `setcap` 给二进制加 capability，以非 root 用户运行 TUN。macOS 无此机制，system mode 以 root 运行即可使用 utun 设备。
+
+### macOS 文件权限
+
+macOS 不使用 Linux 的组文件权限管理。ClashTui 启动时的 `check_startup_perms` 在 macOS 上为 no-op。
+User mode 安装时文件属于当前用户，无需额外权限配置。
+System mode 以 root 运行，配置文件通过 sudo 写入。
+
+> macOS 不使用 Linux 组权限管理。ClashTui 在 macOS 上跳过文件权限检测与修复 (`check_startup_perms` 为 no-op)。

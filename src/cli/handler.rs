@@ -10,7 +10,7 @@ pub fn handle_cli(cmd: Cmds) -> Result<()> {
 
     match command {
         ArgCommand::Profile { command } => handle_profile(command),
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
+        #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
         ArgCommand::Service { command } => handle_service(command),
         ArgCommand::Mode { mode } => handle_mode(mode),
         ArgCommand::Update { ci, target } => handle_update(ci, target),
@@ -134,7 +134,7 @@ fn handle_profile(command: ProfileCommand) -> Result<()> {
 
 // ── Service ──────────────────────────────────────────────────────────
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 fn handle_service(command: ServiceCommand) -> Result<()> {
     match command {
         ServiceCommand::Restart { soft } => {
