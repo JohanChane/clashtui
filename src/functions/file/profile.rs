@@ -440,23 +440,11 @@ pub async fn select(profile: Profile) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn rewrite_provider_paths(content: Option<&mut serde_yml::Mapping>) {
-    let Some(content) = content else { return };
-    let cache = std::path::PathBuf::from(
-        &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
-    );
-    for section in &["proxy-providers", "rule-providers"] {
-        let Some(serde_yml::Value::Mapping(providers)) = content.get_mut(*section) else {
-            continue;
-        };
-        for (_, v) in providers {
-            let Some(provider) = v.as_mapping_mut() else { continue };
-            let Some(path_val) = provider.get_mut("path") else { continue };
-            let Some(rel) = path_val.as_str() else { continue };
-            let abs_path = cache.join(rel);
-            *path_val = serde_yml::Value::String(abs_path.display().to_string());
-        }
-    }
+fn rewrite_provider_paths(_content: Option<&mut serde_yml::Mapping>) {
+    // Paths are kept as-is (relative to mihomo's -d working directory).
+    // Mihomo resolves relative proxy-provider/rule-provider paths against
+    // its config directory, avoiding hard-coded absolute paths that break
+    // when config_dir changes (e.g. switching between user/system mode).
 }
 
 fn deep_merge(base: &mut serde_json::Value, overlay: &serde_json::Value) {

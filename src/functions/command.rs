@@ -126,7 +126,11 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
 
     match password {
         Some(pw) => exec_sudo(argv, pw),
-        None => exec("sudo", argv),
+        None => exec("sudo", {
+            let mut a = vec!["-n"];
+            a.extend(argv);
+            a
+        }),
     }
 }
 
@@ -155,7 +159,11 @@ fn launchd_operation(op: &str, service_name: &str, is_user: bool, password: Opti
                 None => {
                     let mut argv = vec!["launchctl"];
                     argv.extend(args);
-                    exec("sudo", argv)
+                    exec("sudo", {
+                        let mut a = vec!["-n"];
+                        a.extend(argv);
+                        a
+                    })
                 }
             }
         }

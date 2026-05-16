@@ -650,8 +650,12 @@ create_core_configs() {
     log_info "Mihomo core override written to: ${MIHOMO_USER_CONFIG_DIR}/core_override_config.yaml"
 
     if ! $IS_USER; then
-      $SUDO chown mihomo:mihomo "${MIHOMO_CONFIG_DIR}/config.yaml"
-      $SUDO chmod g+r "${MIHOMO_CONFIG_DIR}/config.yaml"
+      if $IS_MACOS; then
+        $SUDO chmod g+rw "${MIHOMO_CONFIG_DIR}/config.yaml"
+      else
+        $SUDO chown mihomo:mihomo "${MIHOMO_CONFIG_DIR}/config.yaml"
+        $SUDO chmod g+r "${MIHOMO_CONFIG_DIR}/config.yaml"
+      fi
     fi
   fi
 
@@ -674,8 +678,12 @@ create_core_configs() {
     log_info "Sing-box core override written to: ${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
 
     if ! $IS_USER; then
-      $SUDO chown sing-box:sing-box "${SINGBOX_CONFIG_DIR}/config.json"
-      $SUDO chmod g+r "${SINGBOX_CONFIG_DIR}/config.json"
+      if $IS_MACOS; then
+        $SUDO chmod g+rw "${SINGBOX_CONFIG_DIR}/config.json"
+      else
+        $SUDO chown sing-box:sing-box "${SINGBOX_CONFIG_DIR}/config.json"
+        $SUDO chmod g+r "${SINGBOX_CONFIG_DIR}/config.json"
+      fi
     fi
   fi
 }
@@ -833,10 +841,16 @@ install_mihomo() {
 
   create_mihomo_user
 
-  if ! $IS_USER && ! $IS_MACOS; then
-    sudo gpasswd -a "$USER" mihomo
-    $SUDO chown -R mihomo:mihomo "$INSTALL_DIR_MIHOMO"
-    $SUDO chmod g+rwxs "$MIHOMO_CONFIG_DIR"
+  if ! $IS_USER; then
+    if $IS_MACOS; then
+      # macOS: service runs as root, admin group gets r/w access
+      $SUDO chown -R root:admin "$INSTALL_DIR_MIHOMO"
+      $SUDO chmod g+rwxs "$MIHOMO_CONFIG_DIR"
+    else
+      sudo gpasswd -a "$USER" mihomo
+      $SUDO chown -R mihomo:mihomo "$INSTALL_DIR_MIHOMO"
+      $SUDO chmod g+rwxs "$MIHOMO_CONFIG_DIR"
+    fi
   fi
 
   create_mihomo_unit
@@ -855,10 +869,15 @@ install_singbox() {
 
   create_singbox_user
 
-  if ! $IS_USER && ! $IS_MACOS; then
-    sudo gpasswd -a "$USER" sing-box
-    $SUDO chown -R sing-box:sing-box "$INSTALL_DIR_SINGBOX"
-    $SUDO chmod g+rwxs "$SINGBOX_CONFIG_DIR"
+  if ! $IS_USER; then
+    if $IS_MACOS; then
+      $SUDO chown -R root:admin "$INSTALL_DIR_SINGBOX"
+      $SUDO chmod g+rwxs "$SINGBOX_CONFIG_DIR"
+    else
+      sudo gpasswd -a "$USER" sing-box
+      $SUDO chown -R sing-box:sing-box "$INSTALL_DIR_SINGBOX"
+      $SUDO chmod g+rwxs "$SINGBOX_CONFIG_DIR"
+    fi
   fi
 
   create_singbox_unit

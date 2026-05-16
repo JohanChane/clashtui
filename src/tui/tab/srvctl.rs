@@ -198,7 +198,7 @@ fn launchd_status(service_name: &str, is_user: bool) -> String {
         }
     } else {
         let output = std::process::Command::new("sudo")
-            .args(["launchctl", "print", &format!("system/{service_name}")])
+            .args(["-n", "launchctl", "print", &format!("system/{service_name}")])
             .output();
         match output {
             Ok(o) if o.status.success() => {

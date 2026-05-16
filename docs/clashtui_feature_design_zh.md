@@ -807,3 +807,139 @@ User mode 安装时文件属于当前用户，无需额外权限配置。
 System mode 以 root 运行，配置文件通过 sudo 写入。
 
 > macOS 不使用 Linux 组权限管理。ClashTui 在 macOS 上跳过文件权限检测与修复 (`check_startup_perms` 为 no-op)。
+
+## launchd plist 文件内容
+
+### 1. User Mode — clashtui_mihomo.plist
+
+路径: `~/Library/LaunchAgents/clashtui_mihomo.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_mihomo</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/johan/.local/clashtui/mihomo/mihomo</string>
+        <string>-d</string>
+        <string>/Users/johan/.local/clashtui/mihomo/config</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/johan/Library/Logs/clashtui_mihomo.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/johan/Library/Logs/clashtui_mihomo.log</string>
+    <key>WorkingDirectory</key>
+    <string>/Users/johan/.local/clashtui/mihomo/config</string>
+</dict>
+</plist>
+```
+
+### 2. User Mode — clashtui_singbox.plist
+
+路径: `~/Library/LaunchAgents/clashtui_singbox.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_singbox</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/johan/.local/clashtui/sing-box/sing-box</string>
+        <string>-D</string>
+        <string>/Users/johan/.local/clashtui/sing-box/config</string>
+        <string>-c</string>
+        <string>/Users/johan/.local/clashtui/sing-box/config/config.json</string>
+        <string>run</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/johan/Library/Logs/clashtui_singbox.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/johan/Library/Logs/clashtui_singbox.log</string>
+    <key>WorkingDirectory</key>
+    <string>/Users/johan/.local/clashtui/sing-box/config</string>
+</dict>
+</plist>
+```
+
+### 3. System Mode — clashtui_mihomo.plist
+
+路径: `/Library/LaunchDaemons/clashtui_mihomo.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_mihomo</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/opt/clashtui/mihomo/mihomo</string>
+        <string>-d</string>
+        <string>/usr/local/opt/clashtui/mihomo/config</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/usr/local/var/log/clashtui_mihomo.log</string>
+    <key>StandardErrorPath</key>
+    <string>/usr/local/var/log/clashtui_mihomo.log</string>
+    <key>WorkingDirectory</key>
+    <string>/usr/local/opt/clashtui/mihomo/config</string>
+</dict>
+</plist>
+```
+
+### 4. System Mode — clashtui_singbox.plist
+
+路径: `/Library/LaunchDaemons/clashtui_singbox.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_singbox</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/opt/clashtui/sing-box/sing-box</string>
+        <string>-D</string>
+        <string>/usr/local/opt/clashtui/sing-box/config</string>
+        <string>-c</string>
+        <string>/usr/local/opt/clashtui/sing-box/config/config.json</string>
+        <string>run</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/usr/local/var/log/clashtui_singbox.log</string>
+    <key>StandardErrorPath</key>
+    <string>/usr/local/var/log/clashtui_singbox.log</string>
+    <key>WorkingDirectory</key>
+    <string>/usr/local/opt/clashtui/sing-box/config</string>
+</dict>
+</plist>
+```
