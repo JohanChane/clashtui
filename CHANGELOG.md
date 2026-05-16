@@ -7,13 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0-alpha.2] - 2026-05-17
+
 ### Added
 - macOS support (#64)
-- CI matrix strategy with platform tests (#65)
+- Windows support documentation (#68)
+
+### Changed
+- CI: matrix strategy with platform tests (#65)
+- CI: unified release file naming
+- Updated demo recording and shields badges
 
 ### Fixed
+- macOS CI builds (#65)
 - Mihomo template generation
-- CI build file naming
 
 ## [0.3.0-reborn] - 2024-10-06
 
@@ -187,7 +194,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Profile switching
 - Service start/stop control
 
-[Unreleased]: https://github.com/JohanChane/clashtui/compare/v0.3.0-reborn...HEAD
+[Unreleased]: https://github.com/JohanChane/clashtui/compare/v0.3.0-alpha.2...HEAD
+[0.3.0-alpha.2]: https://github.com/JohanChane/clashtui/compare/v0.3.0-reborn...v0.3.0-alpha.2
 [0.3.0-reborn]: https://github.com/JohanChane/clashtui/compare/v0.2.3...v0.3.0-reborn
 [0.2.3]: https://github.com/JohanChane/clashtui/compare/v0.2.1...v0.2.3
 [0.2.1]: https://github.com/JohanChane/clashtui/compare/v0.2.0...v0.2.1
