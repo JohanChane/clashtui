@@ -16,35 +16,77 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact-name: Linux_amd64_Build
+            binary-name: clashtui-amd64-debug
+            cache-suffix: linux-amd64
+            run-test: true
+
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            artifact-name: Linux_arm64_Build
+            binary-name: clashtui-arm64-debug
+            cache-suffix: linux-arm64
+            run-test: false
+
+          - os: macos-13
+            target: x86_64-apple-darwin
+            artifact-name: macOS_x86_64_Build
+            binary-name: clashtui-darwin-amd64-debug
+            cache-suffix: macos-x86_64
+            run-test: false
+
+          - os: macos-14
+            target: aarch64-apple-darwin
+            artifact-name: macOS_aarch64_Build
+            binary-name: clashtui-darwin-arm64-debug
+            cache-suffix: macos-aarch64
+            run-test: false
 
     steps:
       - uses: actions/checkout@v4
-      - uses: goto-bus-stop/setup-zig@v2
+
+      - name: Cache Target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./target
+            ~/.cargo
+          key: ci-pr-${{ matrix.cache-suffix }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ci-pr-${{ matrix.cache-suffix }}-${{ hashFiles('Cargo.lock') }}
+            ci-pr-${{ matrix.cache-suffix }}-
 
       - name: Download Dependencies
         run: cargo fetch
 
       - name: Run tests
+        if: matrix.run-test
         run: cargo test --all --verbose
 
       - name: Build
         run: |
-          rustup target add x86_64-unknown-linux-gnu
-          cargo install cargo-zigbuild
-          cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --verbose
+          rustup target add ${{ matrix.target }}
+          cargo build --verbose --locked --target ${{ matrix.target }}
 
       - name: Build Version
-        run: ./target/x86_64-unknown-linux-gnu/debug/clashtui --version
+        if: matrix.run-test
+        run: ./target/${{ matrix.target }}/debug/clashtui --version
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./target/x86_64-unknown-linux-gnu/debug/clashtui ./artifacts/clashtui.debug
+          mv ./target/${{ matrix.target }}/debug/clashtui ./artifacts/${{ matrix.binary-name }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Linux_Build
+          name: ${{ matrix.artifact-name }}
           path: artifacts
           retention-days: 5
