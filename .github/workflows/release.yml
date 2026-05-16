@@ -97,18 +97,20 @@ jobs:
 
       - name: Build macos x86_64
         run: |
+          rustup target add x86_64-apple-darwin
           cargo install cargo-zigbuild
-          cargo zigbuild --target x86_64-macos --release --locked
+          cargo zigbuild --target x86_64-apple-darwin --release --locked
 
       - name: Build macos aarch64
         run: |
-          cargo zigbuild --target aarch64-macos --release --locked
+          rustup target add aarch64-apple-darwin
+          cargo zigbuild --target aarch64-apple-darwin --release --locked
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./target/x86_64-macos/release/clashtui    ./artifacts/clashtui-darwin-amd64
-          mv ./target/aarch64-macos/release/clashtui    ./artifacts/clashtui-darwin-arm64
+          mv ./target/x86_64-apple-darwin/release/clashtui    ./artifacts/clashtui-darwin-amd64
+          mv ./target/aarch64-apple-darwin/release/clashtui    ./artifacts/clashtui-darwin-arm64
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
