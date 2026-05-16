@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use std::cell::Cell;
 use std::time::Instant;
 
-use super::tree::{NodeType, ProxyTree, SortMode};
+use super::tree::{NodeItem, NodeType, ProxyTree, SortMode};
 
 #[derive(Default)]
 pub struct Proxies {
@@ -26,6 +26,22 @@ impl Proxies {
             NodeType::Folder => Some(node.name.clone()),
             NodeType::Link | NodeType::File => node.parent.clone(),
         }
+    }
+
+    fn fzf_display(node: &NodeItem) -> String {
+        let mut s = node.name.clone();
+        if !node.proxy_type.is_empty() {
+            s.push_str(&format!("  [{}]", node.proxy_type));
+        }
+        if node.node_type != NodeType::Folder {
+            if node.tcp {
+                s.push_str(" TCP");
+            }
+            if node.udp {
+                s.push_str(" UDP");
+            }
+        }
+        s
     }
 
     pub(crate) fn selection_key(&self, state: &ListState) -> Option<SelectionKey> {
@@ -243,7 +259,7 @@ impl Proxies {
             super::Key::FzfFind => {
                 let items: Vec<(String, usize)> = self.tree.nodes.iter()
                     .enumerate()
-                    .map(|(i, n)| (n.name.clone(), i))
+                    .map(|(i, n)| (Self::fzf_display(n), i))
                     .collect();
                 self.fzf_find(items, task_set);
             }
@@ -254,7 +270,7 @@ impl Proxies {
                 let items: Vec<(String, usize)> = self.tree.nodes.iter()
                     .enumerate()
                     .filter(|(_, n)| n.parent == parent)
-                    .map(|(i, n)| (n.name.clone(), i))
+                    .map(|(i, n)| (Self::fzf_display(n), i))
                     .collect();
                 if !items.is_empty() {
                     self.fzf_find(items, task_set);
