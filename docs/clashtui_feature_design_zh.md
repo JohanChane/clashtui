@@ -12,7 +12,7 @@
 
 ## ClashTui 的文件结构设计
 
-ClashTui 配置的文件结构:
+ClashTui 配置的文件结构 (e.g. `~/.config/clashtui`):
 
 ```
 .
@@ -32,7 +32,7 @@ ClashTui 配置的文件结构:
     └── templates
 ```
 
-ClashTui Core 的文件结构设计:
+ClashTui Core 的文件结构设计 (e.g. `/opt/clashtui`):
 
 ```
 .
@@ -49,6 +49,22 @@ ClashTui Core 的文件结构设计:
     │   └── config.json               # Core Config Path
     └── sing-box -> /usr/bin/sing-box
 ```
+
+## ServiceController (服务控制器)
+
+ClashTui 支持多种服务管理器，在编译时根据平台自动选择默认值:
+
+| Controller | 平台          | bin_name    | 说明                        |
+|------------|---------------|-------------|----------------------------|
+| Systemd    | Linux (默认)   | `systemctl` | systemd 服务管理             |
+| OpenRc     | Linux (可选)   | `rc-service`| OpenRC 服务管理              |
+| Nssm       | Windows (默认) | `nssm`      | Windows 服务管理             |
+| Launchd    | macOS (默认)   | `launchctl` | launchd 服务管理             |
+
+各平台编译时默认:
+- `cfg!(windows)` → Nssm
+- `cfg!(target_os = "macos")` → Launchd
+- 其他 → Systemd
 
 ## ClashTui 的 clashtui.db 格式设计
 
@@ -85,8 +101,8 @@ singbox:
     is_user: false
 timeout: null
 extra:
-  edit_cmd: kitty -e nvim "%s"
-  open_dir_cmd: kitty -e yazi "%s"
+  edit_cmd: ghostty -e nvim -- "%s"
+  open_dir_cmd: ghostty -e yazi -- "%s"
 ```
 
 设计原则: Mihomo 和 sing-box 不能共同使用的, 分别放在 mihomo 和 sing-box section。
@@ -729,3 +745,228 @@ pvd:  # proxy-provider group name
 ### 恢复正常
 
 `after_sync` 持续检测，当 `detected == configured` 时自动清空 `CORE_MISMATCH` 标志。用户切换到各面板时正常发起 API 请求，数据恢复展示。
+
+## Support macOS
+
+### macOS Core 文件结构 (launchd)
+
+ClashTui Core 的文件结构设计 (e.g. `/usr/local/opt/clashtui`):
+
+```
+.
+├── bin
+│   └── clashtui -> /usr/local/bin/clashtui
+├── mihomo
+│   ├── config                        # Core Config Dir
+│   │   └── config.yaml               # Core Config Path
+│   └── mihomo -> /usr/local/bin/mihomo
+└── sing-box
+    ├── config                        # Core Config Dir
+    │   └── config.json               # Core Config Path
+    └── sing-box -> /usr/local/bin/sing-box
+
+launchd plist (独立存放):
+  User Mode:   ~/Library/LaunchAgents/clashtui_mihomo.plist
+               ~/Library/LaunchAgents/clashtui_singbox.plist
+  System Mode: /Library/LaunchDaemons/clashtui_mihomo.plist
+               /Library/LaunchDaemons/clashtui_singbox.plist
+```
+
+user mode 的 ClashTui Core 的默认路径是 `~/.local/clashtui`。和 Linux 一样。
+
+### systemd vs launchd 对比
+
+| 操作          | Linux (systemd)                          | macOS (launchd)                                    |
+|---------------|------------------------------------------|----------------------------------------------------|
+| **User Mode** |                                          |                                                    |
+| unit 位置     | `~/.config/systemd/user/<name>.service`  | `~/Library/LaunchAgents/<name>.plist`              |
+| 启动服务      | `systemctl --user start <name>`          | `launchctl bootstrap gui/$UID <plist>`             |
+| 停止服务      | `systemctl --user stop <name>`           | `launchctl bootout gui/$UID/<name>`                |
+| 查看状态      | `systemctl --user is-active <name>`      | `launchctl print gui/$UID/<name>`                  |
+| 开机自启      | `systemctl --user enable <name>`         | `RunAtLoad=true` (写入 plist 后即生效)              |
+| 登出后存活    | `loginctl enable-linger` (支持)           | 不支持 (登出即停止)                                  |
+| 崩溃重启      | `systemd service Restart=always`         | plist `KeepAlive=true`                             |
+| **System Mode** |                                        |                                                    |
+| unit 位置     | `/usr/lib/systemd/system/<name>.service` | `/Library/LaunchDaemons/<name>.plist`              |
+| 启动服务      | `sudo systemctl start <name>`            | `sudo launchctl bootstrap system <plist>`          |
+| 停止服务      | `sudo systemctl stop <name>`             | `sudo launchctl bootout system/<name>`             |
+| 查看状态      | `systemctl is-active <name>`             | `sudo launchctl print system/<name>`               |
+| 开机自启      | `sudo systemctl enable <name>`           | `RunAtLoad=true` (放入 /Library/LaunchDaemons/ 即自启) |
+| 运行身份      | 专用用户 (mihomo / sing-box)              | root (launchd system daemon)                       |
+| TUN 权限      | Linux capabilities (setcap)              | sudo / root 直接运行                                |
+
+关键差异:
+- **enable/disable 概念**: systemd 的 `enable` 只设开机自启，`start` 立即启动。launchd 的 `bootstrap` 同时完成"加载 plist + 开机自启 + 立即启动"，`bootout` 同时停止并从 launchd 移除。
+- **登出行为**: launchd 的 `LaunchAgents` 在用户登出时全部停止，无法通过配置改变。`LaunchDaemons` (system mode) 在 boot 时启动，不受登入/登出影响。
+- **TUN 权限**: Linux 用 `setcap` 给二进制加 capability，以非 root 用户运行 TUN。macOS 无此机制，system mode 以 root 运行即可使用 utun 设备。
+
+所以 ClashTui services 在 macOS 下的命令如下:
+
+```sh
+# 启动 system mode
+sudo launchctl bootstrap system /Library/LaunchDaemons/clashtui_mihomo.plist
+sudo launchctl bootstrap system /Library/LaunchDaemons/clashtui_singbox.plist
+
+# 停止
+sudo launchctl bootout system/clashtui_mihomo
+sudo launchctl bootout system/clashtui_singbox
+
+# 查看状态
+sudo launchctl print system/clashtui_mihomo
+sudo launchctl print system/clashtui_singbox
+
+# User mode (无需 sudo)
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/clashtui_mihomo.plist
+launchctl bootout gui/$(id -u)/clashtui_mihomo
+launchctl print gui/$(id -u)/clashtui_mihomo
+```
+
+> macOS 10.11+ 推荐 `bootstrap`/`bootout` 替代旧版 `load`/`unload`。
+
+### macOS 文件权限
+
+macOS 与 Linux 统一使用 Unix 组权限管理 Core 文件:
+
+| 项 | Linux | macOS |
+|---|---|---|
+| Core 目录所有者 | `mihomo:mihomo` / `sing-box:sing-box` | `root:admin` |
+| 添加用户到组 | `gpasswd -a $USER mihomo` | 不需要 (macOS 用户默认在 `admin` 组) |
+| 目录 SGID + group rwx | `chmod g+rwxs` | `chmod g+rwxs` (相同) |
+| 配置文件权限 | `chown mihomo:mihomo` + `chmod g+r` | `chmod g+rw` |
+| 启动时权限检测修复 | ✅ | ✅ (从 `macos.rs` 桩函数改为真实实现) |
+
+原理: macOS system mode 下 Core 服务以 root 运行 (TUN 需要), 普通用户通过 `admin` 组获取文件读写权限。启动时 ClashTui 检测 Core 目录的 SGID、group 一致性、group 可写性, 不一致则通过 `sudo chmod g+s` / `sudo chown :<group>` / `sudo chmod g+w` 修复。
+
+### 1. User Mode — clashtui_mihomo.plist
+
+路径: `~/Library/LaunchAgents/clashtui_mihomo.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_mihomo</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/johan/.local/clashtui/mihomo/mihomo</string>
+        <string>-d</string>
+        <string>/Users/johan/.local/clashtui/mihomo/config</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/johan/Library/Logs/clashtui_mihomo.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/johan/Library/Logs/clashtui_mihomo.log</string>
+    <key>WorkingDirectory</key>
+    <string>/Users/johan/.local/clashtui/mihomo/config</string>
+</dict>
+</plist>
+```
+
+### 2. User Mode — clashtui_singbox.plist
+
+路径: `~/Library/LaunchAgents/clashtui_singbox.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_singbox</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/johan/.local/clashtui/sing-box/sing-box</string>
+        <string>-D</string>
+        <string>/Users/johan/.local/clashtui/sing-box/config</string>
+        <string>-c</string>
+        <string>/Users/johan/.local/clashtui/sing-box/config/config.json</string>
+        <string>run</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/johan/Library/Logs/clashtui_singbox.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/johan/Library/Logs/clashtui_singbox.log</string>
+    <key>WorkingDirectory</key>
+    <string>/Users/johan/.local/clashtui/sing-box/config</string>
+</dict>
+</plist>
+```
+
+### 3. System Mode — clashtui_mihomo.plist
+
+路径: `/Library/LaunchDaemons/clashtui_mihomo.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_mihomo</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/opt/clashtui/mihomo/mihomo</string>
+        <string>-d</string>
+        <string>/usr/local/opt/clashtui/mihomo/config</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/usr/local/var/log/clashtui_mihomo.log</string>
+    <key>StandardErrorPath</key>
+    <string>/usr/local/var/log/clashtui_mihomo.log</string>
+    <key>WorkingDirectory</key>
+    <string>/usr/local/opt/clashtui/mihomo/config</string>
+</dict>
+</plist>
+```
+
+### 4. System Mode — clashtui_singbox.plist
+
+路径: `/Library/LaunchDaemons/clashtui_singbox.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_singbox</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/opt/clashtui/sing-box/sing-box</string>
+        <string>-D</string>
+        <string>/usr/local/opt/clashtui/sing-box/config</string>
+        <string>-c</string>
+        <string>/usr/local/opt/clashtui/sing-box/config/config.json</string>
+        <string>run</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/usr/local/var/log/clashtui_singbox.log</string>
+    <key>StandardErrorPath</key>
+    <string>/usr/local/var/log/clashtui_singbox.log</string>
+    <key>WorkingDirectory</key>
+    <string>/usr/local/opt/clashtui/sing-box/config</string>
+</dict>
+</plist>
+```

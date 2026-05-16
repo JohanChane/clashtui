@@ -1,4 +1,5 @@
 #[cfg_attr(target_os = "linux", path = "command/linux.rs")]
+#[cfg_attr(target_os = "macos", path = "command/macos.rs")]
 mod platform;
 mod utils;
 
@@ -112,6 +113,10 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
         CoreType::Singbox => (&CONFIG.cfg_file.singbox.core_service.service_name, CONFIG.cfg_file.singbox.core_service.is_user),
     };
 
+    if matches!(host, ServiceController::Launchd) {
+        return launchd_operation(op, service_name, is_user, password);
+    }
+
     let svc_args = host.args(op, service_name, is_user);
     if is_user {
         return exec(host.bin_name(), svc_args);
@@ -121,7 +126,58 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
 
     match password {
         Some(pw) => exec_sudo(argv, pw),
-        None => exec("sudo", argv),
+        None => exec("sudo", {
+            let mut a = vec!["-n"];
+            a.extend(argv);
+            a
+        }),
+    }
+}
+
+fn launchd_plist_path(service_name: &str, is_user: bool) -> String {
+    if is_user {
+        let home = std::env::var("HOME").unwrap_or_default();
+        format!("{home}/Library/LaunchAgents/{service_name}.plist")
+    } else {
+        format!("/Library/LaunchDaemons/{service_name}.plist")
+    }
+}
+
+fn launchd_operation(op: &str, service_name: &str, is_user: bool, password: Option<&str>) -> Result<String> {
+    let plist = launchd_plist_path(service_name, is_user);
+
+    let do_exec = |args: Vec<&str>| -> Result<String> {
+        if is_user {
+            exec("launchctl", args)
+        } else {
+            match password {
+                Some(pw) => {
+                    let mut argv = vec!["launchctl"];
+                    argv.extend(args);
+                    exec_sudo(argv, pw)
+                }
+                None => {
+                    let mut argv = vec!["launchctl"];
+                    argv.extend(args);
+                    exec("sudo", {
+                        let mut a = vec!["-n"];
+                        a.extend(argv);
+                        a
+                    })
+                }
+            }
+        }
+    };
+
+    match op {
+        "start" => do_exec(vec!["load", "-w", &plist]),
+        "stop" => do_exec(vec!["unload", &plist]),
+        "restart" | "reload" => {
+            // Best-effort unload, then load
+            let _ = do_exec(vec!["unload", &plist]);
+            do_exec(vec!["load", "-w", &plist])
+        }
+        _ => Err(anyhow::anyhow!("Unknown launchd operation: {op}")),
     }
 }
 

@@ -85,51 +85,57 @@ impl App {
         app.tabs[0].on_enter();
         app
     }
-    #[cfg(target_os = "linux")]
+    #[cfg(target_family = "unix")]
     fn check_startup_perms(&self) {
-        use crate::config::CoreType;
-        let dir_str = match crate::config::CONFIG.core_type() {
-            CoreType::Mihomo => &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
-            CoreType::Singbox => &crate::config::CONFIG.cfg_file.singbox.core.config_dir,
-        };
-        let dir = std::path::Path::new(dir_str);
-        if crate::functions::command::check_file_permissions(dir) {
-            return;
-        }
-
-        let _ = crate::tui::hold(true);
-
         use std::io::Write;
-        print!(
-            "File permissions in '{}' need repair. Fix now? [Y/n] ",
-            dir.display()
-        );
-        let _ = std::io::stdout().flush();
 
-        let mut input = String::new();
-        let _ = std::io::stdin().read_line(&mut input);
+        let dirs_to_check = [
+            &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
+            &crate::config::CONFIG.cfg_file.singbox.core.config_dir,
+        ];
 
-        let _ = crate::tui::hold(false);
+        for dir_str in &dirs_to_check {
+            if dir_str.is_empty() {
+                continue;
+            }
+            let dir = std::path::Path::new(dir_str);
+            if !dir.exists() {
+                continue;
+            }
+            if crate::functions::command::check_file_permissions(dir) {
+                continue;
+            }
 
-        if input.trim().to_lowercase().as_str() != "y" {
-            return;
-        }
-
-        let Some(group) = crate::functions::command::get_dir_group_name(dir) else {
-            return;
-        };
-
-        if let Err(e) = crate::functions::command::repair_file_permissions(dir, &group) {
             let _ = crate::tui::hold(true);
-            eprintln!("Error: {}", e);
-            use std::io::Read;
-            print!("Press Enter to continue...");
+            print!(
+                "File permissions in '{}' need repair. Fix now? [Y/n] ",
+                dir.display()
+            );
             let _ = std::io::stdout().flush();
-            let _ = std::io::stdin().read(&mut [0u8]);
+            let mut input = String::new();
+            let _ = std::io::stdin().read_line(&mut input);
             let _ = crate::tui::hold(false);
+
+            if input.trim().to_lowercase().as_str() != "y" {
+                continue;
+            }
+
+            let Some(group) = crate::functions::command::get_dir_group_name(dir) else {
+                continue;
+            };
+
+            if let Err(e) = crate::functions::command::repair_file_permissions(dir, &group) {
+                let _ = crate::tui::hold(true);
+                eprintln!("Error: {}", e);
+                use std::io::Read;
+                print!("Press Enter to continue...");
+                let _ = std::io::stdout().flush();
+                let _ = std::io::stdin().read(&mut [0u8]);
+                let _ = crate::tui::hold(false);
+            }
         }
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(target_family = "unix"))]
     fn check_startup_perms(&self) {}
     #[tokio::main]
     pub async fn serve() -> anyhow::Result<()> {

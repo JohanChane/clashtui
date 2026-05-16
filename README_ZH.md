@@ -36,6 +36,12 @@ ClashTui 是一个终端用户界面（TUI）代理管理工具，支持 **Mihom
 - **which panel** - 方便用户操作
 - **支持 fzf** - 用户可以使用 fzf 进行选择
 
+## 支持的平台
+
+-   [x] Linux
+-   [x] macOs
+-   [ ] Windows
+
 ## 安装
 
 ### 依赖

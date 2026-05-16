@@ -85,21 +85,23 @@ singbox:
     is_user: false
 timeout: null
 extra:
-  edit_cmd: kitty -e nvim "%s"
-  open_dir_cmd: kitty -e yazi "%s"
+  edit_cmd: ghostty -e nvim -- "%s"
+  open_dir_cmd: ghostty -e yazi -- "%s"
 ```
 
 Design principle: Mihomo and sing-box cannot be used together, so they are placed in separate `mihomo` and `sing-box` sections.
 
 ## ClashTui Core File Management Design
 
-ClashTui uses Linux group file permissions to manage Core files: the user only needs to join the group that owns each Core's files.
+ClashTui uses Unix group file permissions to manage Core files: the user only needs to join the group that owns each Core's files.
 
 File permission detection and repair:
 - On ClashTui startup, obtain the group name of the Core directory (e.g. `/opt/clashtui/mihomo`)
 - Recursively check whether files under the Core directory have consistent group names
 - If inconsistent, repair uniformly. Otherwise, do nothing.
 - Also ensure the Core directory has the group sticky bit set.
+
+This works on both Linux and macOS (true implementations in `macos.rs`, not stubs).
 
 To let the user know what was modified, ClashTui switches to CLI mode and prompts the user for their password. After fixing file permissions, ClashTui restarts.
 
@@ -726,3 +728,94 @@ On first detection of a mismatch (when `detected_core_type` changes from `None` 
 ### Returning to Normal
 
 `after_sync` keeps detecting. When `detected == configured`, the `CORE_MISMATCH` flag is automatically cleared. When the user switches to each panel, API requests resume normally and data is displayed again.
+
+## Support macOS
+
+### macOS Core File Structure (launchd)
+
+ClashTui Core file structure (e.g. `/usr/local/opt/clashtui`):
+
+```
+.
+├── bin
+│   └── clashtui -> /usr/local/bin/clashtui
+├── mihomo
+│   ├── config                        # Core Config Dir
+│   │   └── config.yaml               # Core Config Path
+│   └── mihomo -> /usr/local/bin/mihomo
+└── sing-box
+    ├── config                        # Core Config Dir
+    │   └── config.json               # Core Config Path
+    └── sing-box -> /usr/local/bin/sing-box
+
+launchd plist (stored separately):
+  User Mode:   ~/Library/LaunchAgents/clashtui_mihomo.plist
+               ~/Library/LaunchAgents/clashtui_singbox.plist
+  System Mode: /Library/LaunchDaemons/clashtui_mihomo.plist
+               /Library/LaunchDaemons/clashtui_singbox.plist
+```
+
+User mode default path is `~/.local/clashtui`, same as Linux.
+
+### systemd vs launchd Comparison
+
+| Operation     | Linux (systemd)                          | macOS (launchd)                                    |
+|---------------|------------------------------------------|----------------------------------------------------|
+| **User Mode** |                                          |                                                    |
+| unit location | `~/.config/systemd/user/<name>.service`  | `~/Library/LaunchAgents/<name>.plist`              |
+| start service | `systemctl --user start <name>`          | `launchctl bootstrap gui/$UID <plist>`             |
+| stop service  | `systemctl --user stop <name>`           | `launchctl bootout gui/$UID/<name>`                |
+| check status  | `systemctl --user is-active <name>`      | `launchctl print gui/$UID/<name>`                  |
+| auto-start    | `systemctl --user enable <name>`         | `RunAtLoad=true` (effective once plist is in place) |
+| survive logout| `loginctl enable-linger` (supported)      | Not supported (stops on logout)                     |
+| crash restart | `systemd service Restart=always`         | plist `KeepAlive=true`                             |
+| **System Mode** |                                       |                                                    |
+| unit location | `/usr/lib/systemd/system/<name>.service` | `/Library/LaunchDaemons/<name>.plist`              |
+| start service | `sudo systemctl start <name>`            | `sudo launchctl bootstrap system <plist>`          |
+| stop service  | `sudo systemctl stop <name>`             | `sudo launchctl bootout system/<name>`             |
+| check status  | `systemctl is-active <name>`             | `sudo launchctl print system/<name>`               |
+| auto-start    | `sudo systemctl enable <name>`           | `RunAtLoad=true` (boot-time launch from /Library/LaunchDaemons/) |
+| run as        | Dedicated user (mihomo / sing-box)        | root (launchd system daemon)                       |
+| TUN access    | Linux capabilities (setcap)              | sudo / root (no setcap on macOS)                    |
+
+Key differences:
+- **enable/disable concept**: systemd's `enable` only sets auto-start, `start` starts immediately. launchd's `bootstrap` does all three: "load plist + auto-start + start now". `bootout` stops and removes from launchd.
+- **logout behavior**: launchd `LaunchAgents` stop on logout, no config can change this. `LaunchDaemons` (system mode) start at boot and survive login/logout cycles.
+- **TUN permissions**: Linux uses `setcap` to grant capabilities, running TUN as non-root. macOS has no such mechanism; system mode runs as root for utun device access.
+
+ClashTui service commands on macOS:
+
+```sh
+# Start (system mode)
+sudo launchctl bootstrap system /Library/LaunchDaemons/clashtui_mihomo.plist
+sudo launchctl bootstrap system /Library/LaunchDaemons/clashtui_singbox.plist
+
+# Stop
+sudo launchctl bootout system/clashtui_mihomo
+sudo launchctl bootout system/clashtui_singbox
+
+# Check status
+sudo launchctl print system/clashtui_mihomo
+sudo launchctl print system/clashtui_singbox
+
+# User mode (no sudo)
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/clashtui_mihomo.plist
+launchctl bootout gui/$(id -u)/clashtui_mihomo
+launchctl print gui/$(id -u)/clashtui_mihomo
+```
+
+> macOS 10.11+ recommends `bootstrap`/`bootout` over legacy `load`/`unload`.
+
+### macOS File Permissions
+
+macOS and Linux use a unified Unix group permission model for managing Core files:
+
+| Item | Linux | macOS |
+|---|---|---|
+| Core dir owner | `mihomo:mihomo` / `sing-box:sing-box` | `root:admin` |
+| Add user to group | `gpasswd -a $USER mihomo` | Not needed (macOS users are in `admin` group by default) |
+| Dir SGID + group rwx | `chmod g+rwxs` | `chmod g+rwxs` (same) |
+| Config file perms | `chown mihomo:mihomo` + `chmod g+r` | `chmod g+rw` |
+| Startup permission check/repair | ✅ | ✅ (real impl in `macos.rs`, not stubs) |
+
+Principle: On macOS system mode, Core services run as root (required for TUN), while regular users gain file read/write access through the `admin` group. At startup, ClashTui checks the Core directory's SGID bit, group consistency, and group writability. If inconsistent, it repairs via `sudo chmod g+s` / `sudo chown :<group>` / `sudo chmod g+w`.

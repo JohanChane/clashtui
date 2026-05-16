@@ -2,6 +2,8 @@ use super::dev::*;
 use crate::config::CoreType;
 use ratatui::style::Color;
 use ratatui::widgets::ListItem;
+#[cfg(unix)]
+use libc;
 
 newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
 
@@ -105,18 +107,26 @@ impl SrvCtlContent {
             CoreType::Mihomo => (self.mihomo_service_name.clone(), self.mihomo_is_user),
             CoreType::Singbox => (self.singbox_service_name.clone(), self.singbox_is_user),
         };
+        let controller = crate::config::ServiceController::default();
         async move {
-            let mut args = vec!["is-active"];
-            if is_user {
-                args.push("--user");
-            }
-            args.push(&service_name);
-            let output = std::process::Command::new("systemctl")
-                .args(&args)
-                .output();
-            let status = match output {
-                Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_owned(),
-                Err(_) => "?".to_owned(),
+            let status = match controller {
+                crate::config::ServiceController::Launchd => {
+                    launchd_status(&service_name, is_user)
+                }
+                _ => {
+                    let mut args = vec!["is-active"];
+                    if is_user {
+                        args.push("--user");
+                    }
+                    args.push(&service_name);
+                    let output = std::process::Command::new("systemctl")
+                        .args(&args)
+                        .output();
+                    match output {
+                        Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_owned(),
+                        Err(_) => "?".to_owned(),
+                    }
+                }
             };
             wrapper(move |c: &mut SrvCtlContent| {
                 match target {
@@ -130,18 +140,26 @@ impl SrvCtlContent {
     fn spawn_current_status_check(&self, task_set: &mut FutureSet<Self>) {
         let service_name = self.service_name.clone();
         let is_user = self.is_user;
+        let controller = crate::config::ServiceController::default();
         async move {
-            let mut args = vec!["is-active"];
-            if is_user {
-                args.push("--user");
-            }
-            args.push(&service_name);
-            let output = std::process::Command::new("systemctl")
-                .args(&args)
-                .output();
-            let status = match output {
-                Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_owned(),
-                Err(_) => "?".to_owned(),
+            let status = match controller {
+                crate::config::ServiceController::Launchd => {
+                    launchd_status(&service_name, is_user)
+                }
+                _ => {
+                    let mut args = vec!["is-active"];
+                    if is_user {
+                        args.push("--user");
+                    }
+                    args.push(&service_name);
+                    let output = std::process::Command::new("systemctl")
+                        .args(&args)
+                        .output();
+                    match output {
+                        Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_owned(),
+                        Err(_) => "?".to_owned(),
+                    }
+                }
             };
             wrapper(move |c: &mut SrvCtlContent| {
                 c.status = status.clone();
@@ -152,6 +170,47 @@ impl SrvCtlContent {
             })
         }
         .spawn_at(task_set);
+    }
+}
+
+#[cfg(not(unix))]
+fn launchd_status(_service_name: &str, _is_user: bool) -> String {
+    "?".to_owned()
+}
+
+#[cfg(unix)]
+fn launchd_status(service_name: &str, is_user: bool) -> String {
+    if is_user {
+        let uid = unsafe { libc::getuid() };
+        let output = std::process::Command::new("launchctl")
+            .args(["print", &format!("gui/{uid}/{service_name}")])
+            .output();
+        match output {
+            Ok(o) if o.status.success() => {
+                let stdout = String::from_utf8_lossy(&o.stdout);
+                if stdout.contains("state = running") {
+                    "active".to_owned()
+                } else {
+                    "loaded".to_owned()
+                }
+            }
+            _ => "not loaded".to_owned(),
+        }
+    } else {
+        let output = std::process::Command::new("sudo")
+            .args(["-n", "launchctl", "print", &format!("system/{service_name}")])
+            .output();
+        match output {
+            Ok(o) if o.status.success() => {
+                let stdout = String::from_utf8_lossy(&o.stdout);
+                if stdout.contains("state = running") {
+                    "active".to_owned()
+                } else {
+                    "loaded".to_owned()
+                }
+            }
+            _ => "not loaded".to_owned(),
+        }
     }
 }
 

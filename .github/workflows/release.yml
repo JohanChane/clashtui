@@ -73,10 +73,54 @@ jobs:
           path: artifacts
           retention-days: 5
 
+  build-macos:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: goto-bus-stop/setup-zig@v2
+
+      - name: Cache Target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo
+            ./target
+          key: ci-release-macos-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ci-release-macos-
+
+      - name: Download Dependencies
+        run: cargo fetch
+
+      - name: Build macos x86_64
+        run: |
+          cargo install cargo-zigbuild
+          cargo zigbuild --target x86_64-macos --release --locked
+
+      - name: Build macos aarch64
+        run: |
+          cargo zigbuild --target aarch64-macos --release --locked
+
+      - name: Pre Upload
+        run: |
+          mkdir artifacts
+          mv ./target/x86_64-macos/release/clashtui    ./artifacts/clashtui-darwin-amd64
+          mv ./target/aarch64-macos/release/clashtui    ./artifacts/clashtui-darwin-arm64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS_Release
+          path: artifacts
+          retention-days: 5
+
   release:
     runs-on: ubuntu-latest
 
-    needs: [build-linux]
+    needs: [build-linux, build-macos]
 
     permissions:
       contents: write
@@ -105,6 +149,8 @@ jobs:
         run: |
           gzip -c ./artifacts/clashtui-amd64 > clashtui-linux-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
           gzip -c ./artifacts/clashtui-arm64 > clashtui-linux-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
+          gzip -c ./artifacts/clashtui-darwin-amd64 > clashtui-darwin-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
+          gzip -c ./artifacts/clashtui-darwin-arm64 > clashtui-darwin-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
@@ -113,3 +159,5 @@ jobs:
           files: |
             clashtui-linux-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
             clashtui-linux-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
+            clashtui-darwin-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
+            clashtui-darwin-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
