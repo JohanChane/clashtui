@@ -60,9 +60,9 @@ impl Cmds {
 
         if let Some(ArgCommand::Migrate { version }) = self.command {
             if let Err(e) = match version {
-                #[cfg(feature = "migration_v0_2_3")]
-                OldVersion::V0_2_3 => crate::utils::config::v0_2_3::migrate(),
-                #[cfg(not(any(feature = "migration_v0_2_3")))]
+                #[cfg(feature = "migration_v0_3_0")]
+                OldVersion::V0_3_0 => crate::utils::config::v0_3_0::migrate(),
+                #[cfg(not(any(feature = "migration_v0_3_0")))]
                 OldVersion::NotSupported => {
                     Err::<(), anyhow::Error>(anyhow::anyhow!("unsupported version"))
                 }
@@ -120,10 +120,10 @@ pub(crate) enum ArgCommand {
 
 #[derive(Debug, clap::Subcommand)]
 enum OldVersion {
-    #[cfg(feature = "migration_v0_2_3")]
-    /// v0.2.3
-    V0_2_3,
-    #[cfg(not(any(feature = "migration_v0_2_3")))]
+    #[cfg(feature = "migration_v0_3_0")]
+    /// v0.3.0
+    V0_3_0,
+    #[cfg(not(any(feature = "migration_v0_3_0")))]
     /// not support any version
     NotSupported,
 }

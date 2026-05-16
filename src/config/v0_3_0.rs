@@ -17,7 +17,7 @@ pub fn migrate() -> anyhow::Result<()> {
         edit_cmd,
         open_dir_cmd,
     } = CtCfg::load(&DataDir::get().join("config.yaml"))
-        .map_err(|e| anyhow::anyhow!("Loading v0.2.3 config file: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("Loading v0.3.0 config file: {e}"))?;
     let basic = super::Basic {
         clash_config_dir: clash_cfg_dir,
         clash_bin_path,

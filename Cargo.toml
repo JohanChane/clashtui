@@ -69,7 +69,7 @@ libc = "0.2"
 
 [features]
 customized-theme = ["tui", "ratatui/serde"]
-migration_v0_2_3 = []
+migration_v0_3_0 = []
 tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-lite", "dep:signal-hook-tokio", "dep:tungstenite"]
 
 default = ["customized-theme"]

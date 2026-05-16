@@ -200,7 +200,7 @@ impl BasicInfo {
     }
 }
 
-#[cfg(feature = "migration_v0_2_3")]
+#[cfg(feature = "migration_v0_3_0")]
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct Basic {
@@ -209,7 +209,7 @@ pub struct Basic {
     pub clash_config_path: String,
 }
 
-#[cfg(feature = "migration_v0_2_3")]
+#[cfg(feature = "migration_v0_3_0")]
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct Service {
@@ -220,14 +220,14 @@ pub struct Service {
     pub singbox_is_user: bool,
 }
 
-#[cfg(feature = "migration_v0_2_3")]
+#[cfg(feature = "migration_v0_3_0")]
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct Hack {
     pub service_controller: ServiceController,
 }
 
-#[cfg(feature = "migration_v0_2_3")]
+#[cfg(feature = "migration_v0_3_0")]
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct SingboxBasic {
