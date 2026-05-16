@@ -191,12 +191,12 @@ fn launchd_operation(
     };
 
     match op {
-        "start" => do_exec(vec!["load", "-w", &plist]),
+        "start" => do_exec(vec!["load", &plist]),
         "stop" => do_exec(vec!["unload", &plist]),
         "restart" | "reload" => {
             // Best-effort unload, then load
             let _ = do_exec(vec!["unload", &plist]);
-            do_exec(vec!["load", "-w", &plist])
+            do_exec(vec!["load", &plist])
         }
         _ => Err(anyhow::anyhow!("Unknown launchd operation: {op}")),
     }

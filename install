@@ -54,7 +54,7 @@ resolve_paths() {
     SERVICE_IS_USER=true
     if $IS_MACOS; then
       UNIT_DIR="$HOME/Library/LaunchAgents"
-      SERVICE_LOAD_CMD="launchctl load -w"
+      SERVICE_LOAD_CMD=""
       SERVICE_UNLOAD_CMD="launchctl unload"
       SERVICE_ENABLE_CMD="launchctl load -w"
       LAUNCHD_DOMAIN="gui/\$(id -u)"
@@ -72,7 +72,7 @@ resolve_paths() {
       INSTALL_DIR="/usr/local/opt/clashtui"
       UNIT_DIR="/Library/LaunchDaemons"
       SUDO="sudo"
-      SERVICE_LOAD_CMD="sudo launchctl load -w"
+      SERVICE_LOAD_CMD=""
       SERVICE_UNLOAD_CMD="sudo launchctl unload"
       SERVICE_ENABLE_CMD="sudo launchctl load -w"
       LAUNCHD_DOMAIN="system"
@@ -457,8 +457,9 @@ create_mihomo_unit() {
 </plist>
 EOF
     log_info "Created launchd plist: $plist_path"
-    # Load and start the service
-    $SERVICE_LOAD_CMD "$plist_path"
+    if [ -n "$SERVICE_LOAD_CMD" ]; then
+      $SERVICE_LOAD_CMD "$plist_path"
+    fi
   else
     # ── Linux: systemd unit ──
     log_info "Creating mihomo systemd unit..."
@@ -563,7 +564,9 @@ create_singbox_unit() {
 </plist>
 EOF
     log_info "Created launchd plist: $plist_path"
-    $SERVICE_LOAD_CMD "$plist_path"
+    if [ -n "$SERVICE_LOAD_CMD" ]; then
+      $SERVICE_LOAD_CMD "$plist_path"
+    fi
   else
     # ── Linux: systemd unit ──
     log_info "Creating sing-box systemd unit..."
@@ -1079,17 +1082,31 @@ main() {
 
   if $IS_USER; then
     if $IS_MACOS; then
-      log_info "User mode: services are loaded via launchd (~/Library/LaunchAgents)"
+      log_info "User mode: plist files created in ~/Library/LaunchAgents/"
+      log_info "Services are NOT started automatically. Use these commands:"
+      log_info "  Start now:         launchctl load ~/Library/LaunchAgents/clashtui_mihomo.plist"
+      log_info "  Start + autostart: launchctl load -w ~/Library/LaunchAgents/clashtui_mihomo.plist"
+      log_info "  Stop + disable:    launchctl unload ~/Library/LaunchAgents/clashtui_mihomo.plist"
       log_warn "Services will stop when you log out. To keep them running, keep the session active."
     else
-      log_warn "User mode: services run under systemctl --user"
+      log_info "User mode: unit files created in ~/.config/systemd/user/"
+      log_info "Services are NOT started automatically. Use these commands:"
+      log_info "  Start now:         systemctl --user start clashtui_mihomo"
+      log_info "  Start + autostart: systemctl --user enable --now clashtui_mihomo"
       log_warn "To keep services running after logout, run: loginctl enable-linger"
     fi
   else
     if $IS_MACOS; then
-      log_info "System mode: services are loaded via launchd (/Library/LaunchDaemons)"
+      log_info "System mode: plist files created in /Library/LaunchDaemons/"
+      log_info "Services are NOT started automatically. Use these commands:"
+      log_info "  Start now:         sudo launchctl load /Library/LaunchDaemons/clashtui_mihomo.plist"
+      log_info "  Start + autostart: sudo launchctl load -w /Library/LaunchDaemons/clashtui_mihomo.plist"
+      log_info "  Stop + disable:    sudo launchctl unload /Library/LaunchDaemons/clashtui_mihomo.plist"
     else
-      log_warn "Please log out and log back in for the group file permissions to take effect"
+      log_info "System mode: unit files created in /usr/lib/systemd/system/"
+      log_info "Services are NOT started automatically. Use these commands:"
+      log_info "  Start now:         sudo systemctl start clashtui_mihomo"
+      log_info "  Start + autostart: sudo systemctl enable --now clashtui_mihomo"
     fi
   fi
 }
