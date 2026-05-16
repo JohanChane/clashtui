@@ -92,10 +92,11 @@ bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/hea
 | [Getting Started](docs/getting_started_en.md) | Detailed usage guide: UI operations, CLI, subscription management, config reference, FAQ |
 | [Feature Design](docs/ClashTui_feature_design_en.md) | Feature design: config structure, subscription management, Template expansion, sing-box merge algorithm |
 | [Architecture](docs/architecture_en.md) | Code architecture: module structure, startup flow, TUI event loop, Tab system |
+| [Development Conventions](docs/development_conventions.md) | Branch naming, commit format, CHANGELOG conventions |
 
 ## Contributing
 
-Issues and pull requests are welcome.
+Issues and pull requests are welcome. Please read the [Development Conventions](docs/development_conventions.md) before contributing.
 
 To get up to speed quickly:
 1. [Feature Design](docs/ClashTui_feature_design_en.md) — understand the feature design
