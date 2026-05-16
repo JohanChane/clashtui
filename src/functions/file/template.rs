@@ -1,4 +1,6 @@
-use super::{MAX_SUPPORTED_TEMPLATE_VERSION, PROFILE_JSONS_PATH, PROFILE_YAMLS_PATH, TEMPLATE_PATH};
+use super::{
+    MAX_SUPPORTED_TEMPLATE_VERSION, PROFILE_JSONS_PATH, PROFILE_YAMLS_PATH, TEMPLATE_PATH,
+};
 use crate::config::database::{ProfileType, ProxyProviderGroups};
 use anyhow::{Context as _, bail};
 use std::collections::{HashMap, HashSet};
@@ -33,14 +35,14 @@ pub fn resolve_template_placeholder(
             }
             let mut parts: Vec<&str> = path.split('.').collect();
             let group_name = parts.remove(0);
-            let providers = ppg_data
-                .get(group_name)
-                .with_context(|| format!("PPG group '{group_name}' not found in proxy-provider groups"))?;
+            let providers = ppg_data.get(group_name).with_context(|| {
+                format!("PPG group '{group_name}' not found in proxy-provider groups")
+            })?;
 
             if let Some(provider_name) = parts.first() {
-                providers
-                    .get(*provider_name)
-                    .with_context(|| format!("Provider '{provider_name}' not found in PPG group '{group_name}'"))?;
+                providers.get(*provider_name).with_context(|| {
+                    format!("Provider '{provider_name}' not found in PPG group '{group_name}'")
+                })?;
                 Ok(vec![provider_name.to_string()])
             } else {
                 Ok(providers.keys().cloned().collect())
@@ -52,9 +54,9 @@ pub fn resolve_template_placeholder(
             }
             let mut parts: Vec<&str> = path.split('.').collect();
             let group_name = parts.remove(0);
-            let names = pg_names
-                .get(group_name)
-                .with_context(|| format!("PGG template '{group_name}' not found in generated proxy-group names"))?;
+            let names = pg_names.get(group_name).with_context(|| {
+                format!("PGG template '{group_name}' not found in generated proxy-group names")
+            })?;
             if let Some(provider_name) = parts.first() {
                 let suffix = format!("-{provider_name}");
                 let filtered: Vec<String> = names
@@ -63,7 +65,9 @@ pub fn resolve_template_placeholder(
                     .cloned()
                     .collect();
                 if filtered.is_empty() {
-                    bail!("PGG entry ending with '{suffix}' not found in generated proxy-group names for '{group_name}'");
+                    bail!(
+                        "PGG entry ending with '{suffix}' not found in generated proxy-group names for '{group_name}'"
+                    );
                 }
                 Ok(filtered)
             } else {
@@ -74,8 +78,8 @@ pub fn resolve_template_placeholder(
     }
 }
 
-mod version1;
 pub mod singbox;
+mod version1;
 
 /// Records a proxy name rename applied during deduplication.
 #[derive(Clone, Debug, PartialEq)]
@@ -159,7 +163,12 @@ pub fn read_template_ppg(template_name: &str) -> anyhow::Result<ProxyProviderGro
         .and_then(|c| c.get("proxy_provider_groups"))
         .map(|g| serde_yml::from_value(g.clone()))
         .transpose()
-        .with_context(|| format!("Failed to parse clashtui.proxy_provider_groups in: {}", path.display()))?;
+        .with_context(|| {
+            format!(
+                "Failed to parse clashtui.proxy_provider_groups in: {}",
+                path.display()
+            )
+        })?;
 
     match groups {
         Some(g) if !g.is_empty() => Ok(g),
@@ -182,13 +191,21 @@ fn read_legacy_template_proxy_providers() -> anyhow::Result<ProxyProviderGroups>
     if !path.exists() {
         return Ok(ProxyProviderGroups::new());
     }
-    let content = std::fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read template_proxy_providers: {}", path.display()))?;
+    let content = std::fs::read_to_string(&path).with_context(|| {
+        format!(
+            "Failed to read template_proxy_providers: {}",
+            path.display()
+        )
+    })?;
     if content.trim().is_empty() {
         return Ok(ProxyProviderGroups::new());
     }
-    let groups: ProxyProviderGroups = serde_yml::from_str(&content)
-        .with_context(|| format!("Failed to parse template_proxy_providers.yaml: {}", path.display()))?;
+    let groups: ProxyProviderGroups = serde_yml::from_str(&content).with_context(|| {
+        format!(
+            "Failed to parse template_proxy_providers.yaml: {}",
+            path.display()
+        )
+    })?;
     log::info!(
         "Read proxy-provider groups from legacy template_proxy_providers.yaml ({} groups)",
         groups.len()
@@ -207,14 +224,20 @@ pub fn read_profile_ppg(profile_name: &str) -> anyhow::Result<ProxyProviderGroup
             if content.trim().is_empty() {
                 return Ok(ProxyProviderGroups::new());
             }
-            let value: serde_json::Value = serde_json::from_str(&content)
-                .with_context(|| format!("Failed to parse profile JSON: {}", json_path.display()))?;
+            let value: serde_json::Value = serde_json::from_str(&content).with_context(|| {
+                format!("Failed to parse profile JSON: {}", json_path.display())
+            })?;
             let groups = value
                 .get("clashtui")
                 .and_then(|c| c.get("proxy_provider_groups"))
                 .map(|g| serde_json::from_value(g.clone()))
                 .transpose()
-                .with_context(|| format!("Failed to parse clashtui.proxy_provider_groups in: {}", json_path.display()))?
+                .with_context(|| {
+                    format!(
+                        "Failed to parse clashtui.proxy_provider_groups in: {}",
+                        json_path.display()
+                    )
+                })?
                 .unwrap_or_default();
             return Ok(groups);
         }
@@ -232,7 +255,12 @@ pub fn read_profile_ppg(profile_name: &str) -> anyhow::Result<ProxyProviderGroup
         .and_then(|c| c.get("proxy_provider_groups"))
         .map(|g| serde_yml::from_value(g.clone()))
         .transpose()
-        .with_context(|| format!("Failed to parse clashtui.proxy_provider_groups in: {}", path.display()))?
+        .with_context(|| {
+            format!(
+                "Failed to parse clashtui.proxy_provider_groups in: {}",
+                path.display()
+            )
+        })?
         .unwrap_or_default();
     Ok(groups)
 }
@@ -255,10 +283,7 @@ pub fn write_template_ppg(template_name: &str, groups: &ProxyProviderGroups) -> 
     clashtui
         .as_mapping_mut()
         .ok_or_else(|| anyhow::anyhow!("clashtui key is not a mapping in: {}", path.display()))?
-        .insert(
-            "proxy_provider_groups".into(),
-            serde_yml::to_value(groups)?,
-        );
+        .insert("proxy_provider_groups".into(), serde_yml::to_value(groups)?);
 
     // atomic write
     let tmp_path = path.with_extension("yaml.tmp");
@@ -269,7 +294,9 @@ pub fn write_template_ppg(template_name: &str, groups: &ProxyProviderGroups) -> 
 
 /// Verify that all proxy-provider files for a template profile exist.
 /// Returns an error listing missing files, or Ok(()) if all are present.
-pub fn check_template_ppg_availability(profile: &crate::config::database::Profile) -> anyhow::Result<()> {
+pub fn check_template_ppg_availability(
+    profile: &crate::config::database::Profile,
+) -> anyhow::Result<()> {
     let template = match &profile.dtype {
         ProfileType::Template { template } => template,
         _ => return Ok(()),
@@ -366,9 +393,12 @@ pub fn apply_template(template_name: &str, profile_name: &str) -> anyhow::Result
     serde_yml::to_writer(std::fs::File::create(&tmp_path)?, &gened)?;
     std::fs::rename(&tmp_path, &output_path)?;
     let mut pm = pm!();
-    pm.insert(profile_name, ProfileType::Template {
-        template: template_name.to_owned(),
-    });
+    pm.insert(
+        profile_name,
+        ProfileType::Template {
+            template: template_name.to_owned(),
+        },
+    );
     pm.to_file()?;
     Ok(())
 }
@@ -384,7 +414,9 @@ pub async fn apply_template_singbox(
     let file = std::fs::File::open(&path)
         .inspect_err(|e| log::error!("Opening template {template_name}:{e}"))?;
     let map: serde_json::Value = serde_json::from_reader(file)?;
-    let gened = singbox::gen_template_singbox(&map, template_name, &groups, with_proxy, force_refresh).await?;
+    let gened =
+        singbox::gen_template_singbox(&map, template_name, &groups, with_proxy, force_refresh)
+            .await?;
     let output_path = PROFILE_JSONS_PATH.join(format!("{profile_name}.json"));
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -395,9 +427,12 @@ pub async fn apply_template_singbox(
     serde_json::to_writer_pretty(file, &gened)?;
     std::fs::rename(&tmp_path, &output_path)?;
     let mut pm = pm!();
-    pm.insert(profile_name, ProfileType::Template {
-        template: template_name.to_owned(),
-    });
+    pm.insert(
+        profile_name,
+        ProfileType::Template {
+            template: template_name.to_owned(),
+        },
+    );
     pm.to_file()?;
     Ok(())
 }
@@ -416,7 +451,10 @@ const RULES: &str = "rules";
 pub async fn update_profile_without_pp(
     mut tpl: serde_yml::Mapping,
     with_proxy: bool,
-) -> anyhow::Result<(serde_yml::Mapping, Vec<crate::functions::file::net_resource::NetResourceUpdate>)> {
+) -> anyhow::Result<(
+    serde_yml::Mapping,
+    Vec<crate::functions::file::net_resource::NetResourceUpdate>,
+)> {
     use crate::functions::file::net_resource::{NetResourceUpdate, ResourceSection};
     use std::collections::HashMap;
 
@@ -445,7 +483,9 @@ pub async fn update_profile_without_pp(
 
         let mut download_handles = Vec::new();
         for (pp_name, pp) in pps {
-            let Some(url) = pp.url else { continue; };
+            let Some(url) = pp.url else {
+                continue;
+            };
             let pp_name_clone = pp_name.clone();
             let pp_path = pp
                 .__others
@@ -453,9 +493,8 @@ pub async fn update_profile_without_pp(
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_owned();
-            let cfg_dir = std::path::PathBuf::from(
-                &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
-            );
+            let cfg_dir =
+                std::path::PathBuf::from(&crate::config::CONFIG.cfg_file.mihomo.core.config_dir);
             download_handles.push(tokio::task::spawn_blocking(move || {
                 if !pp_path.is_empty() {
                     let dest = cfg_dir.join(&pp_path);
@@ -469,12 +508,7 @@ pub async fn update_profile_without_pp(
                     Ok(mut rdr) => {
                         let mut buf = Vec::new();
                         if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
-                            return (
-                                pp_name_clone,
-                                url,
-                                pp_path,
-                                Err(e.to_string()),
-                            );
+                            return (pp_name_clone, url, pp_path, Err(e.to_string()));
                         }
                         if !pp_path.is_empty() {
                             let dest = cfg_dir.join(&pp_path);
@@ -485,7 +519,8 @@ pub async fn update_profile_without_pp(
                                 let _ = std::fs::write(&dest, &buf);
                             }
                         }
-                        let yaml = serde_yml::from_slice::<serde_yml::Mapping>(&buf).map_err(|e| e.to_string());
+                        let yaml = serde_yml::from_slice::<serde_yml::Mapping>(&buf)
+                            .map_err(|e| e.to_string());
                         (pp_name_clone, url, pp_path, yaml)
                     }
                     Err(e) => (pp_name_clone, url, pp_path, Err(e.to_string())),
@@ -578,7 +613,9 @@ pub async fn update_profile_without_pp(
 
         let mut download_handles = Vec::new();
         for (rp_name, rp) in rps {
-            let Some(url) = rp.url else { continue; };
+            let Some(url) = rp.url else {
+                continue;
+            };
             let rp_name_clone = rp_name.clone();
             let rp_path = rp
                 .__others
@@ -586,9 +623,8 @@ pub async fn update_profile_without_pp(
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_owned();
-            let cfg_dir = std::path::PathBuf::from(
-                &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
-            );
+            let cfg_dir =
+                std::path::PathBuf::from(&crate::config::CONFIG.cfg_file.mihomo.core.config_dir);
             download_handles.push(tokio::task::spawn_blocking(move || {
                 if !rp_path.is_empty() {
                     let dest = cfg_dir.join(&rp_path);
@@ -602,12 +638,7 @@ pub async fn update_profile_without_pp(
                     Ok(mut rdr) => {
                         let mut buf = Vec::new();
                         if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
-                            return (
-                                rp_name_clone,
-                                url,
-                                rp_path,
-                                Err(e.to_string()),
-                            );
+                            return (rp_name_clone, url, rp_path, Err(e.to_string()));
                         }
                         if !rp_path.is_empty() {
                             let dest = cfg_dir.join(&rp_path);
@@ -616,7 +647,8 @@ pub async fn update_profile_without_pp(
                             }
                             let _ = std::fs::write(&dest, &buf);
                         }
-                        let yaml = serde_yml::from_slice::<serde_yml::Mapping>(&buf).map_err(|e| e.to_string());
+                        let yaml = serde_yml::from_slice::<serde_yml::Mapping>(&buf)
+                            .map_err(|e| e.to_string());
                         (rp_name_clone, url, rp_path, yaml)
                     }
                     Err(e) => (rp_name_clone, url, rp_path, Err(e.to_string())),
@@ -676,10 +708,14 @@ pub async fn fetch_net_resource_statuses(
     yaml: &serde_yml::Mapping,
     with_proxy: bool,
 ) -> Vec<crate::functions::file::net_resource::NetResourceUpdate> {
-    use crate::functions::file::net_resource::{ExtractNetResources, NetResourceUpdate, ResourceSection};
+    use crate::functions::file::net_resource::{
+        ExtractNetResources, NetResourceUpdate, ResourceSection,
+    };
 
-    let resources =
-        yaml.extract(&[ResourceSection::ProxyProvider, ResourceSection::RuleProvider]);
+    let resources = yaml.extract(&[
+        ResourceSection::ProxyProvider,
+        ResourceSection::RuleProvider,
+    ]);
 
     if resources.is_empty() {
         return Vec::new();
@@ -705,7 +741,14 @@ pub async fn fetch_net_resource_statuses(
                         }
                     }
                     if serde_yml::from_slice::<serde_yml::Mapping>(&buf).is_err() {
-                        return (name, url, path, section, false, Some("Invalid YAML format".to_string()));
+                        return (
+                            name,
+                            url,
+                            path,
+                            section,
+                            false,
+                            Some("Invalid YAML format".to_string()),
+                        );
                     }
                     match std::fs::write(&path, &buf) {
                         Ok(()) => (name, url, path, section, true, None),
@@ -754,8 +797,14 @@ mod tests {
     fn make_ppg() -> ProxyProviderGroups {
         let mut groups = ProxyProviderGroups::new();
         let mut providers = std::collections::BTreeMap::new();
-        providers.insert("pvd0".to_string(), "https://example.com/sub1.yaml".to_string());
-        providers.insert("pvd1".to_string(), "https://example.com/sub2.yaml".to_string());
+        providers.insert(
+            "pvd0".to_string(),
+            "https://example.com/sub1.yaml".to_string(),
+        );
+        providers.insert(
+            "pvd1".to_string(),
+            "https://example.com/sub2.yaml".to_string(),
+        );
         groups.insert("pvd".to_string(), providers);
         groups
     }
@@ -780,7 +829,10 @@ mod tests {
     fn test_resolve_pgg() {
         let ppg = make_ppg();
         let mut pg_names = HashMap::new();
-        pg_names.insert("auto".to_string(), vec!["auto-pvd0".to_string(), "auto-pvd1".to_string()]);
+        pg_names.insert(
+            "auto".to_string(),
+            vec!["auto-pvd0".to_string(), "auto-pvd1".to_string()],
+        );
         let result = resolve_template_placeholder("${PGG.auto}", &pg_names, &ppg).unwrap();
         assert_eq!(result, vec!["auto-pvd0", "auto-pvd1"]);
     }
@@ -789,7 +841,10 @@ mod tests {
     fn test_resolve_pgg_specific_provider() {
         let ppg = make_ppg();
         let mut pg_names = HashMap::new();
-        pg_names.insert("auto".to_string(), vec!["auto-pvd0".to_string(), "auto-pvd1".to_string()]);
+        pg_names.insert(
+            "auto".to_string(),
+            vec!["auto-pvd0".to_string(), "auto-pvd1".to_string()],
+        );
         let result = resolve_template_placeholder("${PGG.auto.pvd0}", &pg_names, &ppg).unwrap();
         assert_eq!(result, vec!["auto-pvd0"]);
     }
@@ -865,7 +920,14 @@ pub async fn fetch_net_resource_statuses_from_resources(
                         }
                     }
                     if serde_yml::from_slice::<serde_yml::Mapping>(&buf).is_err() {
-                        return (name, url, path, section, false, Some("Invalid YAML format".to_string()));
+                        return (
+                            name,
+                            url,
+                            path,
+                            section,
+                            false,
+                            Some("Invalid YAML format".to_string()),
+                        );
                     }
                     match std::fs::write(&path, &buf) {
                         Ok(()) => (name, url, path, section, true, None),

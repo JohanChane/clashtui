@@ -16,15 +16,43 @@ mod_agent!(
         ([KeyCode::Up], Key::MoveUp, "Move up"),
         ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
         ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
-        ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Action(Action::Delete), "Delete template"),
+        (
+            [KeyCode::Char('d'), KeyCode::Char('d')],
+            Key::Action(Action::Delete),
+            "Delete template"
+        ),
         ([KeyCode::Char('e')], Key::Action(Action::Edit), "Edit"),
-        ([KeyCode::Char('E')], Key::Action(Action::EditProviders), "Edit proxy providers"),
-        ([KeyCode::Char('p')], Key::Action(Action::Preview), "Preview"),
+        (
+            [KeyCode::Char('E')],
+            Key::Action(Action::EditProviders),
+            "Edit proxy providers"
+        ),
+        (
+            [KeyCode::Char('p')],
+            Key::Action(Action::Preview),
+            "Preview"
+        ),
         ([KeyCode::Enter], Key::Action(Action::Generate), "Generate"),
-        ([KeyCode::Char('f')], Key::Action(Action::FzfFind), "Find template"),
-        ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
-        ([KeyCode::Char('G')], Key::Action(Action::GoEnd), "Go to end"),
-        ([KeyCode::Char('/')], Key::Action(Action::Search), "Search/Filter"),
+        (
+            [KeyCode::Char('f')],
+            Key::Action(Action::FzfFind),
+            "Find template"
+        ),
+        (
+            [KeyCode::Char('g'), KeyCode::Char('g')],
+            Key::Action(Action::GoTop),
+            "Go to top"
+        ),
+        (
+            [KeyCode::Char('G')],
+            Key::Action(Action::GoEnd),
+            "Go to end"
+        ),
+        (
+            [KeyCode::Char('/')],
+            Key::Action(Action::Search),
+            "Search/Filter"
+        ),
     ]
 );
 
@@ -78,12 +106,16 @@ impl<'de> serde::Deserialize<'de> for Key {
                     "MoveUp" => Ok(Key::MoveUp),
                     "MoveDown" => Ok(Key::MoveDown),
                     "Select" => Ok(Key::Select),
-                    s => Err(de::Error::unknown_variant(s, &["Switch", "MoveUp", "MoveDown", "Select", "Action: ..."])),
+                    s => Err(de::Error::unknown_variant(
+                        s,
+                        &["Switch", "MoveUp", "MoveDown", "Select", "Action: ..."],
+                    )),
                 }
             }
 
             fn visit_map<M: de::MapAccess<'de>>(self, mut map: M) -> Result<Key, M::Error> {
-                let k: String = map.next_key()?
+                let k: String = map
+                    .next_key()?
                     .ok_or_else(|| de::Error::missing_field("variant"))?;
                 if k == "Action" {
                     let v: String = map.next_value()?;
@@ -97,10 +129,20 @@ impl<'de> serde::Deserialize<'de> for Key {
                         "FzfFind" => Ok(Key::Action(Action::FzfFind)),
                         "GoTop" => Ok(Key::Action(Action::GoTop)),
                         "GoEnd" => Ok(Key::Action(Action::GoEnd)),
-                        s => Err(de::Error::unknown_variant(s, &[
-                            "Generate", "Delete", "Edit", "EditProviders",
-                            "Preview", "Search", "FzfFind", "GoTop", "GoEnd",
-                        ])),
+                        s => Err(de::Error::unknown_variant(
+                            s,
+                            &[
+                                "Generate",
+                                "Delete",
+                                "Edit",
+                                "EditProviders",
+                                "Preview",
+                                "Search",
+                                "FzfFind",
+                                "GoTop",
+                                "GoEnd",
+                            ],
+                        )),
                     }
                 } else {
                     Err(de::Error::unknown_field(&k, &["Action"]))
@@ -136,7 +178,9 @@ impl TryFrom<&crate::tui::Key> for Key {
 
         Ok(match value.code {
             KeyCode::Enter => Self::Select,
-            KeyCode::Right | KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('l') => Self::Switch,
+            KeyCode::Right | KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('l') => {
+                Self::Switch
+            }
             KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
             KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
 
@@ -180,7 +224,10 @@ impl DualTabContentMate for Template {
         task_set: &mut FutureSet<(Self::Mate, Self)>,
         state: &mut Self::State,
     ) -> bool {
-        log::debug!("Template::handle_key_event: key={key:?} items.len={}", self.items.len());
+        log::debug!(
+            "Template::handle_key_event: key={key:?} items.len={}",
+            self.items.len()
+        );
         match key {
             Key::Switch => return true,
             Key::MoveDown => state.select_next(),

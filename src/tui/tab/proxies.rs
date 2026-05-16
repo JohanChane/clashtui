@@ -18,19 +18,59 @@ mod_agent!(
         ([KeyCode::Char('h')], Key::Parent, "Go to parent"),
         ([KeyCode::Char('l')], Key::Expand, "Expand"),
         ([KeyCode::Enter], Key::Select, "Select"),
-        ([KeyCode::Char('g'), KeyCode::Char('g')], Key::GoTop, "Go to top"),
+        (
+            [KeyCode::Char('g'), KeyCode::Char('g')],
+            Key::GoTop,
+            "Go to top"
+        ),
         ([KeyCode::Char('G')], Key::GoBottom, "Go to bottom"),
         ([KeyCode::Char('/')], Key::Search, "Search/Filter"),
-        ([KeyCode::Char('s'), KeyCode::Char('n')], Key::SortByName, "Sort by name"),
-        ([KeyCode::Char('s'), KeyCode::Char('d')], Key::SortByDelay, "Sort by delay"),
-        ([KeyCode::Char('s'), KeyCode::Char('r')], Key::ResetSort, "Reset sort"),
-        ([KeyCode::Char('S'), KeyCode::Char('n')], Key::GlobalSortByName, "Global sort by name"),
-        ([KeyCode::Char('S'), KeyCode::Char('d')], Key::GlobalSortByDelay, "Global sort by delay"),
-        ([KeyCode::Char('S'), KeyCode::Char('r')], Key::GlobalResetSort, "Global reset sort"),
-        ([KeyCode::Char('a'), KeyCode::Char('f')], Key::CollapseAll, "Collapse all"),
-        ([KeyCode::Char('a'), KeyCode::Char('e')], Key::ExpandAll, "Expand all"),
+        (
+            [KeyCode::Char('s'), KeyCode::Char('n')],
+            Key::SortByName,
+            "Sort by name"
+        ),
+        (
+            [KeyCode::Char('s'), KeyCode::Char('d')],
+            Key::SortByDelay,
+            "Sort by delay"
+        ),
+        (
+            [KeyCode::Char('s'), KeyCode::Char('r')],
+            Key::ResetSort,
+            "Reset sort"
+        ),
+        (
+            [KeyCode::Char('S'), KeyCode::Char('n')],
+            Key::GlobalSortByName,
+            "Global sort by name"
+        ),
+        (
+            [KeyCode::Char('S'), KeyCode::Char('d')],
+            Key::GlobalSortByDelay,
+            "Global sort by delay"
+        ),
+        (
+            [KeyCode::Char('S'), KeyCode::Char('r')],
+            Key::GlobalResetSort,
+            "Global reset sort"
+        ),
+        (
+            [KeyCode::Char('a'), KeyCode::Char('f')],
+            Key::CollapseAll,
+            "Collapse all"
+        ),
+        (
+            [KeyCode::Char('a'), KeyCode::Char('e')],
+            Key::ExpandAll,
+            "Expand all"
+        ),
         ([KeyCode::Char('t')], Key::TestDelay, "Test delay"),
-        ([KeyCode::Char('a'), KeyCode::Char('t')], Key::TestAllDelay, "Test all delay"),
+        (
+            [KeyCode::Char('a'), KeyCode::Char('t')],
+            Key::TestAllDelay,
+            "Test all delay"
+        ),
         ([KeyCode::Char('r')], Key::Refresh, "Refresh"),
         ([KeyCode::Char('f')], Key::GroupSelect, "Group select"),
         ([KeyCode::Char('F')], Key::FzfFind, "Find proxy"),
@@ -74,15 +114,14 @@ impl TryFrom<&crate::tui::Key> for Key {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::tui::Key as TuiKey;
     use crate::tui::widget::{chord::ChordHandler, tab::KeyCombo};
     use crossterm::event::KeyCode;
 
-    use super::{Key, Proxies, Tab, agent};
     use super::all_shortcuts;
+    use super::{Key, Proxies, Tab, agent};
 
     fn mk_key(code: KeyCode) -> TuiKey {
         TuiKey {
@@ -95,12 +134,16 @@ mod tests {
     }
 
     fn make_shortcuts() -> Vec<(KeyCombo, &'static str)> {
-        all_shortcuts().iter().map(|(c, _, d)| (c.clone(), *d)).collect()
+        all_shortcuts()
+            .iter()
+            .map(|(c, _, d)| (c.clone(), *d))
+            .collect()
     }
 
     #[test]
     fn all_shortcuts_contains_chords() {
-        let descs: Vec<&str> = all_shortcuts().iter()
+        let descs: Vec<&str> = all_shortcuts()
+            .iter()
             .filter(|(_, k, _)| matches!(k, Key::CollapseAll | Key::ExpandAll))
             .map(|(_, _, d)| *d)
             .collect();
@@ -145,7 +188,11 @@ mod tests {
         assert!(dispatched.is_empty(), "no dispatch on first key");
         assert!(ch.is_active(), "chord should be active after 'a'");
         assert_eq!(ch.pressed.len(), 1);
-        assert_eq!(ch.candidates.len(), 3, "should have 3 candidates: CollapseAll, ExpandAll, TestAllDelay");
+        assert_eq!(
+            ch.candidates.len(),
+            3,
+            "should have 3 candidates: CollapseAll, ExpandAll, TestAllDelay"
+        );
     }
 
     #[test]
@@ -196,7 +243,10 @@ mod tests {
     #[test]
     fn s_no_longer_a_single_key_shortcut() {
         let kev = mk_key(KeyCode::Char('s'));
-        assert!(Key::try_from(&kev).is_err(), "'s' should no longer be a single-key shortcut");
+        assert!(
+            Key::try_from(&kev).is_err(),
+            "'s' should no longer be a single-key shortcut"
+        );
     }
 
     #[test]
@@ -205,11 +255,17 @@ mod tests {
         let _guard = rt.enter();
         let tab = Tab::<Proxies>::default();
         let shortcuts = tab.shortcuts();
-        assert!(!shortcuts.is_empty(), "Tab<Proxies>::shortcuts() should not be empty");
-        let has_chord = shortcuts.iter().any(|(combo, _)| {
-            combo.len() > 1 && combo[0] == mk_key(KeyCode::Char('a'))
-        });
-        assert!(has_chord, "Tab<Proxies>::shortcuts() should contain 'a' chord entries");
+        assert!(
+            !shortcuts.is_empty(),
+            "Tab<Proxies>::shortcuts() should not be empty"
+        );
+        let has_chord = shortcuts
+            .iter()
+            .any(|(combo, _)| combo.len() > 1 && combo[0] == mk_key(KeyCode::Char('a')));
+        assert!(
+            has_chord,
+            "Tab<Proxies>::shortcuts() should contain 'a' chord entries"
+        );
     }
 
     #[test]
@@ -258,11 +314,17 @@ mod tests {
         let shortcuts = make_shortcuts();
         let mut ch = ChordHandler::default();
         let mut dispatched: Vec<Vec<TuiKey>> = vec![];
-        let consumed = ch.handle(&s_lower, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = ch.handle(&s_lower, &shortcuts, &mut |seq| {
+            dispatched.push(seq.to_vec())
+        });
         assert!(consumed, "s should initiate chord mode");
         assert!(dispatched.is_empty(), "no dispatch on first key");
         assert!(ch.is_active());
-        assert_eq!(ch.candidates.len(), 3, "s should have 3 candidates: group sort by name/delay/reset");
+        assert_eq!(
+            ch.candidates.len(),
+            3,
+            "s should have 3 candidates: group sort by name/delay/reset"
+        );
     }
 
     #[test]
@@ -316,11 +378,17 @@ mod tests {
         let shortcuts = make_shortcuts();
         let mut ch = ChordHandler::default();
         let mut dispatched: Vec<Vec<TuiKey>> = vec![];
-        let consumed = ch.handle(&s_upper, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = ch.handle(&s_upper, &shortcuts, &mut |seq| {
+            dispatched.push(seq.to_vec())
+        });
         assert!(consumed, "S should initiate chord mode");
         assert!(dispatched.is_empty(), "no dispatch on first key");
         assert!(ch.is_active());
-        assert_eq!(ch.candidates.len(), 3, "S should have 3 candidates: global sort by name/delay/reset");
+        assert_eq!(
+            ch.candidates.len(),
+            3,
+            "S should have 3 candidates: global sort by name/delay/reset"
+        );
     }
 
     #[test]
@@ -330,7 +398,9 @@ mod tests {
         let shortcuts = make_shortcuts();
         let mut ch = ChordHandler::default();
         let mut dispatched: Vec<Vec<TuiKey>> = vec![];
-        ch.handle(&s_upper, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        ch.handle(&s_upper, &shortcuts, &mut |seq| {
+            dispatched.push(seq.to_vec())
+        });
         let consumed = ch.handle(&d, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
         assert!(consumed);
         assert_eq!(dispatched.len(), 1);
@@ -345,7 +415,9 @@ mod tests {
         let shortcuts = make_shortcuts();
         let mut ch = ChordHandler::default();
         let mut dispatched: Vec<Vec<TuiKey>> = vec![];
-        ch.handle(&s_upper, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        ch.handle(&s_upper, &shortcuts, &mut |seq| {
+            dispatched.push(seq.to_vec())
+        });
         let consumed = ch.handle(&r, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
         assert!(consumed);
         assert_eq!(dispatched.len(), 1);
@@ -369,7 +441,9 @@ mod tests {
         let proxies = response.proxies;
 
         let mut content = Proxies {
-            tree: ProxyTree::build(ProxiesResponse { proxies: proxies.clone() }),
+            tree: ProxyTree::build(ProxiesResponse {
+                proxies: proxies.clone(),
+            }),
             proxies: proxies.clone(),
             ..Default::default()
         };
@@ -379,7 +453,10 @@ mod tests {
 
         // Select a middle folder
         let folder_name = "Sl-pvd0";
-        let folder_idx = content.tree.nodes.iter()
+        let folder_idx = content
+            .tree
+            .nodes
+            .iter()
             .position(|n| n.node_type == NodeType::Folder && n.name == folder_name)
             .unwrap();
         state.select(Some(folder_idx));
@@ -411,7 +488,10 @@ mod tests {
     fn f_maps_to_group_select_in_agent() {
         let kev = mk_key(KeyCode::Char('f'));
         let key = Key::try_from(&kev);
-        assert!(matches!(key, Ok(Key::GroupSelect)), "f should map to GroupSelect");
+        assert!(
+            matches!(key, Ok(Key::GroupSelect)),
+            "f should map to GroupSelect"
+        );
     }
 
     #[test]
@@ -427,9 +507,15 @@ mod tests {
         let f = mk_key(KeyCode::Char('f'));
         let shortcuts = make_shortcuts();
 
-        assert!(Key::try_from(&f).is_ok(), "f alone should be a single-key shortcut");
         assert!(
-            all_shortcuts().iter().any(|(combo, key, _)| &**combo == &[a.clone(), f.clone()] && matches!(key, Key::CollapseAll)),
+            Key::try_from(&f).is_ok(),
+            "f alone should be a single-key shortcut"
+        );
+        assert!(
+            all_shortcuts()
+                .iter()
+                .any(|(combo, key, _)| &**combo == &[a.clone(), f.clone()]
+                    && matches!(key, Key::CollapseAll)),
             "af chord should dispatch CollapseAll"
         );
 
@@ -457,26 +543,44 @@ mod tests {
         let proxies = response.proxies;
 
         let content = Proxies {
-            tree: ProxyTree::build(ProxiesResponse { proxies: proxies.clone() }),
+            tree: ProxyTree::build(ProxiesResponse {
+                proxies: proxies.clone(),
+            }),
             proxies: proxies.clone(),
             ..Default::default()
         };
 
         // Sl-pvd0 is a top-level Folder (depth 0, parent=None)
-        let folder_idx = content.tree.nodes.iter()
+        let folder_idx = content
+            .tree
+            .nodes
+            .iter()
             .position(|n| n.node_type == NodeType::Folder && n.name == "Sl-pvd0")
             .unwrap();
-        let parent = content.tree.node_at(folder_idx).map(|n| n.parent.clone()).flatten();
+        let parent = content
+            .tree
+            .node_at(folder_idx)
+            .map(|n| n.parent.clone())
+            .flatten();
 
-        let siblings: Vec<&str> = content.tree.nodes.iter()
+        let siblings: Vec<&str> = content
+            .tree
+            .nodes
+            .iter()
             .filter(|n| n.parent == parent)
             .map(|n| n.name.as_str())
             .collect();
 
         // All top-level (parent=None) Folder nodes should be siblings
-        assert!(siblings.contains(&"Sl-pvd0"), "Folder itself should be in siblings");
+        assert!(
+            siblings.contains(&"Sl-pvd0"),
+            "Folder itself should be in siblings"
+        );
         assert!(siblings.contains(&"Entry"), "Entry is a top-level sibling");
-        assert!(!siblings.contains(&"vmess-ipdktc33"), "vmess-ipdktc33 is a child, not a sibling");
+        assert!(
+            !siblings.contains(&"vmess-ipdktc33"),
+            "vmess-ipdktc33 is a child, not a sibling"
+        );
     }
 
     #[test]
@@ -495,7 +599,9 @@ mod tests {
         let proxies = response.proxies;
 
         let mut content = Proxies {
-            tree: ProxyTree::build(ProxiesResponse { proxies: proxies.clone() }),
+            tree: ProxyTree::build(ProxiesResponse {
+                proxies: proxies.clone(),
+            }),
             proxies: proxies.clone(),
             ..Default::default()
         };
@@ -504,37 +610,73 @@ mod tests {
         let mut tasks: FutureSet<Proxies> = tokio::task::JoinSet::new();
 
         // Expand Entry to reveal children
-        let entry_idx = content.tree.nodes.iter()
+        let entry_idx = content
+            .tree
+            .nodes
+            .iter()
             .position(|n| n.node_type == NodeType::Folder && n.name == "Entry")
             .unwrap();
         state.select(Some(entry_idx));
         content.dispatch_key(Key::Expand, &mut tasks, &mut state);
 
         // Sl-pvd0 is a child (Link) of Entry
-        let child_idx = content.tree.nodes.iter()
+        let child_idx = content
+            .tree
+            .nodes
+            .iter()
             .position(|n| n.name == "Sl-pvd0" && n.parent.as_deref() == Some("Entry"))
             .unwrap();
-        let parent = content.tree.node_at(child_idx).map(|n| n.parent.clone()).flatten();
+        let parent = content
+            .tree
+            .node_at(child_idx)
+            .map(|n| n.parent.clone())
+            .flatten();
 
-        let siblings: Vec<&str> = content.tree.nodes.iter()
+        let siblings: Vec<&str> = content
+            .tree
+            .nodes
+            .iter()
             .filter(|n| n.parent == parent)
             .map(|n| n.name.as_str())
             .collect();
 
-        assert!(siblings.contains(&"Sl-pvd0"), "Sl-pvd0 itself should be in siblings");
-        assert!(siblings.contains(&"At-pvd0"), "At-pvd0 is a sibling under Entry");
-        assert!(siblings.contains(&"FltAt-pvd0"), "FltAt-pvd0 is a sibling under Entry");
-        assert!(!siblings.contains(&"Entry"), "Entry is the parent, not a sibling");
+        assert!(
+            siblings.contains(&"Sl-pvd0"),
+            "Sl-pvd0 itself should be in siblings"
+        );
+        assert!(
+            siblings.contains(&"At-pvd0"),
+            "At-pvd0 is a sibling under Entry"
+        );
+        assert!(
+            siblings.contains(&"FltAt-pvd0"),
+            "FltAt-pvd0 is a sibling under Entry"
+        );
+        assert!(
+            !siblings.contains(&"Entry"),
+            "Entry is the parent, not a sibling"
+        );
         // Expand 看视频 and verify its child is NOT a sibling of Sl-pvd0
-        let kan_idx = content.tree.nodes.iter()
-            .position(|n| n.name == "看视频和下载不要选这个" && n.parent.as_deref() == Some("Entry"))
+        let kan_idx = content
+            .tree
+            .nodes
+            .iter()
+            .position(|n| {
+                n.name == "看视频和下载不要选这个" && n.parent.as_deref() == Some("Entry")
+            })
             .unwrap();
         state.select(Some(kan_idx));
         content.dispatch_key(Key::Expand, &mut tasks, &mut state);
-        let siblings_after: Vec<&str> = content.tree.nodes.iter()
+        let siblings_after: Vec<&str> = content
+            .tree
+            .nodes
+            .iter()
             .filter(|n| n.parent == parent)
             .map(|n| n.name.as_str())
             .collect();
-        assert!(!siblings_after.contains(&"[bak]日本-优化2"), "grandchild of 看视频 should not be a sibling of Sl-pvd0");
+        assert!(
+            !siblings_after.contains(&"[bak]日本-优化2"),
+            "grandchild of 看视频 should not be a sibling of Sl-pvd0"
+        );
     }
 }

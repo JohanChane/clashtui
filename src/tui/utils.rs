@@ -15,7 +15,11 @@ pub mod raw_mode {
     /// Disables raw mode and restores the terminal to its original state.
     pub fn restore() -> Result<(), std::io::Error> {
         disable_raw_mode()?;
-        execute!(std::io::stdout(), LeaveAlternateScreen, crossterm::cursor::Show)
+        execute!(
+            std::io::stdout(),
+            LeaveAlternateScreen,
+            crossterm::cursor::Show
+        )
     }
 
     /// make terminal restorable after panic

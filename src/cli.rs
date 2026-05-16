@@ -1,5 +1,5 @@
-mod utils;
 mod handler;
+mod utils;
 mod widgets;
 
 pub use handler::handle_cli;
@@ -165,7 +165,10 @@ impl ProfileTypeFilter {
         match (self, dtype) {
             (ProfileTypeFilter::File, crate::config::database::ProfileType::File) => true,
             (ProfileTypeFilter::Url, crate::config::database::ProfileType::Url(_)) => true,
-            (ProfileTypeFilter::Template, crate::config::database::ProfileType::Template { .. }) => true,
+            (
+                ProfileTypeFilter::Template,
+                crate::config::database::ProfileType::Template { .. },
+            ) => true,
             (ProfileTypeFilter::Singbox, crate::config::database::ProfileType::Singbox) => true,
             _ => false,
         }

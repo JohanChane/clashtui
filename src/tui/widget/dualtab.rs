@@ -101,7 +101,10 @@ where
     }
 
     pub fn dispatch_shortcut(&mut self, seq: &[Key]) {
-        log::debug!("dispatch_shortcut: seq={seq:?} focus_c1={}", self.is_focus_on_c1);
+        log::debug!(
+            "dispatch_shortcut: seq={seq:?} focus_c1={}",
+            self.is_focus_on_c1
+        );
         if self.is_focus_on_c1 {
             for (s, key, desc) in C1::all_shortcuts() {
                 if &**s == seq {

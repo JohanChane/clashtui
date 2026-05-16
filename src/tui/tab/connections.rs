@@ -15,17 +15,61 @@ mod_agent!(
         ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
         ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
         ([KeyCode::Char('G')], Key::GoBottom, "Go to bottom"),
-        ([KeyCode::Char('g'), KeyCode::Char('g')], Key::GoTop, "Go to top"),
-        ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Terminate, "Close"),
-        ([KeyCode::Char('a'), KeyCode::Char('c')], Key::TerminateAll, "Close all"),
-        ([KeyCode::Char('s'), KeyCode::Char('h')], Key::SortByHost, "Sort by Host"),
-        ([KeyCode::Char('s'), KeyCode::Char('l')], Key::SortByRule, "Sort by Rule"),
-        ([KeyCode::Char('s'), KeyCode::Char('c')], Key::SortByChains, "Sort by Chains"),
-        ([KeyCode::Char('s'), KeyCode::Char('n')], Key::SortByDownload, "Sort by Download"),
-        ([KeyCode::Char('s'), KeyCode::Char('u')], Key::SortByUpload, "Sort by Upload"),
-        ([KeyCode::Char('s'), KeyCode::Char('d')], Key::SortByDlSpeed, "Sort by DL Speed"),
-        ([KeyCode::Char('s'), KeyCode::Char('s')], Key::SortByUlSpeed, "Sort by UL Speed"),
-        ([KeyCode::Char('s'), KeyCode::Char('r')], Key::SortReset, "Reset sort"),
+        (
+            [KeyCode::Char('g'), KeyCode::Char('g')],
+            Key::GoTop,
+            "Go to top"
+        ),
+        (
+            [KeyCode::Char('d'), KeyCode::Char('d')],
+            Key::Terminate,
+            "Close"
+        ),
+        (
+            [KeyCode::Char('a'), KeyCode::Char('c')],
+            Key::TerminateAll,
+            "Close all"
+        ),
+        (
+            [KeyCode::Char('s'), KeyCode::Char('h')],
+            Key::SortByHost,
+            "Sort by Host"
+        ),
+        (
+            [KeyCode::Char('s'), KeyCode::Char('l')],
+            Key::SortByRule,
+            "Sort by Rule"
+        ),
+        (
+            [KeyCode::Char('s'), KeyCode::Char('c')],
+            Key::SortByChains,
+            "Sort by Chains"
+        ),
+        (
+            [KeyCode::Char('s'), KeyCode::Char('n')],
+            Key::SortByDownload,
+            "Sort by Download"
+        ),
+        (
+            [KeyCode::Char('s'), KeyCode::Char('u')],
+            Key::SortByUpload,
+            "Sort by Upload"
+        ),
+        (
+            [KeyCode::Char('s'), KeyCode::Char('d')],
+            Key::SortByDlSpeed,
+            "Sort by DL Speed"
+        ),
+        (
+            [KeyCode::Char('s'), KeyCode::Char('s')],
+            Key::SortByUlSpeed,
+            "Sort by UL Speed"
+        ),
+        (
+            [KeyCode::Char('s'), KeyCode::Char('r')],
+            Key::SortReset,
+            "Reset sort"
+        ),
         ([KeyCode::Char('/')], Key::Search, "Search/Filter"),
         ([KeyCode::Char('p')], Key::TogglePause, "Pause/Resume"),
         ([KeyCode::Char('f')], Key::FzfFind, "Find"),
@@ -159,7 +203,10 @@ fn human_speed(bytes_per_sec: u64) -> String {
     format!("{}/s", human_bytes(bytes_per_sec))
 }
 
-fn make_display_rows(conns: &[Conn], last_bytes: &mut HashMap<String, (u64, u64)>) -> Vec<DisplayRow> {
+fn make_display_rows(
+    conns: &[Conn],
+    last_bytes: &mut HashMap<String, (u64, u64)>,
+) -> Vec<DisplayRow> {
     conns
         .iter()
         .map(|c| {
@@ -194,7 +241,10 @@ fn make_display_rows(conns: &[Conn], last_bytes: &mut HashMap<String, (u64, u64)
                 }
             };
 
-            let prev = last_bytes.get(&c.id).copied().unwrap_or((c.download, c.upload));
+            let prev = last_bytes
+                .get(&c.id)
+                .copied()
+                .unwrap_or((c.download, c.upload));
             let dl_speed = c.download.saturating_sub(prev.0);
             let ul_speed = c.upload.saturating_sub(prev.1);
 
@@ -224,7 +274,11 @@ const ULSPD_COL: &str = "UL Speed";
 
 fn sort_header(sort_state: SortState, column: SortColumn, base: &str) -> String {
     if sort_state.column == Some(column) {
-        let arrow = if sort_state.direction == SortDirection::Descending { "▼" } else { "▲" };
+        let arrow = if sort_state.direction == SortDirection::Descending {
+            "▼"
+        } else {
+            "▲"
+        };
         format!("{base} {arrow}")
     } else {
         base.to_owned()
@@ -339,7 +393,9 @@ impl TabContent for Connections {
             }
             Key::Terminate => {
                 let Some(row) = self.row else { return };
-                let Some(display_row) = self.display_rows.get(row) else { return };
+                let Some(display_row) = self.display_rows.get(row) else {
+                    return;
+                };
                 let id = display_row.id.clone();
                 async move {
                     let result = tokio::task::spawn_blocking(move || {
@@ -361,23 +417,22 @@ impl TabContent for Connections {
                 .spawn_at(task_set);
             }
             Key::TerminateAll => {
-                let (use_bulk, ids): (bool, Vec<String>) =
-                    if let Some(ref pat) = self.filter {
-                        let ids: Vec<String> = self
-                            .display_rows
-                            .iter()
-                            .filter(|r| {
-                                r.host.contains(pat)
-                                    || r.rule.contains(pat)
-                                    || r.chains.contains(pat)
-                                    || r.id.contains(pat)
-                            })
-                            .map(|r| r.id.clone())
-                            .collect();
-                        (false, ids)
-                    } else {
-                        (true, Vec::new())
-                    };
+                let (use_bulk, ids): (bool, Vec<String>) = if let Some(ref pat) = self.filter {
+                    let ids: Vec<String> = self
+                        .display_rows
+                        .iter()
+                        .filter(|r| {
+                            r.host.contains(pat)
+                                || r.rule.contains(pat)
+                                || r.chains.contains(pat)
+                                || r.id.contains(pat)
+                        })
+                        .map(|r| r.id.clone())
+                        .collect();
+                    (false, ids)
+                } else {
+                    (true, Vec::new())
+                };
 
                 let count = if self.filter.is_some() {
                     ids.len()
@@ -443,7 +498,9 @@ impl TabContent for Connections {
             }
             Key::FzfFind => {
                 self.paused = true;
-                let names: Vec<String> = self.display_rows.iter()
+                let names: Vec<String> = self
+                    .display_rows
+                    .iter()
                     .map(|r| format!("{} | {} | {}", r.host, r.rule, r.chains))
                     .collect();
                 async move {
@@ -479,15 +536,18 @@ impl TabContent for Connections {
         let block = block.title_bottom(Line::raw(title).right_aligned().reversed());
 
         if !self.error.as_deref().unwrap_or("").is_empty() && self.display_rows.is_empty() {
-            let widget = ratatui::widgets::Paragraph::new(
-                self.error.as_deref().unwrap_or("")
-            ).block(block);
+            let widget =
+                ratatui::widgets::Paragraph::new(self.error.as_deref().unwrap_or("")).block(block);
             f.render_widget(widget, area);
             return;
         }
 
         let sort_indicator = if let Some(col) = self.sort_state.column {
-            let dir = if self.sort_state.direction == SortDirection::Descending { "▼" } else { "▲" };
+            let dir = if self.sort_state.direction == SortDirection::Descending {
+                "▼"
+            } else {
+                "▲"
+            };
             let name = match col {
                 SortColumn::Host => "Host",
                 SortColumn::Rule => "Rule",
@@ -502,10 +562,17 @@ impl TabContent for Connections {
             String::new()
         };
 
-        let filtered_count: usize = self.display_rows.iter()
-            .filter(|r| self.filter.as_deref().is_none_or(|pat| {
-                r.host.contains(pat) || r.rule.contains(pat) || r.chains.contains(pat) || r.id.contains(pat)
-            }))
+        let filtered_count: usize = self
+            .display_rows
+            .iter()
+            .filter(|r| {
+                self.filter.as_deref().is_none_or(|pat| {
+                    r.host.contains(pat)
+                        || r.rule.contains(pat)
+                        || r.chains.contains(pat)
+                        || r.id.contains(pat)
+                })
+            })
             .count();
 
         let count_text = if self.filter.is_some() {
@@ -516,11 +583,7 @@ impl TabContent for Connections {
                 sort_indicator
             )
         } else {
-            format!(
-                "{} conns{}",
-                self.display_rows.len(),
-                sort_indicator
-            )
+            format!("{} conns{}", self.display_rows.len(), sort_indicator)
         };
 
         let header_style = section.border;
@@ -591,8 +654,7 @@ impl TabContent for Connections {
             f.render_stateful_widget(
                 table,
                 area,
-                &mut ratatui::widgets::TableState::default()
-                    .with_offset(0),
+                &mut ratatui::widgets::TableState::default().with_offset(0),
             );
         }
     }
@@ -635,7 +697,10 @@ impl Connections {
         let Some(column) = self.sort_state.column else {
             let orig_ids: Vec<String> = self.conns.iter().map(|c| c.id.clone()).collect();
             self.display_rows.sort_by_key(|r| {
-                orig_ids.iter().position(|id| *id == r.id).unwrap_or(usize::MAX)
+                orig_ids
+                    .iter()
+                    .position(|id| *id == r.id)
+                    .unwrap_or(usize::MAX)
             });
             return;
         };
@@ -664,9 +729,11 @@ impl Connections {
             }
             SortColumn::Download => {
                 if descending {
-                    self.display_rows.sort_by(|a, b| b.download.cmp(&a.download));
+                    self.display_rows
+                        .sort_by(|a, b| b.download.cmp(&a.download));
                 } else {
-                    self.display_rows.sort_by(|a, b| a.download.cmp(&b.download));
+                    self.display_rows
+                        .sort_by(|a, b| a.download.cmp(&b.download));
                 }
             }
             SortColumn::Upload => {
@@ -678,16 +745,20 @@ impl Connections {
             }
             SortColumn::DlSpeed => {
                 if descending {
-                    self.display_rows.sort_by(|a, b| b.dl_speed.cmp(&a.dl_speed));
+                    self.display_rows
+                        .sort_by(|a, b| b.dl_speed.cmp(&a.dl_speed));
                 } else {
-                    self.display_rows.sort_by(|a, b| a.dl_speed.cmp(&b.dl_speed));
+                    self.display_rows
+                        .sort_by(|a, b| a.dl_speed.cmp(&b.dl_speed));
                 }
             }
             SortColumn::UlSpeed => {
                 if descending {
-                    self.display_rows.sort_by(|a, b| b.ul_speed.cmp(&a.ul_speed));
+                    self.display_rows
+                        .sort_by(|a, b| b.ul_speed.cmp(&a.ul_speed));
                 } else {
-                    self.display_rows.sort_by(|a, b| a.ul_speed.cmp(&b.ul_speed));
+                    self.display_rows
+                        .sort_by(|a, b| a.ul_speed.cmp(&b.ul_speed));
                 }
             }
         }

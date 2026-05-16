@@ -1,7 +1,7 @@
 mod dev {
+    pub use crate::tui::Key as TuiKey;
     pub use crate::tui::widget::dualtab::*;
     pub use crate::tui::widget::tab::*;
-    pub use crate::tui::Key as TuiKey;
     pub use crossterm::event::KeyCode;
     pub use ratatui::prelude::{Frame, Rect};
     pub use ratatui::style::{Color, Stylize as _};
@@ -346,30 +346,19 @@ pub mod prelude {
         // Helper: dispatch Mapping (old) vs Sequence (new list-format)
         macro_rules! init_section {
             ($keymap:expr, $section:literal, $tab:ident) => {
-                if let Some(section_val) =
-                    crate::tui::agent::take_section($keymap, $section)
-                {
+                if let Some(section_val) = crate::tui::agent::take_section($keymap, $section) {
                     match section_val {
                         serde_yml::Value::Mapping(map) => {
                             crate::tui::agent::check_duplicate_keys($section, &map);
-                            let (keys, descs) =
-                                crate::tui::agent::extract_keymap_with_descs(map)?;
+                            let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
                             super::$tab::agent_init(keys);
                             super::$tab::init_descs(descs);
                         }
                         serde_yml::Value::Sequence(seq) => {
-                            let entries: Vec<crate::tui::agent::Entry> = serde_yml::from_value(
-                                serde_yml::Value::Sequence(seq),
-                            )
-                            .context(concat!(
-                                "parsing ",
-                                $section,
-                                " entries"
-                            ))?;
-                            crate::tui::agent::check_duplicate_keys_list(
-                                $section,
-                                &entries,
-                            );
+                            let entries: Vec<crate::tui::agent::Entry> =
+                                serde_yml::from_value(serde_yml::Value::Sequence(seq))
+                                    .context(concat!("parsing ", $section, " entries"))?;
+                            crate::tui::agent::check_duplicate_keys_list($section, &entries);
                             let (keys, descs, chords) =
                                 crate::tui::agent::extract_keymap_list(entries)?;
                             super::$tab::agent_init(keys);
@@ -377,10 +366,7 @@ pub mod prelude {
                             super::$tab::init_chords(chords);
                         }
                         _ => {
-                            anyhow::bail!(
-                                "Section `{}` is neither Mapping nor Sequence",
-                                $section
-                            );
+                            anyhow::bail!("Section `{}` is neither Mapping nor Sequence", $section);
                         }
                     }
                 }
@@ -397,11 +383,12 @@ pub mod prelude {
         if let Some(section_val) = crate::tui::agent::take_section(keymap, "file") {
             match section_val {
                 serde_yml::Value::Mapping(map) => {
-                    super::files::agent_init(map)
-                        .context("Loading FileTab KeyMap")?;
+                    super::files::agent_init(map).context("Loading FileTab KeyMap")?;
                 }
                 _ => {
-                    anyhow::bail!("`file` section only supports Mapping format (nested profile/template)");
+                    anyhow::bail!(
+                        "`file` section only supports Mapping format (nested profile/template)"
+                    );
                 }
             }
         }

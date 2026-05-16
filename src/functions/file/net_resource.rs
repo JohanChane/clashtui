@@ -176,8 +176,10 @@ mod tests {
     #[test]
     fn extract_all_sections() {
         let yaml = load_test_yaml();
-        let resources =
-            yaml.extract(&[ResourceSection::ProxyProvider, ResourceSection::RuleProvider]);
+        let resources = yaml.extract(&[
+            ResourceSection::ProxyProvider,
+            ResourceSection::RuleProvider,
+        ]);
         assert_eq!(resources.len(), 4, "should find 2 PP + 2 RP = 4 resources");
 
         let pp_count = resources
@@ -216,8 +218,10 @@ mod tests {
     #[test]
     fn filter_both_sections() {
         let yaml = load_test_yaml();
-        let resources =
-            yaml.extract(&[ResourceSection::ProxyProvider, ResourceSection::RuleProvider]);
+        let resources = yaml.extract(&[
+            ResourceSection::ProxyProvider,
+            ResourceSection::RuleProvider,
+        ]);
         assert_eq!(resources.len(), 4);
     }
 
@@ -231,8 +235,10 @@ mod tests {
     #[test]
     fn verify_extracted_fields() {
         let yaml = load_test_yaml();
-        let resources =
-            yaml.extract(&[ResourceSection::ProxyProvider, ResourceSection::RuleProvider]);
+        let resources = yaml.extract(&[
+            ResourceSection::ProxyProvider,
+            ResourceSection::RuleProvider,
+        ]);
 
         let pp_dcdn = resources
             .iter()
@@ -246,10 +252,7 @@ mod tests {
             .iter()
             .find(|r| r.name == "pp-aws")
             .expect("pp-aws should exist");
-        assert_eq!(
-            pp_aws.url,
-            "https://s3.amazonaws.com/bucket/proxies.yaml"
-        );
+        assert_eq!(pp_aws.url, "https://s3.amazonaws.com/bucket/proxies.yaml");
         assert_eq!(pp_aws.path, "./proxy-providers/aws.yaml");
         assert_eq!(pp_aws.section, ResourceSection::ProxyProvider);
 
@@ -277,8 +280,10 @@ mod tests {
             Value::String("proxies".to_string()),
             Value::Sequence(vec![]),
         );
-        let resources =
-            yaml.extract(&[ResourceSection::ProxyProvider, ResourceSection::RuleProvider]);
+        let resources = yaml.extract(&[
+            ResourceSection::ProxyProvider,
+            ResourceSection::RuleProvider,
+        ]);
         assert!(resources.is_empty());
     }
 

@@ -57,8 +57,7 @@ pub fn agent_init(mut keymap: serde_yml::Mapping) -> anyhow::Result<()> {
                 let entries: Vec<crate::tui::agent::Entry> =
                     serde_yml::from_value(serde_yml::Value::Sequence(seq))?;
                 crate::tui::agent::check_duplicate_keys_list("file/profile", &entries);
-                let (keys, descs, chords) =
-                    crate::tui::agent::extract_keymap_list(entries)?;
+                let (keys, descs, chords) = crate::tui::agent::extract_keymap_list(entries)?;
                 profile::agent_init(keys);
                 profile::init_descs(descs);
                 profile::init_chords(chords);
@@ -78,8 +77,7 @@ pub fn agent_init(mut keymap: serde_yml::Mapping) -> anyhow::Result<()> {
                 let entries: Vec<crate::tui::agent::Entry> =
                     serde_yml::from_value(serde_yml::Value::Sequence(seq))?;
                 crate::tui::agent::check_duplicate_keys_list("file/template", &entries);
-                let (keys, descs, chords) =
-                    crate::tui::agent::extract_keymap_list(entries)?;
+                let (keys, descs, chords) = crate::tui::agent::extract_keymap_list(entries)?;
                 template::agent_init(keys);
                 template::init_descs(descs);
                 template::init_chords(chords);

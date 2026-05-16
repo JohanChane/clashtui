@@ -110,21 +110,28 @@ mod tests {
     use super::*;
 
     fn mk_key(code: KeyCode) -> Key {
-        Key { code, shift: false, ctrl: false, alt: false, super_: false }
+        Key {
+            code,
+            shift: false,
+            ctrl: false,
+            alt: false,
+            super_: false,
+        }
     }
 
     fn mk_key_mod(code: KeyCode, ctrl: bool) -> Key {
-        Key { code, ctrl, shift: false, alt: false, super_: false }
+        Key {
+            code,
+            ctrl,
+            shift: false,
+            alt: false,
+            super_: false,
+        }
     }
 
     fn make_shortcuts(data: &[(&[KeyCode], &'static str)]) -> Vec<(KeyCombo, &'static str)> {
         data.iter()
-            .map(|(codes, desc)| {
-                (
-                    KeyCombo(codes.iter().map(|c| mk_key(*c)).collect()),
-                    *desc,
-                )
-            })
+            .map(|(codes, desc)| (KeyCombo(codes.iter().map(|c| mk_key(*c)).collect()), *desc))
             .collect()
     }
 
@@ -135,8 +142,7 @@ mod tests {
         let mut handler = ChordHandler::default();
         let mut dispatched: Vec<Vec<Key>> = vec![];
 
-        let consumed =
-            handler.handle(&g, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = handler.handle(&g, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
 
         assert!(consumed);
         assert_eq!(dispatched.len(), 1);
@@ -152,8 +158,7 @@ mod tests {
         let mut handler = ChordHandler::default();
         let mut dispatched: Vec<Vec<Key>> = vec![];
 
-        let consumed =
-            handler.handle(&g, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = handler.handle(&g, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
 
         assert!(consumed);
         assert!(dispatched.is_empty());
@@ -202,8 +207,7 @@ mod tests {
         let mut dispatched: Vec<Vec<Key>> = vec![];
 
         handler.handle(&g, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
-        let consumed =
-            handler.handle(&esc, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = handler.handle(&esc, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
 
         assert!(consumed);
         assert!(dispatched.is_empty());
@@ -220,8 +224,7 @@ mod tests {
         let mut handler = ChordHandler::default();
         let mut dispatched: Vec<Vec<Key>> = vec![];
 
-        let consumed =
-            handler.handle(&d, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = handler.handle(&d, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
 
         assert!(consumed);
         assert_eq!(dispatched.len(), 1);
@@ -261,15 +264,16 @@ mod tests {
 
         assert!(consumed);
         assert!(dispatched.is_empty());
-        assert!(!handler.is_active(), "Ctrl-C as a chord mismatch should cancel chord");
+        assert!(
+            !handler.is_active(),
+            "Ctrl-C as a chord mismatch should cancel chord"
+        );
     }
 
     #[test]
     fn ctrl_c_keybinding_dispatches_on_initial_press() {
         let cc = mk_key_mod(KeyCode::Char('c'), true);
-        let shortcuts = vec![
-            (KeyCombo(vec![cc]), "Close"),
-        ];
+        let shortcuts = vec![(KeyCombo(vec![cc]), "Close")];
         let mut handler = ChordHandler::default();
         let mut dispatched: Vec<Vec<Key>> = vec![];
 

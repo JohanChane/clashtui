@@ -36,22 +36,15 @@ impl Proxies {
 }
 
 impl Proxies {
-    pub fn select_inline(
-        &mut self,
-        group: String,
-        node: String,
-        task_set: &mut FutureSet<Self>,
-    ) {
+    pub fn select_inline(&mut self, group: String, node: String, task_set: &mut FutureSet<Self>) {
         let t_secs = crate::config::CONFIG.cfg_file.timeout.unwrap_or(5).max(1) + 3;
         self.error = Some(format!("Switching to {node}..."));
         self.testing_since = Some(Instant::now());
         async move {
             let _ = tri!(
-                tokio::task::spawn_blocking(move || {
-                    proxies::select_proxy(&group, &node)
-                })
-                .await
-                .unwrap(),
+                tokio::task::spawn_blocking(move || { proxies::select_proxy(&group, &node) })
+                    .await
+                    .unwrap(),
                 or_cancel
             );
             let response = match tokio::time::timeout(
@@ -78,15 +71,9 @@ impl Proxies {
         .spawn_at(task_set);
     }
 
-    pub fn test_delay(
-        &mut self,
-        name: String,
-        ntype: NodeType,
-        task_set: &mut FutureSet<Self>,
-    ) {
+    pub fn test_delay(&mut self, name: String, ntype: NodeType, task_set: &mut FutureSet<Self>) {
         let timeout = crate::config::CONFIG.cfg_file.timeout.unwrap_or(5) * 1000;
-        let test_url = self.proxies.get(&name)
-            .and_then(|p| p.test_url.clone());
+        let test_url = self.proxies.get(&name).and_then(|p| p.test_url.clone());
         let t_secs = crate::config::CONFIG.cfg_file.timeout.unwrap_or(5).max(1) + 3;
 
         match ntype {
@@ -126,7 +113,8 @@ impl Proxies {
                         Ok(Ok(Ok(r))) => r,
                         _ => {
                             return wrapper(|content: &mut Self| {
-                                content.error = Some("Failed to refresh proxies after test".to_string());
+                                content.error =
+                                    Some("Failed to refresh proxies after test".to_string());
                                 content.testing_since = None;
                             });
                         }
@@ -184,7 +172,8 @@ impl Proxies {
                         Ok(Ok(Ok(r))) => r,
                         _ => {
                             return wrapper(|content: &mut Self| {
-                                content.error = Some("Failed to refresh proxies after test".to_string());
+                                content.error =
+                                    Some("Failed to refresh proxies after test".to_string());
                                 content.testing_since = None;
                             });
                         }
@@ -207,11 +196,17 @@ impl Proxies {
     }
 
     pub fn test_all_delay(&mut self, task_set: &mut FutureSet<Self>) {
-        let folders: Vec<String> = self.tree.nodes.iter()
+        let folders: Vec<String> = self
+            .tree
+            .nodes
+            .iter()
             .filter(|n| n.node_type == NodeType::Folder)
             .map(|n| n.name.clone())
             .collect();
-        let files: Vec<String> = self.tree.nodes.iter()
+        let files: Vec<String> = self
+            .tree
+            .nodes
+            .iter()
             .filter(|n| n.node_type == NodeType::File && n.depth == 0)
             .map(|n| n.name.clone())
             .collect();
@@ -227,7 +222,8 @@ impl Proxies {
             let t_secs = crate::config::CONFIG.cfg_file.timeout.unwrap_or(5).max(1) + 3;
             let mut all_delays: HashMap<String, u64> = HashMap::new();
             for name in &folders {
-                let url = proxies_map.get(name.as_str())
+                let url = proxies_map
+                    .get(name.as_str())
                     .and_then(|p| p.test_url.clone());
                 let n = name.clone();
                 match tokio::time::timeout(
@@ -243,7 +239,8 @@ impl Proxies {
                 }
             }
             for name in &files {
-                let url = proxies_map.get(name.as_str())
+                let url = proxies_map
+                    .get(name.as_str())
                     .and_then(|p| p.test_url.clone());
                 let n = name.clone();
                 match tokio::time::timeout(

@@ -3,8 +3,8 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::config::database::ProxyProviderGroups;
 use super::resolve_template_placeholder;
+use crate::config::database::ProxyProviderGroups;
 
 fn proxy_provider_cache_path(url: &str) -> PathBuf {
     let hash = format!("{:x}", md5::compute(url.as_bytes()));
@@ -41,12 +41,12 @@ fn interval_to_duration(seconds: u64) -> String {
 }
 
 fn download_subscription(url: &str, with_proxy: bool) -> anyhow::Result<Vec<JsonValue>> {
-    let mut response =
-        crate::functions::restful::download::profile(url, with_proxy)?;
+    let mut response = crate::functions::restful::download::profile(url, with_proxy)?;
     let mut buf = Vec::new();
     std::io::Read::read_to_end(&mut response, &mut buf)?;
 
-    let proxies: Vec<JsonValue> = if let Ok(values) = serde_json::from_slice::<Vec<JsonValue>>(&buf) {
+    let proxies: Vec<JsonValue> = if let Ok(values) = serde_json::from_slice::<Vec<JsonValue>>(&buf)
+    {
         values
     } else if let Ok(value) = serde_json::from_slice::<JsonValue>(&buf) {
         // Sing-box config: extract from outbounds
@@ -173,7 +173,9 @@ pub async fn gen_template_singbox(
                     }
                     Err(e) => {
                         if let Some(cached) = load_cached_proxies(&url) {
-                            log::warn!("Failed to download subscription for {pp_name}: {e}, using cache");
+                            log::warn!(
+                                "Failed to download subscription for {pp_name}: {e}, using cache"
+                            );
                             (pp_name, Ok(cached))
                         } else {
                             (pp_name, Err(e))
@@ -196,9 +198,7 @@ pub async fn gen_template_singbox(
                             if !obj.contains_key("tag") {
                                 let tag = format!(
                                     "{pp_name}-{}",
-                                    obj.get("server")
-                                        .and_then(|v| v.as_str())
-                                        .unwrap_or("node")
+                                    obj.get("server").and_then(|v| v.as_str()).unwrap_or("node")
                                 );
                                 obj.insert("tag".to_string(), JsonValue::String(tag));
                             }
@@ -230,7 +230,19 @@ pub async fn gen_template_singbox(
     for proxies in provider_proxies.values_mut() {
         proxies.retain(|p| {
             let t = p.get("type").and_then(|v| v.as_str()).unwrap_or("");
-            !matches!(t, "selector" | "urltest" | "select" | "url-test" | "fallback" | "load-balance" | "direct" | "block" | "dns" | "")
+            !matches!(
+                t,
+                "selector"
+                    | "urltest"
+                    | "select"
+                    | "url-test"
+                    | "fallback"
+                    | "load-balance"
+                    | "direct"
+                    | "block"
+                    | "dns"
+                    | ""
+            )
         });
     }
 
@@ -278,10 +290,7 @@ pub async fn gen_template_singbox(
             let provider_names = resolve_template_placeholder(pk_str, &pg_names, groups)?;
 
             for pp_name in &provider_names {
-                let tags = pp_tags
-                    .get(pp_name)
-                    .cloned()
-                    .unwrap_or_default();
+                let tags = pp_tags.get(pp_name).cloned().unwrap_or_default();
 
                 // Skip empty providers
                 if tags.is_empty() {
@@ -304,10 +313,7 @@ pub async fn gen_template_singbox(
 
         if has_expand {
             // --- Template group: expand one per proxy-provider in group ---
-            let ob_type = ob
-                .get("type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("urltest");
+            let ob_type = ob.get("type").and_then(|v| v.as_str()).unwrap_or("urltest");
             let sb_type = match ob_type {
                 "select" => "selector",
                 "url-test" | "urltest" => "urltest",
@@ -331,10 +337,7 @@ pub async fn gen_template_singbox(
                 let provider_names = resolve_template_placeholder(pk_str, &pg_names, groups)?;
 
                 for pp_name in &provider_names {
-                    let tags = pp_tags
-                        .get(pp_name)
-                        .cloned()
-                        .unwrap_or_default();
+                    let tags = pp_tags.get(pp_name).cloned().unwrap_or_default();
 
                     // Skip empty providers
                     if tags.is_empty() {
@@ -379,7 +382,9 @@ pub async fn gen_template_singbox(
                     let item_str = item.as_str().unwrap_or("");
                     if item_str.starts_with("${") && item_str.ends_with('}') {
                         let names = resolve_template_placeholder(item_str, &pg_names, groups)
-                            .with_context(|| format!("Can't resolve placeholder in outbounds: {item_str}"))?;
+                            .with_context(|| {
+                                format!("Can't resolve placeholder in outbounds: {item_str}")
+                            })?;
                         for name in names {
                             if let Some(tags) = pp_tags.get(&name) {
                                 resolved.extend(tags.clone());
@@ -396,7 +401,8 @@ pub async fn gen_template_singbox(
             // Resolve ${} placeholders in default field
             if let Some(default_val) = ob.get("default").and_then(|v| v.as_str()) {
                 if default_val.starts_with("${") && default_val.ends_with('}') {
-                    let resolved_default = resolve_default_placeholder(default_val, &pg_names, groups)?;
+                    let resolved_default =
+                        resolve_default_placeholder(default_val, &pg_names, groups)?;
                     ob["default"] = JsonValue::String(resolved_default);
                 }
             }

@@ -54,9 +54,12 @@ impl Proxies {
     pub(crate) fn restore_selection(&self, key: Option<SelectionKey>, state: &mut ListState) {
         state.select(None);
         if let Some((name, parent, ntype)) = key {
-            if let Some(idx) = self.tree.nodes.iter().position(|n| {
-                n.name == name && n.parent == parent && n.node_type == ntype
-            }) {
+            if let Some(idx) = self
+                .tree
+                .nodes
+                .iter()
+                .position(|n| n.name == name && n.parent == parent && n.node_type == ntype)
+            {
                 state.select(Some(idx));
             }
         }
@@ -92,7 +95,9 @@ impl Proxies {
                 }
             }
             super::Key::Parent => {
-                let info = self.tree.node_at(current)
+                let info = self
+                    .tree
+                    .node_at(current)
                     .map(|n| (n.name.clone(), n.node_type.clone(), n.parent.clone()));
                 if let Some((name, ntype, parent)) = info {
                     match ntype {
@@ -114,7 +119,9 @@ impl Proxies {
                 }
             }
             super::Key::Expand => {
-                let info = self.tree.node_at(current)
+                let info = self
+                    .tree
+                    .node_at(current)
                     .map(|n| (n.name.clone(), n.node_type.clone(), n.parent.clone()));
                 if let Some((name, ntype, _parent)) = info {
                     match ntype {
@@ -129,7 +136,9 @@ impl Proxies {
                 }
             }
             super::Key::Select => {
-                let info = self.tree.node_at(current)
+                let info = self
+                    .tree
+                    .node_at(current)
                     .map(|n| (n.name.clone(), n.node_type.clone(), n.parent.clone()));
                 if let Some((name, ntype, parent)) = info {
                     match ntype {
@@ -196,10 +205,17 @@ impl Proxies {
                 }
             }
             super::Key::GlobalSortByName => {
-                let all_by_name = self.tree.nodes.iter()
+                let all_by_name = self
+                    .tree
+                    .nodes
+                    .iter()
                     .filter(|n| n.node_type == NodeType::Folder)
                     .all(|n| n.sort_mode == SortMode::ByName);
-                let new_mode = if all_by_name { SortMode::None } else { SortMode::ByName };
+                let new_mode = if all_by_name {
+                    SortMode::None
+                } else {
+                    SortMode::ByName
+                };
                 for node in &mut self.tree.nodes {
                     if node.node_type == NodeType::Folder {
                         node.sort_mode = new_mode;
@@ -210,10 +226,17 @@ impl Proxies {
                 self.restore_selection(key, state);
             }
             super::Key::GlobalSortByDelay => {
-                let all_by_delay = self.tree.nodes.iter()
+                let all_by_delay = self
+                    .tree
+                    .nodes
+                    .iter()
                     .filter(|n| n.node_type == NodeType::Folder)
                     .all(|n| n.sort_mode == SortMode::ByDelay);
-                let new_mode = if all_by_delay { SortMode::None } else { SortMode::ByDelay };
+                let new_mode = if all_by_delay {
+                    SortMode::None
+                } else {
+                    SortMode::ByDelay
+                };
                 for node in &mut self.tree.nodes {
                     if node.node_type == NodeType::Folder {
                         node.sort_mode = new_mode;
@@ -234,7 +257,9 @@ impl Proxies {
                 self.restore_selection(key, state);
             }
             super::Key::TestDelay => {
-                let info = self.tree.node_at(current)
+                let info = self
+                    .tree
+                    .node_at(current)
                     .map(|n| (n.name.clone(), n.node_type.clone()));
                 if let Some((name, ntype)) = info {
                     self.test_delay(name, ntype, task_set);
@@ -257,7 +282,10 @@ impl Proxies {
                 .spawn_at(task_set);
             }
             super::Key::FzfFind => {
-                let items: Vec<(String, usize)> = self.tree.nodes.iter()
+                let items: Vec<(String, usize)> = self
+                    .tree
+                    .nodes
+                    .iter()
                     .enumerate()
                     .map(|(i, n)| (Self::fzf_display(n), i))
                     .collect();
@@ -268,7 +296,10 @@ impl Proxies {
                 let parent = node.map(|n| n.parent.clone()).flatten();
                 let group_name = parent.as_deref().unwrap_or("top");
                 let prompt = format!("Select in {group_name}");
-                let items: Vec<(String, usize)> = self.tree.nodes.iter()
+                let items: Vec<(String, usize)> = self
+                    .tree
+                    .nodes
+                    .iter()
                     .enumerate()
                     .filter(|(_, n)| n.parent == parent)
                     .map(|(i, n)| (Self::fzf_display(n), i))

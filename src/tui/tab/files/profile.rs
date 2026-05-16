@@ -52,15 +52,15 @@ fn parse_traffic_info(header_value: &str) -> TrafficInfo {
 
 pub fn fetch_traffic_for_url(url: &str, with_proxy: bool) {
     let url = url.to_owned();
-    std::thread::spawn(move || {
-        match download::fetch_subscription_userinfo(&url, with_proxy) {
+    std::thread::spawn(
+        move || match download::fetch_subscription_userinfo(&url, with_proxy) {
             Ok(Some(userinfo)) => {
                 let info = parse_traffic_info(&userinfo);
                 TRAFFIC_CACHE.lock().unwrap().insert(url, info);
             }
             _ => {}
-        }
-    });
+        },
+    );
 }
 
 fn human_bytes(bytes: u64) -> String {
@@ -98,21 +98,69 @@ mod_agent!(
         ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
         ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
         ([KeyCode::Enter], Key::Select, "Select"),
-        ([KeyCode::Char('i')], Key::Action(Action::Add), "Import (URL or file)"),
-        ([KeyCode::Char('d'), KeyCode::Char('d')], Key::Action(Action::Delete), "Delete profile"),
+        (
+            [KeyCode::Char('i')],
+            Key::Action(Action::Add),
+            "Import (URL or file)"
+        ),
+        (
+            [KeyCode::Char('d'), KeyCode::Char('d')],
+            Key::Action(Action::Delete),
+            "Delete profile"
+        ),
         ([KeyCode::Char('e')], Key::Action(Action::Edit), "Edit"),
-        ([KeyCode::Char('p')], Key::Action(Action::Preview), "Preview"),
+        (
+            [KeyCode::Char('p')],
+            Key::Action(Action::Preview),
+            "Preview"
+        ),
         ([KeyCode::Char('u')], Key::Action(Action::Update), "Update"),
-        ([KeyCode::Char('/')], Key::Action(Action::Search), "Search/Filter"),
+        (
+            [KeyCode::Char('/')],
+            Key::Action(Action::Search),
+            "Search/Filter"
+        ),
         ([KeyCode::Char('t')], Key::Action(Action::Test), "Test"),
-        ([KeyCode::Char('c')], Key::Action(Action::Check), "Check config"),
-        ([KeyCode::Char('C'), KeyCode::Char('u')], Key::Action(Action::CopyUrl), "Copy URL"),
-        ([KeyCode::Char('f')], Key::Action(Action::FzfFind), "Find profile"),
-        ([KeyCode::Char('g'), KeyCode::Char('g')], Key::Action(Action::GoTop), "Go to top"),
-        ([KeyCode::Char('G')], Key::Action(Action::GoEnd), "Go to end"),
-        (key("P"), Key::Action(Action::ToggleNoPp), "Toggle no proxy-provider"),
-        (key("n"), Key::Action(Action::TrafficNext), "Traffic display next"),
-        (key("N"), Key::Action(Action::TrafficPrev), "Traffic display prev"),
+        (
+            [KeyCode::Char('c')],
+            Key::Action(Action::Check),
+            "Check config"
+        ),
+        (
+            [KeyCode::Char('C'), KeyCode::Char('u')],
+            Key::Action(Action::CopyUrl),
+            "Copy URL"
+        ),
+        (
+            [KeyCode::Char('f')],
+            Key::Action(Action::FzfFind),
+            "Find profile"
+        ),
+        (
+            [KeyCode::Char('g'), KeyCode::Char('g')],
+            Key::Action(Action::GoTop),
+            "Go to top"
+        ),
+        (
+            [KeyCode::Char('G')],
+            Key::Action(Action::GoEnd),
+            "Go to end"
+        ),
+        (
+            key("P"),
+            Key::Action(Action::ToggleNoPp),
+            "Toggle no proxy-provider"
+        ),
+        (
+            key("n"),
+            Key::Action(Action::TrafficNext),
+            "Traffic display next"
+        ),
+        (
+            key("N"),
+            Key::Action(Action::TrafficPrev),
+            "Traffic display prev"
+        ),
     ]
 );
 
@@ -166,12 +214,16 @@ impl<'de> serde::Deserialize<'de> for Key {
                     "MoveUp" => Ok(Key::MoveUp),
                     "MoveDown" => Ok(Key::MoveDown),
                     "Select" => Ok(Key::Select),
-                    s => Err(de::Error::unknown_variant(s, &["Switch", "MoveUp", "MoveDown", "Select", "Action: ..."])),
+                    s => Err(de::Error::unknown_variant(
+                        s,
+                        &["Switch", "MoveUp", "MoveDown", "Select", "Action: ..."],
+                    )),
                 }
             }
 
             fn visit_map<M: de::MapAccess<'de>>(self, mut map: M) -> Result<Key, M::Error> {
-                let k: String = map.next_key()?
+                let k: String = map
+                    .next_key()?
                     .ok_or_else(|| de::Error::missing_field("variant"))?;
                 if k == "Action" {
                     let v: String = map.next_value()?;
@@ -193,11 +245,28 @@ impl<'de> serde::Deserialize<'de> for Key {
                         "ToggleNoPp" => Ok(Key::Action(Action::ToggleNoPp)),
                         "TrafficNext" => Ok(Key::Action(Action::TrafficNext)),
                         "TrafficPrev" => Ok(Key::Action(Action::TrafficPrev)),
-                        s => Err(de::Error::unknown_variant(s, &[
-                            "Add", "ImportFile", "Delete", "Edit", "Preview", "Update", "UpdateAll",
-                            "Search", "Test", "Check", "CopyUrl", "FzfFind", "GoTop", "GoEnd",
-                            "ToggleNoPp", "TrafficNext", "TrafficPrev",
-                        ])),
+                        s => Err(de::Error::unknown_variant(
+                            s,
+                            &[
+                                "Add",
+                                "ImportFile",
+                                "Delete",
+                                "Edit",
+                                "Preview",
+                                "Update",
+                                "UpdateAll",
+                                "Search",
+                                "Test",
+                                "Check",
+                                "CopyUrl",
+                                "FzfFind",
+                                "GoTop",
+                                "GoEnd",
+                                "ToggleNoPp",
+                                "TrafficNext",
+                                "TrafficPrev",
+                            ],
+                        )),
                     }
                 } else {
                     Err(de::Error::unknown_field(&k, &["Action"]))
@@ -240,7 +309,9 @@ impl TryFrom<&crate::tui::Key> for Key {
         }
 
         Ok(match value.code {
-            KeyCode::Right | KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('l') => Self::Switch,
+            KeyCode::Right | KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('l') => {
+                Self::Switch
+            }
             KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
             KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
             KeyCode::Enter => Self::Select,
@@ -320,9 +391,7 @@ impl DualTabContent for Profile {
                     let items = self.items.clone();
                     actions::fzf_find(items).spawn_at(task_set)
                 }
-                Action::Add | Action::ImportFile => {
-                    action.act(String::new()).spawn_at(task_set)
-                }
+                Action::Add | Action::ImportFile => action.act(String::new()).spawn_at(task_set),
                 Action::UpdateAll => {
                     for name in &self.items {
                         self.updating.insert(name.clone());
@@ -384,8 +453,7 @@ impl DualTabContent for Profile {
             .map(|pf| pf.name)
             .unwrap_or_default();
         let spinner_chars = ['/', '-', '\\', '|'];
-        let spinner_idx =
-            (crate::tui::app::SPINNER_FRAME.load(Ordering::Relaxed) as usize / 8) % 4;
+        let spinner_idx = (crate::tui::app::SPINNER_FRAME.load(Ordering::Relaxed) as usize / 8) % 4;
 
         let iter = self
             .items
@@ -398,9 +466,7 @@ impl DualTabContent for Profile {
                 if self.updating.contains(value.as_str()) {
                     spans.push(Span::raw(format!("{} ", spinner_chars[spinner_idx])));
                 } else if value == current.as_str() {
-                    spans.push(
-                        Span::raw("* ")                .style(section.border),
-                    );
+                    spans.push(Span::raw("* ").style(section.border));
                 } else {
                     spans.push(Span::raw("  "));
                 }
@@ -427,9 +493,17 @@ impl DualTabContent for Profile {
                                         let total_str = if info.total == 0 {
                                             "unlimited".to_owned()
                                         } else {
-                                            format!("{} ({:.0}%)", human_bytes(info.total), traffic_percentage(used, info.total))
+                                            format!(
+                                                "{} ({:.0}%)",
+                                                human_bytes(info.total),
+                                                traffic_percentage(used, info.total)
+                                            )
                                         };
-                                        spans.push(Span::raw(format!(" [Used: {} / {}]", human_bytes(used), total_str)));
+                                        spans.push(Span::raw(format!(
+                                            " [Used: {} / {}]",
+                                            human_bytes(used),
+                                            total_str
+                                        )));
                                     }
                                     TrafficDisplayMode::Gauge => {
                                         let pct = traffic_percentage(used, info.total) as usize;
@@ -475,7 +549,9 @@ mod actions {
                 Self::Check => check(name).await,
                 Self::CopyUrl => copy_url(name).await,
                 Self::ToggleNoPp => toggle_no_pp(name).await,
-                Self::TrafficNext | Self::TrafficPrev => unreachable!("traffic toggle handled in handle_key_event directly"),
+                Self::TrafficNext | Self::TrafficPrev => {
+                    unreachable!("traffic toggle handled in handle_key_event directly")
+                }
                 Self::FzfFind => unreachable!("FzfFind handled directly"),
                 Self::GoTop | Self::GoEnd => do_nothing(),
                 Self::UpdateAll => unreachable!("UpdateAll handled directly in handle_key_event"),
@@ -529,8 +605,7 @@ mod actions {
         );
 
         let is_url = source.starts_with("http://") || source.starts_with("https://");
-        let is_singbox =
-            crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox;
+        let is_singbox = crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox;
 
         if is_singbox {
             let content: serde_json::Value = if is_url {
@@ -541,8 +616,7 @@ mod actions {
                 let file = tri!(std::fs::File::open(&source));
                 tri!(serde_json::from_reader(file))
             };
-            let path = crate::functions::file::PROFILE_JSONS_PATH
-                .join(format!("{name}.json"));
+            let path = crate::functions::file::PROFILE_JSONS_PATH.join(format!("{name}.json"));
             {
                 if let Some(parent) = path.parent() {
                     tri!(std::fs::create_dir_all(parent));
@@ -564,13 +638,11 @@ mod actions {
                 tri!(pm.to_file());
             }
         } else if is_url {
-            let path =
-                crate::functions::file::PROFILE_YAMLS_PATH.join(format!("{name}.yaml"));
+            let path = crate::functions::file::PROFILE_YAMLS_PATH.join(format!("{name}.yaml"));
             {
                 let mut response =
                     tri!(crate::functions::restful::download::profile(&source, false));
-                let content: serde_yml::Mapping =
-                    tri!(serde_yml::from_reader(&mut response));
+                let content: serde_yml::Mapping = tri!(serde_yml::from_reader(&mut response));
                 if let Some(parent) = path.parent() {
                     tri!(std::fs::create_dir_all(parent));
                 }
@@ -787,7 +859,9 @@ mod actions {
                     .with_prompt(format!("URL copied to clipboard: {url}"))
                     .build_and_send();
             }
-            _ => Confirm::err(anyhow::anyhow!("Failed to copy to clipboard. Install xclip or wl-copy.")),
+            _ => Confirm::err(anyhow::anyhow!(
+                "Failed to copy to clipboard. Install xclip or wl-copy."
+            )),
         }
 
         do_nothing()

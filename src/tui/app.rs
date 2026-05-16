@@ -1,15 +1,15 @@
 use super::*;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::LazyLock;
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use tab::prelude::*;
 use tokio::sync::Notify;
 use widget::chord::ChordHandler;
 use widget::help::HelpPanel;
 use widget::popmsg::PopUp;
 
+use Key;
 use crossterm::event::{KeyCode, KeyEventKind};
 use widget::tab::KeyCombo;
-use Key;
 
 // 50fps
 const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
@@ -43,10 +43,7 @@ static GLOBAL_CHORD_SHORTCUTS: LazyLock<Vec<(KeyCombo, &str)>> = LazyLock::new(|
             KeyCombo(vec![ctrl('g'), plain('m')]),
             "Open clash config dir",
         ),
-        (
-            KeyCombo(vec![ctrl('g'), plain('f')]),
-            "Start core service",
-        ),
+        (KeyCombo(vec![ctrl('g'), plain('f')]), "Start core service"),
         (
             KeyCombo(vec![ctrl('g'), plain('t')]),
             "Close all connections",
@@ -206,34 +203,42 @@ impl App {
         {
             let shortcuts_ptr: *const [(KeyCombo, &str)] =
                 GLOBAL_CHORD_SHORTCUTS.as_slice() as *const _;
-            if self.global_chord.handle(kv, unsafe { &*shortcuts_ptr }, &mut |seq| {
-                log::debug!("global_chord dispatch: {seq:?}");
-                match seq.last().and_then(|k| k.plain()) {
-                    Some('c') => {
-                        log::debug!("open_dir: config dir");
-                        let _ = crate::functions::command::open_dir(
-                            crate::config::config_root_path().to_str().unwrap(),
-                        );
+            if self
+                .global_chord
+                .handle(kv, unsafe { &*shortcuts_ptr }, &mut |seq| {
+                    log::debug!("global_chord dispatch: {seq:?}");
+                    match seq.last().and_then(|k| k.plain()) {
+                        Some('c') => {
+                            log::debug!("open_dir: config dir");
+                            let _ = crate::functions::command::open_dir(
+                                crate::config::config_root_path().to_str().unwrap(),
+                            );
+                        }
+                        Some('m') => {
+                            log::debug!("open_dir: clash config dir");
+                            let dir_str = match crate::config::CONFIG.core_type() {
+                                crate::config::CoreType::Mihomo => {
+                                    &crate::config::CONFIG.cfg_file.mihomo.core.config_dir
+                                }
+                                crate::config::CoreType::Singbox => {
+                                    &crate::config::CONFIG.cfg_file.singbox.core.config_dir
+                                }
+                            };
+                            let _ = crate::functions::command::open_dir(dir_str);
+                        }
+                        Some('f') => {
+                            log::debug!("restart core service");
+                            let _ = crate::functions::command::restart_service(None);
+                        }
+                        Some('t') => {
+                            log::debug!("close all connections");
+                            let _ =
+                                crate::functions::restful::connection::terminate_all_connections();
+                        }
+                        _ => {}
                     }
-                    Some('m') => {
-                        log::debug!("open_dir: clash config dir");
-                        let dir_str = match crate::config::CONFIG.core_type() {
-                            crate::config::CoreType::Mihomo => &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
-                            crate::config::CoreType::Singbox => &crate::config::CONFIG.cfg_file.singbox.core.config_dir,
-                        };
-                        let _ = crate::functions::command::open_dir(dir_str);
-                    }
-                    Some('f') => {
-                        log::debug!("restart core service");
-                        let _ = crate::functions::command::restart_service(None);
-                    }
-                    Some('t') => {
-                        log::debug!("close all connections");
-                        let _ = crate::functions::restful::connection::terminate_all_connections();
-                    }
-                    _ => {}
-                }
-            }) {
+                })
+            {
                 return;
             }
         }
@@ -244,14 +249,16 @@ impl App {
         }
 
         let ti = self.tab_index as usize;
-        let shortcuts_ptr: *const [(widget::tab::KeyCombo, &str)] = {
-            self.tabs[ti].shortcuts() as *const _
-        };
+        let shortcuts_ptr: *const [(widget::tab::KeyCombo, &str)] =
+            { self.tabs[ti].shortcuts() as *const _ };
 
-        if self.chord.handle(kv, unsafe { &*shortcuts_ptr }, &mut |seq| {
-            log::debug!("chord dispatch: {seq:?}");
-            self.tabs[ti].dispatch_shortcut(seq);
-        }) {
+        if self
+            .chord
+            .handle(kv, unsafe { &*shortcuts_ptr }, &mut |seq| {
+                log::debug!("chord dispatch: {seq:?}");
+                self.tabs[ti].dispatch_shortcut(seq);
+            })
+        {
             return;
         }
 
@@ -262,10 +269,7 @@ impl App {
         use ratatui::prelude::{Constraint, Layout};
 
         let chunks = Layout::default()
-            .constraints([
-                Constraint::Length(3),
-                Constraint::Fill(1),
-            ])
+            .constraints([Constraint::Length(3), Constraint::Fill(1)])
             .split(f.area());
 
         render_tabbar(
@@ -309,7 +313,9 @@ impl App {
 
         let area = f.area();
         let popup_area = Rect {
-            x: area.x.saturating_add(area.width.saturating_sub(total_width) / 2),
+            x: area
+                .x
+                .saturating_add(area.width.saturating_sub(total_width) / 2),
             y: area.height.saturating_sub(total_height + 2),
             width: total_width.min(area.width),
             height: total_height.min(area.height),
@@ -374,7 +380,9 @@ impl App {
 
         let area = f.area();
         let popup_area = Rect {
-            x: area.x.saturating_add(area.width.saturating_sub(total_width) / 2),
+            x: area
+                .x
+                .saturating_add(area.width.saturating_sub(total_width) / 2),
             y: area.height.saturating_sub(total_height + 2),
             width: total_width.min(area.width),
             height: total_height.min(area.height),
@@ -531,7 +539,13 @@ mod tests {
     use super::*;
 
     fn kev(code: KeyCode) -> Key {
-        Key { code, shift: false, ctrl: false, alt: false, super_: false }
+        Key {
+            code,
+            shift: false,
+            ctrl: false,
+            alt: false,
+            super_: false,
+        }
     }
 
     #[test]

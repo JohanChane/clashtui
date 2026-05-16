@@ -15,8 +15,8 @@ impl TryFrom<&crate::tui::Key> for Key {
     }
 }
 
-use crate::config::CoreType;
 use crate::config::CONFIG;
+use crate::config::CoreType;
 use crate::functions::restful::{self, config_struct::*};
 
 macro_rules! tri {
@@ -113,7 +113,8 @@ impl BasicTabContent for Status {
                 let mismatch = detected != configured;
                 crate::config::set_core_mismatch(mismatch);
                 if mismatch {
-                    let msg = format!("API returned {detected} data, but {configured} is configured");
+                    let msg =
+                        format!("API returned {detected} data, but {configured} is configured");
                     self.error = Some(msg.clone());
                     if was_unknown {
                         crate::tui::widget::popmsg::Confirm::err(msg);
@@ -193,12 +194,12 @@ impl TabContent for Status {
             if detected == configured {
                 lines.push(format!("core: {detected}"));
             } else {
-                lines.push(format!("core: {detected} (configured: {configured}, MISMATCH)"));
+                lines.push(format!(
+                    "core: {detected} (configured: {configured}, MISMATCH)"
+                ));
             }
         }
-        let matched = self
-            .detected_core_type
-            .map_or(true, |d| d == configured);
+        let matched = self.detected_core_type.map_or(true, |d| d == configured);
         if matched {
             if let Some(ref ver) = self.version {
                 lines.push(format!("version: {ver}"));

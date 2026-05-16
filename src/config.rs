@@ -14,8 +14,8 @@ use core::*;
 use database::*;
 use std::{
     path::PathBuf,
-    sync::{Mutex, OnceLock},
     sync::atomic::{AtomicBool, Ordering},
+    sync::{Mutex, OnceLock},
 };
 use util::*;
 
@@ -81,60 +81,67 @@ impl Config {
         // Flush pending legacy Template migrations: write proxy_provider_groups from
         // old database entries into the corresponding template files.
         {
-            let mut queue = database::PENDING_TEMPLATE_MIGRATIONS
-                .lock()
-                .unwrap();
+            let mut queue = database::PENDING_TEMPLATE_MIGRATIONS.lock().unwrap();
             for (template_name, groups) in queue.drain(..) {
                 let tpl_path = template_path().join(&template_name);
                 if tpl_path.exists() {
                     // Only write if the template file doesn't already have clashtui.proxy_provider_groups
-                    let existing = crate::functions::file::template::read_template_ppg(&template_name).unwrap_or_default();
+                    let existing =
+                        crate::functions::file::template::read_template_ppg(&template_name)
+                            .unwrap_or_default();
                     if existing.is_empty() {
-                        if let Err(e) = crate::functions::file::template::write_template_ppg(&template_name, &groups) {
-                            log::error!("Failed to migrate proxy_provider_groups to template '{template_name}': {e}");
+                        if let Err(e) = crate::functions::file::template::write_template_ppg(
+                            &template_name,
+                            &groups,
+                        ) {
+                            log::error!(
+                                "Failed to migrate proxy_provider_groups to template '{template_name}': {e}"
+                            );
                         } else {
-                            log::info!("Migrated proxy_provider_groups from database to template '{template_name}'");
+                            log::info!(
+                                "Migrated proxy_provider_groups from database to template '{template_name}'"
+                            );
                         }
                     } else {
-                        log::info!("Template '{template_name}' already has proxy_provider_groups, skipping migration");
+                        log::info!(
+                            "Template '{template_name}' already has proxy_provider_groups, skipping migration"
+                        );
                     }
                 } else {
-                    log::warn!("Template file '{template_name}' not found for migration — groups will be dropped on next save");
+                    log::warn!(
+                        "Template file '{template_name}' not found for migration — groups will be dropped on next save"
+                    );
                 }
             }
         }
         let data: Mutex<ProfileManager> = data.into();
         if !cfg_file.mihomo.core.config_path.is_empty() {
-            cfg_file.mihomo.core.config_path = std::path::absolute(
-                std::path::PathBuf::from(&cfg_file.mihomo.core.config_path),
-            )
-            .context("Failed to resolve mihomo config_path")?
-            .display()
-            .to_string();
+            cfg_file.mihomo.core.config_path =
+                std::path::absolute(std::path::PathBuf::from(&cfg_file.mihomo.core.config_path))
+                    .context("Failed to resolve mihomo config_path")?
+                    .display()
+                    .to_string();
         }
         if !cfg_file.mihomo.core.config_dir.is_empty() {
-            cfg_file.mihomo.core.config_dir = std::path::absolute(
-                std::path::PathBuf::from(&cfg_file.mihomo.core.config_dir),
-            )
-            .context("Failed to resolve mihomo config_dir")?
-            .display()
-            .to_string();
+            cfg_file.mihomo.core.config_dir =
+                std::path::absolute(std::path::PathBuf::from(&cfg_file.mihomo.core.config_dir))
+                    .context("Failed to resolve mihomo config_dir")?
+                    .display()
+                    .to_string();
         }
         if !cfg_file.singbox.core.config_dir.is_empty() {
-            cfg_file.singbox.core.config_dir = std::path::absolute(
-                std::path::PathBuf::from(&cfg_file.singbox.core.config_dir),
-            )
-            .context("Failed to resolve singbox config_dir")?
-            .display()
-            .to_string();
+            cfg_file.singbox.core.config_dir =
+                std::path::absolute(std::path::PathBuf::from(&cfg_file.singbox.core.config_dir))
+                    .context("Failed to resolve singbox config_dir")?
+                    .display()
+                    .to_string();
         }
         if !cfg_file.singbox.core.config_path.is_empty() {
-            cfg_file.singbox.core.config_path = std::path::absolute(
-                std::path::PathBuf::from(&cfg_file.singbox.core.config_path),
-            )
-            .context("Failed to resolve singbox config_path")?
-            .display()
-            .to_string();
+            cfg_file.singbox.core.config_path =
+                std::path::absolute(std::path::PathBuf::from(&cfg_file.singbox.core.config_path))
+                    .context("Failed to resolve singbox config_path")?
+                    .display()
+                    .to_string();
         }
         let (singbox_controller, singbox_secret) = {
             let mut secret = None;
@@ -209,8 +216,9 @@ pub fn init(base_path: Option<PathBuf>) -> Result<()> {
             load_home_dir()?
         };
         if !path.exists() {
-            std::fs::create_dir_all(&path)
-                .with_context(|| format!("Failed to create config directory: {}", path.display()))?;
+            std::fs::create_dir_all(&path).with_context(|| {
+                format!("Failed to create config directory: {}", path.display())
+            })?;
         }
         ensure!(path.is_dir(), "{} is not a dir", path.display());
 

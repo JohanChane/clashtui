@@ -266,12 +266,18 @@ extra:
         let cfg: ConfigFile = serde_yml::from_str(yaml).unwrap();
         assert_eq!(cfg.mihomo.core.config_dir, "/opt/clashtui/mihomo/config");
         assert_eq!(cfg.mihomo.core.bin_path, "/opt/clashtui/mihomo/mihomo");
-        assert_eq!(cfg.mihomo.core.config_path, "/opt/clashtui/mihomo/config/config.yaml");
+        assert_eq!(
+            cfg.mihomo.core.config_path,
+            "/opt/clashtui/mihomo/config/config.yaml"
+        );
         assert_eq!(cfg.mihomo.core_service.service_name, "clashtui_mihomo");
         assert!(!cfg.mihomo.core_service.is_user);
         assert_eq!(cfg.singbox.core.bin_path, "/opt/clashtui/sing-box/sing-box");
         assert_eq!(cfg.singbox.core.config_dir, "/opt/clashtui/sing-box/config");
-        assert_eq!(cfg.singbox.core.config_path, "/opt/clashtui/sing-box/config/config.json");
+        assert_eq!(
+            cfg.singbox.core.config_path,
+            "/opt/clashtui/sing-box/config/config.json"
+        );
         assert_eq!(cfg.singbox.core_service.service_name, "clashtui_singbox");
         assert_eq!(cfg.timeout, Some(5));
         assert_eq!(cfg.extra.edit_cmd, r#"kitty -e nvim "%s""#);

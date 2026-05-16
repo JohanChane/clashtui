@@ -1,5 +1,5 @@
-use anyhow::Context;
 use crate::config::database::ProxyProviderGroups;
+use anyhow::Context;
 
 use super::{PROXY_GROUPS, PROXY_PROVIDERS, resolve_template_placeholder};
 
@@ -113,9 +113,7 @@ pub(super) fn gen_template_with_urls(
         let mut new_pg = the_pg.clone();
         new_pg.remove("expand_group_with");
 
-        let provider_keys = if let Some(provider_keys) =
-            the_pg["expand_group_with"].as_sequence()
-        {
+        let provider_keys = if let Some(provider_keys) = the_pg["expand_group_with"].as_sequence() {
             provider_keys
         } else {
             anyhow::bail!("Failed to parse `expand_group_with`");
@@ -177,8 +175,9 @@ pub(super) fn gen_template_with_urls(
                     .with_context(|| "Non-string value in `use` list")?;
                 if p_str.starts_with("${") && p_str.ends_with('}') {
                     new_providers.extend(
-                        resolve_template_placeholder(p_str, &pg_names, groups)
-                            .with_context(|| format!("Can't resolve placeholder in `use`: {p_str}"))?
+                        resolve_template_placeholder(p_str, &pg_names, groups).with_context(
+                            || format!("Can't resolve placeholder in `use`: {p_str}"),
+                        )?,
                     );
                 } else {
                     new_providers.push(p_str.to_string());
@@ -200,8 +199,9 @@ pub(super) fn gen_template_with_urls(
                     .with_context(|| "Non-string value in `proxies` list")?;
                 if g_str.starts_with("${") && g_str.ends_with('}') {
                     new_groups.extend(
-                        resolve_template_placeholder(g_str, &pg_names, groups)
-                            .with_context(|| format!("Can't resolve placeholder in `proxies`: {g_str}"))?
+                        resolve_template_placeholder(g_str, &pg_names, groups).with_context(
+                            || format!("Can't resolve placeholder in `proxies`: {g_str}"),
+                        )?,
                     );
                 } else {
                     new_groups.push(g_str.to_string());
@@ -223,10 +223,7 @@ pub(super) fn gen_template_with_urls(
             "proxy_provider_groups".into(),
             serde_yml::to_value(groups).unwrap_or_default(),
         );
-        out_parsed_yaml.insert(
-            "clashtui".into(),
-            serde_yml::Value::Mapping(clashtui_map),
-        );
+        out_parsed_yaml.insert("clashtui".into(), serde_yml::Value::Mapping(clashtui_map));
     }
 
     Ok(out_parsed_yaml)
@@ -244,9 +241,7 @@ mod tests {
             .join(name)
     }
 
-    fn load_yaml<P: AsRef<std::path::Path>>(
-        path: P,
-    ) -> anyhow::Result<serde_yml::Mapping> {
+    fn load_yaml<P: AsRef<std::path::Path>>(path: P) -> anyhow::Result<serde_yml::Mapping> {
         let file = std::fs::File::open(path)?;
         Ok(serde_yml::from_reader(file)?)
     }
@@ -302,8 +297,20 @@ mod tests {
         .unwrap();
 
         let groups = make_multi_groups(&[
-            ("pvd", &["https://example.com/sub1.yaml" as &str, "https://example.com/sub2.yaml"]),
-            ("pvd2", &["https://example.com/sub1.yaml", "https://example.com/sub2.yaml"]),
+            (
+                "pvd",
+                &[
+                    "https://example.com/sub1.yaml" as &str,
+                    "https://example.com/sub2.yaml",
+                ],
+            ),
+            (
+                "pvd2",
+                &[
+                    "https://example.com/sub1.yaml",
+                    "https://example.com/sub2.yaml",
+                ],
+            ),
         ]);
         let result = gen_template_with_urls(tpl, "multi_provider_tpl", &groups).unwrap();
         let result_value = serde_yml::to_value(result).unwrap();
@@ -380,8 +387,20 @@ mod tests {
     fn test_dollar_brace_provider_placeholder() {
         let tpl = load_yaml(testdata_path("multi_provider_tpl.yaml")).unwrap();
         let groups = make_multi_groups(&[
-            ("pvd", &["https://example.com/sub1.yaml" as &str, "https://example.com/sub2.yaml"]),
-            ("pvd2", &["https://example.com/sub1.yaml", "https://example.com/sub2.yaml"]),
+            (
+                "pvd",
+                &[
+                    "https://example.com/sub1.yaml" as &str,
+                    "https://example.com/sub2.yaml",
+                ],
+            ),
+            (
+                "pvd2",
+                &[
+                    "https://example.com/sub1.yaml",
+                    "https://example.com/sub2.yaml",
+                ],
+            ),
         ]);
         let result = gen_template_with_urls(tpl, "multi_provider_tpl", &groups).unwrap();
 
@@ -410,8 +429,20 @@ mod tests {
     fn test_dollar_brace_group_placeholder() {
         let tpl = load_yaml(testdata_path("multi_provider_tpl.yaml")).unwrap();
         let groups = make_multi_groups(&[
-            ("pvd", &["https://example.com/sub1.yaml" as &str, "https://example.com/sub2.yaml"]),
-            ("pvd2", &["https://example.com/sub1.yaml", "https://example.com/sub2.yaml"]),
+            (
+                "pvd",
+                &[
+                    "https://example.com/sub1.yaml" as &str,
+                    "https://example.com/sub2.yaml",
+                ],
+            ),
+            (
+                "pvd2",
+                &[
+                    "https://example.com/sub1.yaml",
+                    "https://example.com/sub2.yaml",
+                ],
+            ),
         ]);
         let result = gen_template_with_urls(tpl, "multi_provider_tpl", &groups).unwrap();
 
@@ -435,7 +466,13 @@ mod tests {
 
         assert_eq!(
             proxies,
-            vec!["DIRECT", "Auto-pvd0", "Auto-pvd1", "Fallback-pvd20", "Fallback-pvd21"]
+            vec![
+                "DIRECT",
+                "Auto-pvd0",
+                "Auto-pvd1",
+                "Fallback-pvd20",
+                "Fallback-pvd21"
+            ]
         );
     }
 
@@ -474,10 +511,13 @@ mod tests {
     #[test]
     fn test_multi_url_expansion() {
         let tpl = load_yaml(testdata_path("simple_tpl.yaml")).unwrap();
-        let groups = make_groups("pvd", &[
-            "https://a.example.com/p1.yaml",
-            "https://b.example.com/p2.yaml",
-        ]);
+        let groups = make_groups(
+            "pvd",
+            &[
+                "https://a.example.com/p1.yaml",
+                "https://b.example.com/p2.yaml",
+            ],
+        );
         let result = gen_template_with_urls(tpl, "simple_tpl", &groups).unwrap();
 
         let providers = result
@@ -537,22 +577,37 @@ mod tests {
         let mut mapping = serde_yml::Mapping::new();
 
         let mut pp_mapping = serde_yml::Mapping::new();
-        pp_mapping.insert(Value::String("pvd".into()), serde_yml::to_value(serde_yml::Mapping::from_iter([
-            (Value::String("tpl_param".into()), Value::Null),
-            (Value::String("type".into()), Value::String("http".into())),
-            (Value::String("url".into()), Value::String("https://example.com/sub1.yaml".into())),
-        ])).unwrap());
-        mapping.insert(Value::String(PROXY_PROVIDERS.into()), Value::Mapping(pp_mapping));
-
-        mapping.insert(Value::String(PROXY_GROUPS.into()), Value::Sequence(vec![
+        pp_mapping.insert(
+            Value::String("pvd".into()),
             serde_yml::to_value(serde_yml::Mapping::from_iter([
-                (Value::String("name".into()), Value::String("Direct".into())),
-                (Value::String("type".into()), Value::String("select".into())),
-                (Value::String("proxies".into()), Value::Sequence(vec![
-                    Value::String("${bare}".into()),
-                ])),
-            ])).unwrap(),
-        ]));
+                (Value::String("tpl_param".into()), Value::Null),
+                (Value::String("type".into()), Value::String("http".into())),
+                (
+                    Value::String("url".into()),
+                    Value::String("https://example.com/sub1.yaml".into()),
+                ),
+            ]))
+            .unwrap(),
+        );
+        mapping.insert(
+            Value::String(PROXY_PROVIDERS.into()),
+            Value::Mapping(pp_mapping),
+        );
+
+        mapping.insert(
+            Value::String(PROXY_GROUPS.into()),
+            Value::Sequence(vec![
+                serde_yml::to_value(serde_yml::Mapping::from_iter([
+                    (Value::String("name".into()), Value::String("Direct".into())),
+                    (Value::String("type".into()), Value::String("select".into())),
+                    (
+                        Value::String("proxies".into()),
+                        Value::Sequence(vec![Value::String("${bare}".into())]),
+                    ),
+                ]))
+                .unwrap(),
+            ]),
+        );
 
         let groups = make_groups("pvd", &["https://example.com/sub1.yaml"]);
         let result = gen_template_with_urls(mapping, "test", &groups);

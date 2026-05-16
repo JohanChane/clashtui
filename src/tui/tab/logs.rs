@@ -18,16 +18,40 @@ mod_agent!(
         ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
         ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
         ([KeyCode::Char('G')], Key::GoBottom, "Go to bottom"),
-        ([KeyCode::Char('g'), KeyCode::Char('g')], Key::GoTop, "Go to top"),
+        (
+            [KeyCode::Char('g'), KeyCode::Char('g')],
+            Key::GoTop,
+            "Go to top"
+        ),
         ([KeyCode::Char('/')], Key::Search, "Search/Filter"),
         ([KeyCode::Char('p')], Key::TogglePause, "Pause/Resume"),
         ([KeyCode::Char('f')], Key::FzfFind, "Find"),
         ([KeyCode::Char('c')], Key::Clear, "Clear logs"),
-        ([KeyCode::Char('t'), KeyCode::Char('d')], Key::ToggleDebug, "Toggle debug"),
-        ([KeyCode::Char('t'), KeyCode::Char('i')], Key::ToggleInfo, "Toggle info"),
-        ([KeyCode::Char('t'), KeyCode::Char('w')], Key::ToggleWarning, "Toggle warning"),
-        ([KeyCode::Char('t'), KeyCode::Char('e')], Key::ToggleError, "Toggle error"),
-        ([KeyCode::Char('t'), KeyCode::Char('s')], Key::ToggleSilent, "Toggle silent"),
+        (
+            [KeyCode::Char('t'), KeyCode::Char('d')],
+            Key::ToggleDebug,
+            "Toggle debug"
+        ),
+        (
+            [KeyCode::Char('t'), KeyCode::Char('i')],
+            Key::ToggleInfo,
+            "Toggle info"
+        ),
+        (
+            [KeyCode::Char('t'), KeyCode::Char('w')],
+            Key::ToggleWarning,
+            "Toggle warning"
+        ),
+        (
+            [KeyCode::Char('t'), KeyCode::Char('e')],
+            Key::ToggleError,
+            "Toggle error"
+        ),
+        (
+            [KeyCode::Char('t'), KeyCode::Char('s')],
+            Key::ToggleSilent,
+            "Toggle silent"
+        ),
     ]
 );
 
@@ -166,9 +190,7 @@ fn spawn_ws_logs(
             reconnect.store(false, Ordering::Relaxed);
 
             let url_str = if let Some(ref s) = secret {
-                format!(
-                    "{ws_scheme}://{addr}/logs?token={s}&level={current_level}"
-                )
+                format!("{ws_scheme}://{addr}/logs?token={s}&level={current_level}")
             } else {
                 format!("{ws_scheme}://{addr}/logs?level={current_level}")
             };
@@ -183,9 +205,7 @@ fn spawn_ws_logs(
                     loop {
                         match ws.read() {
                             Ok(tungstenite::Message::Text(text)) => {
-                                if let Ok(v) =
-                                    serde_json::from_str::<serde_json::Value>(&text)
-                                {
+                                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
                                     let type_ = v
                                         .get("type")
                                         .and_then(|t| t.as_str())
@@ -206,8 +226,7 @@ fn spawn_ws_logs(
                             Ok(tungstenite::Message::Close(_)) => break,
                             Err(tungstenite::Error::Io(ref e))
                                 if e.kind() == std::io::ErrorKind::WouldBlock
-                                    || e.kind()
-                                        == std::io::ErrorKind::TimedOut =>
+                                    || e.kind() == std::io::ErrorKind::TimedOut =>
                             {
                                 if reconnect.load(Ordering::Relaxed) {
                                     break;
@@ -251,9 +270,7 @@ impl BasicTabContent for Logs {
         // Refresh log level from core on every re-entry
         async {
             let cfg = tri!(
-                tokio::task::spawn_blocking(config::fetch)
-                    .await
-                    .unwrap(),
+                tokio::task::spawn_blocking(config::fetch).await.unwrap(),
                 or_set
             );
             wrapper(move |content: &mut Self| {
@@ -283,18 +300,15 @@ impl BasicTabContent for Logs {
             let pending = Arc::clone(pending);
             async move {
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                let entries: Vec<LogEntry> =
-                    pending.lock().unwrap().drain(..).collect();
+                let entries: Vec<LogEntry> = pending.lock().unwrap().drain(..).collect();
                 wrapper(move |content: &mut Self| {
                     for entry in entries {
                         content.buffer.push(entry);
                     }
                     if content.buffer.count() > 0
-                        && content.scroll + 1
-                            >= content.buffer.count().saturating_sub(1)
+                        && content.scroll + 1 >= content.buffer.count().saturating_sub(1)
                     {
-                        content.scroll =
-                            content.buffer.count().saturating_sub(1);
+                        content.scroll = content.buffer.count().saturating_sub(1);
                     }
                 })
             }
@@ -317,9 +331,7 @@ impl TabContent for Logs {
         // Fetch initial log level
         async {
             let cfg = tri!(
-                tokio::task::spawn_blocking(config::fetch)
-                    .await
-                    .unwrap(),
+                tokio::task::spawn_blocking(config::fetch).await.unwrap(),
                 or_set
             );
             wrapper(move |content: &mut Self| {
@@ -381,10 +393,7 @@ impl TabContent for Logs {
                 self.paused = !self.paused;
                 if !self.paused {
                     // Kickstart the after_sync poll chain
-                    async {
-                        wrapper(|_content: &mut Logs| {})
-                    }
-                    .spawn_at(task_set);
+                    async { wrapper(|_content: &mut Logs| {}) }.spawn_at(task_set);
                 }
             }
             Key::FzfFind => {
@@ -436,17 +445,11 @@ impl TabContent for Logs {
         if self.paused {
             title_parts.push(" [PAUSED]".to_owned());
         }
-        let block = block.title_bottom(
-            Line::raw(title_parts.join(" "))
-                .right_aligned()
-                .reversed(),
-        );
+        let block = block.title_bottom(Line::raw(title_parts.join(" ")).right_aligned().reversed());
 
         if !self.error.as_deref().unwrap_or("").is_empty() && self.buffer.is_empty() {
-            let widget = ratatui::widgets::Paragraph::new(
-                self.error.as_deref().unwrap_or(""),
-            )
-            .block(block);
+            let widget =
+                ratatui::widgets::Paragraph::new(self.error.as_deref().unwrap_or("")).block(block);
             f.render_widget(widget, area);
             return;
         }
@@ -455,11 +458,7 @@ impl TabContent for Logs {
             .buffer
             .iter_from_head()
             .map(|e| format!("{} {} {}", e.time, e.type_, e.payload))
-            .filter(|line| {
-                self.filter
-                    .as_deref()
-                    .is_none_or(|pat| line.contains(pat))
-            })
+            .filter(|line| self.filter.as_deref().is_none_or(|pat| line.contains(pat)))
             .map(|line| ListItem::new(Line::raw(line)))
             .collect();
 
@@ -468,8 +467,8 @@ impl TabContent for Logs {
             .block(block)
             .highlight_style(highlight_style);
 
-        let mut list_state = ratatui::widgets::ListState::default()
-            .with_selected(Some(self.scroll));
+        let mut list_state =
+            ratatui::widgets::ListState::default().with_selected(Some(self.scroll));
         f.render_stateful_widget(list, area, &mut list_state);
     }
 }
@@ -572,8 +571,10 @@ mod tests {
             filter: Some("test".to_owned()),
             ..Default::default()
         };
-        logs.buffer.push(make_entry("info", "line1", "00-01-01 00:00:00"));
-        logs.buffer.push(make_entry("info", "line2", "00-01-01 00:00:00"));
+        logs.buffer
+            .push(make_entry("info", "line1", "00-01-01 00:00:00"));
+        logs.buffer
+            .push(make_entry("info", "line2", "00-01-01 00:00:00"));
         assert_eq!(logs.buffer.count(), 2);
         assert!(logs.filter.is_some());
 
@@ -611,8 +612,10 @@ mod tests {
             scroll: 0,
             ..Default::default()
         };
-        logs.buffer.push(make_entry("info", "a", "00-00-00 00:00:00"));
-        logs.buffer.push(make_entry("info", "b", "00-00-00 00:00:00"));
+        logs.buffer
+            .push(make_entry("info", "a", "00-00-00 00:00:00"));
+        logs.buffer
+            .push(make_entry("info", "b", "00-00-00 00:00:00"));
         logs.scroll += 1;
         logs.scroll += 1;
         if logs.scroll >= logs.buffer.count() {

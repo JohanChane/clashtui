@@ -1,5 +1,5 @@
-use anyhow::bail;
 use anyhow::Result;
+use anyhow::bail;
 
 use super::*;
 
@@ -45,7 +45,10 @@ fn handle_profile(command: ProfileCommand) -> Result<()> {
             };
 
             let profiles: Vec<_> = if let Some(filter) = &type_filter {
-                profiles.into_iter().filter(|pf| filter.matches(&pf.dtype)).collect()
+                profiles
+                    .into_iter()
+                    .filter(|pf| filter.matches(&pf.dtype))
+                    .collect()
             } else {
                 profiles
             };
@@ -72,7 +75,11 @@ fn handle_profile(command: ProfileCommand) -> Result<()> {
                     pf, with_proxy,
                 )) {
                     Ok(result) => {
-                        println!("  Updated: {} ({} resources)", result.name, result.net_updates.len());
+                        println!(
+                            "  Updated: {} ({} resources)",
+                            result.name,
+                            result.net_updates.len()
+                        );
                     }
                     Err(e) => {
                         eprintln!("  Error: {e}");
@@ -103,7 +110,9 @@ fn handle_profile(command: ProfileCommand) -> Result<()> {
         } => {
             let pfs = crate::functions::file::profile::db::get_all();
             let mut pfs: Vec<_> = if let Some(filter) = &type_filter {
-                pfs.into_iter().filter(|pf| filter.matches(&pf.dtype)).collect()
+                pfs.into_iter()
+                    .filter(|pf| filter.matches(&pf.dtype))
+                    .collect()
             } else {
                 pfs
             };
@@ -161,9 +170,8 @@ fn handle_service(command: ServiceCommand) -> Result<()> {
 fn handle_mode(mode: Option<ModeCommand>) -> Result<()> {
     match mode {
         None => {
-            let config =
-                crate::functions::restful::config::fetch()
-                    .map_err(|e| anyhow::anyhow!("Failed to fetch config: {e}"))?;
+            let config = crate::functions::restful::config::fetch()
+                .map_err(|e| anyhow::anyhow!("Failed to fetch config: {e}"))?;
             println!("{}", config.mode);
             Ok(())
         }
@@ -276,13 +284,15 @@ fn fetch_latest_release(repo: &str, ci: bool) -> Result<GhRelease> {
             .json()
             .map_err(|e| anyhow::anyhow!("Failed to parse releases: {e}"))?
     } else {
-        vec![minreq::get(url)
-            .with_header("User-Agent", "clashtui")
-            .with_timeout(10)
-            .send()
-            .map_err(|e| anyhow::anyhow!("Failed to fetch latest release: {e}"))?
-            .json()
-            .map_err(|e| anyhow::anyhow!("Failed to parse release: {e}"))?]
+        vec![
+            minreq::get(url)
+                .with_header("User-Agent", "clashtui")
+                .with_timeout(10)
+                .send()
+                .map_err(|e| anyhow::anyhow!("Failed to fetch latest release: {e}"))?
+                .json()
+                .map_err(|e| anyhow::anyhow!("Failed to parse release: {e}"))?,
+        ]
     };
 
     if releases.is_empty() {

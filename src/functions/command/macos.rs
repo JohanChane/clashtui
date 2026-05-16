@@ -187,7 +187,10 @@ mod tests {
             stderr: b"hello stderr\n"[..].into(),
         };
         let result = stringify_output(output);
-        assert!(result.contains("OK"), "should contain OK for success: {result}");
+        assert!(
+            result.contains("OK"),
+            "should contain OK for success: {result}"
+        );
         assert!(result.contains("hello stdout"));
         assert!(result.contains("hello stderr"));
     }
@@ -228,7 +231,10 @@ mod tests {
 
         let result = find_files_not_group_writable(&dir);
         // The file with group-write should NOT be in the result
-        assert!(!result.contains(&file), "file with group-write should not be in result: {result:?}");
+        assert!(
+            !result.contains(&file),
+            "file with group-write should not be in result: {result:?}"
+        );
     }
 
     #[test]
@@ -241,7 +247,10 @@ mod tests {
         std::fs::set_permissions(&file, perms).unwrap();
 
         let result = find_files_not_group_writable(&dir);
-        assert!(result.contains(&file), "file without group-write should be in result: {result:?}");
+        assert!(
+            result.contains(&file),
+            "file without group-write should be in result: {result:?}"
+        );
     }
 
     #[test]
@@ -263,7 +272,13 @@ mod tests {
         }
 
         let result = find_files_not_group_writable(&dir);
-        assert!(result.contains(&file1), "file1 should be in result: {result:?}");
-        assert!(result.contains(&file2), "file2 should be in result: {result:?}");
+        assert!(
+            result.contains(&file1),
+            "file1 should be in result: {result:?}"
+        );
+        assert!(
+            result.contains(&file2),
+            "file2 should be in result: {result:?}"
+        );
     }
 }

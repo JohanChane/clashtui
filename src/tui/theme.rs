@@ -15,7 +15,11 @@ pub(crate) struct StyleDef {
 
 impl Default for StyleDef {
     fn default() -> Self {
-        Self { fg: None, bg: None, bold: false }
+        Self {
+            fg: None,
+            bg: None,
+            bold: false,
+        }
     }
 }
 
@@ -123,7 +127,10 @@ pub(crate) struct Tabbar {
 
 impl From<TabbarDef> for Tabbar {
     fn from(def: TabbarDef) -> Self {
-        Self { text: Style::from(def.text), highlight: Style::from(def.highlight) }
+        Self {
+            text: Style::from(def.text),
+            highlight: Style::from(def.highlight),
+        }
     }
 }
 
@@ -135,7 +142,10 @@ pub(crate) struct Popup {
 
 impl From<PopupDef> for Popup {
     fn from(def: PopupDef) -> Self {
-        Self { border: Style::from(def.border), text: Style::from(def.text) }
+        Self {
+            border: Style::from(def.border),
+            text: Style::from(def.text),
+        }
     }
 }
 
@@ -158,23 +168,73 @@ impl Theme {
 
 fn make_default_palette() -> SectionPaletteDef {
     let mut extra = HashMap::new();
-    extra.insert("node_link".into(), StyleDef { fg: Some(Color::Rgb(100, 180, 150)), bg: None, bold: false });
-    extra.insert("node_file".into(), StyleDef { fg: Some(Color::Rgb(220, 220, 220)), bg: None, bold: false });
-    extra.insert("node_tcp".into(), StyleDef { fg: Some(Color::Cyan), bg: None, bold: false });
-    extra.insert("node_udp".into(), StyleDef { fg: Some(Color::Yellow), bg: None, bold: false });
+    extra.insert(
+        "node_link".into(),
+        StyleDef {
+            fg: Some(Color::Rgb(100, 180, 150)),
+            bg: None,
+            bold: false,
+        },
+    );
+    extra.insert(
+        "node_file".into(),
+        StyleDef {
+            fg: Some(Color::Rgb(220, 220, 220)),
+            bg: None,
+            bold: false,
+        },
+    );
+    extra.insert(
+        "node_tcp".into(),
+        StyleDef {
+            fg: Some(Color::Cyan),
+            bg: None,
+            bold: false,
+        },
+    );
+    extra.insert(
+        "node_udp".into(),
+        StyleDef {
+            fg: Some(Color::Yellow),
+            bg: None,
+            bold: false,
+        },
+    );
 
     SectionPaletteDef {
-        border: Some(StyleDef { fg: Some(Color::Rgb(0, 204, 153)), bg: None, bold: false }),
-        highlight: Some(StyleDef { fg: None, bg: Some(Color::Rgb(64, 64, 64)), bold: true }),
+        border: Some(StyleDef {
+            fg: Some(Color::Rgb(0, 204, 153)),
+            bg: None,
+            bold: false,
+        }),
+        highlight: Some(StyleDef {
+            fg: None,
+            bg: Some(Color::Rgb(64, 64, 64)),
+            bold: true,
+        }),
         text: None,
-        muted: Some(StyleDef { fg: Some(Color::Rgb(128, 128, 128)), bg: None, bold: false }),
-        title: Some(StyleDef { fg: Some(Color::Rgb(0, 204, 153)), bg: None, bold: true }),
+        muted: Some(StyleDef {
+            fg: Some(Color::Rgb(128, 128, 128)),
+            bg: None,
+            bold: false,
+        }),
+        title: Some(StyleDef {
+            fg: Some(Color::Rgb(0, 204, 153)),
+            bg: None,
+            bold: true,
+        }),
         extra,
     }
 }
 
 const SECTION_NAMES: &[&str] = &[
-    "connections", "proxies", "settings", "srvctl", "logs", "status", "file",
+    "connections",
+    "proxies",
+    "settings",
+    "srvctl",
+    "logs",
+    "status",
+    "file",
 ];
 
 fn build_default_theme() -> Theme {
@@ -182,7 +242,10 @@ fn build_default_theme() -> Theme {
     let default = make_default_palette();
     let mut sections = HashMap::new();
     for name in SECTION_NAMES {
-        sections.insert(name.to_string(), ComputedSectionTheme::from_palette(&empty, &default));
+        sections.insert(
+            name.to_string(),
+            ComputedSectionTheme::from_palette(&empty, &default),
+        );
     }
     Theme {
         tabbar: Tabbar {
@@ -236,7 +299,10 @@ impl TryFrom<ThemeFile> for Theme {
         for (name, palette_opt) in table {
             let empty = SectionPaletteDef::default();
             let palette = palette_opt.unwrap_or(&empty);
-            sections.insert(name.to_string(), ComputedSectionTheme::from_palette(palette, &default));
+            sections.insert(
+                name.to_string(),
+                ComputedSectionTheme::from_palette(palette, &default),
+            );
         }
 
         Ok(Self {
@@ -258,9 +324,9 @@ pub(crate) fn load_theme(path: &std::path::Path) -> anyhow::Result<Theme> {
 
     // Detect old format legacy keys
     let legacy: &[&str] = &["tab", "bars", "connection_tab", "profile_tab", "browser"];
-    let has_legacy = value.keys().any(|k| {
-        k.as_str().is_some_and(|s| legacy.contains(&s))
-    });
+    let has_legacy = value
+        .keys()
+        .any(|k| k.as_str().is_some_and(|s| legacy.contains(&s)));
     if has_legacy {
         anyhow::bail!("old theme format detected");
     }
@@ -327,7 +393,11 @@ mod tests {
 
     #[test]
     fn style_def_to_style_converts() {
-        let def = StyleDef { fg: Some(Color::Red), bg: Some(Color::Blue), bold: true };
+        let def = StyleDef {
+            fg: Some(Color::Red),
+            bg: Some(Color::Blue),
+            bold: true,
+        };
         let style: Style = def.into();
         assert_eq!(style.fg, Some(Color::Red));
         assert_eq!(style.bg, Some(Color::Blue));
@@ -337,9 +407,21 @@ mod tests {
     #[test]
     fn section_palette_resolve_falls_back_to_default() {
         let default = SectionPaletteDef {
-            border: Some(StyleDef { fg: Some(Color::Red), bg: None, bold: false }),
-            highlight: Some(StyleDef { fg: Some(Color::White), bg: Some(Color::Black), bold: true }),
-            text: Some(StyleDef { fg: Some(Color::Green), bg: None, bold: false }),
+            border: Some(StyleDef {
+                fg: Some(Color::Red),
+                bg: None,
+                bold: false,
+            }),
+            highlight: Some(StyleDef {
+                fg: Some(Color::White),
+                bg: Some(Color::Black),
+                bold: true,
+            }),
+            text: Some(StyleDef {
+                fg: Some(Color::Green),
+                bg: None,
+                bold: false,
+            }),
             muted: None,
             title: None,
             extra: HashMap::new(),
@@ -354,11 +436,19 @@ mod tests {
     #[test]
     fn section_palette_override_replaces_default() {
         let default = SectionPaletteDef {
-            border: Some(StyleDef { fg: Some(Color::Red), bg: None, bold: false }),
+            border: Some(StyleDef {
+                fg: Some(Color::Red),
+                bg: None,
+                bold: false,
+            }),
             ..Default::default()
         };
         let palette = SectionPaletteDef {
-            border: Some(StyleDef { fg: Some(Color::Blue), bg: None, bold: true }),
+            border: Some(StyleDef {
+                fg: Some(Color::Blue),
+                bg: None,
+                bold: true,
+            }),
             ..Default::default()
         };
         let resolved = ComputedSectionTheme::from_palette(&palette, &default);
@@ -369,16 +459,42 @@ mod tests {
     #[test]
     fn extra_fields_merge_inherits_default_extras() {
         let mut default_extras = HashMap::new();
-        default_extras.insert("node_link".into(), StyleDef { fg: Some(Color::Cyan), bg: None, bold: false });
-        let default = SectionPaletteDef { extra: default_extras, ..Default::default() };
+        default_extras.insert(
+            "node_link".into(),
+            StyleDef {
+                fg: Some(Color::Cyan),
+                bg: None,
+                bold: false,
+            },
+        );
+        let default = SectionPaletteDef {
+            extra: default_extras,
+            ..Default::default()
+        };
 
         let mut palette_extras = HashMap::new();
-        palette_extras.insert("node_file".into(), StyleDef { fg: Some(Color::Yellow), bg: None, bold: false });
-        let palette = SectionPaletteDef { extra: palette_extras, ..Default::default() };
+        palette_extras.insert(
+            "node_file".into(),
+            StyleDef {
+                fg: Some(Color::Yellow),
+                bg: None,
+                bold: false,
+            },
+        );
+        let palette = SectionPaletteDef {
+            extra: palette_extras,
+            ..Default::default()
+        };
 
         let resolved = ComputedSectionTheme::from_palette(&palette, &default);
-        assert_eq!(resolved.extra.get("node_link").unwrap().fg, Some(Color::Cyan));
-        assert_eq!(resolved.extra.get("node_file").unwrap().fg, Some(Color::Yellow));
+        assert_eq!(
+            resolved.extra.get("node_link").unwrap().fg,
+            Some(Color::Cyan)
+        );
+        assert_eq!(
+            resolved.extra.get("node_file").unwrap().fg,
+            Some(Color::Yellow)
+        );
     }
 
     #[test]
@@ -444,8 +560,14 @@ proxies:
         let file: ThemeFile = serde_yml::from_str(yaml).unwrap();
         let theme = Theme::try_from(file).unwrap();
         let proxies = theme.section("proxies");
-        assert_eq!(proxies.extra.get("node_link").unwrap().fg, Some(Color::Rgb(100, 180, 150)));
-        assert_eq!(proxies.extra.get("node_file").unwrap().fg, Some(Color::Rgb(220, 220, 220)));
+        assert_eq!(
+            proxies.extra.get("node_link").unwrap().fg,
+            Some(Color::Rgb(100, 180, 150))
+        );
+        assert_eq!(
+            proxies.extra.get("node_file").unwrap().fg,
+            Some(Color::Rgb(220, 220, 220))
+        );
     }
 
     #[test]
@@ -483,7 +605,9 @@ default:
 "##;
         let mapping: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
         let legacy: &[&str] = &["tab", "bars", "connection_tab", "profile_tab", "browser"];
-        let has_legacy = mapping.keys().any(|k| k.as_str().is_some_and(|s| legacy.contains(&s)));
+        let has_legacy = mapping
+            .keys()
+            .any(|k| k.as_str().is_some_and(|s| legacy.contains(&s)));
         assert!(has_legacy);
     }
 
@@ -492,7 +616,9 @@ default:
         let yaml = "tabbar:\n  text: {}\n  highlight: {}\ndefault:\n  border: {}\n";
         let mapping: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
         let legacy: &[&str] = &["tab", "bars", "connection_tab", "profile_tab", "browser"];
-        let has_legacy = mapping.keys().any(|k| k.as_str().is_some_and(|s| legacy.contains(&s)));
+        let has_legacy = mapping
+            .keys()
+            .any(|k| k.as_str().is_some_and(|s| legacy.contains(&s)));
         assert!(!has_legacy);
     }
 }

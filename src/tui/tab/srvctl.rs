@@ -1,9 +1,9 @@
 use super::dev::*;
 use crate::config::CoreType;
-use ratatui::style::Color;
-use ratatui::widgets::ListItem;
 #[cfg(unix)]
 use libc;
+use ratatui::style::Color;
+use ratatui::widgets::ListItem;
 
 newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
 
@@ -110,29 +110,23 @@ impl SrvCtlContent {
         let controller = crate::config::ServiceController::default();
         async move {
             let status = match controller {
-                crate::config::ServiceController::Launchd => {
-                    launchd_status(&service_name, is_user)
-                }
+                crate::config::ServiceController::Launchd => launchd_status(&service_name, is_user),
                 _ => {
                     let mut args = vec!["is-active"];
                     if is_user {
                         args.push("--user");
                     }
                     args.push(&service_name);
-                    let output = std::process::Command::new("systemctl")
-                        .args(&args)
-                        .output();
+                    let output = std::process::Command::new("systemctl").args(&args).output();
                     match output {
                         Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_owned(),
                         Err(_) => "?".to_owned(),
                     }
                 }
             };
-            wrapper(move |c: &mut SrvCtlContent| {
-                match target {
-                    CoreType::Mihomo => c.mihomo_status = status,
-                    CoreType::Singbox => c.singbox_status = status,
-                }
+            wrapper(move |c: &mut SrvCtlContent| match target {
+                CoreType::Mihomo => c.mihomo_status = status,
+                CoreType::Singbox => c.singbox_status = status,
             })
         }
         .spawn_at(task_set);
@@ -143,18 +137,14 @@ impl SrvCtlContent {
         let controller = crate::config::ServiceController::default();
         async move {
             let status = match controller {
-                crate::config::ServiceController::Launchd => {
-                    launchd_status(&service_name, is_user)
-                }
+                crate::config::ServiceController::Launchd => launchd_status(&service_name, is_user),
                 _ => {
                     let mut args = vec!["is-active"];
                     if is_user {
                         args.push("--user");
                     }
                     args.push(&service_name);
-                    let output = std::process::Command::new("systemctl")
-                        .args(&args)
-                        .output();
+                    let output = std::process::Command::new("systemctl").args(&args).output();
                     match output {
                         Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_owned(),
                         Err(_) => "?".to_owned(),
@@ -198,7 +188,12 @@ fn launchd_status(service_name: &str, is_user: bool) -> String {
         }
     } else {
         let output = std::process::Command::new("sudo")
-            .args(["-n", "launchctl", "print", &format!("system/{service_name}")])
+            .args([
+                "-n",
+                "launchctl",
+                "print",
+                &format!("system/{service_name}"),
+            ])
             .output();
         match output {
             Ok(o) if o.status.success() => {
@@ -305,10 +300,11 @@ impl TabContent for SrvCtlContent {
                 let needs_sudo = !self.is_user;
 
                 async move {
-                    let password = match crate::functions::command::resolve_sudo_password(needs_sudo).await {
-                        Ok(pw) => pw,
-                        Err(_) => return do_nothing(),
-                    };
+                    let password =
+                        match crate::functions::command::resolve_sudo_password(needs_sudo).await {
+                            Ok(pw) => pw,
+                            Err(_) => return do_nothing(),
+                        };
 
                     macro_rules! handle {
                         ($result:expr, $new_status:expr) => {
@@ -318,11 +314,9 @@ impl TabContent for SrvCtlContent {
                                         crate::tui::widget::popmsg::Confirm::err(out);
                                         do_nothing()
                                     } else {
-                                        crate::tui::widget::popmsg::Confirm::title(
-                                            "OK".to_owned(),
-                                        )
-                                        .with_prompt(out)
-                                        .build_and_send();
+                                        crate::tui::widget::popmsg::Confirm::title("OK".to_owned())
+                                            .with_prompt(out)
+                                            .build_and_send();
                                         wrapper(move |c: &mut SrvCtlContent| {
                                             let s = $new_status.to_owned();
                                             c.status = s.clone();
@@ -345,11 +339,9 @@ impl TabContent for SrvCtlContent {
                                     if out.starts_with("Error") {
                                         crate::tui::widget::popmsg::Confirm::err(out);
                                     } else {
-                                        crate::tui::widget::popmsg::Confirm::title(
-                                            "OK".to_owned(),
-                                        )
-                                        .with_prompt(out)
-                                        .build_and_send();
+                                        crate::tui::widget::popmsg::Confirm::title("OK".to_owned())
+                                            .with_prompt(out)
+                                            .build_and_send();
                                     }
                                     do_nothing()
                                 }
@@ -364,16 +356,10 @@ impl TabContent for SrvCtlContent {
                     let pw_ref = password.as_deref();
                     match op {
                         SrvCtlOp::Stop => {
-                            handle!(
-                                crate::functions::command::stop_service(pw_ref),
-                                "inactive"
-                            )
+                            handle!(crate::functions::command::stop_service(pw_ref), "inactive")
                         }
                         SrvCtlOp::Restart => {
-                            handle!(
-                                crate::functions::command::restart_service(pw_ref),
-                                "active"
-                            )
+                            handle!(crate::functions::command::restart_service(pw_ref), "active")
                         }
                         SrvCtlOp::StopAll => {
                             handle!(
@@ -449,10 +435,8 @@ impl TabContent for SrvCtlContent {
                                     .build_and_send()
                                     .await;
 
-                                    crate::tui::app::QUIT.store(
-                                        true,
-                                        std::sync::atomic::Ordering::Relaxed,
-                                    );
+                                    crate::tui::app::QUIT
+                                        .store(true, std::sync::atomic::Ordering::Relaxed);
                                     update_label
                                 }
                                 Err(e) => {
@@ -501,7 +485,10 @@ impl TabContent for SrvCtlContent {
             .border_style(section.border)
             .title(format!(
                 "{} — {} (core: {}){}",
-                Self::TITLE, self.service_name, self.core_label, user_tag
+                Self::TITLE,
+                self.service_name,
+                self.core_label,
+                user_tag
             ))
             .title_bottom(
                 ratatui::text::Line::from(vec![
