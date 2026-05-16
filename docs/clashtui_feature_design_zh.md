@@ -54,15 +54,15 @@ ClashTui Core 的文件结构设计 (e.g. `/opt/clashtui`):
 
 ClashTui 支持多种服务管理器，在编译时根据平台自动选择默认值:
 
-| Controller | 平台          | bin_name    | 说明                        |
-|------------|---------------|-------------|----------------------------|
-| Systemd    | Linux (默认)   | `systemctl` | systemd 服务管理             |
-| OpenRc     | Linux (可选)   | `rc-service`| OpenRC 服务管理              |
-| Nssm       | Windows (默认) | `nssm`      | Windows 服务管理             |
-| Launchd    | macOS (默认)   | `launchctl` | launchd 服务管理             |
+| Controller      | 平台          | 实现方式                      | 说明                        |
+|-----------------|---------------|------------------------------|----------------------------|
+| Systemd         | Linux (默认)   | `systemctl` CLI              | systemd 服务管理             |
+| OpenRc          | Linux (可选)   | `rc-service` CLI             | OpenRC 服务管理              |
+| WindowsService  | Windows (默认) | `windows-service` Rust crate | 直接调 Windows SCM API       |
+| Launchd         | macOS (默认)   | `launchctl` CLI              | launchd 服务管理             |
 
 各平台编译时默认:
-- `cfg!(windows)` → Nssm
+- `cfg!(windows)` → WindowsService
 - `cfg!(target_os = "macos")` → Launchd
 - 其他 → Systemd
 
@@ -970,3 +970,270 @@ macOS 与 Linux 统一使用 Unix 组权限管理 Core 文件:
 </dict>
 </plist>
 ```
+
+## Support Windows
+
+### Windows Core 文件结构
+
+ClashTui Core 的文件结构设计 (System mode, e.g. `C:\Program Files\clashtui`):
+
+```
+.
+├── bin
+│   └── clashtui.exe
+├── mihomo
+│   ├── config                          # Core Config Dir
+│   │   └── config.yaml                 # Core Config Path
+│   └── mihomo.exe -> <mihomo.exe bin path> # 或直接放置 .exe
+└── sing-box
+    ├── config                          # Core Config Dir
+    │   └── config.json                 # Core Config Path
+    └── sing-box.exe -> <sing-box bin path>
+```
+
+User mode 的默认路径是 `%LOCALAPPDATA%\clashtui` (e.g. `C:\Users\<User>\AppData\Local\clashtui`)。
+
+ClashTui 的配置文件结构同 Linux/macOS, 存放在 `%APPDATA%\clashtui` (e.g. `C:\Users\<User>\AppData\Roaming\clashtui`).
+
+和 Linux/macOS 类似, Windows 也可使用 symlink 指向二进制路径 (`mklink` / `mklink /D`), 但需要 Administrator 权限。如果用户没有管理员权限, 可以直接放置 `.exe` 文件。
+
+### Core services 管理 (Windows Service API)
+
+Windows 使用 Rust 的 [`windows-service`](https://crates.io/crates/windows-service) crate 直接调用 Windows SCM (Service Control Manager) API 管理服务，无需依赖外部工具 (sc.exe / WinSW / NSSM)。Clash Verge Rev 和 FlClash 都采用相同方式。
+
+#### systemd vs launchd vs Windows SCM 对比
+
+| 操作            | Linux (systemd)                          | macOS (launchd)                               | Windows (SCM API)                                      |
+|-----------------|------------------------------------------|-----------------------------------------------|--------------------------------------------------------|
+| **User Mode**   |                                          |                                               |                                                        |
+| 安装服务        | `systemctl --user link <unit>`           | (plist 写入 `~/Library/LaunchAgents/` 即安装)   | `ServiceManager::create_service()`                     |
+| 卸载服务        | `systemctl --user disable <name>`        | (删除 plist + `launchctl bootout`)              | `service.stop()` → `service.delete()`                  |
+| 启动服务        | `systemctl --user start <name>`          | `launchctl bootstrap gui/$UID <plist>`         | `service.start()`                                      |
+| 停止服务        | `systemctl --user stop <name>`           | `launchctl bootout gui/$UID/<name>`            | `service.stop()`                                       |
+| 查看状态        | `systemctl --user is-active <name>`      | `launchctl print gui/$UID/<name>`              | `service.query_status()` → `ServiceState`              |
+| 崩溃重启        | `Restart=always` (unit file)             | `KeepAlive=true` (plist)                       | `SERVICE_CONFIG_FAILURE_ACTIONS` (通过 SCM API 配置)     |
+| **System Mode** |                                          |                                               |                                                        |
+| 安装服务        | `sudo systemctl link <unit>`             | `sudo launchctl bootstrap system <plist>`      | `ServiceManager::create_service()` (需 Administrator)   |
+| 卸载服务        | `sudo systemctl disable <name>`          | `sudo launchctl bootout system/<name>`         | `stop()` → `delete()`  (需 Administrator)               |
+| 启动服务        | `sudo systemctl start <name>`            | `sudo launchctl bootstrap system <plist>`      | `service.start()` (需 Administrator)                    |
+| 停止服务        | `sudo systemctl stop <name>`             | `sudo launchctl bootout system/<name>`         | `service.stop()` (需 Administrator)                     |
+| 查看状态        | `systemctl is-active <name>`             | `sudo launchctl print system/<name>`           | `service.query_status()`                                |
+| TUN 权限        | `setcap` (Linux capabilities)            | root 运行 (无 setcap)                           | Administrator 运行即可 (LocalSystem 默认)                |
+
+关键差异:
+- **零外部依赖**: `windows-service` crate 直接调用 Windows SCM API，无需用户安装任何第三方工具。SCM API 是 Windows 操作系统的核心组件。
+- **类型安全**: 通过 Rust crate 的强类型 API (`ServiceState`, `ServiceType`, `ServiceStartType`) 管理服务，避免 CLI 字符串解析错误。
+- **崩溃重启**: 通过 SCM API 的 `ChangeServiceConfig2W` + `SERVICE_CONFIG_FAILURE_ACTIONS` 配置。`windows-service` crate 目前不直接暴露此接口，需通过 `windows` crate 补充调用，或安装后使用 `sc failure` 配置。
+
+#### 安装命令示例
+
+clashtui 直接调用 SCM API (无需外部命令):
+
+```rust
+// 伪代码示意
+use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+
+let manager = ServiceManager::local_computer(None, ServiceManagerAccess::CREATE_SERVICE)?;
+let service = manager.create_service(
+    &ServiceInfo {
+        name: "clashtui_mihomo".into(),
+        display_name: "ClashTui Mihomo".into(),
+        service_type: ServiceType::OWN_PROCESS,
+        start_type: ServiceStartType::AutoStart,
+        error_control: ServiceErrorControl::Normal,
+        executable_path: r"C:\Program Files\clashtui\mihomo\mihomo.exe",
+        launch_arguments: vec![r#"-d "C:\Program Files\clashtui\mihomo\config""#.into()],
+        dependencies: vec![],
+        account_name: None, // LocalSystem
+        account_password: None,
+    },
+    ServiceAccess::START | ServiceAccess::STOP,
+)?;
+```
+
+#### CoreSrvCtl 新增操作
+
+Windows 命令行不方便, 所以 CoreSrvCtl tab 在 Windows 上额外提供以下操作:
+
+**1. Install Srv (安装服务)**
+
+- 通过 `windows-service` crate 调用 SCM API: `ServiceManager::create_service()`
+- service type: `OWN_PROCESS`, start type: `AutoStart`, account: `LocalSystem` (Administrator 权限)
+- `executable_path` = `bin_path`, `launch_arguments` 根据 CoreType 生成
+- 安装后服务状态变为 `installed`
+- 可选: 安装后通过 `sc failure` 配置崩溃重启策略 (SCM API 的 failure actions 配置较底层)
+
+**2. Uninstall Srv (卸载服务)**
+
+- 如果服务正在运行, 先 `service.stop()`
+- 再 `service.delete()` 卸载服务
+- 卸载后服务状态变为 `uninstalled`
+
+**3. Toggle System Proxy (切换系统代理)**
+
+参考 clashtui v0.2.3 的实现, 通过修改 Windows 注册表实现系统代理的开关:
+
+| 接口                  | 操作                                                                |
+|-----------------------|--------------------------------------------------------------------|
+| 检查系统代理状态       | 读取 `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ProxyEnable` (REG_DWORD): `0` = disabled, `1` = enabled |
+| Enable system proxy   | `ProxyEnable` → `1`; `ProxyServer` → `127.0.0.1:<port>`; `ProxyOverride` → `<-loopback>`; 广播 `WM_SETTINGCHANGE` |
+| Disable system proxy  | `ProxyEnable` → `0`; 广播 `WM_SETTINGCHANGE`                        |
+
+代理端口从 core 的 mixed 端口获取 (通常是 `7890`), 通过 REST API `GET /configs` 读取 mixed inbound 的 `listen_port`。
+
+实现方式: 通过 `winreg` crate 直接操作注册表, 或调用 `reg.exe` 命令行 (推荐 `winreg` crate 以获得更好的错误处理)。修改注册表后需调用 `SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, ...)` 通知系统刷新代理设置。
+
+#### CoreSrvCtl 操作列表 (Windows)
+
+CoreSrvCtl tab 的操作列表:
+
+| 操作             | 说明                                           |
+|------------------|------------------------------------------------|
+| Stop Service     | 停止当前 core 的 service                       |
+| Start Service    | 启动当前 core 的 service                       |
+| Install Srv      | 安装当前 core 为 Windows Service (SCM API create_service) |
+| Uninstall Srv    | 卸载当前 core 的 Windows Service (先 stop 再 delete) |
+| Toggle SysProxy  | 切换系统代理 (enable/disable)                   |
+| Switch Core      | 切换到另一个 core (mihomo ↔ sing-box)           |
+| Stop All         | 停止所有 core services                          |
+
+#### 服务状态
+
+| 状态           | 含义                                |
+|----------------|-------------------------------------|
+| `active`       | 服务正在运行                         |
+| `inactive`     | 服务已安装但未运行                    |
+| `installed`    | Windows Service 已注册 (但未启动)        |
+| `uninstalled`  | 未找到 Windows Service (需要 Install)    |
+| `?`            | 无法确定状态 (如权限不足)         |
+
+状态检测优先级:
+1. 通过 SCM API `service.query_status()` 获取 `ServiceState`
+2. `Running` → `"active"`, `Stopped` → `"inactive"`
+3. 服务未注册 (ERROR_SERVICE_DOES_NOT_EXIST) → `"uninstalled"`
+
+### 文件权限
+
+Windows 使用 NTFS ACL (Access Control List) 管理文件权限, 与 Unix 模式位完全不同。
+
+**Windows 上的策略:**
+- `check_file_permissions()` → 始终返回 `true` (权限始终视为 OK)
+- `repair_file_permissions()` → 始终返回 `Ok("Permissions OK on Windows")` (无需修复)
+- `correct_cap_for_tun()` → 始终返回 `Ok("No setcap on Windows")` (TUN 功能由 core 自行管理)
+- `check_startup_perms()` → 空操作 (跳过权限检查)
+
+原因: Windows 的权限模型基于用户/组 ACL, 不存在 Unix 的 group sticky bit、mode bits 等概念。Core 文件以 Administrator 运行即可获得足够权限, 普通用户的 TUI 工具只需要读写 `%APPDATA%\clashtui` 配置目录 (用户默认有权限)。
+
+### CoreSrvCtl tab 的 Windows 适配
+
+#### 现状 — 当前 CoreSrvCtl 操作
+
+```rust
+enum SrvCtlOp {
+    Stop,        // "Stop Service"
+    Restart,     // "Start Service"
+    SwitchCore,  // "Switch Core"
+    StopAll,     // "Stop All Services"
+}
+```
+
+#### Windows 扩展
+
+在 Windows 上, `ServiceController::default()` 返回 `WindowsService` 时, 额外增加以下操作:
+
+```rust
+#[cfg(windows)]
+SrvCtlOp::Install,       // "Install Service" — SCM API create_service
+#[cfg(windows)]
+SrvCtlOp::Uninstall,     // "Uninstall Service" — stop + delete
+#[cfg(windows)]
+SrvCtlOp::ToggleSysProxy, // "Toggle System Proxy" — 读写注册表
+```
+
+**Install** 执行逻辑:
+1. 通过 `windows-service` crate 调用 `ServiceManager::create_service()`
+2. service type: `OWN_PROCESS`, account: `LocalSystem`, start: `AutoStart`
+3. `executable_path` = `bin_path`, `launch_arguments` 根据 CoreType 生成
+4. 更新状态为 `installed`
+
+**Uninstall** 执行逻辑:
+1. 打开 service, 如果 running 则先 `service.stop()`
+2. 再 `service.delete()`
+3. 更新状态为 `uninstalled`
+
+**Toggle System Proxy** 执行逻辑:
+1. 读取当前 `ProxyEnable` 注册表值
+2. 如果当前 disabled → enable: 设置 `ProxyEnable=1`, `ProxyServer=127.0.0.1:<port>`, `ProxyOverride=<-loopback>`, 广播 `WM_SETTINGCHANGE`
+3. 如果当前 enabled → disable: 设置 `ProxyEnable=0`, 广播 `WM_SETTINGCHANGE`
+4. 混合端口通过 REST API 读取 `GET /configs` 的 mixed inbound 配置
+
+#### 状态查询适配
+
+当前 srvctl 的状态查询 hardcode `systemctl is-active` 用于非 Launchd 的情况。需适配为:
+
+```rust
+match ServiceController::default() {
+    ServiceController::Launchd => launchd_status(...),
+    ServiceController::WindowsService => windows_service_status(...), // 新增
+    _ => systemd_status(...),
+}
+```
+
+`windows_service_status()` 实现:
+1. 通过 `windows-service` crate 打开 service → `service.query_status()`
+2. 解析 `ServiceState`:
+   - `Running` → `"active"`
+   - `Stopped` / `Paused` 等 → `"inactive"`
+   - `ERROR_SERVICE_DOES_NOT_EXIST` → `"uninstalled"`
+
+### Install Script
+
+为了降低 Windows 用户的部署门槛, 提供一个 PowerShell 安装脚本 (`install.ps1`) 完成以下操作:
+
+#### 功能
+
+1. **选择安装目录**: 默认 `C:\Program Files\clashtui`, 用户可通过参数指定其他位置 (e.g. `D:\clashtui`)
+2. **创建目录结构**: 自动创建 `mihomo/config/`, `sing-box/config/` 等子目录
+3. **复制文件**:
+   - 复制或提示用户放置 `mihomo.exe` / `sing-box.exe` 到对应 core 目录
+   - 复制 `clashtui.exe` 到 `bin/`
+4. **注册 Windows Service**: clashtui 通过 `windows-service` crate 的 SCM API 注册两个 core services (无需外部工具)
+6. **生成 config.yaml 模板**: 自动填充 `bin_path` 和 `config_dir` 为用户选择的安装目录
+
+#### 使用方式
+
+```powershell
+# 默认安装到 C:\Program Files\clashtui
+.\install.ps1
+
+# 安装到自定义目录
+.\install.ps1 -InstallDir "D:\MyTools\clashtui"
+```
+
+#### Windows 平台的额外参数
+
+| 参数           | 默认值                         | 说明                                      |
+|----------------|-------------------------------|------------------------------------------|
+| `-InstallDir`   | `C:\Program Files\clashtui`   | 安装根目录                                 |
+
+#### 安装后的文件结构
+
+假设 `-InstallDir "D:\clashtui"`:
+
+```
+D:\clashtui\
+├── bin
+│   └── clashtui.exe
+├── mihomo
+│   ├── config
+│   │   └── config.yaml             # Core config (由 clashtui 管理)
+│   └── mihomo.exe -> C:\bin\mihomo.exe  # symlink 或直接放置
+└── sing-box
+    ├── config
+    │   └── config.json             # Core config (由 clashtui 管理)
+    └── sing-box.exe -> C:\bin\sing-box.exe
+```
+
+#### Service 注册
+
+脚本通过 clashtui 自身的 `clashtui service install` 子命令注册 Windows Service, 底层使用 `windows-service` crate 调用 SCM API, 无需外部工具。
