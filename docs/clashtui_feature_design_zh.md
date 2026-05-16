@@ -36,15 +36,17 @@ ClashTui Core 的文件结构设计:
 
 ```
 .
+├── bin
+│   └── clashtui -> /home/johan/.local/bin/clashtui
 ├── mihomo
 │   ├── clashtui_mihomo.service       # Mihomo Core 的 systemd unit file
 │   ├── config                        # Core Config Dir
-│   │   ├── config.yaml               # Core Config Path
+│   │   └── config.yaml               # Core Config Path
 │   └── mihomo -> /usr/bin/mihomo
 └── sing-box
     ├── clashtui_singbox.service
     ├── config                        # Core Config Dir
-    │   ├── config.json               # Core Config Path
+    │   └── config.json               # Core Config Path
     └── sing-box -> /usr/bin/sing-box
 ```
 
