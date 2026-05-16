@@ -5,7 +5,7 @@
 
 # ClashTui
 
-<img width="2254" height="1254" alt="demo" src="https://github.com/user-attachments/assets/4059d70c-c7d8-4835-b177-0a768c32d91b" />
+<img width="2254" height="1254" alt="demo" src="https://github.com/user-attachments/assets/84c194e2-8a4f-4ba6-8208-e46c8d469d61" />
 
 Language: [English](./README.md) | [中文](./README_ZH.md)
 
