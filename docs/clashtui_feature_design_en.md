@@ -50,6 +50,22 @@ ClashTui Core file structure design:
     └── sing-box -> /usr/bin/sing-box
 ```
 
+## ServiceController
+
+ClashTui supports multiple service managers, with the default automatically selected at compile time based on the platform:
+
+| Controller      | Platform        | Implementation               | Description                  |
+|-----------------|-----------------|------------------------------|------------------------------|
+| Systemd         | Linux (default) | `systemctl` CLI              | systemd service management   |
+| OpenRc          | Linux (optional)| `rc-service` CLI             | OpenRC service management    |
+| WindowsService  | Windows (default)| `windows-service` Rust crate | Direct Windows SCM API       |
+| Launchd         | macOS (default) | `launchctl` CLI              | launchd service management   |
+
+Compile-time defaults:
+- `cfg!(windows)` → WindowsService
+- `cfg!(target_os = "macos")` → Launchd
+- Other → Systemd
+
 ## ClashTui clashtui.db Format Design
 
 ```yaml
@@ -819,3 +835,268 @@ macOS and Linux use a unified Unix group permission model for managing Core file
 | Startup permission check/repair | ✅ | ✅ (real impl in `macos.rs`, not stubs) |
 
 Principle: On macOS system mode, Core services run as root (required for TUN), while regular users gain file read/write access through the `admin` group. At startup, ClashTui checks the Core directory's SGID bit, group consistency, and group writability. If inconsistent, it repairs via `sudo chmod g+s` / `sudo chown :<group>` / `sudo chmod g+w`.
+
+## Support Windows
+
+### Windows Core File Structure
+
+ClashTui Core file structure (System mode, e.g. `C:\Program Files\clashtui`):
+
+```
+.
+├── bin
+│   └── clashtui.exe
+├── mihomo
+│   ├── config                          # Core Config Dir
+│   │   └── config.yaml                 # Core Config Path
+│   └── mihomo.exe -> C:\bin\mihomo.exe # or place .exe directly
+└── sing-box
+    ├── config                          # Core Config Dir
+    │   └── config.json                 # Core Config Path
+    └── sing-box.exe -> C:\bin\sing-box.exe
+```
+
+User mode default path is `%LOCALAPPDATA%\clashtui` (e.g. `C:\Users\<User>\AppData\Local\clashtui`).
+
+ClashTui config file structure is the same as Linux/macOS, stored at `%APPDATA%\clashtui` (e.g. `C:\Users\<User>\AppData\Roaming\clashtui`).
+
+Like Linux/macOS, Windows supports symlinks (`mklink` / `mklink /D`) to point to binary paths, but requires Administrator privileges. Without admin rights, users can place `.exe` files directly.
+
+### Core Services Management (Windows SCM API)
+
+Windows uses the Rust [`windows-service`](https://crates.io/crates/windows-service) crate to directly call the Windows SCM (Service Control Manager) API — no external tools required (sc.exe / WinSW / NSSM). Both Clash Verge Rev and FlClash use the same approach.
+
+#### systemd vs launchd vs Windows SCM Comparison
+
+| Operation       | Linux (systemd)                          | macOS (launchd)                               | Windows (SCM API)                                      |
+|-----------------|------------------------------------------|-----------------------------------------------|--------------------------------------------------------|
+| **User Mode**   |                                          |                                               |                                                        |
+| install service | `systemctl --user link <unit>`           | (plist in `~/Library/LaunchAgents/` = installed)| `ServiceManager::create_service()`                     |
+| uninstall       | `systemctl --user disable <name>`        | (delete plist + `launchctl bootout`)           | `service.stop()` → `service.delete()`                  |
+| start service   | `systemctl --user start <name>`          | `launchctl bootstrap gui/$UID <plist>`         | `service.start()`                                      |
+| stop service    | `systemctl --user stop <name>`           | `launchctl bootout gui/$UID/<name>`            | `service.stop()`                                       |
+| check status    | `systemctl --user is-active <name>`      | `launchctl print gui/$UID/<name>`              | `service.query_status()` → `ServiceState`              |
+| crash restart   | `Restart=always` (unit file)             | `KeepAlive=true` (plist)                       | `SERVICE_CONFIG_FAILURE_ACTIONS` (via SCM API)          |
+| **System Mode** |                                          |                                               |                                                        |
+| install service | `sudo systemctl link <unit>`             | `sudo launchctl bootstrap system <plist>`      | `ServiceManager::create_service()` (Admin required)     |
+| uninstall       | `sudo systemctl disable <name>`          | `sudo launchctl bootout system/<name>`         | `stop()` → `delete()`  (Admin required)                 |
+| start service   | `sudo systemctl start <name>`            | `sudo launchctl bootstrap system <plist>`      | `service.start()` (Admin required)                      |
+| stop service    | `sudo systemctl stop <name>`             | `sudo launchctl bootout system/<name>`         | `service.stop()` (Admin required)                       |
+| check status    | `systemctl is-active <name>`             | `sudo launchctl print system/<name>`           | `service.query_status()`                                |
+| TUN access      | `setcap` (Linux capabilities)            | root (no setcap)                               | Administrator suffices (LocalSystem by default)         |
+
+Key differences:
+- **Zero external dependencies**: The `windows-service` crate calls the SCM API directly — the SCM is a core Windows OS component. No third-party tools need to be installed by the user.
+- **Type-safe API**: Uses Rust's strong typing (`ServiceState`, `ServiceType`, `ServiceStartType`) instead of parsing CLI string output, avoiding parsing errors.
+- **Crash restart**: Configured via SCM API `ChangeServiceConfig2W` + `SERVICE_CONFIG_FAILURE_ACTIONS`. The `windows-service` crate doesn't expose this directly yet; may require supplemental `windows` crate calls, or post-install `sc failure` configuration.
+
+#### Installation Example
+
+ClashTui calls the SCM API directly (no external commands):
+
+```rust
+// Pseudocode
+use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+
+let manager = ServiceManager::local_computer(None, ServiceManagerAccess::CREATE_SERVICE)?;
+let service = manager.create_service(
+    &ServiceInfo {
+        name: "clashtui_mihomo".into(),
+        display_name: "ClashTui Mihomo".into(),
+        service_type: ServiceType::OWN_PROCESS,
+        start_type: ServiceStartType::AutoStart,
+        error_control: ServiceErrorControl::Normal,
+        executable_path: r"C:\Program Files\clashtui\mihomo\mihomo.exe",
+        launch_arguments: vec![r#"-d "C:\Program Files\clashtui\mihomo\config""#.into()],
+        dependencies: vec![],
+        account_name: None, // LocalSystem
+        account_password: None,
+    },
+    ServiceAccess::START | ServiceAccess::STOP,
+)?;
+```
+
+#### CoreSrvCtl New Operations
+
+Since Windows command line is inconvenient, CoreSrvCtl tab provides three additional operations on Windows:
+
+**1. Install Srv**
+
+- Calls SCM API via the `windows-service` crate: `ServiceManager::create_service()`
+- service type: `OWN_PROCESS`, start type: `AutoStart`, account: `LocalSystem` (Administrator privileges)
+- `executable_path` = `bin_path`, `launch_arguments` derived from CoreType
+- After installation, service status becomes `installed`
+- Optional: post-install crash restart configuration via `sc failure`
+
+**2. Uninstall Srv**
+
+- If the service is running, first `service.stop()`
+- Then `service.delete()` to remove the service
+- After uninstallation, service status becomes `uninstalled`
+
+**3. Toggle System Proxy**
+
+Based on clashtui v0.2.3 implementation, system proxy is toggled via Windows Registry:
+
+| Interface              | Action                                                                    |
+|------------------------|--------------------------------------------------------------------------|
+| Check proxy status     | Read `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings\ProxyEnable` (REG_DWORD): `0` = disabled, `1` = enabled |
+| Enable system proxy    | `ProxyEnable` → `1`; `ProxyServer` → `127.0.0.1:<port>`; `ProxyOverride` → `<-loopback>`; broadcast `WM_SETTINGCHANGE` |
+| Disable system proxy   | `ProxyEnable` → `0`; broadcast `WM_SETTINGCHANGE`                        |
+
+The proxy port is obtained from the core's mixed port (typically `7890`) via REST API `GET /configs` reading the mixed inbound's `listen_port`.
+
+Implementation: Use the `winreg` crate to directly manipulate the registry (recommended for better error handling). After modifying registry values, call `SendMessageTimeoutW(HWND_BROADCAST, WM_SETTINGCHANGE, ...)` to notify the system to refresh proxy settings.
+
+#### CoreSrvCtl Operation List (Windows)
+
+| Operation        | Description                                                 |
+|------------------|-------------------------------------------------------------|
+| Stop Service     | Stop the current core's service                             |
+| Start Service    | Start the current core's service                            |
+| Install Srv      | Install current core as Windows Service (SCM API create_service) |
+| Uninstall Srv    | Uninstall current core's Windows Service (stop then delete) |
+| Toggle SysProxy  | Toggle system proxy (enable/disable)                        |
+| Switch Core      | Switch to the other core (mihomo ↔ sing-box)                |
+| Stop All         | Stop all core services                                      |
+
+#### Service States
+
+| State          | Meaning                                  |
+|----------------|------------------------------------------|
+| `active`       | Service is running                       |
+| `inactive`     | Service installed but not running         |
+| `installed`    | Windows Service registered (not started)    |
+| `uninstalled`  | No Windows Service found (needs Install)    |
+| `?`            | Unable to determine (e.g. insufficient permissions) |
+
+State detection priority:
+1. Query via SCM API `service.query_status()` to get `ServiceState`
+2. `Running` → `"active"`, `Stopped` → `"inactive"`
+3. Service not found (ERROR_SERVICE_DOES_NOT_EXIST) → `"uninstalled"`
+
+### File Permissions
+
+Windows uses NTFS ACL (Access Control List) for file permissions, which is fundamentally different from Unix mode bits.
+
+**Windows strategy:**
+- `check_file_permissions()` → always returns `true` (permissions always considered OK)
+- `repair_file_permissions()` → always returns `Ok("Permissions OK on Windows")` (no repair needed)
+- `correct_cap_for_tun()` → always returns `Ok("No setcap on Windows")` (TUN capabilities managed by the core)
+- `check_startup_perms()` → no-op (skip permission checks)
+
+Rationale: Windows' permission model is based on user/group ACLs — concepts like group sticky bit and mode bits do not exist. Core files running as Administrator have sufficient privileges. The regular user's TUI tool only needs read/write access to `%APPDATA%\clashtui` config directory (which users have by default).
+
+### CoreSrvCtl Tab Windows Adaptation
+
+#### Current State — CoreSrvCtl Operations
+
+```rust
+enum SrvCtlOp {
+    Stop,        // "Stop Service"
+    Restart,     // "Start Service"
+    SwitchCore,  // "Switch Core"
+    StopAll,     // "Stop All Services"
+}
+```
+
+#### Windows Extensions
+
+On Windows, when `ServiceController::default()` returns `WindowsService`, three additional operations are available:
+
+```rust
+#[cfg(windows)]
+SrvCtlOp::Install,       // "Install Service" — SCM API create_service
+#[cfg(windows)]
+SrvCtlOp::Uninstall,     // "Uninstall Service" — stop + delete
+#[cfg(windows)]
+SrvCtlOp::ToggleSysProxy, // "Toggle System Proxy" — registry read/write
+```
+
+**Install** execution logic:
+1. Call `ServiceManager::create_service()` via the `windows-service` crate
+2. service type: `OWN_PROCESS`, account: `LocalSystem`, start: `AutoStart`
+3. `executable_path` = `bin_path`, `launch_arguments` derived from CoreType
+4. Update status to `installed`
+
+**Uninstall** execution logic:
+1. Open service; if running, call `service.stop()`
+2. Then `service.delete()`
+3. Update status to `uninstalled`
+
+**Toggle System Proxy** execution logic:
+1. Read current `ProxyEnable` registry value
+2. If currently disabled → enable: set `ProxyEnable=1`, `ProxyServer=127.0.0.1:<port>`, `ProxyOverride=<-loopback>`, broadcast `WM_SETTINGCHANGE`
+3. If currently enabled → disable: set `ProxyEnable=0`, broadcast `WM_SETTINGCHANGE`
+4. Mixed port obtained from REST API `GET /configs` mixed inbound config
+
+#### Status Query Adaptation
+
+The current srvctl status query hardcodes `systemctl is-active` for non-Launchd cases. It needs to be adapted:
+
+```rust
+match ServiceController::default() {
+    ServiceController::Launchd => launchd_status(...),
+    ServiceController::WindowsService => windows_service_status(...), // new
+    _ => systemd_status(...),
+}
+```
+
+`windows_service_status()` implementation:
+1. Open service via `windows-service` crate → `service.query_status()`
+2. Parse `ServiceState`:
+   - `Running` → `"active"`
+   - `Stopped` / `Paused` etc. → `"inactive"`
+   - `ERROR_SERVICE_DOES_NOT_EXIST` → `"uninstalled"`
+
+### Install Script
+
+To lower the deployment barrier for Windows users, a PowerShell install script (`install.ps1`) handles the following:
+
+#### Features
+
+1. **Choose install directory**: Default `C:\Program Files\clashtui`, user can specify a custom path via parameter (e.g. `D:\clashtui`)
+2. **Create directory structure**: Automatically creates `mihomo/config/`, `sing-box/config/` etc.
+3. **Copy files**:
+   - Copy or prompt user to place `mihomo.exe` / `sing-box.exe` in the respective core directory
+   - Copy `clashtui.exe` to `bin/`
+4. **Register Windows Services**: clashtui registers both core services via the `windows-service` crate's SCM API (no external tools needed)
+5. **Generate config.yaml template**: Auto-fill `bin_path` and `config_dir` with the user's chosen install directory
+
+#### Usage
+
+```powershell
+# Default install to C:\Program Files\clashtui
+.\install.ps1
+
+# Install to custom directory
+.\install.ps1 -InstallDir "D:\MyTools\clashtui"
+```
+
+#### Windows-specific Parameters
+
+| Parameter      | Default                              | Description                 |
+|----------------|--------------------------------------|-----------------------------|
+| `-InstallDir`  | `C:\Program Files\clashtui`          | Installation root directory |
+
+#### Post-Install File Structure
+
+Assuming `-InstallDir "D:\clashtui"`:
+
+```
+D:\clashtui\
+├── bin
+│   └── clashtui.exe
+├── mihomo
+│   ├── config
+│   │   └── config.yaml             # Core config (managed by clashtui)
+│   └── mihomo.exe -> C:\bin\mihomo.exe  # symlink or direct copy
+├── sing-box
+    ├── config
+    │   └── config.json             # Core config (managed by clashtui)
+    └── sing-box.exe -> C:\bin\sing-box.exe
+```
+
+#### Service Registration
+
+The script registers Windows Services via clashtui's own `clashtui service install` subcommand, which uses the `windows-service` crate to call the SCM API — no external tools required.
