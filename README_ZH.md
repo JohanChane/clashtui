@@ -88,10 +88,11 @@ bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/hea
 | [使用指南](docs/getting_started_zh.md) | 详细使用教程：界面操作、命令行、订阅管理、配置说明、常见问题 |
 | [功能设计](docs/ClashTui_feature_design_zh.md) | 功能设计文档：配置结构、订阅管理、Template 展开、sing-box 合并算法 |
 | [架构](docs/architecture_zh.md) | 代码架构文档：模块结构、启动流程、TUI 事件循环、Tab 体系 |
+| [开发约定](docs/development_conventions.md) | 分支命名、提交规范、CHANGELOG 约定 |
 
 ## 参与开发
 
-欢迎提交 Issue 和 Pull Request。
+欢迎提交 Issue 和 Pull Request。参与开发前请先阅读[开发约定](docs/development_conventions.md)。
 
 快速了解项目, 加入开发:
 1.  docs/ClashTui_feature_design_zh.md
