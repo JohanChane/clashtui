@@ -40,6 +40,12 @@ ClashTui is a terminal user interface (TUI) proxy management tool supporting bot
 - **which panel** - convenient for user operations
 - **Supports fzf** - users can use fzf for selection
 
+## Supported Platforms
+
+-   [x] Linux
+-   [x] macOs
+-   [ ] Windows
+
 ## Installation
 
 ### Requirements

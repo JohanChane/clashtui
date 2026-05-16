@@ -67,3 +67,48 @@ jobs:
           name: Linux_Build
           path: artifacts
           retention-days: 5
+
+  build-macos:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: goto-bus-stop/setup-zig@v2
+
+      - name: Cache Target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./target
+            ~/.cargo
+          key: ci-macos-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ci-macos-${{ hashFiles('Cargo.lock') }}
+            ci-macos-
+
+      - name: Download Dependencies
+        run: cargo fetch
+
+      - name: Build macos x86_64
+        run: |
+          cargo install cargo-zigbuild
+          cargo zigbuild --target x86_64-macos --locked
+
+      - name: Build macos aarch64
+        run: |
+          cargo zigbuild --target aarch64-macos --locked
+
+      - name: Pre Upload
+        run: |
+          mkdir artifacts
+          mv ./target/x86_64-macos/debug/clashtui    ./artifacts/clashtui-darwin-amd64
+          mv ./target/aarch64-macos/debug/clashtui    ./artifacts/clashtui-darwin-arm64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS_Build
+          path: artifacts
+          retention-days: 5
