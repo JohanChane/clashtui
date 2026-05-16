@@ -8,10 +8,20 @@ use super::tree::NodeType;
 
 impl Proxies {
     pub fn fzf_find(&mut self, items: Vec<(String, usize)>, task_set: &mut FutureSet<Self>) {
+        self.fzf_find_with_prompt(items, "Find Proxy", task_set);
+    }
+
+    pub fn fzf_find_with_prompt(
+        &mut self,
+        items: Vec<(String, usize)>,
+        prompt: &str,
+        task_set: &mut FutureSet<Self>,
+    ) {
         let names: Vec<String> = items.iter().map(|(name, _)| name.clone()).collect();
+        let prompt = prompt.to_owned();
         async move {
             let selected = tokio::task::spawn_blocking(move || {
-                crate::tui::widget::fzffind::run_fzf(&names, "Find Proxy")
+                crate::tui::widget::fzffind::run_fzf(&names, &prompt)
             })
             .await
             .unwrap_or(None);

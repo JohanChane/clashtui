@@ -264,16 +264,17 @@ impl Proxies {
                 self.fzf_find(items, task_set);
             }
             super::Key::GroupSelect => {
-                let parent = self.tree.node_at(current)
-                    .map(|n| n.parent.clone())
-                    .flatten();
+                let node = self.tree.node_at(current);
+                let parent = node.map(|n| n.parent.clone()).flatten();
+                let group_name = parent.as_deref().unwrap_or("top");
+                let prompt = format!("Select in {group_name}");
                 let items: Vec<(String, usize)> = self.tree.nodes.iter()
                     .enumerate()
                     .filter(|(_, n)| n.parent == parent)
                     .map(|(i, n)| (Self::fzf_display(n), i))
                     .collect();
                 if !items.is_empty() {
-                    self.fzf_find(items, task_set);
+                    self.fzf_find_with_prompt(items, &prompt, task_set);
                 }
             }
         }
