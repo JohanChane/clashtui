@@ -35,14 +35,14 @@ jobs:
             cache-suffix: linux-arm64
             run-test: false
 
-          - os: macos-13
+          - os: macos-latest
             target: x86_64-apple-darwin
             artifact-name: macOS_x86_64_Build
             binary-name: clashtui-darwin-amd64-debug
             cache-suffix: macos-x86_64
             run-test: false
 
-          - os: macos-14
+          - os: macos-latest
             target: aarch64-apple-darwin
             artifact-name: macOS_aarch64_Build
             binary-name: clashtui-darwin-arm64-debug
