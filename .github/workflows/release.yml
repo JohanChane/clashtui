@@ -94,19 +94,22 @@ jobs:
         run: |
           if [ -n "$INPUT_VERSION" ]; then
             echo "CLASHTUI_VERSION=$INPUT_VERSION" >> $GITHUB_ENV
+            echo "CLASHTUI_RELEASE_VERSION=$INPUT_VERSION" >> $GITHUB_ENV
           else
-            echo CLASHTUI_VERSION="$(cat ./artifacts/version.txt)" >> $GITHUB_ENV
+            VERSION="$(cat ./artifacts/version.txt)"
+            echo "CLASHTUI_VERSION=$VERSION" >> $GITHUB_ENV
+            echo "CLASHTUI_RELEASE_VERSION=${VERSION%%-*}" >> $GITHUB_ENV
           fi
 
       - name: Archive Release
         run: |
-          gzip -c ./artifacts/clashtui-amd64 > clashtui-linux-amd64-${{ env.CLASHTUI_VERSION }}.gz
-          gzip -c ./artifacts/clashtui-arm64 > clashtui-linux-arm64-${{ env.CLASHTUI_VERSION }}.gz
+          gzip -c ./artifacts/clashtui-amd64 > clashtui-linux-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
+          gzip -c ./artifacts/clashtui-arm64 > clashtui-linux-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         with:
           prerelease: true
           files: |
-            clashtui-linux-amd64-${{ env.CLASHTUI_VERSION }}.gz
-            clashtui-linux-arm64-${{ env.CLASHTUI_VERSION }}.gz
+            clashtui-linux-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
+            clashtui-linux-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
