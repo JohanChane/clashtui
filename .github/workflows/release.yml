@@ -98,7 +98,7 @@ jobs:
           else
             VERSION="$(cat ./artifacts/version.txt)"
             echo "CLASHTUI_VERSION=$VERSION" >> $GITHUB_ENV
-            echo "CLASHTUI_RELEASE_VERSION=${VERSION%%-*}" >> $GITHUB_ENV
+            echo "CLASHTUI_RELEASE_VERSION=v${VERSION%%-*}" >> $GITHUB_ENV
           fi
 
       - name: Archive Release
