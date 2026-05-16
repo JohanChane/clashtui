@@ -10,10 +10,20 @@ pub struct Confirm {
 
 impl Confirm {
     pub fn title(title: String) -> MsgBuilder<Self> {
-        MsgBuilder::new(Self { dismiss_on_any_key: false }, title)
+        MsgBuilder::new(
+            Self {
+                dismiss_on_any_key: false,
+            },
+            title,
+        )
     }
     pub fn dismiss_any(title: String) -> MsgBuilder<Self> {
-        MsgBuilder::new(Self { dismiss_on_any_key: true }, title)
+        MsgBuilder::new(
+            Self {
+                dismiss_on_any_key: true,
+            },
+            title,
+        )
     }
     pub fn err(e: impl std::fmt::Display) {
         Self::title("Error".to_owned())

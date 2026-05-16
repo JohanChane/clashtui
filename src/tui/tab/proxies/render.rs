@@ -34,7 +34,9 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
     });
 
     if content.tree.is_empty() {
-        let msg = spinner_str.as_deref().unwrap_or(content.error.as_deref().unwrap_or(""));
+        let msg = spinner_str
+            .as_deref()
+            .unwrap_or(content.error.as_deref().unwrap_or(""));
         let widget = ratatui::widgets::Paragraph::new(msg).block(block);
         f.render_widget(widget, area);
         return;
@@ -46,9 +48,10 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
         .iter()
         .enumerate()
         .filter(|(_, node)| {
-            content.filter.as_deref().is_none_or(|pat| {
-                node.name.to_lowercase().contains(&pat.to_lowercase())
-            })
+            content
+                .filter
+                .as_deref()
+                .is_none_or(|pat| node.name.to_lowercase().contains(&pat.to_lowercase()))
         })
         .map(|(i, _)| i)
         .collect();
@@ -118,19 +121,39 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
             let indent = "  ".repeat(node.depth);
             let prefix = match node.node_type {
                 NodeType::Folder => {
-                    if node.expanded { "▼" } else { "▶" }
+                    if node.expanded {
+                        "▼"
+                    } else {
+                        "▶"
+                    }
                 }
                 NodeType::Link => {
-                    if node.is_now { "*" } else { " " }
+                    if node.is_now {
+                        "*"
+                    } else {
+                        " "
+                    }
                 }
                 NodeType::File => {
-                    if node.is_now { "*" } else { " " }
+                    if node.is_now {
+                        "*"
+                    } else {
+                        " "
+                    }
                 }
             };
             let style = match node.node_type {
                 NodeType::Folder => section.border,
-                NodeType::Link => section.extra.get("node_link").copied().unwrap_or(section.text),
-                _ => section.extra.get("node_file").copied().unwrap_or(section.text),
+                NodeType::Link => section
+                    .extra
+                    .get("node_link")
+                    .copied()
+                    .unwrap_or(section.text),
+                _ => section
+                    .extra
+                    .get("node_file")
+                    .copied()
+                    .unwrap_or(section.text),
             };
 
             let mut spans = vec![Span::styled(
@@ -146,13 +169,21 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
                 if node.tcp {
                     spans.push(Span::styled(
                         " TCP",
-                        section.extra.get("node_tcp").copied().unwrap_or(section.text),
+                        section
+                            .extra
+                            .get("node_tcp")
+                            .copied()
+                            .unwrap_or(section.text),
                     ));
                 }
                 if node.udp {
                     spans.push(Span::styled(
                         " UDP",
-                        section.extra.get("node_udp").copied().unwrap_or(section.text),
+                        section
+                            .extra
+                            .get("node_udp")
+                            .copied()
+                            .unwrap_or(section.text),
                     ));
                 }
             }

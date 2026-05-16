@@ -165,10 +165,7 @@ impl Msg for InputMasked {
                 Span::raw(after),
             ]))
             .block(block)
-            .scroll((
-                0,
-                prefix_width.saturating_sub(area.width.saturating_sub(8)),
-            ))
+            .scroll((0, prefix_width.saturating_sub(area.width.saturating_sub(8))))
         };
         f.render_widget(widget, area);
     }
@@ -237,7 +234,10 @@ mod tests {
 
     #[test]
     fn input_cjk_insert_between_chars() {
-        let mut inp = Input { buffer: "你好".into(), cursor: 1 };
+        let mut inp = Input {
+            buffer: "你好".into(),
+            cursor: 1,
+        };
         inp.enter_char('中');
         assert_eq!(inp.buffer, "你中好");
         assert_eq!(inp.cursor, 2);
@@ -245,7 +245,10 @@ mod tests {
 
     #[test]
     fn input_cjk_insert_at_beginning() {
-        let mut inp = Input { buffer: "你好".into(), cursor: 0 };
+        let mut inp = Input {
+            buffer: "你好".into(),
+            cursor: 0,
+        };
         inp.enter_char('啊');
         assert_eq!(inp.buffer, "啊你好");
         assert_eq!(inp.cursor, 1);
@@ -253,7 +256,10 @@ mod tests {
 
     #[test]
     fn input_cjk_insert_at_end() {
-        let mut inp = Input { buffer: "你好".into(), cursor: 2 };
+        let mut inp = Input {
+            buffer: "你好".into(),
+            cursor: 2,
+        };
         inp.enter_char('啊');
         assert_eq!(inp.buffer, "你好啊");
         assert_eq!(inp.cursor, 3);
@@ -261,7 +267,10 @@ mod tests {
 
     #[test]
     fn input_move_cursor_right_with_cjk() {
-        let mut inp = Input { buffer: "你好".into(), cursor: 1 };
+        let mut inp = Input {
+            buffer: "你好".into(),
+            cursor: 1,
+        };
         inp.move_cursor_right();
         assert_eq!(inp.cursor, 2);
         inp.move_cursor_right();
@@ -270,7 +279,10 @@ mod tests {
 
     #[test]
     fn input_cjk_delete_char() {
-        let mut inp = Input { buffer: "你中好".into(), cursor: 2 };
+        let mut inp = Input {
+            buffer: "你中好".into(),
+            cursor: 2,
+        };
         inp.delete_char();
         assert_eq!(inp.buffer, "你好");
         assert_eq!(inp.cursor, 1);
@@ -278,7 +290,10 @@ mod tests {
 
     #[test]
     fn masked_cjk_insert_between_chars() {
-        let mut inp = InputMasked { buffer: "你好".into(), cursor: 1 };
+        let mut inp = InputMasked {
+            buffer: "你好".into(),
+            cursor: 1,
+        };
         inp.enter_char('中');
         assert_eq!(inp.buffer, "你中好");
         assert_eq!(inp.cursor, 2);
@@ -286,7 +301,10 @@ mod tests {
 
     #[test]
     fn masked_move_cursor_right_with_cjk() {
-        let mut inp = InputMasked { buffer: "你好".into(), cursor: 1 };
+        let mut inp = InputMasked {
+            buffer: "你好".into(),
+            cursor: 1,
+        };
         inp.move_cursor_right();
         assert_eq!(inp.cursor, 2);
         inp.move_cursor_right();

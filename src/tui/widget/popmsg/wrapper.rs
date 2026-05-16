@@ -56,10 +56,7 @@ impl<C: Msg> Wrapper for Instance<C> {
                     .max()
                     .unwrap_or(0);
                 let title_w = self.title.len() as u16;
-                let w = content_width
-                    .max(prompt_text_w)
-                    .max(title_w)
-                    .max(20);
+                let w = content_width.max(prompt_text_w).max(title_w).max(20);
                 let h = content_height + prompt_height + 1;
                 let area = calc_area_from(w, h, f.area());
                 f.render_widget(Clear, area);
@@ -126,9 +123,7 @@ impl Prompt {
 
 fn calc_area_from(dialog_width: u16, dialog_height: u16, area: Rect) -> Rect {
     // make up for block
-    let dialog_width = (dialog_width + 2)
-        .max(30)
-        .min(area.width.saturating_sub(4));
+    let dialog_width = (dialog_width + 2).max(30).min(area.width.saturating_sub(4));
     let dialog_height = (dialog_height + 2)
         .max(3)
         .min(area.height.saturating_sub(6));

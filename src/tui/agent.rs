@@ -1,6 +1,6 @@
-use anyhow::Result;
 use crate::config::CoreType;
 use crate::tui::widget::tab::KeyCombo;
+use anyhow::Result;
 use std::collections::HashMap;
 use std::str::FromStr;
 
@@ -41,7 +41,9 @@ impl<'de> serde::de::Visitor<'de> for OnVisitor {
     }
 }
 
-fn deserialize_on<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<crate::tui::Key>, D::Error> {
+fn deserialize_on<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Vec<crate::tui::Key>, D::Error> {
     d.deserialize_any(OnVisitor)
 }
 
@@ -86,9 +88,7 @@ pub fn extract_keymap_list<K: serde::de::DeserializeOwned>(
 /// Deserialize a serde_yml::Value into K.
 /// serde_yml::from_value on a Value::Mapping fails for externally-tagged enums,
 /// so we embed the value in a container struct to trigger YAML document deserialization.
-fn deserialize_action_value<K: serde::de::DeserializeOwned>(
-    val: serde_yml::Value,
-) -> Result<K> {
+fn deserialize_action_value<K: serde::de::DeserializeOwned>(val: serde_yml::Value) -> Result<K> {
     if !matches!(val, serde_yml::Value::Mapping(_)) {
         return Ok(serde_yml::from_value(val)?);
     }
@@ -109,7 +109,9 @@ pub fn check_duplicate_keys_list(section: &str, entries: &[Entry]) {
         if entry.on.len() == 1 {
             let k = entry.on[0];
             if !seen.insert(k) {
-                log::warn!("duplicate key `{k}` in [{section}] keymap — later binding overwrites earlier");
+                log::warn!(
+                    "duplicate key `{k}` in [{section}] keymap — later binding overwrites earlier"
+                );
             }
         }
     }
@@ -123,7 +125,10 @@ pub fn take_section(value: &mut serde_yml::Mapping, idx: &str) -> Option<serde_y
 
 pub fn extract_keymap_with_descs<K: serde::de::DeserializeOwned>(
     map: serde_yml::Mapping,
-) -> Result<(HashMap<crate::tui::Key, K>, HashMap<crate::tui::Key, String>)> {
+) -> Result<(
+    HashMap<crate::tui::Key, K>,
+    HashMap<crate::tui::Key, String>,
+)> {
     let mut agent = HashMap::new();
     let mut descs = HashMap::new();
     for (key_val, value_val) in map {
@@ -154,9 +159,7 @@ pub fn init() -> Result<()> {
 
     let mut value: serde_yml::Mapping = match std::fs::File::open(&path) {
         Ok(file) => serde_yml::from_reader(file)?,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            serde_yml::Mapping::new()
-        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_yml::Mapping::new(),
         Err(e) => {
             return Err(anyhow::anyhow!(
                 "failed to open keymap file at {}: {e}",
@@ -227,7 +230,9 @@ pub fn check_duplicate_keys(section: &str, map: &serde_yml::Mapping) {
     for key in map.keys() {
         if let Ok(k) = serde_yml::from_value::<crate::tui::Key>(key.clone()) {
             if !seen.insert(k) {
-                log::warn!("duplicate key `{k}` in [{section}] keymap — later binding overwrites earlier");
+                log::warn!(
+                    "duplicate key `{k}` in [{section}] keymap — later binding overwrites earlier"
+                );
             }
         }
     }
@@ -235,8 +240,8 @@ pub fn check_duplicate_keys(section: &str, map: &serde_yml::Mapping) {
 
 #[test]
 fn example() -> anyhow::Result<()> {
-    use std::collections::HashMap;
     use crate::tui::Key;
+    use std::collections::HashMap;
 
     #[derive(serde::Deserialize, Debug)]
     enum K {
@@ -253,12 +258,17 @@ file:
       super_: false
     : Select
 "#;
-    let value =
-        serde_yml::from_str::<serde_yml::Mapping>(str)?["file"]["profile"].clone();
+    let value = serde_yml::from_str::<serde_yml::Mapping>(str)?["file"]["profile"].clone();
     let keymap: HashMap<Key, K> = serde_yml::from_value(value)?;
     println!("{:?}", keymap);
     assert!(matches!(
-        keymap.get(&Key { code: crossterm::event::KeyCode::Enter, shift: false, ctrl: false, alt: false, super_: false }),
+        keymap.get(&Key {
+            code: crossterm::event::KeyCode::Enter,
+            shift: false,
+            ctrl: false,
+            alt: false,
+            super_: false
+        }),
         Some(K::Select)
     ));
     Ok(())
@@ -291,7 +301,10 @@ mihomo:
     // Remove sing-box section too
     common.remove("sing-box");
 
-    assert!(mihomo_section.is_some(), "mihomo section should be extracted");
+    assert!(
+        mihomo_section.is_some(),
+        "mihomo section should be extracted"
+    );
 
     if let Some(mut core_specific) = mihomo_section {
         merge_mappings(&mut common, &mut core_specific);
@@ -336,9 +349,9 @@ common:
 
 #[test]
 fn test_profile_key_deserialization_string_variants() -> anyhow::Result<()> {
-    use std::collections::HashMap;
     use crate::tui::Key as TuiKey;
     use crate::tui::tab::files::profile::Key;
+    use std::collections::HashMap;
 
     let yaml = r#"
 ? code: Enter
@@ -361,17 +374,16 @@ fn test_profile_key_deserialization_string_variants() -> anyhow::Result<()> {
 : MoveDown
 "#;
     let value: serde_yml::Mapping = serde_yml::from_str(yaml)?;
-    let keymap: HashMap<TuiKey, Key> =
-        serde_yml::from_value(serde_yml::Value::Mapping(value))?;
+    let keymap: HashMap<TuiKey, Key> = serde_yml::from_value(serde_yml::Value::Mapping(value))?;
     assert_eq!(keymap.len(), 3);
     Ok(())
 }
 
 #[test]
 fn test_profile_key_with_action_mapping_no_crash() -> anyhow::Result<()> {
-    use std::collections::HashMap;
     use crate::tui::Key as TuiKey;
     use crate::tui::tab::files::profile::Key;
+    use std::collections::HashMap;
 
     let yaml = r#"
 ? code: !Char e
@@ -388,8 +400,7 @@ fn test_profile_key_with_action_mapping_no_crash() -> anyhow::Result<()> {
 : Action: Add
 "#;
     let value: serde_yml::Mapping = serde_yml::from_str(yaml)?;
-    let keymap: HashMap<TuiKey, Key> =
-        serde_yml::from_value(serde_yml::Value::Mapping(value))?;
+    let keymap: HashMap<TuiKey, Key> = serde_yml::from_value(serde_yml::Value::Mapping(value))?;
     assert_eq!(keymap.len(), 2);
     let e_key = TuiKey {
         code: crossterm::event::KeyCode::Char('e'),
@@ -412,9 +423,9 @@ fn test_profile_key_with_action_mapping_no_crash() -> anyhow::Result<()> {
 
 #[test]
 fn test_template_key_deserialization() -> anyhow::Result<()> {
-    use std::collections::HashMap;
     use crate::tui::Key as TuiKey;
     use crate::tui::tab::files::template::Key;
+    use std::collections::HashMap;
 
     let yaml = r#"
 ? code: Enter
@@ -431,8 +442,7 @@ fn test_template_key_deserialization() -> anyhow::Result<()> {
 : Switch
 "#;
     let value: serde_yml::Mapping = serde_yml::from_str(yaml)?;
-    let keymap: HashMap<TuiKey, Key> =
-        serde_yml::from_value(serde_yml::Value::Mapping(value))?;
+    let keymap: HashMap<TuiKey, Key> = serde_yml::from_value(serde_yml::Value::Mapping(value))?;
     assert_eq!(keymap.len(), 2);
     let enter_key = TuiKey {
         code: crossterm::event::KeyCode::Enter,
@@ -470,7 +480,10 @@ fn test_no_duplicate_keys_in_default_agents() {
     check!("logs", crate::tui::tab::logs::agent());
 
     if !violations.is_empty() {
-        panic!("duplicate keys in default agents:\n{}", violations.join("\n"));
+        panic!(
+            "duplicate keys in default agents:\n{}",
+            violations.join("\n")
+        );
     }
 }
 
@@ -496,7 +509,13 @@ fn test_list_format_single_key() -> anyhow::Result<()> {
     let (keys, _, chords) = extract_keymap_list::<TestAction>(entries)?;
     assert_eq!(keys.len(), 1);
     assert!(chords.is_empty());
-    let j = crate::tui::Key { code: crossterm::event::KeyCode::Char('j'), shift: false, ctrl: false, alt: false, super_: false };
+    let j = crate::tui::Key {
+        code: crossterm::event::KeyCode::Char('j'),
+        shift: false,
+        ctrl: false,
+        alt: false,
+        super_: false,
+    };
     assert_eq!(keys.get(&j), Some(&TestAction::MoveDown));
     Ok(())
 }
@@ -510,7 +529,13 @@ fn test_list_format_modifier_key() -> anyhow::Result<()> {
     let entries: Vec<Entry> = serde_yml::from_str(yaml)?;
     assert_eq!(entries.len(), 1);
     let (keys, _, _) = extract_keymap_list::<TestAction>(entries)?;
-    let ctrl_u = crate::tui::Key { code: crossterm::event::KeyCode::Char('u'), shift: false, ctrl: true, alt: false, super_: false };
+    let ctrl_u = crate::tui::Key {
+        code: crossterm::event::KeyCode::Char('u'),
+        shift: false,
+        ctrl: true,
+        alt: false,
+        super_: false,
+    };
     assert_eq!(keys.get(&ctrl_u), Some(&TestAction::MoveUp));
     Ok(())
 }
@@ -559,7 +584,13 @@ fn test_list_format_nested_action() -> anyhow::Result<()> {
 "#;
     let entries: Vec<Entry> = serde_yml::from_str(yaml)?;
     let (keys, _, _) = extract_keymap_list::<Key>(entries)?;
-    let e = crate::tui::Key { code: crossterm::event::KeyCode::Char('e'), shift: false, ctrl: false, alt: false, super_: false };
+    let e = crate::tui::Key {
+        code: crossterm::event::KeyCode::Char('e'),
+        shift: false,
+        ctrl: false,
+        alt: false,
+        super_: false,
+    };
     assert!(matches!(keys.get(&e), Some(Key::Action(_))));
     Ok(())
 }
@@ -577,10 +608,21 @@ fn test_list_format_multiple_same_action() -> anyhow::Result<()> {
     let (keys, _, chords) = extract_keymap_list::<TestAction>(entries)?;
     assert_eq!(keys.len(), 2);
     assert!(chords.is_empty());
-    let j = crate::tui::Key { code: crossterm::event::KeyCode::Char('j'), shift: false, ctrl: false, alt: false, super_: false };
-    let down = crate::tui::Key { code: crossterm::event::KeyCode::Down, shift: false, ctrl: false, alt: false, super_: false };
+    let j = crate::tui::Key {
+        code: crossterm::event::KeyCode::Char('j'),
+        shift: false,
+        ctrl: false,
+        alt: false,
+        super_: false,
+    };
+    let down = crate::tui::Key {
+        code: crossterm::event::KeyCode::Down,
+        shift: false,
+        ctrl: false,
+        alt: false,
+        super_: false,
+    };
     assert_eq!(keys.get(&j), Some(&TestAction::MoveDown));
     assert_eq!(keys.get(&down), Some(&TestAction::MoveDown));
     Ok(())
 }
-

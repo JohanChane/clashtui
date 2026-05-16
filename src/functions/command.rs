@@ -68,11 +68,21 @@ pub fn check_config(profile_path: &Path) -> anyhow::Result<()> {
             // Strip clashtui metadata before check — sing-box rejects unknown fields
             let check_path = if let Ok(content) = std::fs::read_to_string(profile_path) {
                 if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if value.as_object_mut().map_or(false, |obj| obj.remove("clashtui").is_some()) {
-                        let tmp = profile_path.with_file_name(
-                            format!("{}.raw.json", profile_path.file_stem().and_then(|s| s.to_str()).unwrap_or("tmp"))
+                    if value
+                        .as_object_mut()
+                        .map_or(false, |obj| obj.remove("clashtui").is_some())
+                    {
+                        let tmp = profile_path.with_file_name(format!(
+                            "{}.raw.json",
+                            profile_path
+                                .file_stem()
+                                .and_then(|s| s.to_str())
+                                .unwrap_or("tmp")
+                        ));
+                        let _ = std::fs::write(
+                            &tmp,
+                            serde_json::to_string_pretty(&value).unwrap_or_default(),
                         );
-                        let _ = std::fs::write(&tmp, serde_json::to_string_pretty(&value).unwrap_or_default());
                         tmp
                     } else {
                         profile_path.to_path_buf()
@@ -109,8 +119,14 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
     let ct = core_type.unwrap_or(CONFIG.core_type());
 
     let (service_name, is_user) = match ct {
-        CoreType::Mihomo => (&CONFIG.cfg_file.mihomo.core_service.service_name, CONFIG.cfg_file.mihomo.core_service.is_user),
-        CoreType::Singbox => (&CONFIG.cfg_file.singbox.core_service.service_name, CONFIG.cfg_file.singbox.core_service.is_user),
+        CoreType::Mihomo => (
+            &CONFIG.cfg_file.mihomo.core_service.service_name,
+            CONFIG.cfg_file.mihomo.core_service.is_user,
+        ),
+        CoreType::Singbox => (
+            &CONFIG.cfg_file.singbox.core_service.service_name,
+            CONFIG.cfg_file.singbox.core_service.is_user,
+        ),
     };
 
     if matches!(host, ServiceController::Launchd) {
@@ -143,7 +159,12 @@ fn launchd_plist_path(service_name: &str, is_user: bool) -> String {
     }
 }
 
-fn launchd_operation(op: &str, service_name: &str, is_user: bool, password: Option<&str>) -> Result<String> {
+fn launchd_operation(
+    op: &str,
+    service_name: &str,
+    is_user: bool,
+    password: Option<&str>,
+) -> Result<String> {
     let plist = launchd_plist_path(service_name, is_user);
 
     let do_exec = |args: Vec<&str>| -> Result<String> {
@@ -223,15 +244,29 @@ pub fn edit(path: &str) -> Result<()> {
     log::debug!("edit: path={path} cmd={}", CONFIG.cfg_file.extra.edit_cmd);
     spawn(
         "sh",
-        vec!["-c", CONFIG.cfg_file.extra.edit_cmd.replace("%s", path).as_str()],
+        vec![
+            "-c",
+            CONFIG.cfg_file.extra.edit_cmd.replace("%s", path).as_str(),
+        ],
     )
 }
 
 pub fn open_dir(path: &str) -> Result<()> {
-    log::debug!("open_dir: path={path} cmd={}", CONFIG.cfg_file.extra.open_dir_cmd);
+    log::debug!(
+        "open_dir: path={path} cmd={}",
+        CONFIG.cfg_file.extra.open_dir_cmd
+    );
     spawn(
         "sh",
-        vec!["-c", CONFIG.cfg_file.extra.open_dir_cmd.replace("%s", path).as_str()],
+        vec![
+            "-c",
+            CONFIG
+                .cfg_file
+                .extra
+                .open_dir_cmd
+                .replace("%s", path)
+                .as_str(),
+        ],
     )
 }
 
@@ -259,7 +294,10 @@ mod tests {
     #[test]
     fn test_service_controller_args_launchd() {
         let args = ServiceController::Launchd.args("start", "my_service", false);
-        assert!(args.is_empty(), "Launchd args should be empty (handled inline)");
+        assert!(
+            args.is_empty(),
+            "Launchd args should be empty (handled inline)"
+        );
     }
 
     #[test]

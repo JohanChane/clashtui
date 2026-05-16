@@ -18,10 +18,7 @@ fn get_version() -> String {
         }
     };
 
-    let dirty = match Command::new("git")
-        .args(["status", "--short"])
-        .output()
-    {
+    let dirty = match Command::new("git").args(["status", "--short"]).output() {
         Ok(v) => {
             if v.stdout.is_empty() {
                 String::new()

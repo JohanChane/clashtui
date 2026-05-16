@@ -1,5 +1,6 @@
 /// Group name → provider_name → URL.
-pub type ProxyProviderGroups = std::collections::HashMap<String, std::collections::BTreeMap<String, String>>;
+pub type ProxyProviderGroups =
+    std::collections::HashMap<String, std::collections::BTreeMap<String, String>>;
 
 #[derive(Clone)]
 pub struct Profile {
@@ -27,7 +28,10 @@ pub struct ProfileData {
 
 impl ProfileData {
     pub fn new(dtype: ProfileType) -> Self {
-        Self { dtype, no_pp: false }
+        Self {
+            dtype,
+            no_pp: false,
+        }
     }
 }
 
@@ -35,9 +39,7 @@ impl ProfileData {
 pub enum ProfileType {
     File,
     Url(String),
-    Template {
-        template: String,
-    },
+    Template { template: String },
     Singbox,
 }
 
@@ -48,7 +50,10 @@ impl Default for ProfileType {
 }
 
 impl serde::Serialize for ProfileType {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
         match self {
             ProfileType::File => serializer.serialize_unit_variant("ProfileType", 0, "File"),
             ProfileType::Url(url) => {
@@ -99,7 +104,10 @@ impl<'de> serde::Deserialize<'de> for ProfileType {
         Ok(match wire {
             Wire::File => ProfileType::File,
             Wire::Url(s) => ProfileType::Url(s),
-            Wire::Template { template, proxy_provider_groups } => {
+            Wire::Template {
+                template,
+                proxy_provider_groups,
+            } => {
                 if let Some(groups) = proxy_provider_groups {
                     if !groups.is_empty() {
                         log::warn!(
@@ -114,12 +122,8 @@ impl<'de> serde::Deserialize<'de> for ProfileType {
                 ProfileType::Template { template }
             }
             Wire::Generated(name) => {
-                log::warn!(
-                    "Migrating deprecated ProfileType::Generated({name}) to Template."
-                );
-                ProfileType::Template {
-                    template: name,
-                }
+                log::warn!("Migrating deprecated ProfileType::Generated({name}) to Template.");
+                ProfileType::Template { template: name }
             }
             Wire::Singbox => ProfileType::Singbox,
         })
@@ -128,11 +132,15 @@ impl<'de> serde::Deserialize<'de> for ProfileType {
 
 /// Queue for legacy Template entries with embedded proxy_provider_groups.
 /// Drained after ProfileManager::from_file() to write groups into template files.
-pub static PENDING_TEMPLATE_MIGRATIONS: std::sync::LazyLock<std::sync::Mutex<Vec<(String, ProxyProviderGroups)>>> =
-    std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
+pub static PENDING_TEMPLATE_MIGRATIONS: std::sync::LazyLock<
+    std::sync::Mutex<Vec<(String, ProxyProviderGroups)>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
 
 impl serde::Serialize for ProfileData {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap;
         let mut map = serializer.serialize_map(Some(2))?;
         map.serialize_entry("dtype", &self.dtype)?;
@@ -142,8 +150,11 @@ impl serde::Serialize for ProfileData {
 }
 
 impl<'de> serde::Deserialize<'de> for ProfileData {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
-        let value = serde_yml::Value::deserialize(deserializer).map_err(serde::de::Error::custom)?;
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let value =
+            serde_yml::Value::deserialize(deserializer).map_err(serde::de::Error::custom)?;
 
         if let serde_yml::Value::Mapping(map) = value {
             let dtype = map
@@ -158,7 +169,10 @@ impl<'de> serde::Deserialize<'de> for ProfileData {
             Ok(ProfileData { dtype, no_pp })
         } else {
             let dtype = serde_yml::from_value(value).map_err(serde::de::Error::custom)?;
-            Ok(ProfileData { dtype, no_pp: false })
+            Ok(ProfileData {
+                dtype,
+                no_pp: false,
+            })
         }
     }
 }
@@ -202,7 +216,8 @@ impl ProfileManager {
             }
             _ => &mut self.mihomo,
         };
-        db.profiles.insert(name.as_ref().into(), ProfileData::new(dtype))
+        db.profiles
+            .insert(name.as_ref().into(), ProfileData::new(dtype))
             .map(|data| Profile {
                 name: name.as_ref().to_string(),
                 dtype: data.dtype,
@@ -282,7 +297,6 @@ impl ProfileManager {
             data.no_pp = no_pp;
         }
     }
-
 }
 
 #[cfg(test)]
@@ -300,7 +314,10 @@ singbox:
   profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().dtype, ProfileType::File);
+        assert_eq!(
+            db.mihomo.profiles.get("pf1").unwrap().dtype,
+            ProfileType::File
+        );
         assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
         assert_eq!(
             db.mihomo.profiles.get("pf2").unwrap().dtype,

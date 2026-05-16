@@ -117,12 +117,24 @@ pub mod download {
     fn base64_encode(input: &[u8]) -> String {
         let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
         for chunk in input.chunks(3) {
-            let b = [chunk[0], chunk.get(1).copied().unwrap_or(0), chunk.get(2).copied().unwrap_or(0)];
+            let b = [
+                chunk[0],
+                chunk.get(1).copied().unwrap_or(0),
+                chunk.get(2).copied().unwrap_or(0),
+            ];
             let n = ((b[0] as u32) << 16) | ((b[1] as u32) << 8) | (b[2] as u32);
             out.push(B64[((n >> 18) & 0x3F) as usize] as char);
             out.push(B64[((n >> 12) & 0x3F) as usize] as char);
-            out.push(if chunk.len() > 1 { B64[((n >> 6) & 0x3F) as usize] as char } else { '=' });
-            out.push(if chunk.len() > 2 { B64[(n & 0x3F) as usize] as char } else { '=' });
+            out.push(if chunk.len() > 1 {
+                B64[((n >> 6) & 0x3F) as usize] as char
+            } else {
+                '='
+            });
+            out.push(if chunk.len() > 2 {
+                B64[(n & 0x3F) as usize] as char
+            } else {
+                '='
+            });
         }
         out
     }
@@ -160,17 +172,16 @@ pub mod download {
         if with_proxy {
             req = req.with_proxy(minreq::Proxy::new(&CONFIG.proxy_addr)?)
         }
-        req = req.with_timeout(timeout!())
-            .with_header(
-                headers::USER_AGENT,
-                CONFIG.global_ua.as_deref().unwrap_or_else(|| {
-                    if CONFIG.core_type() == crate::config::CoreType::Singbox {
-                        "sing-box"
-                    } else {
-                        "clash.meta"
-                    }
-                }),
-            );
+        req = req.with_timeout(timeout!()).with_header(
+            headers::USER_AGENT,
+            CONFIG.global_ua.as_deref().unwrap_or_else(|| {
+                if CONFIG.core_type() == crate::config::CoreType::Singbox {
+                    "sing-box"
+                } else {
+                    "clash.meta"
+                }
+            }),
+        );
         if let Some(auth) = auth_header {
             req = req.with_header(headers::AUTHORIZATION, auth);
         }
@@ -198,10 +209,7 @@ pub mod download {
             req = req.with_header(headers::AUTHORIZATION, auth);
         }
         let resp = req.send()?;
-        let info: Option<String> = resp
-            .headers
-            .get("subscription-userinfo")
-            .cloned();
+        let info: Option<String> = resp.headers.get("subscription-userinfo").cloned();
         Ok(info)
     }
 
@@ -213,7 +221,10 @@ pub mod download {
         fn strip_token_from_github_url() {
             let url = "https://ghp_token@raw.githubusercontent.com/user/repo/main/config.yaml";
             let (clean, auth) = strip_userinfo(url);
-            assert_eq!(clean, "https://raw.githubusercontent.com/user/repo/main/config.yaml");
+            assert_eq!(
+                clean,
+                "https://raw.githubusercontent.com/user/repo/main/config.yaml"
+            );
             assert_eq!(auth.unwrap(), "Basic Z2hwX3Rva2VuOg==");
         }
 
@@ -391,29 +402,31 @@ pub mod api_log {
     pub fn parse_log_entries(body: &str) -> Vec<LogEntry> {
         body.lines()
             .filter(|line| !line.is_empty())
-            .filter_map(|line| match serde_json::from_str::<serde_json::Value>(line) {
-                Ok(v) => {
-                    let type_ = v
-                        .get("type")
-                        .and_then(|t| t.as_str())
-                        .unwrap_or("unknown")
-                        .to_owned();
-                    let payload = v
-                        .get("payload")
-                        .and_then(|p| p.as_str())
-                        .unwrap_or("")
-                        .to_owned();
-                    Some(LogEntry {
-                        type_,
-                        payload,
-                        time: timestamp(),
-                    })
-                }
-                Err(_) => {
-                    log::warn!("Failed to parse log line as JSON: {line}");
-                    None
-                }
-            })
+            .filter_map(
+                |line| match serde_json::from_str::<serde_json::Value>(line) {
+                    Ok(v) => {
+                        let type_ = v
+                            .get("type")
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("unknown")
+                            .to_owned();
+                        let payload = v
+                            .get("payload")
+                            .and_then(|p| p.as_str())
+                            .unwrap_or("")
+                            .to_owned();
+                        Some(LogEntry {
+                            type_,
+                            payload,
+                            time: timestamp(),
+                        })
+                    }
+                    Err(_) => {
+                        log::warn!("Failed to parse log line as JSON: {line}");
+                        None
+                    }
+                },
+            )
             .collect()
     }
 

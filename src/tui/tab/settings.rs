@@ -128,10 +128,7 @@ impl TabContent for SettingsContent {
         }
 
         async move {
-            let result =
-                tokio::task::spawn_blocking(|| {
-                    crate::functions::restful::config::fetch()
-                })
+            let result = tokio::task::spawn_blocking(|| crate::functions::restful::config::fetch())
                 .await
                 .unwrap();
             match result {
@@ -170,8 +167,7 @@ impl TabContent for SettingsContent {
             match key {
                 SettingsKey::MoveUp => {
                     let i = self.mode_selector_state.selected().unwrap_or(0);
-                    self.mode_selector_state
-                        .select(Some(i.saturating_sub(1)));
+                    self.mode_selector_state.select(Some(i.saturating_sub(1)));
                 }
                 SettingsKey::MoveDown => {
                     let i = self.mode_selector_state.selected().unwrap_or(0);
@@ -183,8 +179,7 @@ impl TabContent for SettingsContent {
                     self.mode_selector_visible = false;
                 }
                 SettingsKey::Execute => {
-                    let idx =
-                        self.mode_selector_state.selected().unwrap_or(0);
+                    let idx = self.mode_selector_state.selected().unwrap_or(0);
                     if let Some(mode) = self.modes.get(idx) {
                         let mode = *mode;
                         self.mode_selector_visible = false;
@@ -192,13 +187,9 @@ impl TabContent for SettingsContent {
                             if crate::config::is_core_mismatch() {
                                 return do_nothing();
                             }
-                            let payload =
-                                serde_json::json!({"mode": mode.to_string()})
-                                    .to_string();
+                            let payload = serde_json::json!({"mode": mode.to_string()}).to_string();
                             let result = tokio::task::spawn_blocking(move || {
-                                crate::functions::restful::config::patch(
-                                    payload,
-                                )
+                                crate::functions::restful::config::patch(payload)
                             })
                             .await
                             .unwrap();
@@ -210,9 +201,7 @@ impl TabContent for SettingsContent {
                                     })
                                 }
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(
-                                        e,
-                                    );
+                                    crate::tui::widget::popmsg::Confirm::err(e);
                                     do_nothing()
                                 }
                             }
@@ -228,8 +217,7 @@ impl TabContent for SettingsContent {
             match key {
                 SettingsKey::MoveUp => {
                     let i = self.tun_selector_state.selected().unwrap_or(0);
-                    self.tun_selector_state
-                        .select(Some(i.saturating_sub(1)));
+                    self.tun_selector_state.select(Some(i.saturating_sub(1)));
                 }
                 SettingsKey::MoveDown => {
                     let i = self.tun_selector_state.selected().unwrap_or(0);
@@ -241,8 +229,7 @@ impl TabContent for SettingsContent {
                     self.tun_selector_visible = false;
                 }
                 SettingsKey::Execute => {
-                    let idx =
-                        self.tun_selector_state.selected().unwrap_or(0);
+                    let idx = self.tun_selector_state.selected().unwrap_or(0);
                     if let Some(stack) = self.tun_stacks.get(idx) {
                         let stack = *stack;
                         self.tun_selector_visible = false;
@@ -250,9 +237,8 @@ impl TabContent for SettingsContent {
                             if crate::config::is_core_mismatch() {
                                 return do_nothing();
                             }
-                            let payload =
-                                serde_json::json!({"tun": {"stack": stack.to_string()}})
-                                    .to_string();
+                            let payload = serde_json::json!({"tun": {"stack": stack.to_string()}})
+                                .to_string();
                             let result = tokio::task::spawn_blocking(move || {
                                 crate::functions::restful::config::patch(payload)
                             })
@@ -303,19 +289,16 @@ impl TabContent for SettingsContent {
                             if crate::config::is_core_mismatch() {
                                 return do_nothing();
                             }
-                            let payload =
-                                serde_json::json!({"allow-lan": new_val}).to_string();
+                            let payload = serde_json::json!({"allow-lan": new_val}).to_string();
                             let result = tokio::task::spawn_blocking(move || {
                                 crate::functions::restful::config::patch(payload)
                             })
                             .await
                             .unwrap();
                             match result {
-                                Ok(_) => {
-                                    wrapper(move |c: &mut SettingsContent| {
-                                        c.allow_lan = new_val;
-                                    })
-                                }
+                                Ok(_) => wrapper(move |c: &mut SettingsContent| {
+                                    c.allow_lan = new_val;
+                                }),
                                 Err(e) => {
                                     crate::tui::widget::popmsg::Confirm::err(e);
                                     wrapper(move |c: &mut SettingsContent| {
@@ -341,11 +324,9 @@ impl TabContent for SettingsContent {
                             .await
                             .unwrap();
                             match result {
-                                Ok(_) => {
-                                    wrapper(move |c: &mut SettingsContent| {
-                                        c.tun_enable = new_val;
-                                    })
-                                }
+                                Ok(_) => wrapper(move |c: &mut SettingsContent| {
+                                    c.tun_enable = new_val;
+                                }),
                                 Err(e) => {
                                     crate::tui::widget::popmsg::Confirm::err(e);
                                     wrapper(move |c: &mut SettingsContent| {
@@ -364,12 +345,11 @@ impl TabContent for SettingsContent {
                             if crate::config::is_core_mismatch() {
                                 return do_nothing();
                             }
-                            let result =
-                                tokio::task::spawn_blocking(|| {
-                                    crate::functions::restful::cache::flush_fakeip()
-                                })
-                                .await
-                                .unwrap();
+                            let result = tokio::task::spawn_blocking(|| {
+                                crate::functions::restful::cache::flush_fakeip()
+                            })
+                            .await
+                            .unwrap();
                             match result {
                                 Ok(_) => do_nothing(),
                                 Err(e) => {
@@ -385,12 +365,11 @@ impl TabContent for SettingsContent {
                             if crate::config::is_core_mismatch() {
                                 return do_nothing();
                             }
-                            let result =
-                                tokio::task::spawn_blocking(|| {
-                                    crate::functions::restful::cache::flush_dns()
-                                })
-                                .await
-                                .unwrap();
+                            let result = tokio::task::spawn_blocking(|| {
+                                crate::functions::restful::cache::flush_dns()
+                            })
+                            .await
+                            .unwrap();
                             match result {
                                 Ok(_) => do_nothing(),
                                 Err(e) => {
@@ -425,9 +404,7 @@ impl TabContent for SettingsContent {
             .iter()
             .map(|op| {
                 let (name, current) = match op {
-                    SettingsOp::SwitchMode => {
-                        ("Mode", self.current_mode.as_str())
-                    }
+                    SettingsOp::SwitchMode => ("Mode", self.current_mode.as_str()),
                     SettingsOp::AllowLan => {
                         let val = if self.allow_lan { "Yes" } else { "No" };
                         ("Allow LAN", val)
@@ -436,15 +413,9 @@ impl TabContent for SettingsContent {
                         let val = if self.tun_enable { "Yes" } else { "No" };
                         ("TUN", val)
                     }
-                    SettingsOp::TunStackOp => {
-                        ("TUN Stack", self.tun_stack.as_str())
-                    }
-                    SettingsOp::FlushFakeIP => {
-                        ("Flush Fake-IP", "")
-                    }
-                    SettingsOp::FlushDNSCache => {
-                        ("Flush DNS Cache", "")
-                    }
+                    SettingsOp::TunStackOp => ("TUN Stack", self.tun_stack.as_str()),
+                    SettingsOp::FlushFakeIP => ("Flush Fake-IP", ""),
+                    SettingsOp::FlushDNSCache => ("Flush DNS Cache", ""),
                 };
                 ListItem::new(Line::from(vec![
                     Span::raw(format!("  {:<14}", name)),
@@ -497,11 +468,7 @@ impl TabContent for SettingsContent {
                 )
                 .highlight_style(highlight_style);
             f.render_widget(Clear, select_area);
-            f.render_stateful_widget(
-                tun_list,
-                select_area,
-                &mut self.tun_selector_state.clone(),
-            );
+            f.render_stateful_widget(tun_list, select_area, &mut self.tun_selector_state.clone());
         }
     }
 }

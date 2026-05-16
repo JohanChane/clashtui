@@ -5,9 +5,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 use std::rc::Rc;
 
-use crate::tui::theme::Theme;
 use super::chord::key_event_to_str;
 use super::tab::KeyCombo;
+use crate::tui::theme::Theme;
 
 #[derive(Default)]
 pub struct HelpPanel {
@@ -46,7 +46,9 @@ pub fn render_help(f: &mut ratatui::Frame, tab: &impl TuiTab) {
         (KeyCombo(vec![]), "Close all connections"),
     ]);
 
-    let global_labels: &[&str] = &["1-7", "<Tab>", "?", "q", "C-c", "C-g c", "C-g m", "C-g f", "C-g t"];
+    let global_labels: &[&str] = &[
+        "1-7", "<Tab>", "?", "q", "C-c", "C-g c", "C-g m", "C-g f", "C-g t",
+    ];
 
     let tab_entries = shortcuts.len();
     let global_entries = global_shortcuts.len();
