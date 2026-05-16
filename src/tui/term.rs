@@ -62,7 +62,6 @@ pub fn hold(on: bool) -> anyhow::Result<()> {
 pub fn suspend() {
     disable_csi_u();
     let _ = raw_mode::restore();
-    super::app::FULL_RENDER.notify_one();
 }
 
 pub fn resume() -> anyhow::Result<()> {
