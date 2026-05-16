@@ -22,14 +22,51 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-linux:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            zig-target: x86_64-unknown-linux-gnu.2.17
+            artifact-name: Linux_amd64_Release
+            binary-name: clashtui-amd64
+            cache-suffix: linux-amd64
+            extract-version: true
+
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            zig-target: aarch64-unknown-linux-gnu.2.17
+            artifact-name: Linux_arm64_Release
+            binary-name: clashtui-arm64
+            cache-suffix: linux-arm64
+            extract-version: false
+
+          - os: macos-13
+            target: x86_64-apple-darwin
+            zig-target: ''
+            artifact-name: macOS_x86_64_Release
+            binary-name: clashtui-darwin-amd64
+            cache-suffix: macos-x86_64
+            extract-version: false
+
+          - os: macos-14
+            target: aarch64-apple-darwin
+            zig-target: ''
+            artifact-name: macOS_aarch64_Release
+            binary-name: clashtui-darwin-arm64
+            cache-suffix: macos-aarch64
+            extract-version: false
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: goto-bus-stop/setup-zig@v2
+        if: matrix.zig-target != ''
 
       - name: Cache Target
         uses: actions/cache@v4
@@ -37,92 +74,47 @@ jobs:
           path: |
             ~/.cargo
             ./target
-          key: ci-release-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          key: ci-release-${{ matrix.cache-suffix }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
-            ci-release-${{ runner.os }}-
+            ci-release-${{ matrix.cache-suffix }}-
 
       - name: Download Dependencies
         run: cargo fetch
 
-      - name: Build linux amd64
+      - name: Build (zig + glibc 2.17)
+        if: matrix.zig-target != ''
         run: |
-          rustup target add x86_64-unknown-linux-gnu
+          rustup target add ${{ matrix.target }}
           cargo install cargo-zigbuild
-          cargo zigbuild --target x86_64-unknown-linux-gnu.2.17 --release --locked
+          cargo zigbuild --target ${{ matrix.zig-target }} --release --locked
 
-      - name: Build linux arm64
+      - name: Build (native)
+        if: matrix.zig-target == ''
         run: |
-          rustup target add aarch64-unknown-linux-gnu
-          cargo install cargo-zigbuild
-          cargo zigbuild --target aarch64-unknown-linux-gnu.2.17 --release --locked
+          rustup target add ${{ matrix.target }}
+          cargo build --release --locked --target ${{ matrix.target }}
 
       - name: Build Version
-        run: ./target/x86_64-unknown-linux-gnu/release/clashtui --version | awk '{print $2}' > version.txt
+        if: matrix.extract-version
+        run: ./target/${{ matrix.target }}/release/clashtui --version | awk '{print $2}' > version.txt
 
       - name: Pre Upload
         run: |
           mkdir artifacts
-          mv ./target/x86_64-unknown-linux-gnu/release/clashtui    ./artifacts/clashtui-amd64
-          mv ./target/aarch64-unknown-linux-gnu/release/clashtui    ./artifacts/clashtui-arm64
-          mv version.txt                                            ./artifacts/version.txt
+          mv ./target/${{ matrix.target }}/release/clashtui    ./artifacts/${{ matrix.binary-name }}
+          if [ -f version.txt ]; then mv version.txt ./artifacts/version.txt; fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Linux_Release
-          path: artifacts
-          retention-days: 5
-
-  build-macos:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: goto-bus-stop/setup-zig@v2
-
-      - name: Cache Target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo
-            ./target
-          key: ci-release-macos-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            ci-release-macos-
-
-      - name: Download Dependencies
-        run: cargo fetch
-
-      - name: Build macos x86_64
-        run: |
-          rustup target add x86_64-apple-darwin
-          cargo install cargo-zigbuild
-          cargo zigbuild --target x86_64-apple-darwin --release --locked
-
-      - name: Build macos aarch64
-        run: |
-          rustup target add aarch64-apple-darwin
-          cargo zigbuild --target aarch64-apple-darwin --release --locked
-
-      - name: Pre Upload
-        run: |
-          mkdir artifacts
-          mv ./target/x86_64-apple-darwin/release/clashtui    ./artifacts/clashtui-darwin-amd64
-          mv ./target/aarch64-apple-darwin/release/clashtui    ./artifacts/clashtui-darwin-arm64
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macOS_Release
+          name: ${{ matrix.artifact-name }}
           path: artifacts
           retention-days: 5
 
   release:
     runs-on: ubuntu-latest
 
-    needs: [build-linux, build-macos]
+    needs: [build]
 
     permissions:
       contents: write
