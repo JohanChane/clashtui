@@ -32,7 +32,8 @@ mod_agent!(
         ([KeyCode::Char('t')], Key::TestDelay, "Test delay"),
         ([KeyCode::Char('a'), KeyCode::Char('t')], Key::TestAllDelay, "Test all delay"),
         ([KeyCode::Char('r')], Key::Refresh, "Refresh"),
-        ([KeyCode::Char('f')], Key::FzfFind, "Find proxy"),
+        ([KeyCode::Char('f')], Key::GroupSelect, "Group select"),
+        ([KeyCode::Char('F')], Key::FzfFind, "Find proxy"),
     ]
 );
 
@@ -58,6 +59,7 @@ pub enum Key {
     Refresh,
     Search,
     FzfFind,
+    GroupSelect,
 }
 
 impl TryFrom<&crate::tui::Key> for Key {
@@ -403,5 +405,136 @@ mod tests {
         );
         assert_eq!(node.node_type, NodeType::Folder);
         assert_eq!(node.name, folder_name);
+    }
+
+    #[test]
+    fn f_maps_to_group_select_in_agent() {
+        let kev = mk_key(KeyCode::Char('f'));
+        let key = Key::try_from(&kev);
+        assert!(matches!(key, Ok(Key::GroupSelect)), "f should map to GroupSelect");
+    }
+
+    #[test]
+    fn F_maps_to_fzf_find_in_agent() {
+        let kev = mk_key(KeyCode::Char('F'));
+        let key = Key::try_from(&kev);
+        assert!(matches!(key, Ok(Key::FzfFind)), "F should map to FzfFind");
+    }
+
+    #[test]
+    fn chord_af_still_dispatches_collapse_all() {
+        let a = mk_key(KeyCode::Char('a'));
+        let f = mk_key(KeyCode::Char('f'));
+        let shortcuts = make_shortcuts();
+
+        assert!(Key::try_from(&f).is_ok(), "f alone should be a single-key shortcut");
+        assert!(
+            all_shortcuts().iter().any(|(combo, key, _)| &**combo == &[a.clone(), f.clone()] && matches!(key, Key::CollapseAll)),
+            "af chord should dispatch CollapseAll"
+        );
+
+        let mut ch = ChordHandler::default();
+        let mut dispatched: Vec<Vec<TuiKey>> = vec![];
+        ch.handle(&a, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        let consumed = ch.handle(&f, &shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        assert!(consumed, "af should be consumed by chord handler");
+        assert_eq!(dispatched.len(), 1);
+        assert_eq!(dispatched[0].len(), 2);
+        assert!(!ch.is_active());
+    }
+
+    #[test]
+    fn group_select_on_folder_collects_siblings() {
+        use crate::functions::restful::proxies::ProxiesResponse;
+        use crate::tui::tab::proxies::tree::{NodeType, ProxyTree};
+
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/tui/tab/proxies/tests/fixtures/proxies.json"
+        );
+        let data = std::fs::read_to_string(path).unwrap();
+        let response: ProxiesResponse = serde_json::from_str(&data).unwrap();
+        let proxies = response.proxies;
+
+        let content = Proxies {
+            tree: ProxyTree::build(ProxiesResponse { proxies: proxies.clone() }),
+            proxies: proxies.clone(),
+            ..Default::default()
+        };
+
+        // Sl-pvd0 is a top-level Folder (depth 0, parent=None)
+        let folder_idx = content.tree.nodes.iter()
+            .position(|n| n.node_type == NodeType::Folder && n.name == "Sl-pvd0")
+            .unwrap();
+        let parent = content.tree.node_at(folder_idx).map(|n| n.parent.clone()).flatten();
+
+        let siblings: Vec<&str> = content.tree.nodes.iter()
+            .filter(|n| n.parent == parent)
+            .map(|n| n.name.as_str())
+            .collect();
+
+        // All top-level (parent=None) Folder nodes should be siblings
+        assert!(siblings.contains(&"Sl-pvd0"), "Folder itself should be in siblings");
+        assert!(siblings.contains(&"Entry"), "Entry is a top-level sibling");
+        assert!(!siblings.contains(&"vmess-ipdktc33"), "vmess-ipdktc33 is a child, not a sibling");
+    }
+
+    #[test]
+    fn group_select_on_child_collects_siblings_in_same_group() {
+        use crate::functions::restful::proxies::ProxiesResponse;
+        use crate::tui::tab::proxies::tree::{NodeType, ProxyTree};
+        use crate::tui::widget::tab::FutureSet;
+        use ratatui::widgets::ListState;
+
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/tui/tab/proxies/tests/fixtures/proxies.json"
+        );
+        let data = std::fs::read_to_string(path).unwrap();
+        let response: ProxiesResponse = serde_json::from_str(&data).unwrap();
+        let proxies = response.proxies;
+
+        let mut content = Proxies {
+            tree: ProxyTree::build(ProxiesResponse { proxies: proxies.clone() }),
+            proxies: proxies.clone(),
+            ..Default::default()
+        };
+
+        let mut state = ListState::default();
+        let mut tasks: FutureSet<Proxies> = tokio::task::JoinSet::new();
+
+        // Expand Entry to reveal children
+        let entry_idx = content.tree.nodes.iter()
+            .position(|n| n.node_type == NodeType::Folder && n.name == "Entry")
+            .unwrap();
+        state.select(Some(entry_idx));
+        content.dispatch_key(Key::Expand, &mut tasks, &mut state);
+
+        // Sl-pvd0 is a child (Link) of Entry
+        let child_idx = content.tree.nodes.iter()
+            .position(|n| n.name == "Sl-pvd0" && n.parent.as_deref() == Some("Entry"))
+            .unwrap();
+        let parent = content.tree.node_at(child_idx).map(|n| n.parent.clone()).flatten();
+
+        let siblings: Vec<&str> = content.tree.nodes.iter()
+            .filter(|n| n.parent == parent)
+            .map(|n| n.name.as_str())
+            .collect();
+
+        assert!(siblings.contains(&"Sl-pvd0"), "Sl-pvd0 itself should be in siblings");
+        assert!(siblings.contains(&"At-pvd0"), "At-pvd0 is a sibling under Entry");
+        assert!(siblings.contains(&"FltAt-pvd0"), "FltAt-pvd0 is a sibling under Entry");
+        assert!(!siblings.contains(&"Entry"), "Entry is the parent, not a sibling");
+        // Expand 看视频 and verify its child is NOT a sibling of Sl-pvd0
+        let kan_idx = content.tree.nodes.iter()
+            .position(|n| n.name == "看视频和下载不要选这个" && n.parent.as_deref() == Some("Entry"))
+            .unwrap();
+        state.select(Some(kan_idx));
+        content.dispatch_key(Key::Expand, &mut tasks, &mut state);
+        let siblings_after: Vec<&str> = content.tree.nodes.iter()
+            .filter(|n| n.parent == parent)
+            .map(|n| n.name.as_str())
+            .collect();
+        assert!(!siblings_after.contains(&"[bak]日本-优化2"), "grandchild of 看视频 should not be a sibling of Sl-pvd0");
     }
 }
