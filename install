@@ -662,11 +662,11 @@ prompt_templates_and_rules() {
     read -r response
     if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
       log_info "Downloading sing-box templates..."
-      copy_contrib "templates/sing-box/v1.12-common_tpl.json" "$SINGBOX_USER_CONFIG_DIR/templates/common_tpl.json"
-      copy_contrib "templates/sing-box/v1.12-tun_fakeip_bypass_dnsleak.json" "$SINGBOX_USER_CONFIG_DIR/templates/tun_fakeip_bypass_dnsleak.json"
-      copy_contrib "templates/sing-box/v1.12-tun_fakeip_bypass_no_dnsleak.json" "$SINGBOX_USER_CONFIG_DIR/templates/tun_fakeip_bypass_no_dnsleak.json"
-      copy_contrib "templates/sing-box/v1.12-tun_ipv4_ipv6.json" "$SINGBOX_USER_CONFIG_DIR/templates/tun_ipv4_ipv6.json"
-      copy_contrib "templates/sing-box/v1.12-tun_ipv4_only.json" "$SINGBOX_USER_CONFIG_DIR/templates/tun_ipv4_only.json"
+      copy_contrib "templates/sing-box/v1.12-common_tpl.json" "$SINGBOX_USER_CONFIG_DIR/templates/v1.12-common_tpl.json"
+      copy_contrib "templates/sing-box/v1.12-tun_fakeip_bypass_dnsleak.json" "$SINGBOX_USER_CONFIG_DIR/templates/v1.12-tun_fakeip_bypass_dnsleak.json"
+      copy_contrib "templates/sing-box/v1.12-tun_fakeip_bypass_no_dnsleak.json" "$SINGBOX_USER_CONFIG_DIR/templates/v1.12-tun_fakeip_bypass_no_dnsleak.json"
+      copy_contrib "templates/sing-box/v1.12-tun_ipv4_ipv6.json" "$SINGBOX_USER_CONFIG_DIR/templates/v1.12-tun_ipv4_ipv6.json"
+      copy_contrib "templates/sing-box/v1.12-tun_ipv4_only.json" "$SINGBOX_USER_CONFIG_DIR/templates/v1.12-tun_ipv4_only.json"
     fi
   fi
 }
