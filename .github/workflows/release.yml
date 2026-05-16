@@ -131,12 +131,33 @@ jobs:
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           if [ -n "$INPUT_VERSION" ]; then
-            echo "CLASHTUI_VERSION=$INPUT_VERSION" >> $GITHUB_ENV
-            echo "CLASHTUI_RELEASE_VERSION=$INPUT_VERSION" >> $GITHUB_ENV
+            RELEASE_VERSION="$INPUT_VERSION"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            RELEASE_VERSION="${GITHUB_REF#refs/tags/}"
           else
             VERSION="$(cat ./artifacts/version.txt)"
-            echo "CLASHTUI_VERSION=$VERSION" >> $GITHUB_ENV
-            echo "CLASHTUI_RELEASE_VERSION=v${VERSION%%-*}" >> $GITHUB_ENV
+            SEMVER="$(echo "$VERSION" | sed 's/-[0-9a-f]\{7,\}\(-dirty\)\?$//')"
+            RELEASE_VERSION="v$SEMVER"
+          fi
+          TAG_VERSION="${RELEASE_VERSION#v}"
+          # Verify Cargo.toml base version matches the tag base version
+          if [ -f ./artifacts/version.txt ]; then
+            BIN_VERSION="$(cat ./artifacts/version.txt)"
+            CARGO_VERSION="$(echo "$BIN_VERSION" | sed 's/-[0-9a-f]\{7,\}\(-dirty\)\?$//')"
+            TAG_BASE="${TAG_VERSION%%-*}"
+            CARGO_BASE="${CARGO_VERSION%%-*}"
+            if [ "$CARGO_BASE" != "$TAG_BASE" ]; then
+              echo "Error: Cargo.toml base version ($CARGO_BASE) does not match tag base version ($RELEASE_VERSION)"
+              echo "Please update Cargo.toml version to $TAG_BASE before releasing."
+              exit 1
+            fi
+          fi
+          echo "CLASHTUI_RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+          # Detect prerelease: version (without 'v' prefix) contains '-'
+          if [[ "$TAG_VERSION" == *-* ]]; then
+            echo "CLASHTUI_IS_PRERELEASE=true" >> $GITHUB_ENV
+          else
+            echo "CLASHTUI_IS_PRERELEASE=false" >> $GITHUB_ENV
           fi
 
       - name: Archive Release
@@ -149,7 +170,7 @@ jobs:
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         with:
-          prerelease: true
+          prerelease: ${{ env.CLASHTUI_IS_PRERELEASE == 'true' }}
           files: |
             clashtui-linux-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
             clashtui-linux-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
