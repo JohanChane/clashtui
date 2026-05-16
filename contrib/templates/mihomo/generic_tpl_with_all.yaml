@@ -9,28 +9,26 @@ proxy-groups:
     proxies:
       - AllAt
       - AllSl
-      - <At>
-      - <Sl>
+      - ${PGG.At}
+      - ${PGG.Sl}
 
   - name: "AllSl"
     type: select
     use:
-      - <pvd>
+      - ${PPG.pvd}
 
   - name: "Sl"
-    tpl_param:
-      providers: ["pvd"]
+    expand_group_with: ["${PPG.pvd}"]
     type: select
 
   - name: "AllAt"
     type: url-test
     proxies:
-      - <At>
+      - ${PGG.At}
     <<: *pa_dt
 
   - name: "At"
-    tpl_param:
-      providers: ["pvd"]
+    expand_group_with: ["${PPG.pvd}"]
     type: url-test
     <<: *pa_dt
 

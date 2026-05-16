@@ -11,61 +11,56 @@ proxy-groups:
     proxies:
       #- FltAllAt
       #- FltAllLb
-      - <FltAt>
-      #- <FltFb>
-      #- <FltLb>
+      - ${PGG.FltAt}
+      #- ${PGG.FltFb}
+      #- ${PGG.FltLb}
       - FltAllSl
-      - <At>
-      - <Sl>
+      - ${PGG.At}
+      - ${PGG.Sl}
 
   - name: "FltAllSl"
     type: select
     use: 
-      - <pvd>
+      - ${PPG.pvd}
     <<: *pa_flt
 
   - name: "Sl"
-    tpl_param:
-      providers: ["pvd"]
+    expand_group_with: ["${PPG.pvd}"]
     type: select
 
   #- name: "FltAllAt"
   #  type: url-test
   #  proxies:
-  #    - <FltAt>
+  #    - ${PGG.FltAt}
   #  <<: *pa_dt
 
   #- name: "FltAllLb"
   #  proxies:
-  #    - <FltAt>
+  #    - ${PGG.FltAt}
   #  type: load-balance
   #  #strategy: consistent-hashing
   #  #strategy: round-robin
   #  <<: *pa_dt
 
   - name: "FltAt"
-    tpl_param:
-      providers: ["pvd"]
+    expand_group_with: ["${PPG.pvd}"]
     type: url-test
     <<: [*pa_dt, *pa_flt]
 
   #- name: "FltFb"
-  #  tpl_param:
-  #    providers: ["pvd"]
+  #  expand_group_with: ["${PPG.pvd}"]
   #  type: fallback
   #  <<: [*pa_dt, *pa_flt]
   #
   #- name: "FltLb"
-  #  tpl_param:
-  #    providers: ["pvd"]
+  #  expand_group_with: ["${PPG.pvd}"]
   #  type: load-balance
   #  #strategy: consistent-hashing
   #  #strategy: round-robin
   #  <<: [*pa_dt, *pa_flt]
 
   - name: "At"
-    tpl_param:
-      providers: ["pvd"]
+    expand_group_with: ["${PPG.pvd}"]
     type: url-test
     <<: *pa_dt
 

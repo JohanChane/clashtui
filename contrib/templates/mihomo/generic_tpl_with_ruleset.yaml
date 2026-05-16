@@ -6,17 +6,15 @@ proxy-groups:
   - name: "Entry"
     type: select
     proxies:
-      - <At>
-      - <Sl>
+      - ${PGG.At}
+      - ${PGG.Sl}
 
   - name: "Sl"
-    tpl_param:
-      providers: ["pvd"]
+    expand_group_with: ["${PPG.pvd}"]
     type: select
 
   - name: "At"
-    tpl_param:
-      providers: ["pvd"]
+    expand_group_with: ["${PPG.pvd}"]
     type: url-test
     <<: *pa_dt
 
