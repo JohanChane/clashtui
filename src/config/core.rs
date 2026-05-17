@@ -67,31 +67,70 @@ pub struct ConfigFile {
 }
 impl Default for ConfigFile {
     fn default() -> Self {
-        Self {
-            mihomo: MihomoSection {
-                core: CoreConfig {
-                    config_dir: "/opt/clashtui/mihomo/config".into(),
-                    bin_path: "/opt/clashtui/mihomo/mihomo".into(),
-                    config_path: "/opt/clashtui/mihomo/config/config.yaml".into(),
+        if cfg!(windows) {
+            let local_appdata = std::env::var_os("LOCALAPPDATA")
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|| {
+                    let home = std::env::var("USERPROFILE").unwrap_or_default();
+                    format!("{home}\\AppData\\Local")
+                });
+            Self {
+                mihomo: MihomoSection {
+                    core: CoreConfig {
+                        config_dir: format!("{local_appdata}\\clashtui\\mihomo\\config"),
+                        bin_path: format!("{local_appdata}\\clashtui\\mihomo\\mihomo.exe"),
+                        config_path: format!(
+                            "{local_appdata}\\clashtui\\mihomo\\config\\config.yaml"
+                        ),
+                    },
+                    core_service: CoreServiceConfig {
+                        service_name: "clashtui_mihomo".into(),
+                        is_user: false,
+                    },
                 },
-                core_service: CoreServiceConfig {
-                    service_name: "clashtui_mihomo".into(),
-                    is_user: false,
+                singbox: SingboxSection {
+                    core: CoreConfig {
+                        config_dir: format!("{local_appdata}\\clashtui\\sing-box\\config"),
+                        bin_path: format!("{local_appdata}\\clashtui\\sing-box\\sing-box.exe"),
+                        config_path: format!(
+                            "{local_appdata}\\clashtui\\sing-box\\config\\config.json"
+                        ),
+                    },
+                    core_service: CoreServiceConfig {
+                        service_name: "clashtui_singbox".into(),
+                        is_user: false,
+                    },
                 },
-            },
-            singbox: SingboxSection {
-                core: CoreConfig {
-                    config_dir: "/opt/clashtui/sing-box/config".into(),
-                    bin_path: "/opt/clashtui/sing-box/sing-box".into(),
-                    config_path: "/opt/clashtui/sing-box/config/config.json".into(),
+                timeout: Default::default(),
+                extra: Default::default(),
+            }
+        } else {
+            Self {
+                mihomo: MihomoSection {
+                    core: CoreConfig {
+                        config_dir: "/opt/clashtui/mihomo/config".into(),
+                        bin_path: "/opt/clashtui/mihomo/mihomo".into(),
+                        config_path: "/opt/clashtui/mihomo/config/config.yaml".into(),
+                    },
+                    core_service: CoreServiceConfig {
+                        service_name: "clashtui_mihomo".into(),
+                        is_user: false,
+                    },
                 },
-                core_service: CoreServiceConfig {
-                    service_name: "clashtui_singbox".into(),
-                    is_user: false,
+                singbox: SingboxSection {
+                    core: CoreConfig {
+                        config_dir: "/opt/clashtui/sing-box/config".into(),
+                        bin_path: "/opt/clashtui/sing-box/sing-box".into(),
+                        config_path: "/opt/clashtui/sing-box/config/config.json".into(),
+                    },
+                    core_service: CoreServiceConfig {
+                        service_name: "clashtui_singbox".into(),
+                        is_user: false,
+                    },
                 },
-            },
-            timeout: Default::default(),
-            extra: Default::default(),
+                timeout: Default::default(),
+                extra: Default::default(),
+            }
         }
     }
 }
@@ -121,14 +160,15 @@ impl Default for Extra {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub enum ServiceController {
     Systemd,
-    Nssm,
+    #[serde(alias = "nssm")]
+    WindowsService,
     OpenRc,
     Launchd,
 }
 impl Default for ServiceController {
     fn default() -> Self {
         if cfg!(windows) {
-            ServiceController::Nssm
+            ServiceController::WindowsService
         } else if cfg!(target_os = "macos") {
             ServiceController::Launchd
         } else {
@@ -148,7 +188,7 @@ impl ServiceController {
             ServiceController::Systemd => vec![work_type, service_name],
             ServiceController::OpenRc if is_user => vec![service_name, work_type, "--user"],
             ServiceController::OpenRc => vec![service_name, work_type],
-            ServiceController::Nssm => vec![work_type, service_name],
+            ServiceController::WindowsService => vec![work_type, service_name],
             // Launchd args are constructed inline in svc_operation
             ServiceController::Launchd => vec![],
         }
@@ -156,7 +196,7 @@ impl ServiceController {
     pub fn bin_name(&self) -> &'static str {
         match self {
             ServiceController::Systemd => "systemctl",
-            ServiceController::Nssm => "nssm",
+            ServiceController::WindowsService => "",
             ServiceController::OpenRc => "rc-service",
             ServiceController::Launchd => "launchctl",
         }
@@ -336,7 +376,7 @@ profiles:
     fn service_controller_bin_name() {
         assert_eq!(ServiceController::Launchd.bin_name(), "launchctl");
         assert_eq!(ServiceController::Systemd.bin_name(), "systemctl");
-        assert_eq!(ServiceController::Nssm.bin_name(), "nssm");
+        assert_eq!(ServiceController::WindowsService.bin_name(), "");
         assert_eq!(ServiceController::OpenRc.bin_name(), "rc-service");
     }
 
@@ -347,8 +387,8 @@ profiles:
     }
 
     #[test]
-    fn service_controller_args_nssm() {
-        let args = ServiceController::Nssm.args("start", "svc", false);
+    fn service_controller_args_windows_service() {
+        let args = ServiceController::WindowsService.args("start", "svc", false);
         assert_eq!(args, vec!["start", "svc"]);
     }
 

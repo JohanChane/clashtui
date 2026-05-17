@@ -1,5 +1,6 @@
 #[cfg_attr(target_os = "linux", path = "command/linux.rs")]
 #[cfg_attr(target_os = "macos", path = "command/macos.rs")]
+#[cfg_attr(target_os = "windows", path = "command/windows.rs")]
 mod platform;
 mod utils;
 
@@ -133,6 +134,10 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
         return launchd_operation(op, service_name, is_user, password);
     }
 
+    if matches!(host, ServiceController::WindowsService) {
+        return windows_service_operation(op, service_name);
+    }
+
     let svc_args = host.args(op, service_name, is_user);
     if is_user {
         return exec(host.bin_name(), svc_args);
@@ -224,6 +229,10 @@ pub fn restart_service(password: Option<&str>) -> Result<String> {
 
 pub fn stop_service(password: Option<&str>) -> Result<String> {
     svc_operation("stop", password, None)
+}
+
+pub fn start_service(password: Option<&str>) -> Result<String> {
+    svc_operation("start", password, None)
 }
 
 pub fn stop_all_services(password: Option<&str>) -> Result<String> {

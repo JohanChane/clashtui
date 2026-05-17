@@ -54,23 +54,29 @@ tokio = { version = "1.48.0", features = [
 crossterm = { version = "*", features = [
     "event-stream",
     "serde",
+    "windows",
 ], default-features = false, optional = true }
 ratatui = { version = "0.29.0", features = [
     "crossterm",
 ], default-features = false, optional = true }
 futures-lite = { version = "2.6.0", default-features = false, optional = true }
-signal-hook-tokio = { version = "0", features = ["futures-v0_3"], optional = true }
 unicode-width = { version = "0.2.0", default-features = false }
-nix = { version = "0", features = ["user", "fs"] }
 tungstenite = { version = "0.24", default-features = false, features = ["handshake", "url"], optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-service = "0.7"
+winreg = "0.55"
+windows = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+nix = { version = "0", features = ["user", "fs"] }
+signal-hook-tokio = { version = "0", features = ["futures-v0_3"] }
 
 [features]
 customized-theme = ["tui", "ratatui/serde"]
 migration_v0_3_0 = []
-tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-lite", "dep:signal-hook-tokio", "dep:tungstenite"]
+tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-lite", "dep:tungstenite"]
 
 default = ["customized-theme"]
 

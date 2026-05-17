@@ -146,6 +146,11 @@ fn handle_profile(command: ProfileCommand) -> Result<()> {
 #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 fn handle_service(command: ServiceCommand) -> Result<()> {
     match command {
+        ServiceCommand::Start => {
+            let output = crate::functions::command::start_service(None)?;
+            println!("{output}");
+            Ok(())
+        }
         ServiceCommand::Restart { soft } => {
             if soft {
                 crate::functions::restful::control::restart(None)
@@ -159,6 +164,33 @@ fn handle_service(command: ServiceCommand) -> Result<()> {
         }
         ServiceCommand::Stop => {
             let output = crate::functions::command::stop_service(None)?;
+            println!("{output}");
+            Ok(())
+        }
+        #[cfg(windows)]
+        ServiceCommand::Install { core } => {
+            let ct = match core {
+                super::CoreArg::Mihomo => crate::config::CoreType::Mihomo,
+                super::CoreArg::Singbox => crate::config::CoreType::Singbox,
+            };
+            let service_name = crate::functions::command::service_name_for(ct);
+            let bin_path = crate::functions::command::service_bin_path(ct);
+            let launch_args = crate::functions::command::service_launch_args(ct);
+            let output = crate::functions::command::windows_service_install(
+                ct, &bin_path, &service_name, &launch_args,
+            )?;
+            println!("{output}");
+            Ok(())
+        }
+        #[cfg(windows)]
+        ServiceCommand::Uninstall { core } => {
+            let ct = match core {
+                super::CoreArg::Mihomo => crate::config::CoreType::Mihomo,
+                super::CoreArg::Singbox => crate::config::CoreType::Singbox,
+            };
+            let service_name = crate::functions::command::service_name_for(ct);
+            let output =
+                crate::functions::command::windows_service_uninstall(&service_name)?;
             println!("{output}");
             Ok(())
         }

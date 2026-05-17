@@ -69,6 +69,12 @@ enum SrvCtlOp {
     Restart,
     SwitchCore,
     StopAll,
+    #[cfg(windows)]
+    Install,
+    #[cfg(windows)]
+    Uninstall,
+    #[cfg(windows)]
+    ToggleSysProxy,
 }
 
 impl SrvCtlOp {
@@ -78,10 +84,23 @@ impl SrvCtlOp {
             Self::Restart => "Start Service",
             Self::SwitchCore => "Switch Core",
             Self::StopAll => "Stop All Services",
+            #[cfg(windows)]
+            Self::Install => "Install Service",
+            #[cfg(windows)]
+            Self::Uninstall => "Uninstall Service",
+            #[cfg(windows)]
+            Self::ToggleSysProxy => "Toggle System Proxy",
         }
     }
     fn all() -> Vec<Self> {
-        vec![Self::Stop, Self::Restart, Self::SwitchCore, Self::StopAll]
+        let mut ops = vec![Self::Stop, Self::Restart, Self::SwitchCore, Self::StopAll];
+        #[cfg(windows)]
+        {
+            ops.push(Self::Install);
+            ops.push(Self::Uninstall);
+            ops.push(Self::ToggleSysProxy);
+        }
+        ops
     }
 }
 
@@ -99,6 +118,10 @@ struct SrvCtlContent {
     singbox_service_name: String,
     mihomo_is_user: bool,
     singbox_is_user: bool,
+    #[cfg(windows)]
+    proxy_enabled: bool,
+    #[cfg(windows)]
+    proxy_port: Option<u16>,
 }
 
 impl SrvCtlContent {
@@ -111,6 +134,9 @@ impl SrvCtlContent {
         async move {
             let status = match controller {
                 crate::config::ServiceController::Launchd => launchd_status(&service_name, is_user),
+                crate::config::ServiceController::WindowsService => {
+                    crate::functions::command::windows_service_status(&service_name)
+                }
                 _ => {
                     let mut args = vec!["is-active"];
                     if is_user {
@@ -138,6 +164,9 @@ impl SrvCtlContent {
         async move {
             let status = match controller {
                 crate::config::ServiceController::Launchd => launchd_status(&service_name, is_user),
+                crate::config::ServiceController::WindowsService => {
+                    crate::functions::command::windows_service_status(&service_name)
+                }
                 _ => {
                     let mut args = vec!["is-active"];
                     if is_user {
@@ -156,6 +185,10 @@ impl SrvCtlContent {
                 match crate::config::CONFIG.core_type() {
                     CoreType::Mihomo => c.mihomo_status = status,
                     CoreType::Singbox => c.singbox_status = status,
+                }
+                #[cfg(windows)]
+                {
+                    c.proxy_enabled = crate::functions::command::get_system_proxy_state();
                 }
             })
         }
@@ -266,6 +299,11 @@ impl TabContent for SrvCtlContent {
         self.status = "...".to_owned();
         self.mihomo_status = "...".to_owned();
         self.singbox_status = "...".to_owned();
+        #[cfg(windows)]
+        {
+            self.proxy_enabled = crate::functions::command::get_system_proxy_state();
+            self.proxy_port = None;
+        }
         if !self.ops.is_empty() {
             state.select(Some(0));
         }
@@ -445,6 +483,74 @@ impl TabContent for SrvCtlContent {
                                 }
                             }
                         }
+                        #[cfg(windows)]
+                        SrvCtlOp::Install => {
+                            let service_name = crate::functions::command::service_name_for(
+                                crate::config::CONFIG.core_type(),
+                            );
+                            let bin_path =
+                                crate::functions::command::service_bin_path(
+                                    crate::config::CONFIG.core_type(),
+                                );
+                            let launch_args = crate::functions::command::service_launch_args(
+                                crate::config::CONFIG.core_type(),
+                            );
+                            let result = crate::functions::command::windows_service_install(
+                                crate::config::CONFIG.core_type(),
+                                &bin_path,
+                                &service_name,
+                                &launch_args,
+                            );
+                            handle!(result, "installed")
+                        }
+                        #[cfg(windows)]
+                        SrvCtlOp::Uninstall => {
+                            let service_name = crate::functions::command::service_name_for(
+                                crate::config::CONFIG.core_type(),
+                            );
+                            let result =
+                                crate::functions::command::windows_service_uninstall(&service_name);
+                            handle!(result, "uninstalled")
+                        }
+                        #[cfg(windows)]
+                        SrvCtlOp::ToggleSysProxy => {
+                            let current_state =
+                                crate::functions::command::get_system_proxy_state();
+                            let port = crate::functions::command::get_mixed_port();
+                            let result = if current_state {
+                                crate::functions::command::toggle_system_proxy(false, 0)
+                            } else {
+                                match port {
+                                    Some(p) => {
+                                        crate::functions::command::toggle_system_proxy(true, p)
+                                    }
+                                    None => Err(anyhow::anyhow!(
+                                        "Cannot determine proxy port — core may not be running"
+                                    )),
+                                }
+                            };
+                            match result {
+                                Ok(out) => {
+                                    if out.starts_with("Error") {
+                                        crate::tui::widget::popmsg::Confirm::err(out);
+                                        do_nothing()
+                                    } else {
+                                        crate::tui::widget::popmsg::Confirm::title("OK".to_owned())
+                                            .with_prompt(out)
+                                            .build_and_send();
+                                        let new_state =
+                                            crate::functions::command::get_system_proxy_state();
+                                        wrapper(move |c: &mut SrvCtlContent| {
+                                            c.proxy_enabled = new_state;
+                                        })
+                                    }
+                                }
+                                Err(e) => {
+                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    do_nothing()
+                                }
+                            }
+                        }
                     }
                 }
                 .spawn_at(task_set);
@@ -490,8 +596,8 @@ impl TabContent for SrvCtlContent {
                 self.core_label,
                 user_tag
             ))
-            .title_bottom(
-                ratatui::text::Line::from(vec![
+            .title_bottom({
+                let mut spans = vec![
                     ratatui::text::Span::styled(
                         format!(" {} ", current_core_label),
                         section.border,
@@ -500,9 +606,21 @@ impl TabContent for SrvCtlContent {
                         format!(" {} ", other_core_label),
                         section.border.fg(Color::Rgb(100, 100, 100)),
                     ),
-                ])
-                .right_aligned(),
-            );
+                ];
+                #[cfg(windows)]
+                {
+                    let proxy_label = if self.proxy_enabled {
+                        "Proxy: ON"
+                    } else {
+                        "Proxy: OFF"
+                    };
+                    spans.push(ratatui::text::Span::styled(
+                        format!(" {} ", proxy_label),
+                        section.border.fg(Color::Rgb(180, 180, 0)),
+                    ));
+                }
+                ratatui::text::Line::from(spans).right_aligned()
+            });
 
         let items: Vec<ListItem> = self
             .ops

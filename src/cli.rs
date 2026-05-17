@@ -218,6 +218,8 @@ enum ProfileCommand {
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 enum ServiceCommand {
+    /// start service
+    Start,
     /// start/restart service, can be soft
     Restart {
         /// restart by send POST request to mihomo
@@ -226,6 +228,28 @@ enum ServiceCommand {
     },
     /// stop service
     Stop,
+    /// install Windows service (Windows only)
+    #[cfg(windows)]
+    Install {
+        /// core type: mihomo or sing-box
+        #[arg(value_enum)]
+        core: CoreArg,
+    },
+    /// uninstall Windows service (Windows only)
+    #[cfg(windows)]
+    Uninstall {
+        /// core type: mihomo or sing-box
+        #[arg(value_enum)]
+        core: CoreArg,
+    },
+}
+
+#[cfg(windows)]
+#[derive(clap::ValueEnum, Clone, Copy, Debug)]
+enum CoreArg {
+    Mihomo,
+    #[clap(name = "sing-box")]
+    Singbox,
 }
 
 // use crate::backend::Mode;
