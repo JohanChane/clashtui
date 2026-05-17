@@ -64,7 +64,7 @@ unicode-width = { version = "0.2.0", default-features = false }
 tungstenite = { version = "0.24", default-features = false, features = ["handshake", "url"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-service = "0.7"
+
 winreg = "0.55"
 windows = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation"] }
 

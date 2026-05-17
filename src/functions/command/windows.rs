@@ -29,14 +29,7 @@ pub fn repair_file_permissions(_dir: &Path, _group_name: &str) -> Result<String>
     Ok("Permissions OK on Windows".into())
 }
 
-// ── Service operations via SCM API ─────────────────────────────
-
-use windows_service::{
-    service::{
-        ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceType,
-    },
-    service_manager::{ServiceManager, ServiceManagerAccess},
-};
+// ── Service operations via nssm ────────────────────────────────
 
 /// Build the service binary launch arguments based on core type.
 pub fn service_launch_args(ct: CoreType) -> Vec<String> {
@@ -81,112 +74,54 @@ pub fn service_name_for(ct: CoreType) -> String {
     }
 }
 
-/// Start or stop a Windows service.
+/// Start or stop a Windows service via nssm.
 pub fn windows_service_operation(op: &str, service_name: &str) -> Result<String> {
-    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
-
-    match op {
-        "start" => {
-            let service = manager.open_service(service_name, ServiceAccess::START)?;
-            service.start(&[] as &[&str])?;
-            Ok(format!("Service '{service_name}' started"))
-        }
-        "stop" => {
-            let service = manager.open_service(service_name, ServiceAccess::STOP)?;
-            service.stop()?;
-            Ok(format!("Service '{service_name}' stopped"))
-        }
-        "restart" | "reload" => {
-            // Best-effort stop, then start
-            let _ = windows_service_operation("stop", service_name);
-            windows_service_operation("start", service_name)
-        }
-        _ => Err(anyhow::anyhow!("Unknown Windows service operation: {op}")),
-    }
+    let nssm_op = match op {
+        "start" => "start",
+        "stop" => "stop",
+        "restart" | "reload" => "restart",
+        _ => return Err(anyhow::anyhow!("Unknown Windows service operation: {op}")),
+    };
+    exec("nssm", vec![nssm_op, service_name])
 }
 
-/// Install a Windows service via SCM API.
+/// Install a Windows service via nssm.
 pub fn windows_service_install(
-    ct: CoreType,
+    _ct: CoreType,
     bin_path: &str,
     service_name: &str,
     launch_args: &[String],
 ) -> Result<String> {
-    let manager_access = ServiceManagerAccess::CREATE_SERVICE;
-    let manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
-
-    let service_info = ServiceInfo {
-        name: service_name.into(),
-        display_name: match ct {
-            CoreType::Mihomo => "ClashTui Mihomo".into(),
-            CoreType::Singbox => "ClashTui SingBox".into(),
-        },
-        service_type: ServiceType::OWN_PROCESS,
-        start_type: ServiceStartType::AutoStart,
-        error_control: ServiceErrorControl::Normal,
-        executable_path: bin_path.into(),
-        launch_arguments: launch_args.iter().map(|s| s.as_str().into()).collect(),
-        dependencies: vec![],
-        account_name: None,
-        account_password: None,
-    };
-
-    let _service =
-        manager.create_service(&service_info, ServiceAccess::START | ServiceAccess::STOP)?;
-
-    Ok(format!("Service '{service_name}' installed successfully"))
-}
-
-/// Uninstall a Windows service (stop first if running, then delete).
-pub fn windows_service_uninstall(service_name: &str) -> Result<String> {
-    let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
-
-    // Try to stop first if running
-    if let Ok(service) =
-        manager.open_service(service_name, ServiceAccess::STOP | ServiceAccess::QUERY_STATUS)
-    {
-        let status = service.query_status()?;
-        if status.current_state != windows_service::service::ServiceState::Stopped {
-            if let Err(e) = service.stop() {
-                log::warn!("Failed to stop service '{service_name}' before uninstall: {e}");
-            } else {
-                std::thread::sleep(std::time::Duration::from_secs(2));
-            }
-        }
+    let mut args: Vec<&str> = vec!["install", service_name, bin_path];
+    for arg in launch_args {
+        args.push(arg.as_str());
     }
-
-    let service = manager.open_service(service_name, ServiceAccess::DELETE)?;
-    service.delete()?;
-
-    Ok(format!("Service '{service_name}' uninstalled"))
+    exec("nssm", args)
 }
 
-/// Query Windows service status.
+/// Uninstall a Windows service via nssm.
+pub fn windows_service_uninstall(service_name: &str) -> Result<String> {
+    // nssm remove requires literal "confirm" to proceed
+    exec("nssm", vec!["remove", service_name, "confirm"])
+}
+
+/// Query Windows service status via nssm.
 pub fn windows_service_status(service_name: &str) -> String {
-    let manager = match ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT) {
-        Ok(m) => m,
-        Err(_) => return "?".to_owned(),
-    };
-
-    let service = match manager.open_service(service_name, ServiceAccess::QUERY_STATUS) {
-        Ok(s) => s,
-        Err(_) => {
-            // Service likely doesn't exist (not installed)
-            return "uninstalled".to_owned();
-        }
-    };
-
-    match service.query_status() {
-        Ok(status) => {
-            use windows_service::service::ServiceState;
-            match status.current_state {
-                ServiceState::Running => "active".to_owned(),
-                ServiceState::Stopped
-                | ServiceState::Paused
-                | ServiceState::StartPending
-                | ServiceState::StopPending
-                | ServiceState::ContinuePending
-                | ServiceState::PausePending => "inactive".to_owned(),
+    match std::process::Command::new("nssm")
+        .args(["status", service_name])
+        .output()
+    {
+        Ok(output) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if stdout.contains("SERVICE_RUNNING") {
+                "active".to_owned()
+            } else if stdout.contains("SERVICE_STOPPED") {
+                "inactive".to_owned()
+            } else if stdout.contains("SERVICE_PAUSED") {
+                "inactive".to_owned()
+            } else {
+                // Probably "Could not connect to service manager" etc.
+                "uninstalled".to_owned()
             }
         }
         Err(_) => "?".to_owned(),

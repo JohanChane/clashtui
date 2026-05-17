@@ -2,8 +2,9 @@
 # ================================
 #
 # Installs clashtui and core proxies (mihomo / sing-box) on Windows.
-# Uses the clashtui binary's built-in service subcommand to register
-# Windows Services via SCM API (no external tools needed).
+# Uses clashtui binary's built-in service subcommand which delegates to
+# nssm (Non-Sucking Service Manager) for Windows Service management.
+# Requires: nssm (install via `scoop install nssm` or https://nssm.cc/download)
 #
 # Usage:
 #   .\install.ps1                              # Default: system mode to C:\Program Files\clashtui
@@ -119,17 +120,12 @@ function Invoke-Uninstall {
     $installDir = Get-NormalizedInstallDir
     $configDir = Get-ClashtuiConfigDir
 
-    # Remove Windows Services
+    # Remove Windows Services via nssm
     foreach ($svc in @("clashtui_mihomo", "clashtui_singbox")) {
-        $svcObj = Get-Service -Name $svc -ErrorAction SilentlyContinue
-        if ($svcObj) {
-            if ($svcObj.Status -eq 'Running') {
-                Write-Info "Stopping service: $svc"
-                Stop-Service -Name $svc -Force -ErrorAction SilentlyContinue
-                Start-Sleep -Seconds 2
-            }
-            Write-Info "Deleting service: $svc"
-            sc.exe delete $svc 2>$null | Out-Null
+        $status = & nssm status $svc 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Info "Removing service: $svc"
+            & nssm remove $svc confirm 2>$null | Out-Null
         }
     }
 
@@ -543,6 +539,16 @@ function New-WindowsServices {
         [string]$CoreType
     )
 
+    # Check nssm is available
+    if (-not (Get-Command "nssm" -ErrorAction SilentlyContinue)) {
+        Write-Warn "nssm not found. Install it first: scoop install nssm"
+        Write-Warn "Or download from: https://nssm.cc/download"
+        Write-Warn "Then register services manually:"
+        Write-Warn "  clashtui service install mihomo"
+        Write-Warn "  clashtui service install sing-box"
+        return
+    }
+
     $clashtuiExe = Join-Path $InstallDir "bin\clashtui.exe"
     if (-not (Test-Path -LiteralPath $clashtuiExe)) {
         Write-Warn "clashtui.exe not found at $clashtuiExe. Skipping service registration."
@@ -753,11 +759,11 @@ function Main {
     Write-Host ""
     Write-Info "Windows Services are registered but NOT started."
     Write-Info "You can manage services from within clashtui (CoreSrvCtl tab, press 7)."
-    Write-Info "Or use the clashtui CLI: clashtui service start mihomo"
-    Write-Info "Or via native tools:"
-    Write-Info "  sc.exe start clashtui_mihomo"
-    Write-Info "  sc.exe stop clashtui_mihomo"
-    Write-Info "  sc.exe query clashtui_mihomo"
+    Write-Info "Or use the clashtui CLI: clashtui service start"
+    Write-Info "Or via nssm directly:"
+    Write-Info "  nssm start clashtui_mihomo"
+    Write-Info "  nssm stop clashtui_mihomo"
+    Write-Info "  nssm status clashtui_mihomo"
 }
 
 Main

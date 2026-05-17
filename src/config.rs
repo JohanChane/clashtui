@@ -358,7 +358,7 @@ pub const DEFAULT_SINGBOX_BASIC_CONFIG: &str = r#"{
     {
       "type": "mixed",
       "tag": "mixed-in",
-      "listen": "::",
+      "listen": "127.0.0.1",
       "listen_port": 7890
     }
   ],

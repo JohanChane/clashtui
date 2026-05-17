@@ -862,58 +862,42 @@ ClashTui config file structure is the same as Linux/macOS, stored at `%APPDATA%\
 
 Like Linux/macOS, Windows supports symlinks (`mklink` / `mklink /D`) to point to binary paths, but requires Administrator privileges. Without admin rights, users can place `.exe` files directly.
 
-### Core Services Management (Windows SCM API)
+### Core Services Management (nssm)
 
-Windows uses the Rust [`windows-service`](https://crates.io/crates/windows-service) crate to directly call the Windows SCM (Service Control Manager) API — no external tools required (sc.exe / WinSW / NSSM). Both Clash Verge Rev and FlClash use the same approach.
+mihomo.exe and sing-box.exe are not Windows service programs — they don't respond to SCM (Service Control Manager) start/stop requests. Installing them directly as services causes a 90-second timeout and forced termination.
 
-#### systemd vs launchd vs Windows SCM Comparison
+Clash Verge Rev solves this with a custom service binary (`clash-verge-service`) implementing IPC wrapper. clashtui uses a lighter approach: [nssm](https://nssm.cc/) (Non-Sucking Service Manager), a battle-tested Windows Service wrapper that wraps any ordinary program into a proper service process.
 
-| Operation       | Linux (systemd)                          | macOS (launchd)                               | Windows (SCM API)                                      |
+**Dependency**: Users need to install nssm (via `scoop install nssm` or [nssm.cc/download](https://nssm.cc/download)).
+
+#### systemd vs launchd vs nssm Comparison
+
+| Operation       | Linux (systemd)                          | macOS (launchd)                               | Windows (nssm CLI)                                     |
 |-----------------|------------------------------------------|-----------------------------------------------|--------------------------------------------------------|
-| **User Mode**   |                                          |                                               |                                                        |
-| install service | `systemctl --user link <unit>`           | (plist in `~/Library/LaunchAgents/` = installed)| `ServiceManager::create_service()`                     |
-| uninstall       | `systemctl --user disable <name>`        | (delete plist + `launchctl bootout`)           | `service.stop()` → `service.delete()`                  |
-| start service   | `systemctl --user start <name>`          | `launchctl bootstrap gui/$UID <plist>`         | `service.start()`                                      |
-| stop service    | `systemctl --user stop <name>`           | `launchctl bootout gui/$UID/<name>`            | `service.stop()`                                       |
-| check status    | `systemctl --user is-active <name>`      | `launchctl print gui/$UID/<name>`              | `service.query_status()` → `ServiceState`              |
-| crash restart   | `Restart=always` (unit file)             | `KeepAlive=true` (plist)                       | `SERVICE_CONFIG_FAILURE_ACTIONS` (via SCM API)          |
 | **System Mode** |                                          |                                               |                                                        |
-| install service | `sudo systemctl link <unit>`             | `sudo launchctl bootstrap system <plist>`      | `ServiceManager::create_service()` (Admin required)     |
-| uninstall       | `sudo systemctl disable <name>`          | `sudo launchctl bootout system/<name>`         | `stop()` → `delete()`  (Admin required)                 |
-| start service   | `sudo systemctl start <name>`            | `sudo launchctl bootstrap system <plist>`      | `service.start()` (Admin required)                      |
-| stop service    | `sudo systemctl stop <name>`             | `sudo launchctl bootout system/<name>`         | `service.stop()` (Admin required)                       |
-| check status    | `systemctl is-active <name>`             | `sudo launchctl print system/<name>`           | `service.query_status()`                                |
+| install service | `sudo systemctl link <unit>`             | `sudo launchctl bootstrap system <plist>`      | `nssm install <name> <exe> <args...>` (Admin required)  |
+| uninstall       | `sudo systemctl disable <name>`          | `sudo launchctl bootout system/<name>`         | `nssm remove <name> confirm` (Admin required)           |
+| start service   | `sudo systemctl start <name>`            | `sudo launchctl bootstrap system <plist>`      | `nssm start <name>` (Admin required)                    |
+| stop service    | `sudo systemctl stop <name>`             | `sudo launchctl bootout system/<name>`         | `nssm stop <name>` (Admin required)                     |
+| restart service | `sudo systemctl restart <name>`          | bootout then bootstrap                         | `nssm restart <name>`                                  |
+| check status    | `systemctl is-active <name>`             | `sudo launchctl print system/<name>`           | `nssm status <name>` → parse SERVICE_RUNNING/STOPPED    |
 | TUN access      | `setcap` (Linux capabilities)            | root (no setcap)                               | Administrator suffices (LocalSystem by default)         |
 
 Key differences:
-- **Zero external dependencies**: The `windows-service` crate calls the SCM API directly — the SCM is a core Windows OS component. No third-party tools need to be installed by the user.
-- **Type-safe API**: Uses Rust's strong typing (`ServiceState`, `ServiceType`, `ServiceStartType`) instead of parsing CLI string output, avoiding parsing errors.
-- **Crash restart**: Configured via SCM API `ChangeServiceConfig2W` + `SERVICE_CONFIG_FAILURE_ACTIONS`. The `windows-service` crate doesn't expose this directly yet; may require supplemental `windows` crate calls, or post-install `sc failure` configuration.
+- **nssm wrapper**: nssm wraps mihomo/sing-box as proper Windows services that correctly respond to SCM events.
+- **CLI calls**: clashtui invokes `nssm.exe` via `std::process::Command`, similar to how it calls `systemctl`.
+- **Crash restart**: nssm has built-in crash restart support, no extra configuration needed.
 
 #### Installation Example
 
-ClashTui calls the SCM API directly (no external commands):
+clashtui invokes nssm CLI (similar to systemctl):
 
-```rust
-// Pseudocode
-use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+```powershell
+# mihomo
+nssm install clashtui_mihomo "C:\Program Files\clashtui\mihomo\mihomo.exe" -d "C:\Program Files\clashtui\mihomo\config"
 
-let manager = ServiceManager::local_computer(None, ServiceManagerAccess::CREATE_SERVICE)?;
-let service = manager.create_service(
-    &ServiceInfo {
-        name: "clashtui_mihomo".into(),
-        display_name: "ClashTui Mihomo".into(),
-        service_type: ServiceType::OWN_PROCESS,
-        start_type: ServiceStartType::AutoStart,
-        error_control: ServiceErrorControl::Normal,
-        executable_path: r"C:\Program Files\clashtui\mihomo\mihomo.exe",
-        launch_arguments: vec![r#"-d "C:\Program Files\clashtui\mihomo\config""#.into()],
-        dependencies: vec![],
-        account_name: None, // LocalSystem
-        account_password: None,
-    },
-    ServiceAccess::START | ServiceAccess::STOP,
-)?;
+# sing-box
+nssm install clashtui_singbox "C:\Program Files\clashtui\sing-box\sing-box.exe" -D "C:\Program Files\clashtui\sing-box\config" -c "C:\Program Files\clashtui\sing-box\config\config.json" run
 ```
 
 #### CoreSrvCtl New Operations
@@ -922,16 +906,14 @@ Since Windows command line is inconvenient, CoreSrvCtl tab provides three additi
 
 **1. Install Srv**
 
-- Calls SCM API via the `windows-service` crate: `ServiceManager::create_service()`
-- service type: `OWN_PROCESS`, start type: `AutoStart`, account: `LocalSystem` (Administrator privileges)
-- `executable_path` = `bin_path`, `launch_arguments` derived from CoreType
+- Invokes nssm CLI: `nssm install <name> <bin_path> <launch_args...>`
 - After installation, service status becomes `installed`
-- Optional: post-install crash restart configuration via `sc failure`
+- nssm has built-in crash restart and log management
 
 **2. Uninstall Srv**
 
-- If the service is running, first `service.stop()`
-- Then `service.delete()` to remove the service
+- Invokes nssm CLI: `nssm remove <name> confirm`
+- nssm automatically stops a running service before removal
 - After uninstallation, service status becomes `uninstalled`
 
 **3. Toggle System Proxy**
@@ -954,8 +936,8 @@ Implementation: Use the `winreg` crate to directly manipulate the registry (reco
 |------------------|-------------------------------------------------------------|
 | Stop Service     | Stop the current core's service                             |
 | Start Service    | Start the current core's service                            |
-| Install Srv      | Install current core as Windows Service (SCM API create_service) |
-| Uninstall Srv    | Uninstall current core's Windows Service (stop then delete) |
+| Install Srv      | Install current core as Windows Service via nssm      |
+| Uninstall Srv    | Uninstall current core's Windows Service via nssm |
 | Toggle SysProxy  | Toggle system proxy (enable/disable)                        |
 | Switch Core      | Switch to the other core (mihomo ↔ sing-box)                |
 | Stop All         | Stop all core services                                      |
@@ -971,9 +953,9 @@ Implementation: Use the `winreg` crate to directly manipulate the registry (reco
 | `?`            | Unable to determine (e.g. insufficient permissions) |
 
 State detection priority:
-1. Query via SCM API `service.query_status()` to get `ServiceState`
-2. `Running` → `"active"`, `Stopped` → `"inactive"`
-3. Service not found (ERROR_SERVICE_DOES_NOT_EXIST) → `"uninstalled"`
+1. Query via `nssm status <service_name>` CLI
+2. `SERVICE_RUNNING` → `"active"`, `SERVICE_STOPPED` / `SERVICE_PAUSED` → `"inactive"`
+3. nssm returns error (service not found) → `"uninstalled"`
 
 ### File Permissions
 
@@ -1006,22 +988,20 @@ On Windows, when `ServiceController::default()` returns `WindowsService`, three 
 
 ```rust
 #[cfg(windows)]
-SrvCtlOp::Install,       // "Install Service" — SCM API create_service
+SrvCtlOp::Install,       // "Install Service" — nssm install
 #[cfg(windows)]
-SrvCtlOp::Uninstall,     // "Uninstall Service" — stop + delete
+SrvCtlOp::Uninstall,     // "Uninstall Service" — nssm remove
 #[cfg(windows)]
 SrvCtlOp::ToggleSysProxy, // "Toggle System Proxy" — registry read/write
 ```
 
 **Install** execution logic:
-1. Call `ServiceManager::create_service()` via the `windows-service` crate
-2. service type: `OWN_PROCESS`, account: `LocalSystem`, start: `AutoStart`
-3. `executable_path` = `bin_path`, `launch_arguments` derived from CoreType
-4. Update status to `installed`
+1. Invoke nssm CLI: `nssm install <name> <bin_path> <launch_args...>`
+2. Update status to `installed`
 
 **Uninstall** execution logic:
-1. Open service; if running, call `service.stop()`
-2. Then `service.delete()`
+1. Invoke nssm CLI: `nssm remove <name> confirm`
+2. nssm automatically stops a running service before removal
 3. Update status to `uninstalled`
 
 **Toggle System Proxy** execution logic:
@@ -1043,11 +1023,11 @@ match ServiceController::default() {
 ```
 
 `windows_service_status()` implementation:
-1. Open service via `windows-service` crate → `service.query_status()`
-2. Parse `ServiceState`:
-   - `Running` → `"active"`
-   - `Stopped` / `Paused` etc. → `"inactive"`
-   - `ERROR_SERVICE_DOES_NOT_EXIST` → `"uninstalled"`
+1. Call `nssm status <service_name>` CLI
+2. Parse stdout:
+   - `SERVICE_RUNNING` → `"active"`
+   - `SERVICE_STOPPED` / `SERVICE_PAUSED` → `"inactive"`
+   - No output or error → `"uninstalled"`
 
 ### Install Script
 
@@ -1060,7 +1040,7 @@ To lower the deployment barrier for Windows users, a PowerShell install script (
 3. **Copy files**:
    - Copy or prompt user to place `mihomo.exe` / `sing-box.exe` in the respective core directory
    - Copy `clashtui.exe` to `bin/`
-4. **Register Windows Services**: clashtui registers both core services via the `windows-service` crate's SCM API (no external tools needed)
+4. **Register Windows Services**: clashtui registers both core services via nssm CLI
 5. **Generate config.yaml template**: Auto-fill `bin_path` and `config_dir` with the user's chosen install directory
 
 #### Usage
@@ -1099,4 +1079,4 @@ D:\clashtui\
 
 #### Service Registration
 
-The script registers Windows Services via clashtui's own `clashtui service install` subcommand, which uses the `windows-service` crate to call the SCM API — no external tools required.
+The script registers Windows Services via clashtui's own `clashtui service install` subcommand, which invokes nssm CLI.

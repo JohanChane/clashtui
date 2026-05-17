@@ -62,8 +62,21 @@ pub struct SingboxSection {
 pub struct ConfigFile {
     pub mihomo: MihomoSection,
     pub singbox: SingboxSection,
+    #[serde(deserialize_with = "nullable")]
     pub timeout: Option<u64>,
     pub extra: Extra,
+}
+
+fn nullable<'de, T: serde::de::DeserializeOwned, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<T>, D::Error> {
+    let v: serde_yml::Value = serde::Deserialize::deserialize(d)?;
+    match v {
+        serde_yml::Value::Null | serde_yml::Value::Tagged(_) => Ok(None),
+        other => serde_yml::from_value(other)
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+    }
 }
 impl Default for ConfigFile {
     fn default() -> Self {

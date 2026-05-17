@@ -997,58 +997,42 @@ ClashTui 的配置文件结构同 Linux/macOS, 存放在 `%APPDATA%\clashtui` (e
 
 和 Linux/macOS 类似, Windows 也可使用 symlink 指向二进制路径 (`mklink` / `mklink /D`), 但需要 Administrator 权限。如果用户没有管理员权限, 可以直接放置 `.exe` 文件。
 
-### Core services 管理 (Windows Service API)
+### Core services 管理 (nssm)
 
-Windows 使用 Rust 的 [`windows-service`](https://crates.io/crates/windows-service) crate 直接调用 Windows SCM (Service Control Manager) API 管理服务，无需依赖外部工具 (sc.exe / WinSW / NSSM)。Clash Verge Rev 和 FlClash 都采用相同方式。
+mihomo.exe 和 sing-box.exe 不是 Windows 服务程序，不会响应 SCM (Service Control Manager) 的启动/停止请求。直接注册为服务会因超时（90 秒无响应）被系统 kill。
 
-#### systemd vs launchd vs Windows SCM 对比
+Clash Verge Rev 使用自研 service 二进制 (`clash-verge-service`) 实现 IPC wrappper。clashtui 使用更轻量的方案：[nssm](https://nssm.cc/) (Non-Sucking Service Manager) 来管理 Windows 服务。nssm 是一个久经考验的 Windows Service 包装器，能将任何普通程序包裹为合格的服务进程。
 
-| 操作            | Linux (systemd)                          | macOS (launchd)                               | Windows (SCM API)                                      |
+**依赖**: 用户需安装 nssm（通过 `scoop install nssm` 或 [nssm.cc/download](https://nssm.cc/download)）。
+
+#### systemd vs launchd vs nssm 对比
+
+| 操作            | Linux (systemd)                          | macOS (launchd)                               | Windows (nssm CLI)                                     |
 |-----------------|------------------------------------------|-----------------------------------------------|--------------------------------------------------------|
-| **User Mode**   |                                          |                                               |                                                        |
-| 安装服务        | `systemctl --user link <unit>`           | (plist 写入 `~/Library/LaunchAgents/` 即安装)   | `ServiceManager::create_service()`                     |
-| 卸载服务        | `systemctl --user disable <name>`        | (删除 plist + `launchctl bootout`)              | `service.stop()` → `service.delete()`                  |
-| 启动服务        | `systemctl --user start <name>`          | `launchctl bootstrap gui/$UID <plist>`         | `service.start()`                                      |
-| 停止服务        | `systemctl --user stop <name>`           | `launchctl bootout gui/$UID/<name>`            | `service.stop()`                                       |
-| 查看状态        | `systemctl --user is-active <name>`      | `launchctl print gui/$UID/<name>`              | `service.query_status()` → `ServiceState`              |
-| 崩溃重启        | `Restart=always` (unit file)             | `KeepAlive=true` (plist)                       | `SERVICE_CONFIG_FAILURE_ACTIONS` (通过 SCM API 配置)     |
 | **System Mode** |                                          |                                               |                                                        |
-| 安装服务        | `sudo systemctl link <unit>`             | `sudo launchctl bootstrap system <plist>`      | `ServiceManager::create_service()` (需 Administrator)   |
-| 卸载服务        | `sudo systemctl disable <name>`          | `sudo launchctl bootout system/<name>`         | `stop()` → `delete()`  (需 Administrator)               |
-| 启动服务        | `sudo systemctl start <name>`            | `sudo launchctl bootstrap system <plist>`      | `service.start()` (需 Administrator)                    |
-| 停止服务        | `sudo systemctl stop <name>`             | `sudo launchctl bootout system/<name>`         | `service.stop()` (需 Administrator)                     |
-| 查看状态        | `systemctl is-active <name>`             | `sudo launchctl print system/<name>`           | `service.query_status()`                                |
+| 安装服务        | `sudo systemctl link <unit>`             | `sudo launchctl bootstrap system <plist>`      | `nssm install <name> <exe> <args...>` (需 Administrator)|
+| 卸载服务        | `sudo systemctl disable <name>`          | `sudo launchctl bootout system/<name>`         | `nssm remove <name> confirm` (需 Administrator)         |
+| 启动服务        | `sudo systemctl start <name>`            | `sudo launchctl bootstrap system <plist>`      | `nssm start <name>` (需 Administrator)                  |
+| 停止服务        | `sudo systemctl stop <name>`             | `sudo launchctl bootout system/<name>`         | `nssm stop <name>` (需 Administrator)                   |
+| 重启服务        | `sudo systemctl restart <name>`          | 先 bootout 再 bootstrap                         | `nssm restart <name>`                                  |
+| 查看状态        | `systemctl is-active <name>`             | `sudo launchctl print system/<name>`           | `nssm status <name>` → 解析 SERVICE_RUNNING/STOPPED     |
 | TUN 权限        | `setcap` (Linux capabilities)            | root 运行 (无 setcap)                           | Administrator 运行即可 (LocalSystem 默认)                |
 
 关键差异:
-- **零外部依赖**: `windows-service` crate 直接调用 Windows SCM API，无需用户安装任何第三方工具。SCM API 是 Windows 操作系统的核心组件。
-- **类型安全**: 通过 Rust crate 的强类型 API (`ServiceState`, `ServiceType`, `ServiceStartType`) 管理服务，避免 CLI 字符串解析错误。
-- **崩溃重启**: 通过 SCM API 的 `ChangeServiceConfig2W` + `SERVICE_CONFIG_FAILURE_ACTIONS` 配置。`windows-service` crate 目前不直接暴露此接口，需通过 `windows` crate 补充调用，或安装后使用 `sc failure` 配置。
+- **nssm 包装器**: nssm 将 mihomo/sing-box 包装为合法 Windows 服务，正确响应 SCM 事件。
+- **CLI 调用**: clashtui 通过 `std::process::Command` 调用 `nssm.exe`，与调用 `systemctl` 的方式一致。
+- **崩溃重启**: nssm 内置崩溃重启支持，无需额外配置。
 
 #### 安装命令示例
 
-clashtui 直接调用 SCM API (无需外部命令):
+clashtui 调用 nssm CLI (与 systemctl 类似):
 
-```rust
-// 伪代码示意
-use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+```powershell
+# mihomo
+nssm install clashtui_mihomo "C:\Program Files\clashtui\mihomo\mihomo.exe" -d "C:\Program Files\clashtui\mihomo\config"
 
-let manager = ServiceManager::local_computer(None, ServiceManagerAccess::CREATE_SERVICE)?;
-let service = manager.create_service(
-    &ServiceInfo {
-        name: "clashtui_mihomo".into(),
-        display_name: "ClashTui Mihomo".into(),
-        service_type: ServiceType::OWN_PROCESS,
-        start_type: ServiceStartType::AutoStart,
-        error_control: ServiceErrorControl::Normal,
-        executable_path: r"C:\Program Files\clashtui\mihomo\mihomo.exe",
-        launch_arguments: vec![r#"-d "C:\Program Files\clashtui\mihomo\config""#.into()],
-        dependencies: vec![],
-        account_name: None, // LocalSystem
-        account_password: None,
-    },
-    ServiceAccess::START | ServiceAccess::STOP,
-)?;
+# sing-box
+nssm install clashtui_singbox "C:\Program Files\clashtui\sing-box\sing-box.exe" -D "C:\Program Files\clashtui\sing-box\config" -c "C:\Program Files\clashtui\sing-box\config\config.json" run
 ```
 
 #### CoreSrvCtl 新增操作
@@ -1057,16 +1041,14 @@ Windows 命令行不方便, 所以 CoreSrvCtl tab 在 Windows 上额外提供以
 
 **1. Install Srv (安装服务)**
 
-- 通过 `windows-service` crate 调用 SCM API: `ServiceManager::create_service()`
-- service type: `OWN_PROCESS`, start type: `AutoStart`, account: `LocalSystem` (Administrator 权限)
-- `executable_path` = `bin_path`, `launch_arguments` 根据 CoreType 生成
+- 调用 nssm CLI: `nssm install <name> <bin_path> <launch_args...>`
 - 安装后服务状态变为 `installed`
-- 可选: 安装后通过 `sc failure` 配置崩溃重启策略 (SCM API 的 failure actions 配置较底层)
+- nssm 内置崩溃重启和日志管理
 
 **2. Uninstall Srv (卸载服务)**
 
-- 如果服务正在运行, 先 `service.stop()`
-- 再 `service.delete()` 卸载服务
+- 调用 nssm CLI: `nssm remove <name> confirm`
+- nssm 自动停止运行中的服务再卸载
 - 卸载后服务状态变为 `uninstalled`
 
 **3. Toggle System Proxy (切换系统代理)**
@@ -1091,8 +1073,8 @@ CoreSrvCtl tab 的操作列表:
 |------------------|------------------------------------------------|
 | Stop Service     | 停止当前 core 的 service                       |
 | Start Service    | 启动当前 core 的 service                       |
-| Install Srv      | 安装当前 core 为 Windows Service (SCM API create_service) |
-| Uninstall Srv    | 卸载当前 core 的 Windows Service (先 stop 再 delete) |
+| Install Srv      | 通过 nssm 安装当前 core 为 Windows Service      |
+| Uninstall Srv    | 通过 nssm 卸载当前 core 的 Windows Service       |
 | Toggle SysProxy  | 切换系统代理 (enable/disable)                   |
 | Switch Core      | 切换到另一个 core (mihomo ↔ sing-box)           |
 | Stop All         | 停止所有 core services                          |
@@ -1108,9 +1090,9 @@ CoreSrvCtl tab 的操作列表:
 | `?`            | 无法确定状态 (如权限不足)         |
 
 状态检测优先级:
-1. 通过 SCM API `service.query_status()` 获取 `ServiceState`
-2. `Running` → `"active"`, `Stopped` → `"inactive"`
-3. 服务未注册 (ERROR_SERVICE_DOES_NOT_EXIST) → `"uninstalled"`
+1. 调用 `nssm status <service_name>` 获取状态字符串
+2. `SERVICE_RUNNING` → `"active"`, `SERVICE_STOPPED` / `SERVICE_PAUSED` → `"inactive"`
+3. nssm 返回错误 (服务不存在) → `"uninstalled"`
 
 ### 文件权限
 
@@ -1143,22 +1125,20 @@ enum SrvCtlOp {
 
 ```rust
 #[cfg(windows)]
-SrvCtlOp::Install,       // "Install Service" — SCM API create_service
+SrvCtlOp::Install,       // "Install Service" — nssm install
 #[cfg(windows)]
-SrvCtlOp::Uninstall,     // "Uninstall Service" — stop + delete
+SrvCtlOp::Uninstall,     // "Uninstall Service" — nssm remove
 #[cfg(windows)]
 SrvCtlOp::ToggleSysProxy, // "Toggle System Proxy" — 读写注册表
 ```
 
 **Install** 执行逻辑:
-1. 通过 `windows-service` crate 调用 `ServiceManager::create_service()`
-2. service type: `OWN_PROCESS`, account: `LocalSystem`, start: `AutoStart`
-3. `executable_path` = `bin_path`, `launch_arguments` 根据 CoreType 生成
-4. 更新状态为 `installed`
+1. 调用 nssm CLI: `nssm install <name> <bin_path> <launch_args...>`
+2. 更新状态为 `installed`
 
 **Uninstall** 执行逻辑:
-1. 打开 service, 如果 running 则先 `service.stop()`
-2. 再 `service.delete()`
+1. 调用 nssm CLI: `nssm remove <name> confirm`
+2. nssm 自动停止运行中的服务再卸载
 3. 更新状态为 `uninstalled`
 
 **Toggle System Proxy** 执行逻辑:
@@ -1180,11 +1160,11 @@ match ServiceController::default() {
 ```
 
 `windows_service_status()` 实现:
-1. 通过 `windows-service` crate 打开 service → `service.query_status()`
-2. 解析 `ServiceState`:
-   - `Running` → `"active"`
-   - `Stopped` / `Paused` 等 → `"inactive"`
-   - `ERROR_SERVICE_DOES_NOT_EXIST` → `"uninstalled"`
+1. 调用 `nssm status <service_name>` CLI 获取状态
+2. 解析 stdout:
+   - `SERVICE_RUNNING` → `"active"`
+   - `SERVICE_STOPPED` / `SERVICE_PAUSED` → `"inactive"`
+   - 无输出或错误 → `"uninstalled"`
 
 ### Install Script
 
@@ -1197,7 +1177,7 @@ match ServiceController::default() {
 3. **复制文件**:
    - 复制或提示用户放置 `mihomo.exe` / `sing-box.exe` 到对应 core 目录
    - 复制 `clashtui.exe` 到 `bin/`
-4. **注册 Windows Service**: clashtui 通过 `windows-service` crate 的 SCM API 注册两个 core services (无需外部工具)
+4. **注册 Windows Service**: clashtui 通过 nssm CLI 注册两个 core services
 6. **生成 config.yaml 模板**: 自动填充 `bin_path` 和 `config_dir` 为用户选择的安装目录
 
 #### 使用方式
@@ -1236,4 +1216,4 @@ D:\clashtui\
 
 #### Service 注册
 
-脚本通过 clashtui 自身的 `clashtui service install` 子命令注册 Windows Service, 底层使用 `windows-service` crate 调用 SCM API, 无需外部工具。
+脚本通过 clashtui 自身的 `clashtui service install` 子命令注册 Windows Service, 底层调用 nssm CLI。
