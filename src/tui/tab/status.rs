@@ -104,33 +104,8 @@ impl BasicTabContent for Status {
     fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         self.paused = false;
 
-        // Synchronous detection so other tabs see the flag before their first fetch
         let was_unknown = self.detected_core_type.is_none();
-        match restful::core_detect::detect_core_type() {
-            Ok(detected) => {
-                let configured = CONFIG.core_type();
-                self.detected_core_type = Some(detected);
-                let mismatch = detected != configured;
-                crate::config::set_core_mismatch(mismatch);
-                if mismatch {
-                    let msg =
-                        format!("API returned {detected} data, but {configured} is configured");
-                    self.error = Some(msg.clone());
-                    if was_unknown {
-                        crate::tui::widget::popmsg::Confirm::err(msg);
-                    }
-                }
-            }
-            Err(e) => {
-                self.error = Some(format!("Core detection failed: {e}"));
-            }
-        }
-
-        if crate::config::is_core_mismatch() {
-            return;
-        }
-
-        async {
+        async move {
             let version = tri!(
                 tokio::task::spawn_blocking(restful::control::version)
                     .await
@@ -153,12 +128,17 @@ impl BasicTabContent for Status {
                 if detected == configured {
                     content.version = Some(version);
                     content.config = Some(config);
+                    content.error = None;
                     crate::config::set_core_mismatch(false);
                 } else {
-                    content.error = Some(format!(
+                    let msg = format!(
                         "API returned {detected} data, but {configured} is configured"
-                    ));
+                    );
+                    content.error = Some(msg.clone());
                     crate::config::set_core_mismatch(true);
+                    if was_unknown {
+                        crate::tui::widget::popmsg::Confirm::err(msg);
+                    }
                 }
             })
         }

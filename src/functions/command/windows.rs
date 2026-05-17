@@ -1,7 +1,91 @@
 use super::*;
 use crate::config::CoreType;
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::path::PathBuf;
+use std::process::Command as StdCommand;
+
+/// Check whether the current process is running with administrator privileges.
+fn is_admin() -> bool {
+    // `is-root` crate approach: try opening the SAM registry key (admin-only)
+    // Fallback: try running a privileged command like `net session`
+    StdCommand::new("net")
+        .args(["session"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// Execute a command with administrator elevation on Windows.
+/// Uses PowerShell `Start-Process -Verb RunAs` to trigger UAC,
+/// redirects output to temp files, waits, and returns combined output.
+fn exec_admin(pgm: &str, args: &[&str]) -> Result<String> {
+    let temp = std::env::temp_dir();
+    let out_file = temp.join(format!("clashtui_{}_out.txt", fastrand::u32(..)));
+    let err_file = temp.join(format!("clashtui_{}_err.txt", fastrand::u32(..)));
+
+    let _ = std::fs::remove_file(&out_file);
+    let _ = std::fs::remove_file(&err_file);
+
+    let arg_string = args
+        .iter()
+        .map(|a| format!("'{}'", a.replace('\'', "''")))
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let ps_cmd = format!(
+        "Start-Process -FilePath '{}' -ArgumentList {} -Verb RunAs -Wait -WindowStyle Hidden -RedirectStandardOutput '{}' -RedirectStandardError '{}'",
+        pgm.replace('\'', "''"),
+        arg_string,
+        out_file.display(),
+        err_file.display(),
+    );
+
+    log::debug!("IPC (admin): {}", ps_cmd);
+
+    let ps_output = StdCommand::new("powershell")
+        .args(["-NoProfile", "-Command", &ps_cmd])
+        .output()
+        .map_err(|e| anyhow!("Failed to launch PowerShell for elevation: {e}"))?;
+
+    if !ps_output.status.success() {
+        let ps_err = String::from_utf8_lossy(&ps_output.stderr);
+        if ps_err.contains("canceled") || ps_err.contains("denied") {
+            return Err(anyhow!("Administrator elevation was denied or cancelled"));
+        }
+        // Continue anyway, maybe the process launched but exited non-zero
+    }
+
+    let stdout = std::fs::read_to_string(&out_file).unwrap_or_default();
+    let stderr = std::fs::read_to_string(&err_file).unwrap_or_default();
+
+    let _ = std::fs::remove_file(&out_file);
+    let _ = std::fs::remove_file(&err_file);
+
+    let combined = if stderr.is_empty() {
+        stdout
+    } else if stdout.is_empty() {
+        stderr
+    } else {
+        format!("{}\n{}", stdout, stderr)
+    };
+
+    if combined.trim().is_empty() {
+        return Ok(String::new());
+    }
+
+    Ok(combined)
+}
+
+/// Call nssm with elevation when admin rights are needed.
+fn exec_nssm(args: &[&str]) -> Result<String> {
+    if is_admin() {
+        exec("nssm", args.to_vec())
+    } else {
+        exec_admin("nssm", args)
+    }
+}
 
 // ── File permission stubs ──────────────────────────────────────
 
@@ -80,9 +164,9 @@ pub fn windows_service_operation(op: &str, service_name: &str) -> Result<String>
         "start" => "start",
         "stop" => "stop",
         "restart" | "reload" => "restart",
-        _ => return Err(anyhow::anyhow!("Unknown Windows service operation: {op}")),
+        _ => return Err(anyhow!("Unknown Windows service operation: {op}")),
     };
-    exec("nssm", vec![nssm_op, service_name])
+    exec_nssm(&[nssm_op, service_name])
 }
 
 /// Install a Windows service via nssm.
@@ -93,26 +177,33 @@ pub fn windows_service_install(
     launch_args: &[String],
 ) -> Result<String> {
     let mut args: Vec<&str> = vec!["install", service_name, bin_path];
-    for arg in launch_args {
+    let string_args: Vec<String> = launch_args.iter().map(|a| a.as_str().to_owned()).collect();
+    for arg in &string_args {
         args.push(arg.as_str());
     }
-    exec("nssm", args)
+    exec_nssm(&args)
 }
 
 /// Uninstall a Windows service via nssm.
 pub fn windows_service_uninstall(service_name: &str) -> Result<String> {
-    // nssm remove requires literal "confirm" to proceed
-    exec("nssm", vec!["remove", service_name, "confirm"])
+    exec_nssm(&["remove", service_name, "confirm"])
 }
 
 /// Query Windows service status via nssm.
 pub fn windows_service_status(service_name: &str) -> String {
-    match std::process::Command::new("nssm")
-        .args(["status", service_name])
-        .output()
-    {
-        Ok(output) => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
+    let result = if is_admin() {
+        StdCommand::new("nssm")
+            .args(["status", service_name])
+            .output()
+            .map(|o| (o.status.success(), String::from_utf8_lossy(&o.stdout).to_string()))
+            .map_err(|e| anyhow!(e))
+    } else {
+        exec_admin("nssm", &["status", service_name])
+            .map(|s| (true, s))
+    };
+
+    match result {
+        Ok((_, stdout)) => {
             if stdout.contains("SERVICE_RUNNING") {
                 "active".to_owned()
             } else if stdout.contains("SERVICE_STOPPED") {
@@ -120,7 +211,6 @@ pub fn windows_service_status(service_name: &str) -> String {
             } else if stdout.contains("SERVICE_PAUSED") {
                 "inactive".to_owned()
             } else {
-                // Probably "Could not connect to service manager" etc.
                 "uninstalled".to_owned()
             }
         }
