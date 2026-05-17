@@ -488,10 +488,9 @@ impl TabContent for SrvCtlContent {
                             let service_name = crate::functions::command::service_name_for(
                                 crate::config::CONFIG.core_type(),
                             );
-                            let bin_path =
-                                crate::functions::command::service_bin_path(
-                                    crate::config::CONFIG.core_type(),
-                                );
+                            let bin_path = crate::functions::command::service_bin_path(
+                                crate::config::CONFIG.core_type(),
+                            );
                             let launch_args = crate::functions::command::service_launch_args(
                                 crate::config::CONFIG.core_type(),
                             );
@@ -514,8 +513,7 @@ impl TabContent for SrvCtlContent {
                         }
                         #[cfg(windows)]
                         SrvCtlOp::ToggleSysProxy => {
-                            let current_state =
-                                crate::functions::command::get_system_proxy_state();
+                            let current_state = crate::functions::command::get_system_proxy_state();
                             let port = crate::functions::command::get_mixed_port();
                             let result = if current_state {
                                 crate::functions::command::toggle_system_proxy(false, 0)

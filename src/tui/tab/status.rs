@@ -131,9 +131,8 @@ impl BasicTabContent for Status {
                     content.error = None;
                     crate::config::set_core_mismatch(false);
                 } else {
-                    let msg = format!(
-                        "API returned {detected} data, but {configured} is configured"
-                    );
+                    let msg =
+                        format!("API returned {detected} data, but {configured} is configured");
                     content.error = Some(msg.clone());
                     crate::config::set_core_mismatch(true);
                     if was_unknown {

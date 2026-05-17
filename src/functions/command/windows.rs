@@ -1,6 +1,6 @@
 use super::*;
 use crate::config::CoreType;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::path::PathBuf;
 use std::process::Command as StdCommand;
 
@@ -119,10 +119,7 @@ pub fn repair_file_permissions(_dir: &Path, _group_name: &str) -> Result<String>
 pub fn service_launch_args(ct: CoreType) -> Vec<String> {
     let cfg = &crate::config::CONFIG.cfg_file;
     match ct {
-        CoreType::Mihomo => vec![
-            "-d".to_owned(),
-            cfg.mihomo.core.config_dir.clone(),
-        ],
+        CoreType::Mihomo => vec!["-d".to_owned(), cfg.mihomo.core.config_dir.clone()],
         CoreType::Singbox => vec![
             "-D".to_owned(),
             cfg.singbox.core.config_dir.clone(),
@@ -195,11 +192,15 @@ pub fn windows_service_status(service_name: &str) -> String {
         StdCommand::new("nssm")
             .args(["status", service_name])
             .output()
-            .map(|o| (o.status.success(), String::from_utf8_lossy(&o.stdout).to_string()))
+            .map(|o| {
+                (
+                    o.status.success(),
+                    String::from_utf8_lossy(&o.stdout).to_string(),
+                )
+            })
             .map_err(|e| anyhow!(e))
     } else {
-        exec_admin("nssm", &["status", service_name])
-            .map(|s| (true, s))
+        exec_admin("nssm", &["status", service_name]).map(|s| (true, s))
     };
 
     match result {
@@ -222,8 +223,8 @@ pub fn windows_service_status(service_name: &str) -> String {
 
 /// Read the Windows system proxy state from registry.
 pub fn get_system_proxy_state() -> bool {
-    use winreg::enums::*;
     use winreg::RegKey;
+    use winreg::enums::*;
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
@@ -242,8 +243,8 @@ pub fn get_system_proxy_state() -> bool {
 /// Enable or disable the Windows system proxy.
 /// `mixed_port` is the core's mixed inbound port (e.g., 7890).
 pub fn toggle_system_proxy(enable: bool, mixed_port: u16) -> Result<String> {
-    use winreg::enums::*;
     use winreg::RegKey;
+    use winreg::enums::*;
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let internet_settings = hkcu.open_subkey_with_flags(
@@ -253,8 +254,7 @@ pub fn toggle_system_proxy(enable: bool, mixed_port: u16) -> Result<String> {
 
     if enable {
         internet_settings.set_value("ProxyEnable", &1u32)?;
-        internet_settings
-            .set_value("ProxyServer", &format!("127.0.0.1:{mixed_port}"))?;
+        internet_settings.set_value("ProxyServer", &format!("127.0.0.1:{mixed_port}"))?;
         internet_settings.set_value("ProxyOverride", &"<-loopback>")?;
         broadcast_settings_change();
         Ok("System proxy enabled".into())
@@ -269,7 +269,7 @@ pub fn toggle_system_proxy(enable: bool, mixed_port: u16) -> Result<String> {
 fn broadcast_settings_change() {
     use windows::Win32::Foundation::{LPARAM, WPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{
-        SendMessageTimeoutW, HWND_BROADCAST, SMTO_NORMAL, WM_SETTINGCHANGE,
+        HWND_BROADCAST, SMTO_NORMAL, SendMessageTimeoutW, WM_SETTINGCHANGE,
     };
 
     let env_str = "Environment";

@@ -177,7 +177,10 @@ fn handle_service(command: ServiceCommand) -> Result<()> {
             let bin_path = crate::functions::command::service_bin_path(ct);
             let launch_args = crate::functions::command::service_launch_args(ct);
             let output = crate::functions::command::windows_service_install(
-                ct, &bin_path, &service_name, &launch_args,
+                ct,
+                &bin_path,
+                &service_name,
+                &launch_args,
             )?;
             println!("{output}");
             Ok(())
@@ -189,8 +192,7 @@ fn handle_service(command: ServiceCommand) -> Result<()> {
                 super::CoreArg::Singbox => crate::config::CoreType::Singbox,
             };
             let service_name = crate::functions::command::service_name_for(ct);
-            let output =
-                crate::functions::command::windows_service_uninstall(&service_name)?;
+            let output = crate::functions::command::windows_service_uninstall(&service_name)?;
             println!("{output}");
             Ok(())
         }
