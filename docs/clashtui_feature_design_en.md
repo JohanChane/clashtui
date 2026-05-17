@@ -779,48 +779,52 @@ User mode default path is `~/.local/clashtui`, same as Linux.
 |---------------|------------------------------------------|----------------------------------------------------|
 | **User Mode** |                                          |                                                    |
 | unit location | `~/.config/systemd/user/<name>.service`  | `~/Library/LaunchAgents/<name>.plist`              |
-| start service | `systemctl --user start <name>`          | `launchctl bootstrap gui/$UID <plist>`             |
-| stop service  | `systemctl --user stop <name>`           | `launchctl bootout gui/$UID/<name>`                |
+| start service | `systemctl --user start <name>`          | `launchctl load <plist>` (RunAtLoad starts immediately) |
+| stop service  | `systemctl --user stop <name>`           | `launchctl unload <plist>`                         |
 | check status  | `systemctl --user is-active <name>`      | `launchctl print gui/$UID/<name>`                  |
-| auto-start    | `systemctl --user enable <name>`         | `RunAtLoad=true` (effective once plist is in place) |
+| auto-start    | `systemctl --user enable <name>`         | `launchctl load -w <plist>` (persists across reboots) |
 | survive logout| `loginctl enable-linger` (supported)      | Not supported (stops on logout)                     |
 | crash restart | `systemd service Restart=always`         | plist `KeepAlive=true`                             |
 | **System Mode** |                                       |                                                    |
 | unit location | `/usr/lib/systemd/system/<name>.service` | `/Library/LaunchDaemons/<name>.plist`              |
-| start service | `sudo systemctl start <name>`            | `sudo launchctl bootstrap system <plist>`          |
-| stop service  | `sudo systemctl stop <name>`             | `sudo launchctl bootout system/<name>`             |
+| start service | `sudo systemctl start <name>`            | `sudo launchctl load <plist>` (RunAtLoad starts immediately) |
+| stop service  | `sudo systemctl stop <name>`             | `sudo launchctl unload <plist>`                    |
 | check status  | `systemctl is-active <name>`             | `sudo launchctl print system/<name>`               |
-| auto-start    | `sudo systemctl enable <name>`           | `RunAtLoad=true` (boot-time launch from /Library/LaunchDaemons/) |
+| auto-start    | `sudo systemctl enable <name>`           | `sudo launchctl load -w <plist>` (persists across reboots) |
 | run as        | Dedicated user (mihomo / sing-box)        | root (launchd system daemon)                       |
 | TUN access    | Linux capabilities (setcap)              | sudo / root (no setcap on macOS)                    |
 
 Key differences:
-- **enable/disable concept**: systemd's `enable` only sets auto-start, `start` starts immediately. launchd's `bootstrap` does all three: "load plist + auto-start + start now". `bootout` stops and removes from launchd.
+- **enable/disable concept**: systemd's `enable` only sets auto-start, `start` starts immediately. launchd's `load` starts the service now (RunAtLoad=true). `load -w` additionally persists auto-start across reboots by removing the disabled override. `unload` stops and removes from launchd. `unload -w` also marks as disabled for boot.
 - **logout behavior**: launchd `LaunchAgents` stop on logout, no config can change this. `LaunchDaemons` (system mode) start at boot and survive login/logout cycles.
 - **TUN permissions**: Linux uses `setcap` to grant capabilities, running TUN as non-root. macOS has no such mechanism; system mode runs as root for utun device access.
 
 ClashTui service commands on macOS:
 
 ```sh
-# Start (system mode)
-sudo launchctl bootstrap system /Library/LaunchDaemons/clashtui_mihomo.plist
-sudo launchctl bootstrap system /Library/LaunchDaemons/clashtui_singbox.plist
+# Start now (system mode)
+sudo launchctl load /Library/LaunchDaemons/clashtui_mihomo.plist
+sudo launchctl load /Library/LaunchDaemons/clashtui_singbox.plist
+
+# Start + auto-start on boot
+sudo launchctl load -w /Library/LaunchDaemons/clashtui_mihomo.plist
+sudo launchctl load -w /Library/LaunchDaemons/clashtui_singbox.plist
 
 # Stop
-sudo launchctl bootout system/clashtui_mihomo
-sudo launchctl bootout system/clashtui_singbox
+sudo launchctl unload /Library/LaunchDaemons/clashtui_mihomo.plist
+sudo launchctl unload /Library/LaunchDaemons/clashtui_singbox.plist
 
 # Check status
-sudo launchctl print system/clashtui_mihomo
-sudo launchctl print system/clashtui_singbox
+sudo launchctl list | grep clashtui
 
 # User mode (no sudo)
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/clashtui_mihomo.plist
-launchctl bootout gui/$(id -u)/clashtui_mihomo
-launchctl print gui/$(id -u)/clashtui_mihomo
+launchctl load ~/Library/LaunchAgents/clashtui_mihomo.plist
+launchctl unload ~/Library/LaunchAgents/clashtui_mihomo.plist
+launchctl load -w ~/Library/LaunchAgents/clashtui_mihomo.plist
 ```
 
-> macOS 10.11+ recommends `bootstrap`/`bootout` over legacy `load`/`unload`.
+> `load` starts the service immediately because `RunAtLoad=true` is set in the plist.
+> `load -w` additionally persists auto-start across reboots.
 
 ### macOS File Permissions
 
@@ -835,6 +839,142 @@ macOS and Linux use a unified Unix group permission model for managing Core file
 | Startup permission check/repair | ✅ | ✅ (real impl in `macos.rs`, not stubs) |
 
 Principle: On macOS system mode, Core services run as root (required for TUN), while regular users gain file read/write access through the `admin` group. At startup, ClashTui checks the Core directory's SGID bit, group consistency, and group writability. If inconsistent, it repairs via `sudo chmod g+s` / `sudo chown :<group>` / `sudo chmod g+w`.
+
+### Launchd Plist Files
+
+#### 1. User Mode — clashtui_mihomo.plist
+
+Path: `~/Library/LaunchAgents/clashtui_mihomo.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_mihomo</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>~/.local/clashtui/mihomo/mihomo</string>
+        <string>-d</string>
+        <string>~/.local/clashtui/mihomo/config</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>~/Library/Logs/clashtui_mihomo.log</string>
+    <key>StandardErrorPath</key>
+    <string>~/Library/Logs/clashtui_mihomo.log</string>
+    <key>WorkingDirectory</key>
+    <string>~/.local/clashtui/mihomo/config</string>
+</dict>
+</plist>
+```
+
+#### 2. User Mode — clashtui_singbox.plist
+
+Path: `~/Library/LaunchAgents/clashtui_singbox.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_singbox</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>~/.local/clashtui/sing-box/sing-box</string>
+        <string>-D</string>
+        <string>~/.local/clashtui/sing-box/config</string>
+        <string>-c</string>
+        <string>~/.local/clashtui/sing-box/config/config.json</string>
+        <string>run</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>~/Library/Logs/clashtui_singbox.log</string>
+    <key>StandardErrorPath</key>
+    <string>~/Library/Logs/clashtui_singbox.log</string>
+    <key>WorkingDirectory</key>
+    <string>~/.local/clashtui/sing-box/config</string>
+</dict>
+</plist>
+```
+
+#### 3. System Mode — clashtui_mihomo.plist
+
+Path: `/Library/LaunchDaemons/clashtui_mihomo.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_mihomo</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/opt/clashtui/mihomo/mihomo</string>
+        <string>-d</string>
+        <string>/usr/local/opt/clashtui/mihomo/config</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/usr/local/var/log/clashtui_mihomo.log</string>
+    <key>StandardErrorPath</key>
+    <string>/usr/local/var/log/clashtui_mihomo.log</string>
+    <key>WorkingDirectory</key>
+    <string>/usr/local/opt/clashtui/mihomo/config</string>
+</dict>
+</plist>
+```
+
+#### 4. System Mode — clashtui_singbox.plist
+
+Path: `/Library/LaunchDaemons/clashtui_singbox.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>clashtui_singbox</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/opt/clashtui/sing-box/sing-box</string>
+        <string>-D</string>
+        <string>/usr/local/opt/clashtui/sing-box/config</string>
+        <string>-c</string>
+        <string>/usr/local/opt/clashtui/sing-box/config/config.json</string>
+        <string>run</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/usr/local/var/log/clashtui_singbox.log</string>
+    <key>StandardErrorPath</key>
+    <string>/usr/local/var/log/clashtui_singbox.log</string>
+    <key>WorkingDirectory</key>
+    <string>/usr/local/opt/clashtui/sing-box/config</string>
+</dict>
+</plist>
+```
 
 ## Support Windows
 
