@@ -43,6 +43,8 @@ param(
 $Script:RepoOwner, $Script:RepoName = if ($Repo -match '^(.+)/(.+)$') { $matches[1], $matches[2] } else { "JohanChane", "clashtui" }
 $Script:Branch = $Branch
 $Script:ContribUrlPrefix = "https://raw.githubusercontent.com/$Script:RepoOwner/$Script:RepoName/refs/heads/$Script:Branch/contrib"
+# Capture script-level PSBoundParameters for use in Invoke-Administrator (function scope has its own $PSBoundParameters)
+$Script:BoundParameters = $PSBoundParameters
 
 # --- Helper Functions ---
 
@@ -50,19 +52,36 @@ function Invoke-Administrator {
     <#
     .SYNOPSIS
     Relaunch the script with administrator privileges if not already elevated.
+    .DESCRIPTION
+    Uses Start-Process -Verb RunAs and passes all original parameters via the
+    command line, which lets PowerShell's native parameter binding handle them
+    correctly in the elevated instance.
     #>
     if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         Write-Host "[INFO] Requesting administrator privileges..." -ForegroundColor Yellow
-        $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
-        foreach ($key in $PSBoundParameters.Keys) {
-            $value = $PSBoundParameters[$key]
-            if ($value -is [switch]) {
-                if ($value) { $arguments += " -$key" }
+
+        # Rebuild the original argument list from script-level bound parameters
+        $argList = New-Object System.Collections.Generic.List[string]
+        foreach ($key in $Script:BoundParameters.Keys) {
+            $val = $Script:BoundParameters[$key]
+            if ($val -is [switch]) {
+                if ($val) { $argList.Add("-$key") }
+            } elseif ($val -is [string] -and $val -match '\s') {
+                $argList.Add("-$key")
+                $argList.Add("`"$val`"")
             } else {
-                $arguments += " -$key `"$value`""
+                $argList.Add("-$key")
+                $argList.Add($val)
             }
         }
-        Start-Process powershell -Verb RunAs -ArgumentList $arguments
+
+        $argsString = $argList -join ' '
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = (Get-Process -Id $PID).Path
+        $psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $argsString"
+        $psi.UseShellExecute = $true
+        $psi.Verb = "RunAs"
+        [System.Diagnostics.Process]::Start($psi) | Out-Null
         exit 0
     }
 }
@@ -414,7 +433,8 @@ extra:
   open_dir_cmd: $openDirCmd %s
 "@
 
-    Set-Content -Path $configPath -Value $configContent -Encoding UTF8
+    $utf8 = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($configPath, $configContent, $utf8)
     Write-Info "Config written to: $configPath"
 }
 
@@ -440,7 +460,8 @@ function New-CoreConfigs {
 external-controller: 127.0.0.1:9090
 mixed-port: 7890
 "@
-            Set-Content -Path $overridePath -Value $defaultOverride -Encoding UTF8
+            $utf8 = [System.Text.UTF8Encoding]::new($false)
+            [System.IO.File]::WriteAllText($overridePath, $defaultOverride, $utf8)
             Write-Info "Created mihomo core override: $overridePath"
         }
 
@@ -461,14 +482,16 @@ mixed-port: 7890
 #     pvd0: "https://example.com/sub1.yaml"
 #     pvd1: "https://example.com/sub2.yaml"
 "@
-            Set-Content -Path $tppPath -Value $tppContent -Encoding UTF8
+            $utf8 = [System.Text.UTF8Encoding]::new($false)
+            [System.IO.File]::WriteAllText($tppPath, $tppContent, $utf8)
             Write-Info "Created mihomo template proxy providers: $tppPath"
         }
 
         # Core config.yaml (placeholder, managed by clashtui)
         $coreConfigPath = Join-Path $InstallDir "mihomo\config\config.yaml"
         if (-not (Test-Path -LiteralPath $coreConfigPath)) {
-            Set-Content -Path $coreConfigPath -Value $defaultOverride -Encoding UTF8
+            $utf8 = [System.Text.UTF8Encoding]::new($false)
+            [System.IO.File]::WriteAllText($coreConfigPath, $defaultOverride, $utf8)
             Write-Info "Created mihomo core config: $coreConfigPath"
         }
     }
@@ -501,7 +524,8 @@ mixed-port: 7890
   }
 }
 "@
-            Set-Content -Path $overridePath -Value $defaultOverride -Encoding UTF8
+            $utf8 = [System.Text.UTF8Encoding]::new($false)
+            [System.IO.File]::WriteAllText($overridePath, $defaultOverride, $utf8)
             Write-Info "Created sing-box core override: $overridePath"
         }
 
@@ -521,13 +545,15 @@ mixed-port: 7890
 #     pvd0: "https://example.com/sub1.yaml"
 #     pvd1: "https://example.com/sub2.yaml"
 "@
-            Set-Content -Path $tppPath -Value $tppContent -Encoding UTF8
+            $utf8 = [System.Text.UTF8Encoding]::new($false)
+            [System.IO.File]::WriteAllText($tppPath, $tppContent, $utf8)
             Write-Info "Created sing-box template proxy providers: $tppPath"
         }
 
         $coreConfigPath = Join-Path $InstallDir "sing-box\config\config.json"
         if (-not (Test-Path -LiteralPath $coreConfigPath)) {
-            Set-Content -Path $coreConfigPath -Value $defaultOverride -Encoding UTF8
+            $utf8 = [System.Text.UTF8Encoding]::new($false)
+            [System.IO.File]::WriteAllText($coreConfigPath, $defaultOverride, $utf8)
             Write-Info "Created sing-box core config: $coreConfigPath"
         }
     }
@@ -611,10 +637,11 @@ function Install-Templates {
                 try {
                     $url = "$Script:ContribUrlPrefix/templates/mihomo/$tpl"
                     $dest = Join-Path $mihomoTemplatesDir $tpl
+                    Write-Info "Fetching: $url"
                     Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
                     Write-Info "Downloaded: $tpl"
                 } catch {
-                    Write-Warn "Failed to download $tpl`: $_"
+                    Write-Warn "Failed to download $tpl`: $_ ($url)"
                 }
             }
         }
@@ -635,10 +662,11 @@ function Install-Templates {
                 try {
                     $url = "$Script:ContribUrlPrefix/templates/sing-box/$tpl"
                     $dest = Join-Path $singboxTemplatesDir $tpl
+                    Write-Info "Fetching: $url"
                     Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
                     Write-Info "Downloaded: $tpl"
                 } catch {
-                    Write-Warn "Failed to download $tpl`: $_"
+                    Write-Warn "Failed to download $tpl`: $_ ($url)"
                 }
             }
         }
