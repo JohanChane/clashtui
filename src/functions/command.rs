@@ -1,5 +1,6 @@
 #[cfg_attr(target_os = "linux", path = "command/linux.rs")]
 #[cfg_attr(target_os = "macos", path = "command/macos.rs")]
+#[cfg_attr(target_os = "windows", path = "command/windows.rs")]
 mod platform;
 mod utils;
 
@@ -133,6 +134,11 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
         return launchd_operation(op, service_name, is_user, password);
     }
 
+    // nssm install/remove need special dispatch (launch args)
+    if matches!(host, ServiceController::Nssm) {
+        return nssm_svc_operation(op, service_name, ct);
+    }
+
     let svc_args = host.args(op, service_name, is_user);
     if is_user {
         return exec(host.bin_name(), svc_args);
@@ -147,6 +153,28 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
             a.extend(argv);
             a
         }),
+    }
+}
+
+fn nssm_svc_operation(op: &str, service_name: &str, ct: CoreType) -> Result<String> {
+    match op {
+        "start" | "stop" | "restart" => {
+            let output = std::process::Command::new("nssm")
+                .args([op, service_name])
+                .output()?;
+            Ok(platform::stringify_output(output))
+        }
+        "install" => {
+            let bin_path = match ct {
+                CoreType::Mihomo => &CONFIG.cfg_file.mihomo.core.bin_path,
+                CoreType::Singbox => &CONFIG.cfg_file.singbox.core.bin_path,
+            };
+            let launch_args = platform::nssm_launch_args(ct);
+            let launch_strs: Vec<&str> = launch_args.iter().map(|s| s.as_str()).collect();
+            platform::nssm_install(service_name, bin_path, &launch_strs)
+        }
+        "remove" => platform::nssm_uninstall(service_name),
+        _ => Err(anyhow::anyhow!("Unknown nssm operation: {op}")),
     }
 }
 
@@ -216,6 +244,14 @@ pub fn restart_core_service(password: Option<&str>, core_type: CoreType) -> Resu
 
 pub fn reload_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
     svc_operation("reload", password, Some(core_type))
+}
+
+pub fn install_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
+    svc_operation("install", password, Some(core_type))
+}
+
+pub fn uninstall_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
+    svc_operation("remove", password, Some(core_type))
 }
 
 pub fn restart_service(password: Option<&str>) -> Result<String> {

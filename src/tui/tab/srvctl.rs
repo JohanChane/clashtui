@@ -69,6 +69,12 @@ enum SrvCtlOp {
     Restart,
     SwitchCore,
     StopAll,
+    #[cfg(windows)]
+    Install,
+    #[cfg(windows)]
+    Uninstall,
+    #[cfg(windows)]
+    ToggleSysProxy,
 }
 
 impl SrvCtlOp {
@@ -78,10 +84,23 @@ impl SrvCtlOp {
             Self::Restart => "Start Service",
             Self::SwitchCore => "Switch Core",
             Self::StopAll => "Stop All Services",
+            #[cfg(windows)]
+            Self::Install => "Install Srv",
+            #[cfg(windows)]
+            Self::Uninstall => "Uninstall Srv",
+            #[cfg(windows)]
+            Self::ToggleSysProxy => "Toggle SysProxy",
         }
     }
     fn all() -> Vec<Self> {
-        vec![Self::Stop, Self::Restart, Self::SwitchCore, Self::StopAll]
+        let mut ops = vec![Self::Stop, Self::Restart, Self::SwitchCore, Self::StopAll];
+        #[cfg(windows)]
+        {
+            ops.push(Self::Install);
+            ops.push(Self::Uninstall);
+            ops.push(Self::ToggleSysProxy);
+        }
+        ops
     }
 }
 
@@ -99,6 +118,8 @@ struct SrvCtlContent {
     singbox_service_name: String,
     mihomo_is_user: bool,
     singbox_is_user: bool,
+    #[cfg(windows)]
+    proxy_enabled: bool,
 }
 
 impl SrvCtlContent {
@@ -111,6 +132,10 @@ impl SrvCtlContent {
         async move {
             let status = match controller {
                 crate::config::ServiceController::Launchd => launchd_status(&service_name, is_user),
+                #[cfg(windows)]
+                crate::config::ServiceController::Nssm => {
+                    crate::functions::command::nssm_status(&service_name)
+                }
                 _ => {
                     let mut args = vec!["is-active"];
                     if is_user {
@@ -138,6 +163,10 @@ impl SrvCtlContent {
         async move {
             let status = match controller {
                 crate::config::ServiceController::Launchd => launchd_status(&service_name, is_user),
+                #[cfg(windows)]
+                crate::config::ServiceController::Nssm => {
+                    crate::functions::command::nssm_status(&service_name)
+                }
                 _ => {
                     let mut args = vec!["is-active"];
                     if is_user {
@@ -266,6 +295,11 @@ impl TabContent for SrvCtlContent {
         self.status = "...".to_owned();
         self.mihomo_status = "...".to_owned();
         self.singbox_status = "...".to_owned();
+        #[cfg(windows)]
+        {
+            self.proxy_enabled = crate::functions::command::get_system_proxy_state()
+                .unwrap_or(false);
+        }
         if !self.ops.is_empty() {
             state.select(Some(0));
         }
@@ -445,6 +479,55 @@ impl TabContent for SrvCtlContent {
                                 }
                             }
                         }
+                        #[cfg(windows)]
+                        SrvCtlOp::Install => {
+                            handle!(
+                                crate::functions::command::install_core_service(
+                                    pw_ref,
+                                    crate::config::CONFIG.core_type(),
+                                ),
+                                "installed"
+                            )
+                        }
+                        #[cfg(windows)]
+                        SrvCtlOp::Uninstall => {
+                            handle!(
+                                crate::functions::command::uninstall_core_service(
+                                    pw_ref,
+                                    crate::config::CONFIG.core_type(),
+                                ),
+                                "uninstalled"
+                            )
+                        }
+                        #[cfg(windows)]
+                        SrvCtlOp::ToggleSysProxy => {
+                            let result = async {
+                                let enabled = crate::functions::command::get_system_proxy_state()?;
+                                if enabled {
+                                    crate::functions::command::disable_system_proxy()?;
+                                    Ok::<bool, anyhow::Error>(false)
+                                } else {
+                                    let port = crate::functions::command::get_mixed_port()?;
+                                    crate::functions::command::enable_system_proxy(port)?;
+                                    Ok::<bool, anyhow::Error>(true)
+                                }
+                            };
+                            match result.await {
+                                Ok(new_state) => {
+                                    let label = if new_state { "enabled" } else { "disabled" };
+                                    crate::tui::widget::popmsg::Confirm::title("OK".to_owned())
+                                        .with_prompt(format!("System proxy {label}"))
+                                        .build_and_send();
+                                    wrapper(move |c: &mut SrvCtlContent| {
+                                        c.proxy_enabled = new_state;
+                                    })
+                                }
+                                Err(e) => {
+                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    do_nothing()
+                                }
+                            }
+                        }
                     }
                 }
                 .spawn_at(task_set);
@@ -481,17 +564,25 @@ impl TabContent for SrvCtlContent {
             }
         );
 
+        #[cfg(windows)]
+        let proxy_label = format!(
+            "  Proxy: {}",
+            if self.proxy_enabled { "ON" } else { "OFF" }
+        );
+
+        let title_line = format!(
+            "{} — {} (core: {}){}",
+            Self::TITLE,
+            self.service_name,
+            self.core_label,
+            user_tag
+        );
+
         let block = Block::bordered()
             .border_style(section.border)
-            .title(format!(
-                "{} — {} (core: {}){}",
-                Self::TITLE,
-                self.service_name,
-                self.core_label,
-                user_tag
-            ))
-            .title_bottom(
-                ratatui::text::Line::from(vec![
+            .title(title_line)
+            .title_bottom({
+                let mut spans = vec![
                     ratatui::text::Span::styled(
                         format!(" {} ", current_core_label),
                         section.border,
@@ -500,9 +591,14 @@ impl TabContent for SrvCtlContent {
                         format!(" {} ", other_core_label),
                         section.border.fg(Color::Rgb(100, 100, 100)),
                     ),
-                ])
-                .right_aligned(),
-            );
+                ];
+                #[cfg(windows)]
+                spans.push(ratatui::text::Span::styled(
+                    format!(" {} ", proxy_label),
+                    section.border.fg(Color::Rgb(100, 100, 100)),
+                ));
+                ratatui::text::Line::from(spans).right_aligned()
+            });
 
         let items: Vec<ListItem> = self
             .ops
