@@ -1003,9 +1003,11 @@ ClashTui 的配置文件结构同 Linux/macOS, 存放在 `%APPDATA%\clashtui` (e
 
 和 Linux/macOS 类似, Windows 也可使用 symlink 指向二进制路径 (`mklink` / `mklink /D`), 但需要 Administrator 权限。如果用户没有管理员权限, 可以直接放置 `.exe` 文件。
 
-### 文件权限
+### 文件权限和服务权限
 
 ClashTui core 的文件不要安装在 `C:/Program Files` 和  `C:/Program Files (x86)` 等, 以避免一些文件权限问题。
+
+需要有自动提权的机制, 因为启动需要 TUN 的 Core Service 时, 需要管理员权限。
 
 ### Core services 管理 (nssm)
 
@@ -1122,3 +1124,7 @@ CoreSrvCtl tab 的操作列表:
 ```
 
 **因为 ClashTui 已经支持 install core service 了, 所以 install.ps1 不需要安装 Core service。**
+
+### Windows 文件路径的格式
+
+统一使用 `D:/Foo/Bar` 的格式, 而不使用 `D:\\Foo\\Bar` 的形式 (觉得不好看, 和不方便处理)。
