@@ -69,17 +69,19 @@ impl Default for ConfigFile {
     fn default() -> Self {
         #[cfg(windows)]
         {
-            let local_appdata = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| {
-                let home = std::env::var("USERPROFILE").unwrap_or_default();
-                format!("{home}\\AppData\\Local")
-            });
-            let base = format!("{local_appdata}\\clashtui");
+            let local_appdata = std::env::var("LOCALAPPDATA")
+                .unwrap_or_else(|_| {
+                    let home = std::env::var("USERPROFILE").unwrap_or_default();
+                    format!("{home}/AppData/Local")
+                })
+                .replace('\\', "/");
+            let base = format!("{local_appdata}/clashtui");
             Self {
                 mihomo: MihomoSection {
                     core: CoreConfig {
-                        config_dir: format!("{base}\\mihomo\\config"),
-                        bin_path: format!("{base}\\mihomo\\mihomo.exe"),
-                        config_path: format!("{base}\\mihomo\\config\\config.yaml"),
+                        config_dir: format!("{base}/mihomo/config"),
+                        bin_path: format!("{base}/mihomo/mihomo.exe"),
+                        config_path: format!("{base}/mihomo/config/config.yaml"),
                     },
                     core_service: CoreServiceConfig {
                         service_name: "clashtui_mihomo".into(),
@@ -88,9 +90,9 @@ impl Default for ConfigFile {
                 },
                 singbox: SingboxSection {
                     core: CoreConfig {
-                        config_dir: format!("{base}\\sing-box\\config"),
-                        bin_path: format!("{base}\\sing-box\\sing-box.exe"),
-                        config_path: format!("{base}\\sing-box\\config\\config.json"),
+                        config_dir: format!("{base}/sing-box/config"),
+                        bin_path: format!("{base}/sing-box/sing-box.exe"),
+                        config_path: format!("{base}/sing-box/config/config.json"),
                     },
                     core_service: CoreServiceConfig {
                         service_name: "clashtui_singbox".into(),

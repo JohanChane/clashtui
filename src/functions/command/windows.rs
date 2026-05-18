@@ -69,21 +69,23 @@ fn nssm_cmd(args: &[&str]) -> Result<std::process::Output> {
         .map_err(|e| anyhow::anyhow!("Failed to run nssm: {e}"))
 }
 
-/// Install a Windows service via nssm.
+/// Install a Windows service via nssm (auto-elevates via UAC if needed).
 /// `service_name`: service display name
 /// `bin_path`: full path to the .exe
 /// `launch_args`: arguments passed to the binary at service start
 pub fn nssm_install(service_name: &str, bin_path: &str, launch_args: &[&str]) -> Result<String> {
     let mut args = vec!["install", service_name, bin_path];
     args.extend(launch_args);
-    let output = nssm_cmd(&args)?;
-    Ok(stringify_output(output))
+    nssm_runas_or_direct(service_name, &args)
 }
 
-/// Uninstall a Windows service via nssm (nssm stops it if running).
+/// Uninstall a Windows service via nssm (auto-elevates via UAC if needed).
+/// Stops the service first, then removes it.
 pub fn nssm_uninstall(service_name: &str) -> Result<String> {
-    let output = nssm_cmd(&["remove", service_name, "confirm"])?;
-    Ok(stringify_output(output))
+    // Best-effort stop before remove — ignore errors (service may already be stopped)
+    let _ = nssm_runas_or_direct(service_name, &["stop", service_name]);
+    let args = ["remove", service_name, "confirm"];
+    nssm_runas_or_direct(service_name, &args)
 }
 
 /// Query nssm service status.
@@ -124,6 +126,114 @@ pub fn nssm_launch_args(ct: CoreType) -> Vec<String> {
             ]
         }
     }
+}
+
+// ============================================================================
+// Elevation
+// ============================================================================
+
+pub fn is_elevated() -> bool {
+    use windows::Win32::Foundation::{CloseHandle, HANDLE};
+    use windows::Win32::Security::{
+        GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY,
+    };
+    use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    let mut token = HANDLE::default();
+    unsafe {
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token).is_err() {
+            return false;
+        }
+        let mut elevation: TOKEN_ELEVATION = std::mem::zeroed();
+        let mut size: u32 = std::mem::size_of::<TOKEN_ELEVATION>() as u32;
+        let result = GetTokenInformation(
+            token,
+            TokenElevation,
+            Some(&mut elevation as *mut _ as *mut std::ffi::c_void),
+            size,
+            &mut size,
+        );
+        let _ = CloseHandle(token);
+        result.is_ok() && elevation.TokenIsElevated != 0
+    }
+}
+
+/// Run a command via PowerShell's `Start-Process -Verb RunAs` (UAC elevation).
+/// Distinguishes UAC cancellation (exit code 1223) from command failure.
+fn runas(cmd: &str, args: &[&str]) -> Result<()> {
+    let arg_list = args
+        .iter()
+        .map(|a| a.replace('\\', "/"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    // PowerShell: catch Start-Process errors (e.g. UAC cancelled) and
+    // exit with 1223 (ERROR_CANCELLED).  On success, exit with nssm's
+    // exit code so we can tell whether the command itself failed.
+    let ps = format!(
+        "\
+try {{
+    $p = Start-Process -FilePath '{cmd}' -ArgumentList '{arg_list}' \
+         -Verb RunAs -Wait -PassThru -ErrorAction Stop
+    exit $p.ExitCode
+}} catch {{
+    exit 1223
+}}"
+    );
+    let output = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-Command", &ps])
+        .output()
+        .map_err(|e| anyhow::anyhow!("Failed to launch PowerShell: {e}"))?;
+
+    let code = output.status.code().unwrap_or(-1);
+    if code == 0 {
+        return Ok(());
+    }
+    if code == 1223 {
+        return Err(anyhow::anyhow!(
+            "Administrator privileges are required to manage services.\n\
+             UAC prompt was cancelled or could not be displayed.\n\
+             Please accept the UAC prompt to continue."
+        ));
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    Err(anyhow::anyhow!(
+        "'{cmd}' failed with exit code {code}.\n\
+         Command: {cmd} {arg_list}\n\
+         {stderr}",
+        stderr = stderr.trim()
+    ))
+}
+
+/// Run an nssm command, auto-elevating via UAC if needed.
+/// For start/restart: verifies the service is actually running afterwards.
+pub fn nssm_runas_or_direct(service_name: &str, nssm_args: &[&str]) -> Result<String> {
+    let op = nssm_args.first().copied().unwrap_or("");
+    if is_elevated() {
+        let output = std::process::Command::new(nssm_bin())
+            .args(nssm_args)
+            .output()?;
+        if output.status.success() {
+            return Ok(stringify_output(output));
+        }
+        return Err(anyhow::anyhow!("{}", stringify_output(output)));
+    }
+    runas(nssm_bin(), nssm_args)?;
+    // After the elevated operation, query status (no elevation needed)
+    let status = nssm_status(service_name);
+    // For start/restart, the service must be running
+    if (op == "start" || op == "restart") && status != "active" {
+        return Err(anyhow::anyhow!(
+            "Service started but stopped immediately (status: {status}).\n\
+             Check the core's config or run status check for details."
+        ));
+    }
+    // For stop, the service should be stopped
+    if op == "stop" && status != "inactive" {
+        return Err(anyhow::anyhow!(
+            "Service stop command completed but status is still: {status}."
+        ));
+    }
+    Ok(format!("{op}: {status}"))
 }
 
 // ============================================================================

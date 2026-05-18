@@ -416,25 +416,25 @@ function New-ClashTuiConfig {
     $configPath = Join-Path $CLASHTUI_CONFIG_DIR "config.yaml"
     Backup-File $configPath
 
-    $mihomoBinDir = $INSTALL_DIR_MIHOMO -replace '\\', '\\'
-    $singboxBinDir = $INSTALL_DIR_SINGBOX -replace '\\', '\\'
-    $mihomoCfgDir = $MIHOMO_CONFIG_DIR -replace '\\', '\\'
-    $singboxCfgDir = $SINGBOX_CONFIG_DIR -replace '\\', '\\'
+    $mihomoBinDir = ($INSTALL_DIR_MIHOMO -replace '\\', '/')
+    $singboxBinDir = ($INSTALL_DIR_SINGBOX -replace '\\', '/')
+    $mihomoCfgDir = ($MIHOMO_CONFIG_DIR -replace '\\', '/')
+    $singboxCfgDir = ($SINGBOX_CONFIG_DIR -replace '\\', '/')
 
     $configContent = @"
 mihomo:
   core:
     config_dir: ${mihomoCfgDir}
-    bin_path: ${mihomoBinDir}\mihomo.exe
-    config_path: ${mihomoCfgDir}\config.yaml
+    bin_path: ${mihomoBinDir}/mihomo.exe
+    config_path: ${mihomoCfgDir}/config.yaml
   core_service:
     service_name: clashtui_mihomo
     is_user: false
 singbox:
   core:
-    bin_path: ${singboxBinDir}\sing-box.exe
+    bin_path: ${singboxBinDir}/sing-box.exe
     config_dir: ${singboxCfgDir}
-    config_path: ${singboxCfgDir}\config.json
+    config_path: ${singboxCfgDir}/config.json
   core_service:
     service_name: clashtui_singbox
     is_user: false
@@ -500,11 +500,11 @@ function New-CoreConfigs {
 
         $cfgSrc = "default_configs/mihomo/core_override_config.yaml"
         Copy-Contrib $cfgSrc (Join-Path $MIHOMO_CONFIG_DIR "config.yaml")
-        Write-Info "Mihomo core config written to: $MIHOMO_CONFIG_DIR\config.yaml"
+        Write-Info "Mihomo core config written to: $MIHOMO_CONFIG_DIR/config.yaml"
 
         New-Item -ItemType Directory -Path $MIHOMO_USER_CONFIG_DIR -Force | Out-Null
         Copy-Contrib $cfgSrc (Join-Path $MIHOMO_USER_CONFIG_DIR "core_override_config.yaml")
-        Write-Info "Mihomo core override written to: $MIHOMO_USER_CONFIG_DIR\core_override_config.yaml"
+        Write-Info "Mihomo core override written to: $MIHOMO_USER_CONFIG_DIR/core_override_config.yaml"
     }
 
     if ($CoreType -eq "sing-box" -or $CoreType -eq "all") {
@@ -512,11 +512,11 @@ function New-CoreConfigs {
 
         $cfgSrc = "default_configs/sing-box/core_override_config.json"
         Copy-Contrib $cfgSrc (Join-Path $SINGBOX_CONFIG_DIR "config.json")
-        Write-Info "Sing-box core config written to: $SINGBOX_CONFIG_DIR\config.json"
+        Write-Info "Sing-box core config written to: $SINGBOX_CONFIG_DIR/config.json"
 
         New-Item -ItemType Directory -Path $SINGBOX_USER_CONFIG_DIR -Force | Out-Null
         Copy-Contrib $cfgSrc (Join-Path $SINGBOX_USER_CONFIG_DIR "core_override_config.json")
-        Write-Info "Sing-box core override written to: $SINGBOX_USER_CONFIG_DIR\core_override_config.json"
+        Write-Info "Sing-box core override written to: $SINGBOX_USER_CONFIG_DIR/core_override_config.json"
     }
 }
 
@@ -526,11 +526,11 @@ function Invoke-OptionalDownloads {
         $response = Read-Host "Do you want to download templates for mihomo? (y/N)"
         if ($response -eq "y" -or $response -eq "Y") {
             Write-Info "Downloading mihomo templates..."
-            Copy-Contrib "templates/mihomo/common_tpl.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates\common_tpl.yaml")
-            Copy-Contrib "templates/mihomo/generic_tpl.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates\generic_tpl.yaml")
-            Copy-Contrib "templates/mihomo/generic_tpl_with_all.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates\generic_tpl_with_all.yaml")
-            Copy-Contrib "templates/mihomo/generic_tpl_with_filter.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates\generic_tpl_with_filter.yaml")
-            Copy-Contrib "templates/mihomo/generic_tpl_with_ruleset.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates\generic_tpl_with_ruleset.yaml")
+            Copy-Contrib "templates/mihomo/common_tpl.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates/common_tpl.yaml")
+            Copy-Contrib "templates/mihomo/generic_tpl.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates/generic_tpl.yaml")
+            Copy-Contrib "templates/mihomo/generic_tpl_with_all.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates/generic_tpl_with_all.yaml")
+            Copy-Contrib "templates/mihomo/generic_tpl_with_filter.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates/generic_tpl_with_filter.yaml")
+            Copy-Contrib "templates/mihomo/generic_tpl_with_ruleset.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates/generic_tpl_with_ruleset.yaml")
         }
 
         $response = Read-Host "Do you want to download rules-dat? (y/N)"
@@ -545,11 +545,11 @@ function Invoke-OptionalDownloads {
         $response = Read-Host "Do you want to download templates for sing-box? (y/N)"
         if ($response -eq "y" -or $response -eq "Y") {
             Write-Info "Downloading sing-box templates..."
-            Copy-Contrib "templates/sing-box/v1.12-common_tpl.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates\v1.12-common_tpl.json")
-            Copy-Contrib "templates/sing-box/v1.12-tun_fakeip_bypass_dnsleak.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates\v1.12-tun_fakeip_bypass_dnsleak.json")
-            Copy-Contrib "templates/sing-box/v1.12-tun_fakeip_bypass_no_dnsleak.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates\v1.12-tun_fakeip_bypass_no_dnsleak.json")
-            Copy-Contrib "templates/sing-box/v1.12-tun_ipv4_ipv6.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates\v1.12-tun_ipv4_ipv6.json")
-            Copy-Contrib "templates/sing-box/v1.12-tun_ipv4_only.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates\v1.12-tun_ipv4_only.json")
+            Copy-Contrib "templates/sing-box/v1.12-common_tpl.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-common_tpl.json")
+            Copy-Contrib "templates/sing-box/v1.12-tun_fakeip_bypass_dnsleak.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_fakeip_bypass_dnsleak.json")
+            Copy-Contrib "templates/sing-box/v1.12-tun_fakeip_bypass_no_dnsleak.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_fakeip_bypass_no_dnsleak.json")
+            Copy-Contrib "templates/sing-box/v1.12-tun_ipv4_ipv6.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_ipv4_ipv6.json")
+            Copy-Contrib "templates/sing-box/v1.12-tun_ipv4_only.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_ipv4_only.json")
         }
     }
 }
@@ -595,7 +595,7 @@ function Main {
     Invoke-OptionalDownloads
 
     Write-Info "Installed cores: $Core"
-    Write-Info "Clashtui binary: $INSTALL_BIN\clashtui.exe"
+    Write-Info "Clashtui binary: $INSTALL_BIN/clashtui.exe"
     Write-Info "Clashtui config: $CLASHTUI_CONFIG_DIR"
     Write-Info "Core configs written to core config directories"
     Write-Info "Install directory: $InstallDir"

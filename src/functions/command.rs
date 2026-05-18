@@ -17,13 +17,21 @@ pub async fn resolve_sudo_password(needs_sudo: bool) -> Result<Option<String>> {
     if !needs_sudo {
         return Ok(None);
     }
-    if !sudo_needs_password() {
+    #[cfg(windows)]
+    {
+        // Windows: each nssm operation auto-elevates via UAC
         return Ok(None);
     }
-    match crate::tui::prompt_sudo_password().await {
-        Some(pw) if pw.is_empty() => Ok(None),
-        Some(pw) => Ok(Some(pw)),
-        None => Err(anyhow::anyhow!("cancelled")),
+    #[cfg(not(windows))]
+    {
+        if !sudo_needs_password() {
+            return Ok(None);
+        }
+        match crate::tui::prompt_sudo_password().await {
+            Some(pw) if pw.is_empty() => Ok(None),
+            Some(pw) => Ok(Some(pw)),
+            None => Err(anyhow::anyhow!("cancelled")),
+        }
     }
 }
 
@@ -158,11 +166,10 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
 
 fn nssm_svc_operation(op: &str, service_name: &str, ct: CoreType) -> Result<String> {
     match op {
-        "start" | "stop" | "restart" => {
-            let output = std::process::Command::new("nssm")
-                .args([op, service_name])
-                .output()?;
-            Ok(platform::stringify_output(output))
+        "start" | "stop" | "restart" | "reload" => {
+            let op = if op == "reload" { "restart" } else { op };
+            let args = [op, service_name];
+            platform::nssm_runas_or_direct(service_name, &args)
         }
         "install" => {
             let bin_path = match ct {
