@@ -101,8 +101,8 @@ singbox:
     is_user: false
 timeout: null
 extra:
-  edit_cmd: ghostty -e nvim -- "%s"
-  open_dir_cmd: ghostty -e yazi -- "%s"
+  edit_cmd: ghostty -e nvim "%s"
+  open_dir_cmd: ghostty -e yazi "%s"
 ```
 
 Design principle: Mihomo and sing-box cannot be used together, so they are placed in separate `mihomo` and `sing-box` sections.
