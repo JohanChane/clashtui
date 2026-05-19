@@ -291,7 +291,7 @@ File/Url Profile 的选择:
 -   因为通过 api 更新 Profile 并没有返回值 (不知道是否更新成功), 则不知道有哪些东西要更新。
 -   所以自己实现更新 Profile 会有比较好的体验。
 
-*Mihomo 的 proxy-providers 和 rule-providers 没有 path 时, 则 path 会被设置为 `<url 的 md5 的值>.yaml`。ClashTui 需要支持这个设定。*
+*Mihomo 的 proxy-providers 和 rule-providers 没有 path 时, 则 path 默认为 `proxies/<url 的 md5 的值>`。ClashTui 需要支持这个设定。*
 
 ## Template 的管理设计
 
@@ -380,7 +380,7 @@ proxy-provider 的展开:
 
 因为 sing-box 不支持 proxy-providers, 但是可以用 Template 的功能来替代它:
 -   生成 Tempate type profile 时, 将 urls 存放到 profile 中
--   proxy-providers 还有 url 的文件的路径信息, 比如: 放在 `~/.config/clashtui/sing-box/proxy-providers/<url 的 md5 的值>.yaml`。 
+-   proxy-providers 还有 url 的文件的路径信息, 比如: 放在 `~/.config/clashtui/sing-box/proxy-providers/<url 的 md5 的值>.json`。 
 -   有了上面的信息就可以替代 proxy-providers 的功能了。
 
 Template type profile 的生成:

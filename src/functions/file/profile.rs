@@ -292,7 +292,7 @@ async fn update_template_profile(
     } else {
         let cfg_dir =
             std::path::PathBuf::from(&crate::config::CONFIG.cfg_file.mihomo.core.config_dir);
-        let tpl_name = std::path::Path::new(&template)
+        let _tpl_name = std::path::Path::new(&template)
             .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or(&template);
@@ -302,7 +302,8 @@ async fn update_template_profile(
             for (name, url) in providers {
                 let url = url.clone();
                 let name = name.clone();
-                let path = cfg_dir.join(format!("proxy-providers/tpl/{}/{}.yaml", tpl_name, &name));
+                let hash = format!("{:x}", md5::compute(url.as_bytes()));
+                let path = cfg_dir.join(format!("proxies/{hash}"));
                 download_handles.push(tokio::task::spawn_blocking(move || {
                     match crate::functions::restful::download::profile(&url, with_proxy) {
                         Ok(mut rdr) => {
