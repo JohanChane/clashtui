@@ -34,7 +34,7 @@ minreq = { version = "2.12.0", features = [
 ] }
 strum = { version = "0.26.3", features = ["derive"] }
 fastrand = "2.3.0"
-md5 = "0.7"
+md5 = "0.8"
 
 # CLI
 clap = { version = "4.5.17", features = ["derive"] }
