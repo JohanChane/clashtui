@@ -14,7 +14,9 @@
     {
       "type": "tun",
       "tag": "tun-in",
-      "address": ["172.19.0.1/30"],
+      "address": [
+        "172.19.0.1/30"
+      ],
       "auto_route": true,
       "strict_route": true,
       "stack": "system"
@@ -22,7 +24,7 @@
     {
       "type": "mixed",
       "tag": "mixed-in",
-      "listen": "0.0.0.0",
+      "listen": "127.0.0.1",
       "listen_port": 2080
     }
   ],

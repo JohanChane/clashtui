@@ -1,76 +1,89 @@
 {
   "log": {
-    "level": "info",
+    "disabled": false,
+    "level": "error",
     "timestamp": true
   },
   "dns": {
-    "servers": [
-      {
-        "tag": "dns-remote",
-        "type": "tls",
-        "server": "1.1.1.1",
-        "detour": "Entry"
-      },
-      {
-        "tag": "dns-direct",
-        "type": "https",
-        "server": "dns.alidns.com",
-        "domain_resolver": "dns-local"
-      },
-      {
-        "tag": "dns-local",
-        "type": "local"
-      },
-      {
-        "tag": "dns-fake",
-        "type": "fakeip",
-        "inet4_range": "198.18.0.0/15"
-      }
-    ],
     "rules": [
+      {
+        "clash_mode": "Proxy",
+        "server": "remote"
+      },
+      {
+        "clash_mode": "Direct",
+        "server": "local"
+      },
       {
         "rule_set": [
           "geosite-geolocation-cn"
         ],
-        "server": "dns-direct"
+        "server": "local"
       },
       {
         "rule_set": [
-          "geosite-google"
+          "geosite-geolocation-!cn"
         ],
-        "server": "dns-remote"
+        "server": "remote"
       },
       {
-        "query_type": [
-          "A",
-          "AAAA"
+        "rule_set": [
+          "category-ads-all"
         ],
-        "server": "dns-fake"
-      },
-      {
-        "server": "dns-direct"
+        "server": "block"
       }
     ],
-    "final": "dns-direct",
+    "servers": [
+      {
+        "detour": "Entry",
+        "type": "https",
+        "server": "8.8.8.8",
+        "tag": "remote"
+      },
+      {
+        "tag": "local",
+        "type": "https",
+        "server": "223.5.5.5"
+      },
+      {
+        "type": "hosts",
+        "path": [],
+        "predefined": {},
+        "tag": "block"
+      },
+      {
+        "type": "local"
+      }
+    ],
     "strategy": "prefer_ipv4"
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true
+    },
+    "clash_api": {
+      "default_mode": "Rule",
+      "external_controller": "127.0.0.1:9090",
+      "external_ui": "dashboard",
+      "secret": ""
+    }
   },
   "inbounds": [
     {
-      "type": "mixed",
-      "tag": "mixed-in",
-      "listen": "127.0.0.1",
-      "listen_port": 7890
-    },
-    {
-      "type": "tun",
-      "tag": "tun-in",
       "address": [
-        "172.19.0.1/30"
+        "172.18.0.1/30",
+        "fdfe:dcba:9876::1/126"
       ],
-      "mtu": 9000,
       "auto_route": true,
       "strict_route": true,
-      "stack": "system"
+      "type": "tun"
+    },
+    {
+      "listen": "127.0.0.1",
+      "listen_port": 2080,
+      "tag": "mixed-in",
+      "type": "mixed",
+      "users": []
     }
   ],
   "outbounds": [
@@ -109,40 +122,8 @@
     }
   ],
   "route": {
-    "rule_set": [
-      {
-        "type": "remote",
-        "tag": "geoip-cn",
-        "format": "binary",
-        "url": "https://github.com/SagerNet/sing-geoip/raw/rule-set/geoip-cn.srs",
-        "download_detour": "direct",
-        "update_interval": "7d"
-      },
-      {
-        "type": "remote",
-        "tag": "geosite-geolocation-cn",
-        "format": "binary",
-        "url": "https://github.com/SagerNet/sing-geosite/raw/rule-set/geosite-geolocation-cn.srs",
-        "download_detour": "direct",
-        "update_interval": "7d"
-      },
-      {
-        "type": "remote",
-        "tag": "geosite-google",
-        "format": "binary",
-        "url": "https://github.com/SagerNet/sing-geosite/raw/rule-set/geosite-google.srs",
-        "download_detour": "direct",
-        "update_interval": "7d"
-      },
-      {
-        "type": "remote",
-        "tag": "geosite-category-ads-all",
-        "format": "binary",
-        "url": "https://github.com/SagerNet/sing-geosite/raw/rule-set/geosite-category-ads-all.srs",
-        "download_detour": "direct",
-        "update_interval": "7d"
-      }
-    ],
+    "auto_detect_interface": true,
+    "default_domain_resolver": "local",
     "rules": [
       {
         "action": "sniff"
@@ -152,16 +133,18 @@
         "action": "hijack-dns"
       },
       {
-        "rule_set": [
-          "geosite-category-ads-all"
-        ],
-        "outbound": "block"
+        "clash_mode": "Direct",
+        "outbound": "direct"
+      },
+      {
+        "clash_mode": "Proxy",
+        "outbound": "Entry"
       },
       {
         "rule_set": [
-          "geoip-cn"
+          "geosite-geolocation-!cn"
         ],
-        "outbound": "direct"
+        "outbound": "Entry"
       },
       {
         "rule_set": [
@@ -171,36 +154,46 @@
       },
       {
         "rule_set": [
-          "geosite-google"
+          "geoip-cn"
         ],
-        "outbound": "Entry"
+        "outbound": "direct"
       },
       {
         "ip_is_private": true,
         "outbound": "direct"
       },
       {
-        "protocol": [
-          "bittorrent"
+        "rule_set": [
+          "category-ads-all"
         ],
-        "outbound": "direct"
+        "action": "reject"
       }
     ],
-    "default_domain_resolver": "dns-local",
-    "auto_detect_interface": true,
-    "final": "Entry"
-  },
-  "experimental": {
-    "clash_api": {
-      "external_controller": "127.0.0.1:9090",
-      "external_ui": "dashboard",
-      "secret": "",
-      "default_mode": "Rule"
-    },
-    "cache_file": {
-      "enabled": true,
-      "path": "cache.db",
-      "store_fakeip": true
-    }
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "geosite-geolocation-cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-cn.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-geolocation-!cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "geoip-cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "category-ads-all",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geosite-category-ads-all.srs"
+      }
+    ]
   }
 }
