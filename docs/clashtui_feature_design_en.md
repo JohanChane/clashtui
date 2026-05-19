@@ -292,7 +292,7 @@ Why not use the API to update Profiles:
 - Because the API does not return values when updating Profiles (you don't know if the update succeeded), so you don't know what needs updating.
 - Therefore, implementing profile updates ourselves provides a better experience.
 
-*When Mihomo proxy-providers and rule-providers don't have a path, the path is set to `<md5 of url>.yaml`. ClashTui needs to support this convention.*
+*When Mihomo proxy-providers and rule-providers don't have a path, the path defaults to `proxies/<md5 of url>`. ClashTui needs to support this convention.*
 
 ## Template Management Design
 
@@ -380,7 +380,7 @@ Proxy-provider expansion:
 
 Because sing-box doesn't support proxy-providers, the Template feature can be used as an alternative:
 - When generating a Template type profile, store the URLs in the profile
-- Proxy-providers also have path info for URL files, e.g.: placed in `~/.config/clashtui/sing-box/proxy-providers/<md5 of url>.yaml`
+- Proxy-providers also have path info for URL files, e.g.: placed in `~/.config/clashtui/sing-box/proxy-providers/<md5 of url>.json`
 - With the above information, the proxy-provider functionality can be replaced.
 
 Template type profile generation:

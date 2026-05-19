@@ -308,7 +308,7 @@ pub fn check_template_ppg_availability(
     }
 
     let is_singbox = crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox;
-    let tpl_name = std::path::Path::new(template)
+    let _tpl_name = std::path::Path::new(template)
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or(template);
@@ -323,7 +323,8 @@ pub fn check_template_ppg_availability(
                 let cfg_dir = std::path::PathBuf::from(
                     &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
                 );
-                cfg_dir.join(format!("proxy-providers/tpl/{}/{}.yaml", tpl_name, name))
+                let hash = format!("{:x}", md5::compute(url.as_bytes()));
+                cfg_dir.join(format!("proxies/{hash}"))
             };
             if !path.exists() {
                 missing.push(format!("  {name} ({url}) -> {}", path.display()));

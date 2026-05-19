@@ -33,7 +33,7 @@ pub(super) fn gen_template(
 
 pub(super) fn gen_template_with_urls(
     tpl: serde_yml::Mapping,
-    tpl_name: &str,
+    _tpl_name: &str,
     groups: &ProxyProviderGroups,
 ) -> anyhow::Result<serde_yml::Mapping> {
     use std::collections::HashMap;
@@ -72,13 +72,6 @@ pub(super) fn gen_template_with_urls(
                 new_pp.insert(
                     serde_yml::Value::String("url".into()),
                     serde_yml::Value::String(url.clone()),
-                );
-                new_pp.insert(
-                    serde_yml::Value::String("path".into()),
-                    serde_yml::Value::String(format!(
-                        "proxy-providers/tpl/{}/{}.yaml",
-                        tpl_name, the_pp_name
-                    )),
                 );
                 new_proxy_providers.insert(
                     serde_yml::Value::String(the_pp_name),
@@ -534,20 +527,14 @@ mod tests {
             pvd0.get("url").and_then(|v| v.as_str()),
             Some("https://a.example.com/p1.yaml")
         );
-        assert_eq!(
-            pvd0.get("path").and_then(|v| v.as_str()),
-            Some("proxy-providers/tpl/simple_tpl/pvd0.yaml")
-        );
+        assert!(pvd0.get("path").is_none());
 
         let pvd1 = providers.get("pvd1").unwrap().as_mapping().unwrap();
         assert_eq!(
             pvd1.get("url").and_then(|v| v.as_str()),
             Some("https://b.example.com/p2.yaml")
         );
-        assert_eq!(
-            pvd1.get("path").and_then(|v| v.as_str()),
-            Some("proxy-providers/tpl/simple_tpl/pvd1.yaml")
-        );
+        assert!(pvd1.get("path").is_none());
     }
 
     #[test]

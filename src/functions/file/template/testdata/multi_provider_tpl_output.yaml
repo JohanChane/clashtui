@@ -7,7 +7,6 @@ proxy-providers:
       enable: true
       url: https://www.gstatic.com/generate_204
       interval: 300
-    path: proxy-providers/tpl/multi_provider_tpl/pvd0.yaml
   pvd1:
     type: http
     interval: 3600
@@ -16,7 +15,6 @@ proxy-providers:
       enable: true
       url: https://www.gstatic.com/generate_204
       interval: 300
-    path: proxy-providers/tpl/multi_provider_tpl/pvd1.yaml
   pvd20:
     type: http
     interval: 7200
@@ -25,7 +23,6 @@ proxy-providers:
       enable: true
       url: https://www.gstatic.com/generate_204
       interval: 600
-    path: proxy-providers/tpl/multi_provider_tpl/pvd20.yaml
   pvd21:
     type: http
     interval: 7200
@@ -34,7 +31,6 @@ proxy-providers:
       enable: true
       url: https://www.gstatic.com/generate_204
       interval: 600
-    path: proxy-providers/tpl/multi_provider_tpl/pvd21.yaml
   static:
     type: file
     path: ./proxy-providers/static.yaml

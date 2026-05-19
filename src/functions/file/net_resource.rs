@@ -104,7 +104,10 @@ impl ExtractNetResources for serde_yml::Mapping {
                     .and_then(|v| v.as_str())
                 {
                     Some(s) => s.to_owned(),
-                    None => continue,
+                    None => {
+                        let hash = format!("{:x}", md5::compute(url.as_bytes()));
+                        format!("proxies/{hash}")
+                    }
                 };
 
                 resources.push(NetResource {
@@ -180,8 +183,7 @@ mod tests {
             ResourceSection::ProxyProvider,
             ResourceSection::RuleProvider,
         ]);
-        assert_eq!(resources.len(), 4, "should find 2 PP + 2 RP = 4 resources");
-
+        assert_eq!(resources.len(), 5, "should find 2 PP + 3 RP = 5 resources");
         let pp_count = resources
             .iter()
             .filter(|r| r.section == ResourceSection::ProxyProvider)
@@ -192,7 +194,7 @@ mod tests {
             .iter()
             .filter(|r| r.section == ResourceSection::RuleProvider)
             .count();
-        assert_eq!(rp_count, 2);
+        assert_eq!(rp_count, 3);
     }
 
     #[test]
@@ -209,7 +211,7 @@ mod tests {
     fn filter_rule_providers_only() {
         let yaml = load_test_yaml();
         let resources = yaml.extract(&[ResourceSection::RuleProvider]);
-        assert_eq!(resources.len(), 2);
+        assert_eq!(resources.len(), 3);
         for r in &resources {
             assert_eq!(r.section, ResourceSection::RuleProvider);
         }
@@ -222,7 +224,7 @@ mod tests {
             ResourceSection::ProxyProvider,
             ResourceSection::RuleProvider,
         ]);
-        assert_eq!(resources.len(), 4);
+        assert_eq!(resources.len(), 5);
     }
 
     #[test]
