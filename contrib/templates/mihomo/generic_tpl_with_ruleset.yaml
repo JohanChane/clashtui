@@ -44,103 +44,83 @@ rule-providers:
   private:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/private.yaml"
     type: http
-    path: ./rule-providers/geosite/private.yaml
     <<: *ra_domain
   cn_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.yaml"
     type: http
-    path: ./rule-providers/geosite/cn.yaml
     <<: *ra_domain
   biliintl_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/biliintl.yaml"
     type: http
-    path: ./rule-providers/geosite/biliintl.yaml
     <<: *ra_domain
   ehentai_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/ehentai.yaml"
     type: http
-    path: ./rule-providers/geosite/ehentai.yaml
     <<: *ra_domain
   github_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/github.yaml"
     type: http
-    path: ./rule-providers/geosite/github.yaml
     <<: *ra_domain
   twitter_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/twitter.yaml"
     type: http
-    path: ./rule-providers/geosite/twitter.yaml
     <<: *ra_domain
   youtube_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/youtube.yaml"
     type: http
-    path: ./rule-providers/geosite/youtube.yaml
     <<: *ra_domain
   google_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/google.yaml"
     type: http
-    path: ./rule-providers/geosite/google.yaml
     <<: *ra_domain
   telegram_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/telegram.yaml"
     type: http
-    path: ./rule-providers/geosite/telegram.yaml
     <<: *ra_domain
   netflix_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/netflix.yaml"
     type: http
-    path: ./rule-providers/geosite/netflix.yaml
     <<: *ra_domain
   bilibili_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/bilibili.yaml"
     type: http
-    path: ./rule-providers/geosite/bilibili.yaml
     <<: *ra_domain
   bahamut_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/bahamut.yaml"
     type: http
-    path: ./rule-providers/geosite/bahamut.yaml
     <<: *ra_domain
   spotify_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/spotify.yaml"
     type: http
-    path: ./rule-providers/geosite/spotify.yaml
     <<: *ra_domain
   pixiv_domain:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/pixiv.yaml"
     type: http
-    path: ./rule-providers/geosite/pixiv.yaml
     <<: *ra_domain
   geolocation-!cn:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/geolocation-!cn.yaml"
     type: http
-    path: ./rule-providers/geosite/geolocation-notcn.yaml
     <<: *ra_domain
 
   cn_ip:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/cn.yaml"
     type: http
-    path: ./rule-providers/geoip/cn.yaml
     <<: *ra_ip
   google_ip:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/google.yaml"
     type: http
-    path: ./rule-providers/geoip/google.yaml
     <<: *ra_ip
   netflix_ip:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/netflix.yaml"
     type: http
-    path: ./rule-providers/geoip/netflix.yaml
     <<: *ra_ip
   twitter_ip:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/twitter.yaml"
     type: http
-    path: ./rule-providers/geoip/twitter.yaml
     <<: *ra_ip
   telegram_ip:
     url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/telegram.yaml"
     type: http
-    path: ./rule-providers/geoip/telegram.yaml
     <<: *ra_ip
 
 rules:
