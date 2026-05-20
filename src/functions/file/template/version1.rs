@@ -3,6 +3,34 @@ use anyhow::Context;
 
 use super::{PROXY_GROUPS, PROXY_PROVIDERS, resolve_template_placeholder};
 
+/// serde_yml does not support YAML `<<:` merge keys.
+/// When a mapping has a key `<<`, flatten its contents (mapping keys) into the
+/// parent mapping and remove the `<<` key.  Sequence-valued `<<` (merge of
+/// multiple mappings) is also handled — each element-mapping's keys are merged
+/// into the parent in order.
+fn flatten_yaml_merge_key(map: &mut serde_yml::Mapping) {
+    let Some(merge_val) = map.remove("<<") else {
+        return;
+    };
+    match merge_val {
+        serde_yml::Value::Mapping(inner) => {
+            for (k, v) in inner {
+                map.entry(k).or_insert(v);
+            }
+        }
+        serde_yml::Value::Sequence(seq) => {
+            for item in seq {
+                if let serde_yml::Value::Mapping(inner) = item {
+                    for (k, v) in inner {
+                        map.entry(k).or_insert(v);
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
 struct PGitem {
     name: String,
@@ -50,7 +78,11 @@ pub(super) fn gen_template_with_urls(
 
     for (pp_key, pp_value) in pp_mapping {
         if pp_value.get("tpl_param").is_none() {
-            new_proxy_providers.insert(pp_key.clone(), pp_value.clone());
+            let mut pp_val = pp_value.clone();
+            if let Some(mapping) = pp_val.as_mapping_mut() {
+                flatten_yaml_merge_key(mapping);
+            }
+            new_proxy_providers.insert(pp_key.clone(), pp_val);
             continue;
         }
 
@@ -66,6 +98,7 @@ pub(super) fn gen_template_with_urls(
         if let Some(providers) = groups.get(pp_key_str) {
             for (name, url) in providers {
                 let mut new_pp = pp.clone();
+                flatten_yaml_merge_key(&mut new_pp);
                 new_pp.remove("tpl_param");
                 let the_pp_name = name.clone();
 
@@ -93,7 +126,11 @@ pub(super) fn gen_template_with_urls(
 
     for the_pg_value in pg_value {
         if the_pg_value.get("expand_group_with").is_none() {
-            new_proxy_groups.push(the_pg_value.clone());
+            let mut pg_val = the_pg_value.clone();
+            if let Some(mapping) = pg_val.as_mapping_mut() {
+                flatten_yaml_merge_key(mapping);
+            }
+            new_proxy_groups.push(pg_val);
             continue;
         }
 
@@ -104,6 +141,7 @@ pub(super) fn gen_template_with_urls(
         };
 
         let mut new_pg = the_pg.clone();
+        flatten_yaml_merge_key(&mut new_pg);
         new_pg.remove("expand_group_with");
 
         let provider_keys = if let Some(provider_keys) = the_pg["expand_group_with"].as_sequence() {
@@ -218,6 +256,10 @@ pub(super) fn gen_template_with_urls(
         );
         out_parsed_yaml.insert("clashtui".into(), serde_yml::Value::Mapping(clashtui_map));
     }
+
+    // Remove template-internal sections that should not appear in generated output
+    out_parsed_yaml.remove("proxy-anchor");
+    out_parsed_yaml.remove("clashtui_template_version");
 
     Ok(out_parsed_yaml)
 }
@@ -555,6 +597,234 @@ mod tests {
         // simple_tpl.yaml has ${PPG.pvd} but only "other" group exists
         let result = gen_template_with_urls(tpl, "simple_tpl", &groups);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_bak_with_anchors_and_merge_keys() {
+        // Test that YAML merge keys (<<:) are properly flattened in output
+        let yaml = r#"
+proxy-anchor:
+  - proxy_provider:
+      &pa_pp { interval: 3600, health-check: { enable: true, url: https://www.gstatic.com/generate_204, interval: 300 } }
+
+proxy-providers:
+  pvd:
+    tpl_param:
+    type: http
+    <<: *pa_pp
+  bak:
+    type: http
+    url: https://hajimi.nvimy.com/file/test.yaml
+    <<: *pa_pp
+    override:
+      additional-prefix: "[bak]"
+
+proxy-groups:
+  - name: "Entry"
+    type: select
+    proxies:
+      - DIRECT
+    use:
+      - ${PPG.pvd}
+  - name: "TestGroup"
+    type: select
+    use:
+      - bak
+"#;
+        let tpl: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
+        let groups = make_groups("pvd", &["https://example.com/sub1.yaml"]);
+        let result = gen_template_with_urls(tpl, "test_bak_anchors", &groups).unwrap();
+
+        let providers = result
+            .get(PROXY_PROVIDERS)
+            .and_then(|v| v.as_mapping())
+            .unwrap();
+        let keys: Vec<&str> = providers.keys().filter_map(|k| k.as_str()).collect();
+        assert!(keys.contains(&"pvd0"), "Expected pvd0 in proxy-providers, got: {keys:?}");
+        assert!(keys.contains(&"bak"), "Expected bak in proxy-providers, got: {keys:?}");
+
+        // Verify << key has been flattened (interval and health-check at top level)
+        let bak = providers.get("bak").unwrap().as_mapping().unwrap();
+        assert!(bak.get("<<").is_none(), "<< key should be removed from bak");
+        assert!(bak.get("interval").is_some(), "interval should be at top level after merge flatten");
+        assert!(bak.get("health-check").is_some(), "health-check should be at top level after merge flatten");
+
+        // Verify proxy-anchor section has been stripped
+        assert!(result.get("proxy-anchor").is_none(), "proxy-anchor should be removed from output");
+
+        // Check TestGroup has bak in use
+        let groups_seq = result
+            .get(PROXY_GROUPS)
+            .and_then(|v| v.as_sequence())
+            .unwrap();
+        let test_group = groups_seq
+            .iter()
+            .find(|g| g.get("name").and_then(|n| n.as_str()) == Some("TestGroup"))
+            .expect("TestGroup should exist in proxy-groups");
+        let uses: Vec<&str> = test_group
+            .get("use")
+            .and_then(|v| v.as_sequence())
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect();
+        assert_eq!(uses, vec!["bak"]);
+    }
+
+    #[test]
+    fn test_full_user_template() {
+        // Reproduce user's full template structure with anchors and multiple merge targets
+        let yaml = r#"
+proxy-anchor:
+  - delay_test:
+      &pa_dt { url: https://www.gstatic.com/generate_204, interval: 300 }
+  - proxy_provider:
+      &pa_pp {
+        interval: 3600,
+        health-check:
+          {
+            enable: true,
+            url: https://www.gstatic.com/generate_204,
+            interval: 300,
+          },
+      }
+  - filter:
+      &pa_flt exclude-filter: "(?i)test"
+
+proxy-providers:
+  pvd:
+    tpl_param:
+    type: http
+    <<: *pa_pp
+  bak:
+    type: http
+    url: https://hajimi.nvimy.com/file/test.yaml
+    <<: *pa_pp
+    override:
+        additional-prefix: "[bak]"
+
+proxy-groups:
+  - name: "Entry"
+    type: select
+    proxies:
+      - ${PGG.At}
+      - ${PGG.FltAt}
+    use:
+      - ${PPG.pvd}
+  - name: "At"
+    expand_group_with: ["${PPG.pvd}"]
+    type: url-test
+    <<: *pa_dt
+  - name: "FltAt"
+    expand_group_with: ["${PPG.pvd}"]
+    type: url-test
+    <<: [*pa_dt, *pa_flt]
+  - name: "SpecialGroup"
+    type: select
+    use:
+      - bak
+    <<: *pa_flt
+"#;
+        let tpl: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
+        let groups = make_groups("pvd", &["https://example.com/sub1.yaml"]);
+        let result = gen_template_with_urls(tpl, "user_tpl", &groups).unwrap();
+
+        // Verify no << keys anywhere in proxy-providers or proxy-groups
+        let providers = result.get(PROXY_PROVIDERS).and_then(|v| v.as_mapping()).unwrap();
+        for (k, v) in providers {
+            let m = v.as_mapping().unwrap();
+            assert!(m.get("<<").is_none(), "provider {k:?} should not have << key");
+        }
+
+        let groups_seq = result.get(PROXY_GROUPS).and_then(|v| v.as_sequence()).unwrap();
+        for g in groups_seq {
+            let m = g.as_mapping().unwrap();
+            assert!(m.get("<<").is_none(), "group {:?} should not have << key", m.get("name"));
+        }
+
+        // Verify proxy-anchor is stripped
+        assert!(result.get("proxy-anchor").is_none(), "proxy-anchor should be removed");
+
+        // bak must be in proxy-providers
+        let keys: Vec<&str> = providers.keys().filter_map(|k| k.as_str()).collect();
+        assert!(keys.contains(&"bak"), "Expected bak in proxy-providers, got: {keys:?}");
+
+        // SpecialGroup must use bak
+        let special = groups_seq
+            .iter()
+            .find(|g| g.get("name").and_then(|n| n.as_str()) == Some("SpecialGroup"))
+            .expect("SpecialGroup should exist");
+        let uses: Vec<&str> = special
+            .get("use")
+            .and_then(|v| v.as_sequence())
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect();
+        assert!(uses.contains(&"bak"), "SpecialGroup use should contain bak, got: {uses:?}");
+    }
+
+    #[test]
+    fn test_bak_proxy_provider_passthrough_with_merge_key() {
+        // Reproduce user's template with YAML merge keys (<<:) and anchors
+        let yaml = r#"
+proxy-providers:
+  pvd:
+    tpl_param:
+    type: http
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+  bak:
+    type: http
+    url: https://hajimi.nvimy.com/file/test.yaml
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 300
+proxy-groups:
+  - name: "Entry"
+    type: select
+    proxies:
+      - DIRECT
+    use:
+      - ${PPG.pvd}
+  - name: "TestGroup"
+    type: select
+    use:
+      - bak
+"#;
+        let tpl: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
+        let groups = make_groups("pvd", &["https://example.com/sub1.yaml"]);
+        let result = gen_template_with_urls(tpl, "test_bak", &groups).unwrap();
+
+        // Check proxy-providers section contains both pvd0 and bak
+        let providers = result
+            .get(PROXY_PROVIDERS)
+            .and_then(|v| v.as_mapping())
+            .unwrap();
+        let keys: Vec<&str> = providers.keys().filter_map(|k| k.as_str()).collect();
+        assert!(keys.contains(&"pvd0"), "Expected pvd0 in proxy-providers, got: {keys:?}");
+        assert!(keys.contains(&"bak"), "Expected bak in proxy-providers, got: {keys:?}");
+
+        // Check proxy-groups section contains TestGroup with bak in use list
+        let groups_seq = result
+            .get(PROXY_GROUPS)
+            .and_then(|v| v.as_sequence())
+            .unwrap();
+        let test_group = groups_seq
+            .iter()
+            .find(|g| g.get("name").and_then(|n| n.as_str()) == Some("TestGroup"))
+            .expect("TestGroup should exist in proxy-groups");
+        let uses: Vec<&str> = test_group
+            .get("use")
+            .and_then(|v| v.as_sequence())
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect();
+        assert_eq!(uses, vec!["bak"], "TestGroup use list should contain bak");
     }
 
     #[test]
