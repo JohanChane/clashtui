@@ -366,13 +366,33 @@ profiles:
         assert_eq!(extra.open_dir_cmd, r#"open "%s""#);
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
     #[test]
-    fn extra_default_non_macos_not_open() {
+    fn extra_default_windows() {
         let extra = Extra::default();
-        // On non-macOS platforms, the default should NOT be "open %s"
-        assert_ne!(extra.edit_cmd, "open %s");
-        assert_ne!(extra.open_dir_cmd, "open %s");
+        assert_eq!(extra.edit_cmd, r#"notepad.exe "%s""#);
+        assert_eq!(extra.open_dir_cmd, r#"explorer "%s""#);
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn extra_default_linux() {
+        let extra = Extra::default();
+        assert_eq!(extra.edit_cmd, r#"xdg-open "%s""#);
+        assert_eq!(extra.open_dir_cmd, r#"xdg-open "%s""#);
+    }
+
+    #[test]
+    fn extra_empty_template_stays_empty() {
+        // Serde: explicit empty strings in config MUST NOT trigger platform defaults
+        // (shell_spawn handles the empty-case fallback at runtime)
+        let yaml = r#"
+edit_cmd: ""
+open_dir_cmd: ""
+"#;
+        let extra: Extra = serde_yml::from_str(yaml).unwrap();
+        assert_eq!(extra.edit_cmd, "");
+        assert_eq!(extra.open_dir_cmd, "");
     }
 
     #[test]

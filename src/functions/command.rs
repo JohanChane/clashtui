@@ -335,39 +335,22 @@ pub fn stop_all_services(password: Option<&str>) -> Result<String> {
 }
 
 pub fn edit(path: &str) -> Result<()> {
-    log::debug!("edit: path={path} cmd={}", CONFIG.cfg_file.extra.edit_cmd);
-    spawn(
-        "sh",
-        vec![
-            "-c",
-            CONFIG.cfg_file.extra.edit_cmd.replace("%s", path).as_str(),
-        ],
-    )
+    let tpl = &CONFIG.cfg_file.extra.edit_cmd;
+    log::debug!("edit: path={path} template={tpl}");
+    shell_spawn(tpl, path)
 }
 
 pub fn open_dir(path: &str) -> Result<()> {
-    log::debug!(
-        "open_dir: path={path} cmd={}",
-        CONFIG.cfg_file.extra.open_dir_cmd
-    );
-    spawn(
-        "sh",
-        vec![
-            "-c",
-            CONFIG
-                .cfg_file
-                .extra
-                .open_dir_cmd
-                .replace("%s", path)
-                .as_str(),
-        ],
-    )
+    let tpl = &CONFIG.cfg_file.extra.open_dir_cmd;
+    log::debug!("open_dir: path={path} template={tpl}");
+    shell_spawn(tpl, path)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn test_launchd_plist_path_user() {
         let path = launchd_plist_path("com.example.service", true);
@@ -379,6 +362,7 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn test_launchd_plist_path_system() {
         let path = launchd_plist_path("com.example.service", false);
