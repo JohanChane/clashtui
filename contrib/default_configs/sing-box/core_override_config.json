@@ -1,34 +1,36 @@
 {
+  "log": {
+    "disabled": false,
+    "level": "error",
+    "timestamp": true
+  },
   "experimental": {
     "cache_file": {
       "enabled": true,
-      "store_fakeip": true
+      "store_rdrc": true
     },
     "clash_api": {
       "external_controller": "127.0.0.1:9090",
       "external_ui": "dashboard",
-      "default_mode": "Rule"
+      "secret": ""
     }
   },
   "inbounds": [
     {
-      "type": "tun",
-      "tag": "tun-in",
       "address": [
-        "172.19.0.1/30"
+        "172.18.0.1/30",
+        "fdfe:dcba:9876::1/126"
       ],
       "auto_route": true,
       "strict_route": true,
-      "stack": "system"
+      "type": "tun"
     },
     {
-      "type": "mixed",
-      "tag": "mixed-in",
       "listen": "127.0.0.1",
-      "listen_port": 2080
+      "listen_port": 2080,
+      "tag": "mixed-in",
+      "type": "mixed",
+      "users": []
     }
-  ],
-  "log": {
-    "level": "info"
-  }
+  ]
 }

@@ -36,7 +36,7 @@
     "servers": [
       {
         "detour": "Entry",
-        "type": "https",
+        "type": "tls",
         "server": "8.8.8.8",
         "tag": "remote"
       },
@@ -50,9 +50,6 @@
         "path": [],
         "predefined": {},
         "tag": "block"
-      },
-      {
-        "type": "local"
       }
     ],
     "strategy": "prefer_ipv4"
@@ -192,7 +189,7 @@
         "type": "remote",
         "tag": "category-ads-all",
         "format": "binary",
-        "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geosite-category-ads-all.srs"
+        "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs"
       }
     ]
   }
