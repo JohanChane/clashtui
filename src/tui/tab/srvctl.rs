@@ -297,8 +297,8 @@ impl TabContent for SrvCtlContent {
         self.singbox_status = "...".to_owned();
         #[cfg(windows)]
         {
-            self.proxy_enabled = crate::functions::command::get_system_proxy_state()
-                .unwrap_or(false);
+            self.proxy_enabled =
+                crate::functions::command::get_system_proxy_state().unwrap_or(false);
         }
         if !self.ops.is_empty() {
             state.select(Some(0));
@@ -565,10 +565,7 @@ impl TabContent for SrvCtlContent {
         );
 
         #[cfg(windows)]
-        let proxy_label = format!(
-            "  Proxy: {}",
-            if self.proxy_enabled { "ON" } else { "OFF" }
-        );
+        let proxy_label = format!("  Proxy: {}", if self.proxy_enabled { "ON" } else { "OFF" });
 
         let title_line = format!(
             "{} — {} (core: {}){}",

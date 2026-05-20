@@ -226,7 +226,9 @@ async fn update_template_profile(
     profile: Profile,
     with_proxy: bool,
 ) -> anyhow::Result<UpdateResult> {
-    use crate::functions::file::net_resource::{ExtractNetResources, NetResourceUpdate, ResourceSection};
+    use crate::functions::file::net_resource::{
+        ExtractNetResources, NetResourceUpdate, ResourceSection,
+    };
 
     let template = match &profile.dtype {
         ProfileType::Template { template } => template.clone(),
@@ -766,18 +768,25 @@ proxy-groups:
 "#;
 
         let mut providers = BTreeMap::new();
-        providers.insert("pvd0".to_string(), "https://example.com/sub1.yaml".to_string());
+        providers.insert(
+            "pvd0".to_string(),
+            "https://example.com/sub1.yaml".to_string(),
+        );
         let mut groups = ProxyProviderGroups::new();
         groups.insert("pvd".to_string(), providers);
 
         let urls = collect_proxy_provider_urls(profile_yaml, &groups);
 
         // Group provider (pvd0) should be included
-        assert!(urls.iter().any(|(name, _)| name == "pvd0"),
-            "pvd0 from groups should be collected");
+        assert!(
+            urls.iter().any(|(name, _)| name == "pvd0"),
+            "pvd0 from groups should be collected"
+        );
         // Standalone provider (bak) should also be collected
-        assert!(urls.iter().any(|(name, _)| name == "bak"),
-            "bak standalone provider should be collected");
+        assert!(
+            urls.iter().any(|(name, _)| name == "bak"),
+            "bak standalone provider should be collected"
+        );
 
         // pvd0 should appear only once (not duplicated from extract)
         let pvd0_count = urls.iter().filter(|(name, _)| name == "pvd0").count();
@@ -814,23 +823,41 @@ proxy-groups:
 "#;
 
         let mut pvd_providers = BTreeMap::new();
-        pvd_providers.insert("hajimi".to_string(), "https://hajimi.nvimy.com/file/clash.yaml".to_string());
-        pvd_providers.insert("mojie".to_string(), "https://hajimi.nvimy.com/file/clash_mojie.yaml".to_string());
+        pvd_providers.insert(
+            "hajimi".to_string(),
+            "https://hajimi.nvimy.com/file/clash.yaml".to_string(),
+        );
+        pvd_providers.insert(
+            "mojie".to_string(),
+            "https://hajimi.nvimy.com/file/clash_mojie.yaml".to_string(),
+        );
         let mut groups = ProxyProviderGroups::new();
         groups.insert("pvd".to_string(), pvd_providers);
 
         let urls = collect_proxy_provider_urls(profile_yaml, &groups);
 
-        assert_eq!(urls.len(), 3, "should collect 3 unique URLs: hajimi, mojie, bak");
+        assert_eq!(
+            urls.len(),
+            3,
+            "should collect 3 unique URLs: hajimi, mojie, bak"
+        );
 
         assert!(urls.iter().any(|(name, _)| name == "hajimi"));
         assert!(urls.iter().any(|(name, _)| name == "mojie"));
-        assert!(urls.iter().any(|(name, _)| name == "bak"),
-            "bak MUST be collected as standalone provider");
+        assert!(
+            urls.iter().any(|(name, _)| name == "bak"),
+            "bak MUST be collected as standalone provider"
+        );
 
         // Verify bak's URL is correct
-        let bak_url = urls.iter().find(|(name, _)| name == "bak").map(|(_, url)| url);
-        assert_eq!(bak_url, Some(&"https://hajimi.nvimy.com/file/mojie_johan.yaml".to_string()));
+        let bak_url = urls
+            .iter()
+            .find(|(name, _)| name == "bak")
+            .map(|(_, url)| url);
+        assert_eq!(
+            bak_url,
+            Some(&"https://hajimi.nvimy.com/file/mojie_johan.yaml".to_string())
+        );
     }
 
     #[test]
@@ -873,8 +900,14 @@ proxy-groups:
       - pvd1
 "#;
         let mut providers = BTreeMap::new();
-        providers.insert("pvd0".to_string(), "https://example.com/sub1.yaml".to_string());
-        providers.insert("pvd1".to_string(), "https://example.com/sub2.yaml".to_string());
+        providers.insert(
+            "pvd0".to_string(),
+            "https://example.com/sub1.yaml".to_string(),
+        );
+        providers.insert(
+            "pvd1".to_string(),
+            "https://example.com/sub2.yaml".to_string(),
+        );
         let mut groups = ProxyProviderGroups::new();
         groups.insert("pvd".to_string(), providers);
 

@@ -55,8 +55,8 @@ pub(super) fn stringify_output(output: std::process::Output) -> String {
 // nssm CLI service operations
 // ============================================================================
 
-use crate::config::CoreType;
 use crate::config::CONFIG;
+use crate::config::CoreType;
 
 fn nssm_bin() -> &'static str {
     "nssm"
@@ -135,7 +135,7 @@ pub fn nssm_launch_args(ct: CoreType) -> Vec<String> {
 pub fn is_elevated() -> bool {
     use windows::Win32::Foundation::{CloseHandle, HANDLE};
     use windows::Win32::Security::{
-        GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_QUERY,
+        GetTokenInformation, TOKEN_ELEVATION, TOKEN_QUERY, TokenElevation,
     };
     use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
@@ -240,8 +240,7 @@ pub fn nssm_runas_or_direct(service_name: &str, nssm_args: &[&str]) -> Result<St
 // System proxy toggle (Windows registry)
 // ============================================================================
 
-const PROXY_REG_PATH: &str =
-    r"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
+const PROXY_REG_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings";
 
 /// Returns true if the system proxy is currently enabled.
 pub fn get_system_proxy_state() -> Result<bool> {
@@ -291,7 +290,7 @@ pub fn disable_system_proxy() -> Result<()> {
 fn broadcast_settings_change() {
     use windows::Win32::Foundation::{LPARAM, WPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{
-        HWND_BROADCAST, SendMessageTimeoutW, SMTO_ABORTIFHUNG, WM_SETTINGCHANGE,
+        HWND_BROADCAST, SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_SETTINGCHANGE,
     };
     let _ = unsafe {
         SendMessageTimeoutW(
@@ -309,16 +308,12 @@ fn broadcast_settings_change() {
 /// Retrieve the mixed inbound port from the core REST API (`GET /configs`).
 pub fn get_mixed_port() -> Result<u16> {
     use crate::functions::restful::config_struct::ClashConfig;
-    let resp = minreq::get(format!(
-        "{}/configs",
-        CONFIG.controller_for_core()
-    ))
-    .with_timeout(5)
-    .send()
-    .map_err(|e| anyhow::anyhow!("Failed to fetch /configs: {e}"))?;
-    let cfg: ClashConfig =
-        serde_json::from_str(resp.as_str().map_err(|e| anyhow::anyhow!("{e}"))?)
-            .map_err(|e| anyhow::anyhow!("Failed to parse /configs: {e}"))?;
+    let resp = minreq::get(format!("{}/configs", CONFIG.controller_for_core()))
+        .with_timeout(5)
+        .send()
+        .map_err(|e| anyhow::anyhow!("Failed to fetch /configs: {e}"))?;
+    let cfg: ClashConfig = serde_json::from_str(resp.as_str().map_err(|e| anyhow::anyhow!("{e}"))?)
+        .map_err(|e| anyhow::anyhow!("Failed to parse /configs: {e}"))?;
     cfg.mixed_port
         .or(cfg.port)
         .ok_or_else(|| anyhow::anyhow!("No mixed_port or port found in /configs"))
