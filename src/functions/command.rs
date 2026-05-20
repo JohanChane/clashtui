@@ -142,7 +142,7 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
         return launchd_operation(op, service_name, is_user, password);
     }
 
-    // nssm install/remove need special dispatch (launch args)
+    #[cfg(target_os = "windows")]
     if matches!(host, ServiceController::Nssm) {
         return nssm_svc_operation(op, service_name, ct);
     }
@@ -164,6 +164,7 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
     }
 }
 
+#[cfg(target_os = "windows")]
 fn nssm_svc_operation(op: &str, service_name: &str, ct: CoreType) -> Result<String> {
     match op {
         "start" | "stop" | "restart" | "reload" => {
