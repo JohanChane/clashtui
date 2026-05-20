@@ -545,11 +545,8 @@ function Invoke-OptionalDownloads {
         $response = Read-Host "Do you want to download templates for sing-box? (y/N)"
         if ($response -eq "y" -or $response -eq "Y") {
             Write-Info "Downloading sing-box templates..."
-            Copy-Contrib "templates/sing-box/v1.12-common_tpl.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-common_tpl.json")
-            Copy-Contrib "templates/sing-box/v1.12-tun_fakeip_bypass_dnsleak.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_fakeip_bypass_dnsleak.json")
-            Copy-Contrib "templates/sing-box/v1.12-tun_fakeip_bypass_no_dnsleak.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_fakeip_bypass_no_dnsleak.json")
-            Copy-Contrib "templates/sing-box/v1.12-tun_ipv4_ipv6.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_ipv4_ipv6.json")
-            Copy-Contrib "templates/sing-box/v1.12-tun_ipv4_only.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_ipv4_only.json")
+            Copy-Contrib "templates/sing-box/v1.12-tun_common_tpl.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_common_tpl.json")
+            Copy-Contrib "templates/sing-box/v1.12-tun_bypass.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_bypass.json")
         }
     }
 }

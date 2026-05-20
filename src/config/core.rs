@@ -141,16 +141,22 @@ pub struct Extra {
 }
 impl Default for Extra {
     fn default() -> Self {
-        let common_cmd = if cfg!(windows) {
-            "start %s"
+        if cfg!(windows) {
+            Self {
+                edit_cmd: r#"notepad.exe "%s""#.to_owned(),
+                open_dir_cmd: r#"explorer "%s""#.to_owned(),
+            }
         } else if cfg!(target_os = "macos") {
-            "open %s"
+            Self {
+                edit_cmd: r#"open -t "%s""#.to_owned(),
+                open_dir_cmd: r#"open "%s""#.to_owned(),
+            }
         } else {
-            "xdg-open %s"
-        };
-        Self {
-            edit_cmd: common_cmd.to_owned(),
-            open_dir_cmd: common_cmd.to_owned(),
+            let cmd = r#"xdg-open "%s""#.to_owned();
+            Self {
+                edit_cmd: cmd.clone(),
+                open_dir_cmd: cmd,
+            }
         }
     }
 }
@@ -354,10 +360,10 @@ profiles:
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn extra_default_macos_uses_open() {
+    fn extra_default_macos() {
         let extra = Extra::default();
-        assert_eq!(extra.edit_cmd, "open %s");
-        assert_eq!(extra.open_dir_cmd, "open %s");
+        assert_eq!(extra.edit_cmd, r#"open -t "%s""#);
+        assert_eq!(extra.open_dir_cmd, r#"open "%s""#);
     }
 
     #[cfg(not(target_os = "macos"))]
