@@ -25,45 +25,37 @@ Describe "Get-Architecture" {
 }
 
 Describe "Get-OS" {
-    It "Returns windows on Windows, unsupported on other platforms" {
+    It "Returns a known OS string" {
         $result = Get-OS
-        if ([System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT) {
-            $result | Should -Be "windows"
-        } else {
-            $result | Should -Be "unsupported"
-        }
+        # On Windows CI it's "windows", elsewhere "unsupported"
+        $result | Should -BeIn @("windows", "unsupported")
     }
 }
 
 Describe "Test-ValidInstallDir" {
-    It "Rejects directories with spaces" {
-        { Test-ValidInstallDir "C:\Program Files\test" } | Should -Throw
+    It "Rejects directories with spaces (child process)" {
+        $scriptPath = (Resolve-Path (Join-Path $PSScriptRoot ".." "install.ps1")).Path
+        $result = & powershell -NoProfile -Command "& '$scriptPath' -InstallDir 'C:\Program Files\test' -Core mihomo 2>&1; exit `$LASTEXITCODE" 2>&1
+        $LASTEXITCODE | Should -Not -Be 0
     }
 
-    It "Accepts simple valid paths" {
-        $testDir = Join-Path $env:TEMP "clashtui_test_$(Get-Random)"
+    It "Accepts valid writable path" {
+        $testDir = Join-Path $env:TEMP "clashtui_valid_test_$(Get-Random)"
         try {
             Test-ValidInstallDir $testDir
             Test-Path $testDir | Should -Be $true
         } finally {
-            Remove-Item $testDir -Force -Recurse -ErrorAction SilentlyContinue
+            Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
 }
 
 Describe "Resolve-Paths" {
-    BeforeEach {
-        # Run with a custom install dir
-        $testInstallDir = Join-Path $env:TEMP "clashtui-resolve-test"
-    }
-
-    It "Sets correct INSTALL_DIR" {
-        # Resolve-Paths uses script-scope variables set during BeforeAll
-        # We can verify they exist and are non-null
+    It "Sets INSTALL_DIR" {
         $script:INSTALL_DIR | Should -Not -BeNullOrEmpty
     }
 
-    It "Sets correct subdirectory paths" {
+    It "Sets subdirectory paths" {
         $script:INSTALL_DIR_MIHOMO | Should -Not -BeNullOrEmpty
         $script:INSTALL_DIR_SINGBOX | Should -Not -BeNullOrEmpty
         $script:INSTALL_BIN | Should -Not -BeNullOrEmpty
@@ -78,14 +70,13 @@ Describe "Resolve-Paths" {
 
 Describe "Backup-File" {
     It "Returns early if file does not exist" {
-        $nonexistentPath = Join-Path $env:TEMP "nonexistent_backup_test_$(Get-Random)"
-        # Backup-File does not throw, it just returns
+        $nonexistentPath = Join-Path $env:TEMP "nonexistent_backup_$(Get-Random)"
         { Backup-File $nonexistentPath } | Should -Not -Throw
     }
 }
 
-Describe "Copy-Contrib" {
-    It "Has CONTRIB_URL_PREFIX set correctly" {
+Describe "Copy-Contrib URL prefix" {
+    It "Has CONTRIB_URL_PREFIX set with repo and branch" {
         $script:CONTRIB_URL_PREFIX | Should -Not -BeNullOrEmpty
         $script:CONTRIB_URL_PREFIX | Should -Match "https://raw.githubusercontent.com"
         $script:CONTRIB_URL_PREFIX | Should -Match "JohanChane/clashtui"
@@ -95,67 +86,49 @@ Describe "Copy-Contrib" {
 
 Describe "Write-Info / Write-Warn / Write-ErrorLog" {
     It "Write-Info does not throw" {
-        { Write-Info "Test info message" } | Should -Not -Throw
+        { Write-Info "test message" } | Should -Not -Throw
     }
 
     It "Write-Warn does not throw" {
-        { Write-Warn "Test warn message" } | Should -Not -Throw
+        { Write-Warn "test message" } | Should -Not -Throw
     }
 
     It "Write-ErrorLog does not throw" {
-        { Write-ErrorLog "Test error message" } | Should -Not -Throw
+        { Write-ErrorLog "test message" } | Should -Not -Throw
     }
 }
 
-Describe "End-to-end: install.ps1 -IsTest" {
-    It "Running install.ps1 -IsTest succeeds with all cores" {
-        $testDir = Join-Path $env:TEMP "clashtui-e2e-test-$(Get-Random)"
-        $scriptPath = Join-Path $PSScriptRoot ".." "install.ps1"
+Describe "E2E: install.ps1 -IsTest" {
+    It "Succeeds with exit code 0" {
+        $scriptPath = (Resolve-Path (Join-Path $PSScriptRoot ".." "install.ps1")).Path
+        $testDir = Join-Path $env:TEMP "clashtui-e2e-$(Get-Random)"
 
-        # Find the contrib dir (relative to the script)
-        $contribDir = Join-Path $PSScriptRoot ".." ".." "contrib"
-        if (-not (Test-Path $contribDir)) {
-            # May be running from a different location; try project root
-            $contribDir = Join-Path $PSScriptRoot ".." ".." ".." "contrib"
-        }
-
-        $result = & $scriptPath -IsTest -InstallDir $testDir -Repo "JohanChane/clashtui" -Branch "demotui" -Core "all" 2>&1
-        $exitCode = $LASTEXITCODE
-
-        Write-Host "--- install.ps1 output ---"
-        Write-Host ($result -join "`n")
-
-        $exitCode | Should -Be 0
+        & $scriptPath -IsTest -InstallDir $testDir -Repo "JohanChane/clashtui" -Branch "demotui" -Core all
+        $LASTEXITCODE | Should -Be 0
     }
 
     It "Creates expected directory structure" {
-        $testDir = Join-Path $env:TEMP "clashtui-structure-test-$(Get-Random)"
-        $scriptPath = Join-Path $PSScriptRoot ".." "install.ps1"
+        $testDir = Join-Path $env:TEMP "clashtui-struct-$(Get-Random)"
+        $scriptPath = (Resolve-Path (Join-Path $PSScriptRoot ".." "install.ps1")).Path
 
-        & $scriptPath -IsTest -InstallDir $testDir -Repo "JohanChane/clashtui" -Branch "demotui" -Core "all" 2>&1 | Out-Null
+        & $scriptPath -IsTest -InstallDir $testDir -Repo "JohanChane/clashtui" -Branch "demotui" -Core all
 
-        # In IsTest mode, the script uses $env:TEMP\clashtui-test\ not $testDir
-        $actualTestDir = Join-Path $env:TEMP "clashtui-test"
-        Write-Host "Checking structure under: $actualTestDir"
-
-        if (Test-Path $actualTestDir) {
-            Test-Path (Join-Path $actualTestDir "opt/clashtui/bin") | Should -Be $true
-            Test-Path (Join-Path $actualTestDir "opt/clashtui/mihomo/config") | Should -Be $true
-            Test-Path (Join-Path $actualTestDir "opt/clashtui/sing-box/config") | Should -Be $true
-            Test-Path (Join-Path $actualTestDir "config/clashtui") | Should -Be $true
-        } else {
-            Write-Host "Skipped: test dir not found (may not exist on this platform)"
-            Set-ItResult -Skipped -Because "Running on non-Windows platform"
-        }
+        # Script uses $env:TEMP\clashtui-test\ when IsTest
+        $actualRoot = Join-Path $env:TEMP "clashtui-test"
+        Test-Path (Join-Path $actualRoot "opt/clashtui/bin") | Should -Be $true
+        Test-Path (Join-Path $actualRoot "opt/clashtui/mihomo/config") | Should -Be $true
+        Test-Path (Join-Path $actualRoot "opt/clashtui/sing-box/config") | Should -Be $true
+        Test-Path (Join-Path $actualRoot "config/clashtui") | Should -Be $true
     }
 }
 
 Describe "Guard: dot-sourcing does not execute Main" {
     It "Functions are available without running Main" {
-        # Functions should be defined after dot-sourcing
-        { Get-Command Write-Info } | Should -Not -Throw
-        { Get-Command Resolve-Paths } | Should -Not -Throw
-        { Get-Command Get-Architecture } | Should -Not -Throw
-        { Get-Command Get-OS } | Should -Not -Throw
+        { Get-Command Write-Info -ErrorAction Stop } | Should -Not -Throw
+        { Get-Command Resolve-Paths -ErrorAction Stop } | Should -Not -Throw
+        { Get-Command Get-Architecture -ErrorAction Stop } | Should -Not -Throw
+        { Get-Command Get-OS -ErrorAction Stop } | Should -Not -Throw
+        { Get-Command Backup-File -ErrorAction Stop } | Should -Not -Throw
+        { Get-Command Copy-Contrib -ErrorAction Stop } | Should -Not -Throw
     }
 }

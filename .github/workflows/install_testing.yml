@@ -27,8 +27,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install bats
-        run: npm install -g bats
+      - name: Install bats (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo npm install -g bats
+
+      - name: Install bats (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install bats-core
 
       - name: Run bats tests
         run: bats installs/tests/install.bats
