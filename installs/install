@@ -2,6 +2,7 @@
 
 # --- Configurable options ---
 IS_USER=false
+IS_TEST=false
 REPO="JohanChane/clashtui"
 BRANCH="main"
 CORE_TYPE="all"
@@ -94,7 +95,19 @@ resolve_paths() {
     SERVICE_IS_USER=false
   fi
 
-  CLASHTUI_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/clashtui"
+  if $IS_TEST; then
+    INSTALL_DIR="$TEST_TMPDIR/opt/clashtui"
+    INSTALL_DIR_MIHOMO="$INSTALL_DIR/mihomo"
+    INSTALL_DIR_SINGBOX="$INSTALL_DIR/sing-box"
+    MIHOMO_CONFIG_DIR="$INSTALL_DIR_MIHOMO/config"
+    SINGBOX_CONFIG_DIR="$INSTALL_DIR_SINGBOX/config"
+    CLASHTUI_CONFIG_DIR="$TEST_TMPDIR/config/clashtui"
+    SERVICE_IS_USER=false
+    SUDO=""
+    SYSTEMD_RELOAD="true"  # placeholder: skip actual systemctl
+  fi
+
+  CLASHTUI_CONFIG_DIR="${CLASHTUI_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/clashtui}"
   MIHOMO_USER_CONFIG_DIR="$CLASHTUI_CONFIG_DIR/mihomo"
   SINGBOX_USER_CONFIG_DIR="$CLASHTUI_CONFIG_DIR/sing-box"
 
@@ -265,8 +278,17 @@ download_mihomo() {
   local base_arch=$(detect_architecture)
   local arch=$([ "$base_arch" = "amd64" ] && echo "${base_arch}$(detect_cpu_level)" || echo "$base_arch")
   local os=$(detect_os)
+  local latest_version="v0.0.0-test"
+
+  if $IS_TEST; then
+    download_url="https://github.com/${MIHOMO_UPSTREAM}/releases/latest/download/mihomo-${os}-${arch}-${latest_version}.gz"
+    log_info "[TEST] Would download: $download_url"
+    $SUDO mkdir -p "$INSTALL_DIR_MIHOMO"
+    return 0
+  fi
+
   local temp_dir=$(mktemp -d)
-  local latest_version=$(curl -s "https://api.github.com/repos/${MIHOMO_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  latest_version=$(curl -s "https://api.github.com/repos/${MIHOMO_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
   local download_url
 
   if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
@@ -304,9 +326,18 @@ download_mihomo() {
 download_singbox() {
   local arch=$(detect_architecture)
   local os=$(detect_os)
-  local temp_dir=$(mktemp -d)
-  local latest_version=$(curl -s "https://api.github.com/repos/${SINGBOX_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  local latest_version="v0.0.0-test"
   local download_url
+
+  if $IS_TEST; then
+    download_url="https://github.com/${SINGBOX_UPSTREAM}/releases/latest/download/sing-box-${latest_version}-${os}-${arch}.tar.gz"
+    log_info "[TEST] Would download: $download_url"
+    $SUDO mkdir -p "$INSTALL_DIR_SINGBOX"
+    return 0
+  fi
+
+  local temp_dir=$(mktemp -d)
+  latest_version=$(curl -s "https://api.github.com/repos/${SINGBOX_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
   if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
     log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
@@ -347,9 +378,18 @@ download_singbox() {
 download_clashtui() {
   local arch=$(detect_architecture)
   local os=$(detect_os)
-  local temp_dir=$(mktemp -d)
-  local latest_version=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  local latest_version="v0.0.0-test"
   local download_url
+
+  if $IS_TEST; then
+    download_url="https://github.com/${REPO}/releases/latest/download/clashtui-${os}-${arch}-${latest_version}.gz"
+    log_info "[TEST] Would download: $download_url"
+    $SUDO mkdir -p "$INSTALL_BIN"
+    return 0
+  fi
+
+  local temp_dir=$(mktemp -d)
+  latest_version=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
   if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
     log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
@@ -391,6 +431,10 @@ create_mihomo_user() {
   if $IS_USER || $IS_MACOS; then
     return 0
   fi
+  if $IS_TEST; then
+    log_info "[TEST] Would create mihomo user/group"
+    return 0
+  fi
   if ! id "mihomo" &>/dev/null; then
     log_info "Creating mihomo user and group..."
     sudo groupadd --system mihomo
@@ -402,6 +446,10 @@ create_mihomo_user() {
 
 create_singbox_user() {
   if $IS_USER || $IS_MACOS; then
+    return 0
+  fi
+  if $IS_TEST; then
+    log_info "[TEST] Would create sing-box user/group"
     return 0
   fi
   if ! id "sing-box" &>/dev/null; then
@@ -416,6 +464,11 @@ create_singbox_user() {
 # --- Service unit creation (systemd or launchd) ---
 create_mihomo_unit() {
   local service_name="clashtui_mihomo"
+
+  if $IS_TEST; then
+    log_info "[TEST] Would create mihomo service unit"
+    return 0
+  fi
 
   if $IS_MACOS; then
     # ── macOS: launchd plist ──
@@ -519,6 +572,11 @@ EOF
 
 create_singbox_unit() {
   local service_name="clashtui_singbox"
+
+  if $IS_TEST; then
+    log_info "[TEST] Would create sing-box service unit"
+    return 0
+  fi
 
   if $IS_MACOS; then
     # ── macOS: launchd plist ──
@@ -652,7 +710,7 @@ create_core_configs() {
     copy_contrib "$mihomo_cfg_src" "${MIHOMO_USER_CONFIG_DIR}/core_override_config.yaml"
     log_info "Mihomo core override written to: ${MIHOMO_USER_CONFIG_DIR}/core_override_config.yaml"
 
-    if ! $IS_USER; then
+    if ! $IS_USER && ! $IS_TEST; then
       if $IS_MACOS; then
         $SUDO chmod g+rw "${MIHOMO_CONFIG_DIR}/config.yaml"
       else
@@ -680,7 +738,7 @@ create_core_configs() {
     copy_contrib "$singbox_cfg_src" "${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
     log_info "Sing-box core override written to: ${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
 
-    if ! $IS_USER; then
+    if ! $IS_USER && ! $IS_TEST; then
       if $IS_MACOS; then
         $SUDO chmod g+rw "${SINGBOX_CONFIG_DIR}/config.json"
       else
@@ -795,6 +853,11 @@ EOF
 
 # --- Optional downloads: templates and rules-dat ---
 prompt_templates_and_rules() {
+  if $IS_TEST; then
+    log_info "[TEST] Skipping interactive template/rules-dat download prompts"
+    return 0
+  fi
+
   if [ "$CORE_TYPE" = "mihomo" ] || [ "$CORE_TYPE" = "all" ]; then
     echo -n "Do you want to download templates for mihomo? (y/N): "
     read -r response
@@ -821,7 +884,7 @@ prompt_templates_and_rules() {
     read -r response
     if [ "$response" = "y" ] || [ "$response" = "Y" ]; then
       log_info "Downloading sing-box templates..."
-      copy_contrib "templates/sing-box/v1.12-common_tpl.json" "$SINGBOX_USER_CONFIG_DIR/templates/v1.12-common_tpl.json"
+      copy_contrib "templates/sing-box/v1.12-tun_common_tpl.json" "$SINGBOX_USER_CONFIG_DIR/templates/v1.12-tun_common_tpl.json"
     fi
   fi
 }
@@ -840,7 +903,7 @@ install_mihomo() {
 
   create_mihomo_user
 
-  if ! $IS_USER; then
+  if ! $IS_USER && ! $IS_TEST; then
     if $IS_MACOS; then
       # macOS: service runs as root, admin group gets r/w access
       $SUDO chown -R root:admin "$INSTALL_DIR_MIHOMO"
@@ -868,7 +931,7 @@ install_singbox() {
 
   create_singbox_user
 
-  if ! $IS_USER; then
+  if ! $IS_USER && ! $IS_TEST; then
     if $IS_MACOS; then
       $SUDO chown -R root:admin "$INSTALL_DIR_SINGBOX"
       $SUDO chmod g+rwxs "$SINGBOX_CONFIG_DIR"
@@ -1024,6 +1087,11 @@ main() {
         ;;
       esac
       ;;
+    --is-test)
+      IS_TEST=true
+      TEST_TMPDIR=$(mktemp -d)
+      log_info "Test mode: using temp directory $TEST_TMPDIR"
+      ;;
     *)
       log_error "Unknown option: $1"
       show_help
@@ -1107,4 +1175,7 @@ main() {
   fi
 }
 
-main "$@"
+# Only execute main when run directly (not sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi

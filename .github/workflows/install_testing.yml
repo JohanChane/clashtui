@@ -1,0 +1,50 @@
+name: Install Script Tests
+
+on:
+  push:
+    paths:
+      - 'installs/**'
+      - 'contrib/**'
+      - '.github/workflows/install_testing.yml'
+  pull_request:
+    paths:
+      - 'installs/**'
+      - 'contrib/**'
+      - '.github/workflows/install_testing.yml'
+  workflow_dispatch:
+
+jobs:
+  test-bash:
+    name: Bash Install (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats
+        run: npm install -g bats
+
+      - name: Run bats tests
+        run: bats installs/tests/install.bats
+
+  test-powershell:
+    name: PowerShell Install (Windows)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Pester tests
+        run: |
+          Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser
+          Import-Module Pester
+          Invoke-Pester -Path installs/tests/install.tests.ps1 -Output Detailed
+        shell: pwsh
