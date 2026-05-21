@@ -1191,7 +1191,7 @@ match ServiceController::default() {
 
 ### Install Script
 
-To lower the deployment barrier for Windows users, a PowerShell install script (`install.ps1`) handles the following:
+To lower the deployment barrier for Windows users, a PowerShell install script (`installs/install.ps1`) handles the following:
 
 #### Features
 
@@ -1207,10 +1207,10 @@ To lower the deployment barrier for Windows users, a PowerShell install script (
 
 ```powershell
 # Default install to C:\Program Files\clashtui
-.\install.ps1
+.\installs\install.ps1
 
 # Install to custom directory
-.\install.ps1 -InstallDir "D:\MyTools\clashtui"
+.\installs\install.ps1 -InstallDir "D:\MyTools\clashtui"
 ```
 
 #### Windows-specific Parameters

@@ -24,7 +24,8 @@ param(
     [ValidateSet("mihomo", "sing-box", "all")]
     [string]$Core = "all",
     [string]$Repo = "JohanChane/clashtui",
-    [string]$Branch = "main"
+    [string]$Branch = "main",
+    [switch]$IsTest
 )
 
 $ErrorActionPreference = "Stop"
@@ -121,9 +122,33 @@ function Resolve-Paths {
     $script:MIHOMO_USER_CONFIG_DIR = Join-Path $CLASHTUI_CONFIG_DIR "mihomo"
     $script:SINGBOX_USER_CONFIG_DIR = Join-Path $CLASHTUI_CONFIG_DIR "sing-box"
 
+    if ($IsTest) {
+        $script:TestTmpDir = Join-Path $env:TEMP "clashtui-test"
+        $script:INSTALL_DIR = Join-Path $TestTmpDir "opt/clashtui"
+        $script:INSTALL_DIR_MIHOMO = Join-Path $INSTALL_DIR "mihomo"
+        $script:INSTALL_DIR_SINGBOX = Join-Path $INSTALL_DIR "sing-box"
+        $script:MIHOMO_CONFIG_DIR = Join-Path $INSTALL_DIR_MIHOMO "config"
+        $script:SINGBOX_CONFIG_DIR = Join-Path $INSTALL_DIR_SINGBOX "config"
+        $script:INSTALL_BIN = Join-Path $INSTALL_DIR "bin"
+        $script:CLASHTUI_CONFIG_DIR = Join-Path $TestTmpDir "config/clashtui"
+        $script:MIHOMO_USER_CONFIG_DIR = Join-Path $CLASHTUI_CONFIG_DIR "mihomo"
+        $script:SINGBOX_USER_CONFIG_DIR = Join-Path $CLASHTUI_CONFIG_DIR "sing-box"
+        Write-Info "Test mode: using temp directory $TestTmpDir"
+    }
+
     $script:SCRIPT_DIR = Split-Path $MyInvocation.ScriptName -Parent
-    $script:CONTRIB_SOURCE = if (Test-Path (Join-Path $SCRIPT_DIR "contrib")) { "local" } else { "remote" }
-    $script:CONTRIB_DIR = if ($CONTRIB_SOURCE -eq "local") { Join-Path $SCRIPT_DIR "contrib" } else { $null }
+    $contribLocal = Join-Path $SCRIPT_DIR "contrib"
+    $contribParent = Join-Path (Split-Path $SCRIPT_DIR -Parent) "contrib"
+    if (Test-Path $contribLocal) {
+        $script:CONTRIB_SOURCE = "local"
+        $script:CONTRIB_DIR = $contribLocal
+    } elseif (Test-Path $contribParent) {
+        $script:CONTRIB_SOURCE = "local"
+        $script:CONTRIB_DIR = $contribParent
+    } else {
+        $script:CONTRIB_SOURCE = "remote"
+        $script:CONTRIB_DIR = $null
+    }
 
     $script:CONTRIB_URL_PREFIX = "https://raw.githubusercontent.com/${Repo}/refs/heads/${Branch}/contrib"
 }
@@ -215,6 +240,13 @@ function Install-Mihomo {
     }
 
     # Not found — download
+    if ($IsTest) {
+        $downloadUrl = "https://github.com/$MIHOMO_UPSTREAM/releases/latest"
+        Write-Info "[TEST] Would download mihomo from: $downloadUrl"
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+        return
+    }
+
     $arch = Get-Architecture
     $os = Get-OS
 
@@ -284,6 +316,13 @@ function Install-SingBox {
     }
 
     # Not found — download
+    if ($IsTest) {
+        $downloadUrl = "https://github.com/$SINGBOX_UPSTREAM/releases/latest"
+        Write-Info "[TEST] Would download sing-box from: $downloadUrl"
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+        return
+    }
+
     $arch = Get-Architecture
     $os = Get-OS
 
@@ -355,6 +394,14 @@ function Install-ClashTui {
     }
 
     # Not found — download
+    if ($IsTest) {
+        $downloadUrl = "https://github.com/$Repo/releases/latest"
+        Write-Info "[TEST] Would download clashtui from: $downloadUrl"
+        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
+        New-ClashTuiConfig $CoreType
+        return
+    }
+
     $arch = Get-Architecture
     $os = Get-OS
 
@@ -522,6 +569,11 @@ function New-CoreConfigs {
 
 # --- Optional downloads ---
 function Invoke-OptionalDownloads {
+    if ($IsTest) {
+        Write-Info "[TEST] Skipping interactive template/rules-dat download prompts"
+        return
+    }
+
     if ($Core -eq "mihomo" -or $Core -eq "all") {
         $response = Read-Host "Do you want to download templates for mihomo? (y/N)"
         if ($response -eq "y" -or $response -eq "Y") {
@@ -553,12 +605,14 @@ function Invoke-OptionalDownloads {
 
 # --- Main ---
 function Main {
-    if ((Get-OS) -ne "windows") {
+    if ((-not $IsTest) -and (Get-OS) -ne "windows") {
         Write-ErrorLog "This script is for Windows only. Use the bash install script for Linux/macOS."
         exit 1
     }
 
-    Test-ValidInstallDir $InstallDir
+    if (-not $IsTest) {
+        Test-ValidInstallDir $InstallDir
+    }
     Resolve-Paths
 
     Write-Info "Install directory: $InstallDir"
@@ -599,4 +653,7 @@ function Main {
     Write-Info "Use ClashTui's CoreSrvCtl to manage core services (install/start/stop via nssm)."
 }
 
-Main
+# Only execute Main when run directly (not dot-sourced)
+if ($MyInvocation.InvocationName -ne '.') {
+    Main
+}

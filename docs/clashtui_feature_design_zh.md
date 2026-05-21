@@ -1111,16 +1111,16 @@ CoreSrvCtl tab 的操作列表:
 
 ### Install Script
 
-为了降低 Windows 用户的部署门槛, 提供一个 PowerShell 安装脚本 (`install.ps1`) 完成以下操作:
+为了降低 Windows 用户的部署门槛, 提供一个 PowerShell 安装脚本 (`installs/install.ps1`) 完成以下操作:
 
 #### 使用方式
 
 ```powershell
 # 默认安装到 D:\ClashTui
-.\install.ps1
+.\installs\install.ps1
 
 # 安装到自定义目录 (Core Directory)
-.\install.ps1 -InstallDir "D:\MyTools\ClashTui"  # 检查一下 InstallDir, 路径不允许有空格。同时检查这个目录 ClashTui 是否有权限 (e.g. `C:/Program Files`)
+.\installs\install.ps1 -InstallDir "D:\MyTools\ClashTui"  # 检查一下 InstallDir, 路径不允许有空格。同时检查这个目录 ClashTui 是否有权限 (e.g. `C:/Program Files`)
 ```
 
 **因为 ClashTui 已经支持 install core service 了, 所以 install.ps1 不需要安装 Core service。**
