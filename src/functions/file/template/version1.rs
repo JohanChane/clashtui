@@ -640,17 +640,32 @@ proxy-groups:
             .and_then(|v| v.as_mapping())
             .unwrap();
         let keys: Vec<&str> = providers.keys().filter_map(|k| k.as_str()).collect();
-        assert!(keys.contains(&"pvd0"), "Expected pvd0 in proxy-providers, got: {keys:?}");
-        assert!(keys.contains(&"bak"), "Expected bak in proxy-providers, got: {keys:?}");
+        assert!(
+            keys.contains(&"pvd0"),
+            "Expected pvd0 in proxy-providers, got: {keys:?}"
+        );
+        assert!(
+            keys.contains(&"bak"),
+            "Expected bak in proxy-providers, got: {keys:?}"
+        );
 
         // Verify << key has been flattened (interval and health-check at top level)
         let bak = providers.get("bak").unwrap().as_mapping().unwrap();
         assert!(bak.get("<<").is_none(), "<< key should be removed from bak");
-        assert!(bak.get("interval").is_some(), "interval should be at top level after merge flatten");
-        assert!(bak.get("health-check").is_some(), "health-check should be at top level after merge flatten");
+        assert!(
+            bak.get("interval").is_some(),
+            "interval should be at top level after merge flatten"
+        );
+        assert!(
+            bak.get("health-check").is_some(),
+            "health-check should be at top level after merge flatten"
+        );
 
         // Verify proxy-anchor section has been stripped
-        assert!(result.get("proxy-anchor").is_none(), "proxy-anchor should be removed from output");
+        assert!(
+            result.get("proxy-anchor").is_none(),
+            "proxy-anchor should be removed from output"
+        );
 
         // Check TestGroup has bak in use
         let groups_seq = result
@@ -730,24 +745,43 @@ proxy-groups:
         let result = gen_template_with_urls(tpl, "user_tpl", &groups).unwrap();
 
         // Verify no << keys anywhere in proxy-providers or proxy-groups
-        let providers = result.get(PROXY_PROVIDERS).and_then(|v| v.as_mapping()).unwrap();
+        let providers = result
+            .get(PROXY_PROVIDERS)
+            .and_then(|v| v.as_mapping())
+            .unwrap();
         for (k, v) in providers {
             let m = v.as_mapping().unwrap();
-            assert!(m.get("<<").is_none(), "provider {k:?} should not have << key");
+            assert!(
+                m.get("<<").is_none(),
+                "provider {k:?} should not have << key"
+            );
         }
 
-        let groups_seq = result.get(PROXY_GROUPS).and_then(|v| v.as_sequence()).unwrap();
+        let groups_seq = result
+            .get(PROXY_GROUPS)
+            .and_then(|v| v.as_sequence())
+            .unwrap();
         for g in groups_seq {
             let m = g.as_mapping().unwrap();
-            assert!(m.get("<<").is_none(), "group {:?} should not have << key", m.get("name"));
+            assert!(
+                m.get("<<").is_none(),
+                "group {:?} should not have << key",
+                m.get("name")
+            );
         }
 
         // Verify proxy-anchor is stripped
-        assert!(result.get("proxy-anchor").is_none(), "proxy-anchor should be removed");
+        assert!(
+            result.get("proxy-anchor").is_none(),
+            "proxy-anchor should be removed"
+        );
 
         // bak must be in proxy-providers
         let keys: Vec<&str> = providers.keys().filter_map(|k| k.as_str()).collect();
-        assert!(keys.contains(&"bak"), "Expected bak in proxy-providers, got: {keys:?}");
+        assert!(
+            keys.contains(&"bak"),
+            "Expected bak in proxy-providers, got: {keys:?}"
+        );
 
         // SpecialGroup must use bak
         let special = groups_seq
@@ -761,7 +795,10 @@ proxy-groups:
             .iter()
             .filter_map(|v| v.as_str())
             .collect();
-        assert!(uses.contains(&"bak"), "SpecialGroup use should contain bak, got: {uses:?}");
+        assert!(
+            uses.contains(&"bak"),
+            "SpecialGroup use should contain bak, got: {uses:?}"
+        );
     }
 
     #[test]
@@ -805,8 +842,14 @@ proxy-groups:
             .and_then(|v| v.as_mapping())
             .unwrap();
         let keys: Vec<&str> = providers.keys().filter_map(|k| k.as_str()).collect();
-        assert!(keys.contains(&"pvd0"), "Expected pvd0 in proxy-providers, got: {keys:?}");
-        assert!(keys.contains(&"bak"), "Expected bak in proxy-providers, got: {keys:?}");
+        assert!(
+            keys.contains(&"pvd0"),
+            "Expected pvd0 in proxy-providers, got: {keys:?}"
+        );
+        assert!(
+            keys.contains(&"bak"),
+            "Expected bak in proxy-providers, got: {keys:?}"
+        );
 
         // Check proxy-groups section contains TestGroup with bak in use list
         let groups_seq = result

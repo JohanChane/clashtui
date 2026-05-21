@@ -67,6 +67,43 @@ pub struct ConfigFile {
 }
 impl Default for ConfigFile {
     fn default() -> Self {
+        #[cfg(windows)]
+        {
+            let local_appdata = std::env::var("LOCALAPPDATA")
+                .unwrap_or_else(|_| {
+                    let home = std::env::var("USERPROFILE").unwrap_or_default();
+                    format!("{home}/AppData/Local")
+                })
+                .replace('\\', "/");
+            let base = format!("{local_appdata}/clashtui");
+            Self {
+                mihomo: MihomoSection {
+                    core: CoreConfig {
+                        config_dir: format!("{base}/mihomo/config"),
+                        bin_path: format!("{base}/mihomo/mihomo.exe"),
+                        config_path: format!("{base}/mihomo/config/config.yaml"),
+                    },
+                    core_service: CoreServiceConfig {
+                        service_name: "clashtui_mihomo".into(),
+                        is_user: false,
+                    },
+                },
+                singbox: SingboxSection {
+                    core: CoreConfig {
+                        config_dir: format!("{base}/sing-box/config"),
+                        bin_path: format!("{base}/sing-box/sing-box.exe"),
+                        config_path: format!("{base}/sing-box/config/config.json"),
+                    },
+                    core_service: CoreServiceConfig {
+                        service_name: "clashtui_singbox".into(),
+                        is_user: false,
+                    },
+                },
+                timeout: Default::default(),
+                extra: Default::default(),
+            }
+        }
+        #[cfg(not(windows))]
         Self {
             mihomo: MihomoSection {
                 core: CoreConfig {
@@ -104,16 +141,22 @@ pub struct Extra {
 }
 impl Default for Extra {
     fn default() -> Self {
-        let common_cmd = if cfg!(windows) {
-            "start %s"
+        if cfg!(windows) {
+            Self {
+                edit_cmd: r#"notepad.exe "%s""#.to_owned(),
+                open_dir_cmd: r#"explorer "%s""#.to_owned(),
+            }
         } else if cfg!(target_os = "macos") {
-            "open %s"
+            Self {
+                edit_cmd: r#"open -t "%s""#.to_owned(),
+                open_dir_cmd: r#"open "%s""#.to_owned(),
+            }
         } else {
-            "xdg-open %s"
-        };
-        Self {
-            edit_cmd: common_cmd.to_owned(),
-            open_dir_cmd: common_cmd.to_owned(),
+            let cmd = r#"xdg-open "%s""#.to_owned();
+            Self {
+                edit_cmd: cmd.clone(),
+                open_dir_cmd: cmd,
+            }
         }
     }
 }
@@ -317,19 +360,39 @@ profiles:
 
     #[cfg(target_os = "macos")]
     #[test]
-    fn extra_default_macos_uses_open() {
+    fn extra_default_macos() {
         let extra = Extra::default();
-        assert_eq!(extra.edit_cmd, "open %s");
-        assert_eq!(extra.open_dir_cmd, "open %s");
+        assert_eq!(extra.edit_cmd, r#"open -t "%s""#);
+        assert_eq!(extra.open_dir_cmd, r#"open "%s""#);
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
     #[test]
-    fn extra_default_non_macos_not_open() {
+    fn extra_default_windows() {
         let extra = Extra::default();
-        // On non-macOS platforms, the default should NOT be "open %s"
-        assert_ne!(extra.edit_cmd, "open %s");
-        assert_ne!(extra.open_dir_cmd, "open %s");
+        assert_eq!(extra.edit_cmd, r#"notepad.exe "%s""#);
+        assert_eq!(extra.open_dir_cmd, r#"explorer "%s""#);
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn extra_default_linux() {
+        let extra = Extra::default();
+        assert_eq!(extra.edit_cmd, r#"xdg-open "%s""#);
+        assert_eq!(extra.open_dir_cmd, r#"xdg-open "%s""#);
+    }
+
+    #[test]
+    fn extra_empty_template_stays_empty() {
+        // Serde: explicit empty strings in config MUST NOT trigger platform defaults
+        // (shell_spawn handles the empty-case fallback at runtime)
+        let yaml = r#"
+edit_cmd: ""
+open_dir_cmd: ""
+"#;
+        let extra: Extra = serde_yml::from_str(yaml).unwrap();
+        assert_eq!(extra.edit_cmd, "");
+        assert_eq!(extra.open_dir_cmd, "");
     }
 
     #[test]

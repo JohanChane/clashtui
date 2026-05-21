@@ -318,6 +318,12 @@ pub fn config_dir_path() -> PathBuf {
 pub fn config_root_path() -> PathBuf {
     CONFIG_ROOT.get().unwrap().clone()
 }
+pub fn core_data_dir(core_type: CoreType) -> PathBuf {
+    match core_type {
+        CoreType::Mihomo => mihomo_dir(),
+        CoreType::Singbox => singbox_dir(),
+    }
+}
 pub fn template_path() -> PathBuf {
     mihomo_dir().join(defs::TEMPLATE_DIR)
 }
@@ -389,5 +395,43 @@ mod tests {
         assert!(is_core_mismatch());
         set_core_mismatch(false);
         assert!(!is_core_mismatch());
+    }
+
+    #[test]
+    fn core_data_dir_returns_correct_subdir_per_core_type() {
+        let tmp = std::env::temp_dir().join(format!("clashtui-test-{}", fastrand::u32(..)));
+        std::fs::create_dir_all(&tmp).unwrap();
+        struct Cleanup(std::path::PathBuf);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let _cleanup = Cleanup(tmp.clone());
+
+        init(Some(tmp.clone())).unwrap();
+
+        let mihomo_dir = core_data_dir(CoreType::Mihomo);
+        assert!(
+            mihomo_dir.ends_with("mihomo"),
+            "expected path ending with 'mihomo', got: {mihomo_dir:?}"
+        );
+
+        let singbox_dir = core_data_dir(CoreType::Singbox);
+        assert!(
+            singbox_dir.ends_with("sing-box"),
+            "expected path ending with 'sing-box', got: {singbox_dir:?}"
+        );
+    }
+
+    #[test]
+    fn core_install_dir_is_parent_of_config_dir() {
+        let config_dir = "/opt/clashtui/mihomo/config";
+        let parent = std::path::Path::new(config_dir).parent().unwrap();
+        assert_eq!(parent, std::path::Path::new("/opt/clashtui/mihomo"));
+
+        let config_dir = "/opt/clashtui/sing-box/config";
+        let parent = std::path::Path::new(config_dir).parent().unwrap();
+        assert_eq!(parent, std::path::Path::new("/opt/clashtui/sing-box"));
     }
 }

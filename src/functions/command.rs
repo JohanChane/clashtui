@@ -1,5 +1,6 @@
 #[cfg_attr(target_os = "linux", path = "command/linux.rs")]
 #[cfg_attr(target_os = "macos", path = "command/macos.rs")]
+#[cfg_attr(target_os = "windows", path = "command/windows.rs")]
 mod platform;
 mod utils;
 
@@ -16,13 +17,21 @@ pub async fn resolve_sudo_password(needs_sudo: bool) -> Result<Option<String>> {
     if !needs_sudo {
         return Ok(None);
     }
-    if !sudo_needs_password() {
+    #[cfg(windows)]
+    {
+        // Windows: each nssm operation auto-elevates via UAC
         return Ok(None);
     }
-    match crate::tui::prompt_sudo_password().await {
-        Some(pw) if pw.is_empty() => Ok(None),
-        Some(pw) => Ok(Some(pw)),
-        None => Err(anyhow::anyhow!("cancelled")),
+    #[cfg(not(windows))]
+    {
+        if !sudo_needs_password() {
+            return Ok(None);
+        }
+        match crate::tui::prompt_sudo_password().await {
+            Some(pw) if pw.is_empty() => Ok(None),
+            Some(pw) => Ok(Some(pw)),
+            None => Err(anyhow::anyhow!("cancelled")),
+        }
     }
 }
 
@@ -114,6 +123,56 @@ pub fn check_config(profile_path: &Path) -> anyhow::Result<()> {
     }
 }
 
+pub fn is_core_service_running() -> Option<bool> {
+    let host = &ServiceController::default();
+    let ct = CONFIG.core_type();
+    let (service_name, is_user) = match ct {
+        CoreType::Mihomo => (
+            &CONFIG.cfg_file.mihomo.core_service.service_name,
+            CONFIG.cfg_file.mihomo.core_service.is_user,
+        ),
+        CoreType::Singbox => (
+            &CONFIG.cfg_file.singbox.core_service.service_name,
+            CONFIG.cfg_file.singbox.core_service.is_user,
+        ),
+    };
+
+    if service_name.is_empty() {
+        return None;
+    }
+
+    #[cfg(target_os = "windows")]
+    if matches!(host, ServiceController::Nssm) {
+        let s = nssm_status(service_name);
+        return Some(s == "active");
+    }
+
+    if matches!(host, ServiceController::Systemd | ServiceController::OpenRc) {
+        let mut args = vec!["is-active"];
+        if is_user {
+            args.push("--user");
+        }
+        args.push(service_name);
+        return std::process::Command::new(host.bin_name())
+            .args(&args)
+            .output()
+            .map(|o| Some(String::from_utf8_lossy(&o.stdout).trim() == "active"))
+            .unwrap_or(None);
+    }
+
+    #[cfg(target_os = "macos")]
+    if matches!(host, ServiceController::Launchd) && is_user {
+        let uid = unsafe { libc::getuid() };
+        return std::process::Command::new("launchctl")
+            .args(["print", &format!("gui/{uid}/{service_name}")])
+            .output()
+            .map(|o| Some(String::from_utf8_lossy(&o.stdout).contains("state = running")))
+            .unwrap_or(None);
+    }
+
+    None
+}
+
 fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) -> Result<String> {
     let host = &ServiceController::default();
     let ct = core_type.unwrap_or(CONFIG.core_type());
@@ -133,6 +192,11 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
         return launchd_operation(op, service_name, is_user, password);
     }
 
+    #[cfg(target_os = "windows")]
+    if matches!(host, ServiceController::Nssm) {
+        return nssm_svc_operation(op, service_name, ct);
+    }
+
     let svc_args = host.args(op, service_name, is_user);
     if is_user {
         return exec(host.bin_name(), svc_args);
@@ -147,6 +211,28 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
             a.extend(argv);
             a
         }),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn nssm_svc_operation(op: &str, service_name: &str, ct: CoreType) -> Result<String> {
+    match op {
+        "start" | "stop" | "restart" | "reload" => {
+            let op = if op == "reload" { "restart" } else { op };
+            let args = [op, service_name];
+            platform::nssm_runas_or_direct(service_name, &args)
+        }
+        "install" => {
+            let bin_path = match ct {
+                CoreType::Mihomo => &CONFIG.cfg_file.mihomo.core.bin_path,
+                CoreType::Singbox => &CONFIG.cfg_file.singbox.core.bin_path,
+            };
+            let launch_args = platform::nssm_launch_args(ct);
+            let launch_strs: Vec<&str> = launch_args.iter().map(|s| s.as_str()).collect();
+            platform::nssm_install(service_name, bin_path, &launch_strs)
+        }
+        "remove" => platform::nssm_uninstall(service_name),
+        _ => Err(anyhow::anyhow!("Unknown nssm operation: {op}")),
     }
 }
 
@@ -218,6 +304,14 @@ pub fn reload_core_service(password: Option<&str>, core_type: CoreType) -> Resul
     svc_operation("reload", password, Some(core_type))
 }
 
+pub fn install_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
+    svc_operation("install", password, Some(core_type))
+}
+
+pub fn uninstall_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
+    svc_operation("remove", password, Some(core_type))
+}
+
 pub fn restart_service(password: Option<&str>) -> Result<String> {
     svc_operation("restart", password, None)
 }
@@ -241,39 +335,22 @@ pub fn stop_all_services(password: Option<&str>) -> Result<String> {
 }
 
 pub fn edit(path: &str) -> Result<()> {
-    log::debug!("edit: path={path} cmd={}", CONFIG.cfg_file.extra.edit_cmd);
-    spawn(
-        "sh",
-        vec![
-            "-c",
-            CONFIG.cfg_file.extra.edit_cmd.replace("%s", path).as_str(),
-        ],
-    )
+    let tpl = &CONFIG.cfg_file.extra.edit_cmd;
+    log::debug!("edit: path={path} template={tpl}");
+    shell_spawn(tpl, path)
 }
 
 pub fn open_dir(path: &str) -> Result<()> {
-    log::debug!(
-        "open_dir: path={path} cmd={}",
-        CONFIG.cfg_file.extra.open_dir_cmd
-    );
-    spawn(
-        "sh",
-        vec![
-            "-c",
-            CONFIG
-                .cfg_file
-                .extra
-                .open_dir_cmd
-                .replace("%s", path)
-                .as_str(),
-        ],
-    )
+    let tpl = &CONFIG.cfg_file.extra.open_dir_cmd;
+    log::debug!("open_dir: path={path} template={tpl}");
+    shell_spawn(tpl, path)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn test_launchd_plist_path_user() {
         let path = launchd_plist_path("com.example.service", true);
@@ -285,6 +362,7 @@ mod tests {
         );
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn test_launchd_plist_path_system() {
         let path = launchd_plist_path("com.example.service", false);

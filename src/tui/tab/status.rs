@@ -104,61 +104,52 @@ impl BasicTabContent for Status {
     fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         self.paused = false;
 
-        // Synchronous detection so other tabs see the flag before their first fetch
         let was_unknown = self.detected_core_type.is_none();
-        match restful::core_detect::detect_core_type() {
-            Ok(detected) => {
-                let configured = CONFIG.core_type();
-                self.detected_core_type = Some(detected);
-                let mismatch = detected != configured;
-                crate::config::set_core_mismatch(mismatch);
-                if mismatch {
-                    let msg =
-                        format!("API returned {detected} data, but {configured} is configured");
-                    self.error = Some(msg.clone());
-                    if was_unknown {
-                        crate::tui::widget::popmsg::Confirm::err(msg);
-                    }
+        if was_unknown {
+            match crate::functions::command::is_core_service_running() {
+                Some(false) => {
+                    self.error = Some("Core service is not running".to_owned());
+                    return;
+                }
+                _ => {
+                    self.error = Some("Detecting...".to_owned());
                 }
             }
-            Err(e) => {
-                self.error = Some(format!("Core detection failed: {e}"));
-            }
-        }
-
-        if crate::config::is_core_mismatch() {
-            return;
         }
 
         async {
+            let detected = tri!(
+                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
+                    .await
+                    .unwrap(),
+                or_set
+            );
             let version = tri!(
                 tokio::task::spawn_blocking(restful::control::version)
                     .await
-                    .unwrap()
+                    .unwrap(),
+                or_set
             );
             let config = tri!(
                 tokio::task::spawn_blocking(restful::config::fetch)
                     .await
-                    .unwrap()
-            );
-            let detected = tri!(
-                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
-                    .await
-                    .unwrap()
+                    .unwrap(),
+                or_set
             );
 
             wrapper(move |content: &mut Self| {
                 let configured = CONFIG.core_type();
                 content.detected_core_type = Some(detected);
-                if detected == configured {
+                let mismatch = detected != configured;
+                crate::config::set_core_mismatch(mismatch);
+                if mismatch {
+                    let msg =
+                        format!("API returned {detected} data, but {configured} is configured");
+                    content.error = Some(msg);
+                } else {
                     content.version = Some(version);
                     content.config = Some(config);
-                    crate::config::set_core_mismatch(false);
-                } else {
-                    content.error = Some(format!(
-                        "API returned {detected} data, but {configured} is configured"
-                    ));
-                    crate::config::set_core_mismatch(true);
+                    content.error = None;
                 }
             })
         }

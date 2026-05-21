@@ -48,3 +48,22 @@ pub fn spawn(pgm: &str, args: Vec<&str>) -> Result<()> {
         .spawn()?;
     Ok(())
 }
+
+pub fn shell_spawn(cmd_template: &str, path: &str) -> Result<()> {
+    if cmd_template.is_empty() {
+        if cfg!(windows) {
+            spawn("cmd", vec!["/c", "start", "", path])
+        } else if cfg!(target_os = "macos") {
+            spawn("sh", vec!["-c", &format!("open \"{}\"", path)])
+        } else {
+            spawn("sh", vec!["-c", &format!("xdg-open \"{}\"", path)])
+        }
+    } else {
+        let cmd = cmd_template.replace("%s", path);
+        if cfg!(windows) {
+            spawn("cmd", vec!["/c", &cmd])
+        } else {
+            spawn("sh", vec!["-c", &cmd])
+        }
+    }
+}

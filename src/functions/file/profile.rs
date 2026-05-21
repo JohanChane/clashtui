@@ -133,48 +133,53 @@ pub struct UpdateResult {
 pub async fn update_profile(profile: Profile, with_proxy: bool) -> anyhow::Result<UpdateResult> {
     use super::template::fetch_net_resource_statuses;
 
-    // Template profiles re-generate from template + subscriptions
-    if matches!(profile.dtype, ProfileType::Template { .. }) {
-        return update_template_profile(profile, with_proxy).await;
-    }
-
-    // sing-box local imports always use JSON; URL profiles follow current core type
-    if matches!(profile.dtype, ProfileType::Singbox)
+    let result = if matches!(profile.dtype, ProfileType::Template { .. }) {
+        update_template_profile(profile.clone(), with_proxy).await
+    } else if matches!(profile.dtype, ProfileType::Singbox)
         || crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox
     {
-        return update_singbox_profile(profile, with_proxy).await;
-    }
+        update_singbox_profile(profile.clone(), with_proxy).await
+    } else {
+        let path = PROFILE_YAMLS_PATH.join(format!("{}.yaml", &profile.name));
 
-    let path = PROFILE_YAMLS_PATH.join(format!("{}.yaml", &profile.name));
-
-    if let ProfileType::Url(ref url) = profile.dtype {
-        let mut response = crate::functions::restful::download::profile(url, with_proxy)?;
-        let content: serde_yml::Mapping = serde_yml::from_reader(&mut response)
-            .map_err(|e| anyhow::anyhow!("Failed to parse downloaded profile YAML: {e}"))?;
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
+        if let ProfileType::Url(ref url) = profile.dtype {
+            let mut response = crate::functions::restful::download::profile(url, with_proxy)?;
+            let content: serde_yml::Mapping = serde_yml::from_reader(&mut response)
+                .map_err(|e| anyhow::anyhow!("Failed to parse downloaded profile YAML: {e}"))?;
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            serde_yml::to_writer(std::fs::File::create(&path)?, &content)?;
         }
+
+        anyhow::ensure!(
+            path.exists(),
+            "Profile file not found: {}. Download it first.",
+            path.display()
+        );
+
+        let content: serde_yml::Mapping = {
+            let file = std::fs::File::open(&path)?;
+            serde_yml::from_reader(file)
+                .map_err(|e| anyhow::anyhow!("Failed to read profile YAML: {e}"))?
+        };
+
+        let net_updates = fetch_net_resource_statuses(&content, with_proxy).await;
         serde_yml::to_writer(std::fs::File::create(&path)?, &content)?;
-    }
-
-    anyhow::ensure!(
-        path.exists(),
-        "Profile file not found: {}. Download it first.",
-        path.display()
-    );
-
-    let content: serde_yml::Mapping = {
-        let file = std::fs::File::open(&path)?;
-        serde_yml::from_reader(file)
-            .map_err(|e| anyhow::anyhow!("Failed to read profile YAML: {e}"))?
+        Ok(UpdateResult {
+            name: profile.name.clone(),
+            net_updates,
+        })
     };
 
-    let net_updates = fetch_net_resource_statuses(&content, with_proxy).await;
-    serde_yml::to_writer(std::fs::File::create(&path)?, &content)?;
-    Ok(UpdateResult {
-        name: profile.name,
-        net_updates,
-    })
+    if result.is_ok() {
+        let cur = db::get_current();
+        if cur.name == profile.name {
+            let _ = select(profile).await;
+        }
+    }
+
+    result
 }
 
 async fn update_singbox_profile(
@@ -226,7 +231,9 @@ async fn update_template_profile(
     profile: Profile,
     with_proxy: bool,
 ) -> anyhow::Result<UpdateResult> {
-    use crate::functions::file::net_resource::{ExtractNetResources, NetResourceUpdate, ResourceSection};
+    use crate::functions::file::net_resource::{
+        ExtractNetResources, NetResourceUpdate, ResourceSection,
+    };
 
     let template = match &profile.dtype {
         ProfileType::Template { template } => template.clone(),
@@ -404,13 +411,6 @@ async fn update_template_profile(
                 failures.join("\n")
             );
         }
-    }
-
-    // If the updated profile is the currently active profile, re-select
-    // so the core reloads with the newly downloaded proxy-provider files.
-    let cur = db::get_current();
-    if cur.name == profile.name {
-        let _ = select(profile.clone()).await;
     }
 
     Ok(UpdateResult {
@@ -766,18 +766,25 @@ proxy-groups:
 "#;
 
         let mut providers = BTreeMap::new();
-        providers.insert("pvd0".to_string(), "https://example.com/sub1.yaml".to_string());
+        providers.insert(
+            "pvd0".to_string(),
+            "https://example.com/sub1.yaml".to_string(),
+        );
         let mut groups = ProxyProviderGroups::new();
         groups.insert("pvd".to_string(), providers);
 
         let urls = collect_proxy_provider_urls(profile_yaml, &groups);
 
         // Group provider (pvd0) should be included
-        assert!(urls.iter().any(|(name, _)| name == "pvd0"),
-            "pvd0 from groups should be collected");
+        assert!(
+            urls.iter().any(|(name, _)| name == "pvd0"),
+            "pvd0 from groups should be collected"
+        );
         // Standalone provider (bak) should also be collected
-        assert!(urls.iter().any(|(name, _)| name == "bak"),
-            "bak standalone provider should be collected");
+        assert!(
+            urls.iter().any(|(name, _)| name == "bak"),
+            "bak standalone provider should be collected"
+        );
 
         // pvd0 should appear only once (not duplicated from extract)
         let pvd0_count = urls.iter().filter(|(name, _)| name == "pvd0").count();
@@ -814,23 +821,41 @@ proxy-groups:
 "#;
 
         let mut pvd_providers = BTreeMap::new();
-        pvd_providers.insert("hajimi".to_string(), "https://hajimi.nvimy.com/file/clash.yaml".to_string());
-        pvd_providers.insert("mojie".to_string(), "https://hajimi.nvimy.com/file/clash_mojie.yaml".to_string());
+        pvd_providers.insert(
+            "hajimi".to_string(),
+            "https://hajimi.nvimy.com/file/clash.yaml".to_string(),
+        );
+        pvd_providers.insert(
+            "mojie".to_string(),
+            "https://hajimi.nvimy.com/file/clash_mojie.yaml".to_string(),
+        );
         let mut groups = ProxyProviderGroups::new();
         groups.insert("pvd".to_string(), pvd_providers);
 
         let urls = collect_proxy_provider_urls(profile_yaml, &groups);
 
-        assert_eq!(urls.len(), 3, "should collect 3 unique URLs: hajimi, mojie, bak");
+        assert_eq!(
+            urls.len(),
+            3,
+            "should collect 3 unique URLs: hajimi, mojie, bak"
+        );
 
         assert!(urls.iter().any(|(name, _)| name == "hajimi"));
         assert!(urls.iter().any(|(name, _)| name == "mojie"));
-        assert!(urls.iter().any(|(name, _)| name == "bak"),
-            "bak MUST be collected as standalone provider");
+        assert!(
+            urls.iter().any(|(name, _)| name == "bak"),
+            "bak MUST be collected as standalone provider"
+        );
 
         // Verify bak's URL is correct
-        let bak_url = urls.iter().find(|(name, _)| name == "bak").map(|(_, url)| url);
-        assert_eq!(bak_url, Some(&"https://hajimi.nvimy.com/file/mojie_johan.yaml".to_string()));
+        let bak_url = urls
+            .iter()
+            .find(|(name, _)| name == "bak")
+            .map(|(_, url)| url);
+        assert_eq!(
+            bak_url,
+            Some(&"https://hajimi.nvimy.com/file/mojie_johan.yaml".to_string())
+        );
     }
 
     #[test]
@@ -873,8 +898,14 @@ proxy-groups:
       - pvd1
 "#;
         let mut providers = BTreeMap::new();
-        providers.insert("pvd0".to_string(), "https://example.com/sub1.yaml".to_string());
-        providers.insert("pvd1".to_string(), "https://example.com/sub2.yaml".to_string());
+        providers.insert(
+            "pvd0".to_string(),
+            "https://example.com/sub1.yaml".to_string(),
+        );
+        providers.insert(
+            "pvd1".to_string(),
+            "https://example.com/sub2.yaml".to_string(),
+        );
         let mut groups = ProxyProviderGroups::new();
         groups.insert("pvd".to_string(), providers);
 

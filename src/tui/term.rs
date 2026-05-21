@@ -6,19 +6,24 @@ use super::utils::raw_mode;
 static CSI_U_ENABLED: AtomicBool = AtomicBool::new(false);
 
 fn probe() {
-    let mut stdout = std::io::stdout().lock();
-    let _ = write!(stdout, "\x1b[?u");
-    let _ = stdout.flush();
-    drop(stdout);
+    // CSI-u (kitty keyboard protocol) probe — only meaningful on Unix TTYs.
+    // On Windows, raw mode stdin reads block until a keypress, so skip entirely.
+    #[cfg(unix)]
+    {
+        let mut stdout = std::io::stdout().lock();
+        let _ = write!(stdout, "\x1b[?u");
+        let _ = stdout.flush();
+        drop(stdout);
 
-    std::thread::sleep(std::time::Duration::from_millis(50));
+        std::thread::sleep(std::time::Duration::from_millis(50));
 
-    use std::io::Read;
-    let mut stdin = std::io::stdin().lock();
-    let mut buf = [0u8; 32];
-    if let Ok(n) = stdin.read(&mut buf) {
-        if n > 0 && buf[..n].windows(5).any(|w| w == b"\x1b[?0u") {
-            CSI_U_ENABLED.store(true, Ordering::Relaxed);
+        use std::io::Read;
+        let mut stdin = std::io::stdin().lock();
+        let mut buf = [0u8; 32];
+        if let Ok(n) = stdin.read(&mut buf) {
+            if n > 0 && buf[..n].windows(5).any(|w| w == b"\x1b[?0u") {
+                CSI_U_ENABLED.store(true, Ordering::Relaxed);
+            }
         }
     }
 }
