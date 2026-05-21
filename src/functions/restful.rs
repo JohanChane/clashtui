@@ -270,7 +270,7 @@ pub mod connection {
         pub connections: Option<Vec<Conn>>,
     }
 
-    #[cfg_attr(test, derive(Debug))]
+    #[cfg_attr(test, derive(Debug, Clone))]
     #[derive(Deserialize)]
     pub struct Conn {
         pub id: String,
@@ -285,7 +285,7 @@ pub mod connection {
         pub rule_payload: Option<String>,
     }
 
-    #[cfg_attr(test, derive(Debug))]
+    #[cfg_attr(test, derive(Debug, Clone))]
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct ConnMetaData {

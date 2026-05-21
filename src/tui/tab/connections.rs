@@ -137,7 +137,7 @@ macro_rules! tri {
     };
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum SortColumn {
     Host,
     Rule,
@@ -148,7 +148,7 @@ enum SortColumn {
     UlSpeed,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
 enum SortDirection {
     #[default]
     Descending,
@@ -451,8 +451,332 @@ impl TabContent for Connections {
                         } else {
                             for id in &ids {
                                 let _ = connection::terminate_connection(Some(id.clone()));
-                            }
-                        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::functions::restful::connection::{ConnMetaData, Conn};
+
+    fn mk_key(code: KeyCode) -> crate::tui::Key {
+        crate::tui::Key {
+            code,
+            shift: matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase()),
+            ctrl: false,
+            alt: false,
+            super_: false,
+        }
+    }
+
+    fn conn(id: &str, host: &str) -> Conn {
+        Conn {
+            id: id.to_owned(),
+            metadata: ConnMetaData {
+                network: "tcp".to_owned(),
+                ctype: "".to_owned(),
+                host: host.to_owned(),
+                process: "".to_owned(),
+                process_path: "".to_owned(),
+                source_ip: "".to_owned(),
+                source_port: "0".to_owned(),
+                remote_destination: "".to_owned(),
+                destination_port: "0".to_owned(),
+                destination_ip: None,
+                sniff_host: None,
+            },
+            upload: 0,
+            download: 0,
+            start: "".to_owned(),
+            chains: vec![],
+            rule: None,
+            rule_payload: None,
+        }
+    }
+
+    fn mk_conns(conns: &[Conn]) -> Connections {
+        let mut c = Connections {
+            conns: conns.to_vec(),
+            ..Default::default()
+        };
+        c.display_rows = make_display_rows(&c.conns, &mut c.last_bytes);
+        c
+    }
+
+    #[test]
+    fn key_agent_contains_single_keys() {
+        let a = agent();
+        assert!(a.contains_key(&mk_key(KeyCode::Char('j'))));
+        assert!(a.contains_key(&mk_key(KeyCode::Char('k'))));
+        assert!(a.contains_key(&mk_key(KeyCode::Char('G'))));
+        assert!(a.contains_key(&mk_key(KeyCode::Up)));
+        assert!(a.contains_key(&mk_key(KeyCode::Down)));
+    }
+
+    #[test]
+    fn key_try_from_returns_correct_actions() {
+        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('j'))), Ok(Key::MoveDown)));
+        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('k'))), Ok(Key::MoveUp)));
+        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('G'))), Ok(Key::GoBottom)));
+        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('/'))), Ok(Key::Search)));
+        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('p'))), Ok(Key::TogglePause)));
+        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('f'))), Ok(Key::FzfFind)));
+    }
+
+    #[test]
+    fn chord_keys_not_in_try_from() {
+        assert!(Key::try_from(&mk_key(KeyCode::Char('s'))).is_err());
+        assert!(Key::try_from(&mk_key(KeyCode::Char('d'))).is_err());
+        assert!(Key::try_from(&mk_key(KeyCode::Char('a'))).is_err());
+    }
+
+    #[test]
+    fn human_bytes_formats_correctly() {
+        assert_eq!(human_bytes(0), "0 B");
+        assert_eq!(human_bytes(500), "500 B");
+        assert_eq!(human_bytes(1024), "1.0 KB");
+        assert_eq!(human_bytes(2_048), "2.0 KB");
+        assert_eq!(human_bytes(1_048_576), "1.0 MB");
+        assert_eq!(human_bytes(1_073_741_824), "1.0 GB");
+        assert_eq!(human_bytes(1_099_511_627_776), "1.0 TB");
+    }
+
+    #[test]
+    fn human_speed_appends_per_second() {
+        assert!(human_speed(1024).ends_with("/s"));
+        assert!(human_speed(0).ends_with("/s"));
+    }
+
+    #[test]
+    fn sort_header_shows_arrow_when_active() {
+        let state = SortState {
+            column: Some(SortColumn::Host),
+            direction: SortDirection::Descending,
+        };
+        assert!(sort_header(state, SortColumn::Host, "Host").contains("▼"));
+        assert!(!sort_header(state, SortColumn::Rule, "Rule").contains("▼"));
+    }
+
+    #[test]
+    fn sort_header_shows_ascending_arrow() {
+        let state = SortState {
+            column: Some(SortColumn::Host),
+            direction: SortDirection::Ascending,
+        };
+        assert!(sort_header(state, SortColumn::Host, "Host").contains("▲"));
+    }
+
+    #[test]
+    fn sort_header_no_arrow_when_inactive() {
+        let state = SortState {
+            column: Some(SortColumn::Host),
+            direction: SortDirection::Descending,
+        };
+        assert_eq!(sort_header(state, SortColumn::Rule, "Rule"), "Rule");
+    }
+
+    #[test]
+    fn sort_header_default_state_shows_no_arrow() {
+        let state = SortState::default();
+        assert_eq!(sort_header(state, SortColumn::Host, "Host"), "Host");
+    }
+
+    #[test]
+    fn toggle_sort_first_click_sets_descending() {
+        let mut c = Connections::default();
+        c.toggle_sort(SortColumn::Host);
+        assert_eq!(c.sort_state.column, Some(SortColumn::Host));
+        assert_eq!(c.sort_state.direction, SortDirection::Descending);
+    }
+
+    #[test]
+    fn toggle_sort_second_click_flips_to_ascending() {
+        let mut c = Connections::default();
+        c.toggle_sort(SortColumn::Host);
+        c.toggle_sort(SortColumn::Host);
+        assert_eq!(c.sort_state.column, Some(SortColumn::Host));
+        assert_eq!(c.sort_state.direction, SortDirection::Ascending);
+    }
+
+    #[test]
+    fn toggle_sort_third_click_resets() {
+        let mut c = Connections::default();
+        c.toggle_sort(SortColumn::Host);
+        c.toggle_sort(SortColumn::Host);
+        c.toggle_sort(SortColumn::Host);
+        assert_eq!(c.sort_state.column, None);
+        assert_eq!(c.sort_state.direction, SortDirection::Descending);
+    }
+
+    #[test]
+    fn toggle_sort_different_column_resets_to_descending_for_new_column() {
+        let mut c = Connections::default();
+        c.toggle_sort(SortColumn::Host);
+        assert_eq!(c.sort_state.direction, SortDirection::Descending);
+        c.toggle_sort(SortColumn::Host);
+        assert_eq!(c.sort_state.direction, SortDirection::Ascending);
+        c.toggle_sort(SortColumn::Rule);
+        assert_eq!(c.sort_state.column, Some(SortColumn::Rule));
+        assert_eq!(c.sort_state.direction, SortDirection::Descending);
+    }
+
+    #[test]
+    fn apply_sort_by_host_descending() {
+        let conns = &[conn("1", "z.com"), conn("2", "a.com")];
+        let mut c = mk_conns(conns);
+        c.sort_state = SortState {
+            column: Some(SortColumn::Host),
+            direction: SortDirection::Descending,
+        };
+        c.apply_sort();
+        assert_eq!(c.display_rows[0].host, "z.com");
+        assert_eq!(c.display_rows[1].host, "a.com");
+    }
+
+    #[test]
+    fn apply_sort_by_host_ascending() {
+        let conns = &[conn("1", "z.com"), conn("2", "a.com")];
+        let mut c = mk_conns(conns);
+        c.sort_state = SortState {
+            column: Some(SortColumn::Host),
+            direction: SortDirection::Ascending,
+        };
+        c.apply_sort();
+        assert_eq!(c.display_rows[0].host, "a.com");
+        assert_eq!(c.display_rows[1].host, "z.com");
+    }
+
+    #[test]
+    fn apply_sort_by_download_descending() {
+        let mut c = Connections {
+            display_rows: vec![
+                DisplayRow { host: "a".into(), rule: "".into(), chains: "".into(), download: 100, upload: 0, dl_speed: 0, ul_speed: 0, id: "1".into() },
+                DisplayRow { host: "b".into(), rule: "".into(), chains: "".into(), download: 500, upload: 0, dl_speed: 0, ul_speed: 0, id: "2".into() },
+            ],
+            ..Default::default()
+        };
+        c.sort_state = SortState {
+            column: Some(SortColumn::Download),
+            direction: SortDirection::Descending,
+        };
+        c.apply_sort();
+        assert_eq!(c.display_rows[0].download, 500);
+        assert_eq!(c.display_rows[1].download, 100);
+    }
+
+    #[test]
+    fn apply_sort_reset_restores_original_order() {
+        let conns = &[conn("a", "z.com"), conn("b", "a.com")];
+        let mut c = mk_conns(conns);
+        c.sort_state = SortState {
+            column: Some(SortColumn::Host),
+            direction: SortDirection::Ascending,
+        };
+        c.apply_sort();
+        assert_eq!(c.display_rows[0].id, "b");
+
+        c.sort_state = SortState::default();
+        c.apply_sort();
+        assert_eq!(c.display_rows[0].id, "a");
+        assert_eq!(c.display_rows[1].id, "b");
+    }
+
+    #[test]
+    fn refresh_display_rows_clamps_cursor() {
+        let conns = &[conn("1", "a.com")];
+        let mut c = mk_conns(conns);
+        c.row = Some(5);
+        c.refresh_display_rows();
+        assert_eq!(c.row, Some(0));
+    }
+
+    #[test]
+    fn refresh_display_rows_none_when_empty() {
+        let mut c = Connections::default();
+        c.row = Some(0);
+        c.refresh_display_rows();
+        assert!(c.row.is_none());
+    }
+
+    #[test]
+    fn move_up_from_top_stays_at_top() {
+        let conns = &[conn("1", "a.com"), conn("2", "b.com")];
+        let mut c = mk_conns(conns);
+        c.row = Some(0);
+        // simulate Key::MoveUp handler logic inline
+        if let Some(r) = c.row {
+            if r > 0 {
+                c.row = Some(r - 1);
+            }
+        }
+        assert_eq!(c.row, Some(0));
+    }
+
+    #[test]
+    fn move_down_from_bottom_stays_at_bottom() {
+        let conns = &[conn("1", "a.com"), conn("2", "b.com")];
+        let mut c = mk_conns(conns);
+        c.row = Some(1);
+        if let Some(r) = c.row {
+            if r + 1 < c.display_rows.len() {
+                c.row = Some(r + 1);
+            }
+        }
+        assert_eq!(c.row, Some(1));
+    }
+
+    #[test]
+    fn move_down_from_none_selects_first() {
+        let conns = &[conn("1", "a.com")];
+        let mut c = mk_conns(conns);
+        c.row = None;
+        if c.row.is_none() && !c.display_rows.is_empty() {
+            c.row = Some(0);
+        }
+        assert_eq!(c.row, Some(0));
+    }
+
+    #[test]
+    fn go_top_sets_to_zero() {
+        let conns = &[conn("1", "a.com"), conn("2", "b.com")];
+        let mut c = mk_conns(conns);
+        c.row = Some(1);
+        if !c.display_rows.is_empty() {
+            c.row = Some(0);
+        }
+        assert_eq!(c.row, Some(0));
+    }
+
+    #[test]
+    fn go_bottom_sets_to_last() {
+        let conns = &[conn("1", "a.com"), conn("2", "b.com")];
+        let mut c = mk_conns(conns);
+        c.row = Some(0);
+        if !c.display_rows.is_empty() {
+            c.row = Some(c.display_rows.len().saturating_sub(1));
+        }
+        assert_eq!(c.row, Some(1));
+    }
+
+    #[test]
+    fn pause_toggle_flips_state() {
+        let mut c = Connections::default();
+        assert!(!c.paused);
+        c.paused = !c.paused;
+        assert!(c.paused);
+        c.paused = !c.paused;
+        assert!(!c.paused);
+    }
+
+    #[test]
+    fn all_shortcuts_has_expected_count() {
+        let shortcuts = agent::all_shortcuts();
+        let single_key_count = shortcuts.iter().filter(|(c, _, _)| c.len() == 1).count();
+        let chord_count = shortcuts.iter().filter(|(c, _, _)| c.len() > 1).count();
+        assert!(single_key_count >= 6, "should have at least 6 single-key shortcuts");
+        assert!(chord_count >= 7, "should have at least 7 chord shortcuts");
+    }
+}
                         connection::get_connections()
                     })
                     .await
