@@ -38,10 +38,10 @@ static GLOBAL_CHORD_SHORTCUTS: LazyLock<Vec<(KeyCombo, &str)>> = LazyLock::new(|
         }
     }
     vec![
-        (KeyCombo(vec![ctrl('g'), plain('c')]), "Open app config dir"),
+        (KeyCombo(vec![ctrl('g'), plain('c')]), "Open core data dir"),
         (
             KeyCombo(vec![ctrl('g'), plain('m')]),
-            "Open clash config dir",
+            "Open core install dir",
         ),
         (KeyCombo(vec![ctrl('g'), plain('f')]), "Start core service"),
         (
@@ -209,13 +209,13 @@ impl App {
                     log::debug!("global_chord dispatch: {seq:?}");
                     match seq.last().and_then(|k| k.plain()) {
                         Some('c') => {
-                            log::debug!("open_dir: config dir");
-                            let _ = crate::functions::command::open_dir(
-                                crate::config::config_root_path().to_str().unwrap(),
-                            );
+                            log::debug!("open_dir: core data dir");
+                            let dir =
+                                crate::config::core_data_dir(crate::config::CONFIG.core_type());
+                            let _ = crate::functions::command::open_dir(dir.to_str().unwrap());
                         }
                         Some('m') => {
-                            log::debug!("open_dir: clash config dir");
+                            log::debug!("open_dir: core install dir");
                             let dir_str = match crate::config::CONFIG.core_type() {
                                 crate::config::CoreType::Mihomo => {
                                     &crate::config::CONFIG.cfg_file.mihomo.core.config_dir
@@ -224,7 +224,10 @@ impl App {
                                     &crate::config::CONFIG.cfg_file.singbox.core.config_dir
                                 }
                             };
-                            let _ = crate::functions::command::open_dir(dir_str);
+                            let parent = std::path::Path::new(dir_str)
+                                .parent()
+                                .unwrap_or(std::path::Path::new(dir_str));
+                            let _ = crate::functions::command::open_dir(parent.to_str().unwrap());
                         }
                         Some('f') => {
                             log::debug!("restart core service");

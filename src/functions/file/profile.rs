@@ -133,48 +133,53 @@ pub struct UpdateResult {
 pub async fn update_profile(profile: Profile, with_proxy: bool) -> anyhow::Result<UpdateResult> {
     use super::template::fetch_net_resource_statuses;
 
-    // Template profiles re-generate from template + subscriptions
-    if matches!(profile.dtype, ProfileType::Template { .. }) {
-        return update_template_profile(profile, with_proxy).await;
-    }
-
-    // sing-box local imports always use JSON; URL profiles follow current core type
-    if matches!(profile.dtype, ProfileType::Singbox)
+    let result = if matches!(profile.dtype, ProfileType::Template { .. }) {
+        update_template_profile(profile.clone(), with_proxy).await
+    } else if matches!(profile.dtype, ProfileType::Singbox)
         || crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox
     {
-        return update_singbox_profile(profile, with_proxy).await;
-    }
+        update_singbox_profile(profile.clone(), with_proxy).await
+    } else {
+        let path = PROFILE_YAMLS_PATH.join(format!("{}.yaml", &profile.name));
 
-    let path = PROFILE_YAMLS_PATH.join(format!("{}.yaml", &profile.name));
-
-    if let ProfileType::Url(ref url) = profile.dtype {
-        let mut response = crate::functions::restful::download::profile(url, with_proxy)?;
-        let content: serde_yml::Mapping = serde_yml::from_reader(&mut response)
-            .map_err(|e| anyhow::anyhow!("Failed to parse downloaded profile YAML: {e}"))?;
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
+        if let ProfileType::Url(ref url) = profile.dtype {
+            let mut response = crate::functions::restful::download::profile(url, with_proxy)?;
+            let content: serde_yml::Mapping = serde_yml::from_reader(&mut response)
+                .map_err(|e| anyhow::anyhow!("Failed to parse downloaded profile YAML: {e}"))?;
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            serde_yml::to_writer(std::fs::File::create(&path)?, &content)?;
         }
+
+        anyhow::ensure!(
+            path.exists(),
+            "Profile file not found: {}. Download it first.",
+            path.display()
+        );
+
+        let content: serde_yml::Mapping = {
+            let file = std::fs::File::open(&path)?;
+            serde_yml::from_reader(file)
+                .map_err(|e| anyhow::anyhow!("Failed to read profile YAML: {e}"))?
+        };
+
+        let net_updates = fetch_net_resource_statuses(&content, with_proxy).await;
         serde_yml::to_writer(std::fs::File::create(&path)?, &content)?;
-    }
-
-    anyhow::ensure!(
-        path.exists(),
-        "Profile file not found: {}. Download it first.",
-        path.display()
-    );
-
-    let content: serde_yml::Mapping = {
-        let file = std::fs::File::open(&path)?;
-        serde_yml::from_reader(file)
-            .map_err(|e| anyhow::anyhow!("Failed to read profile YAML: {e}"))?
+        Ok(UpdateResult {
+            name: profile.name.clone(),
+            net_updates,
+        })
     };
 
-    let net_updates = fetch_net_resource_statuses(&content, with_proxy).await;
-    serde_yml::to_writer(std::fs::File::create(&path)?, &content)?;
-    Ok(UpdateResult {
-        name: profile.name,
-        net_updates,
-    })
+    if result.is_ok() {
+        let cur = db::get_current();
+        if cur.name == profile.name {
+            let _ = select(profile).await;
+        }
+    }
+
+    result
 }
 
 async fn update_singbox_profile(
@@ -406,13 +411,6 @@ async fn update_template_profile(
                 failures.join("\n")
             );
         }
-    }
-
-    // If the updated profile is the currently active profile, re-select
-    // so the core reloads with the newly downloaded proxy-provider files.
-    let cur = db::get_current();
-    if cur.name == profile.name {
-        let _ = select(profile.clone()).await;
     }
 
     Ok(UpdateResult {
