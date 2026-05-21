@@ -118,6 +118,9 @@ resolve_paths() {
   if [ -d "$SCRIPT_DIR/contrib" ]; then
     CONTRIB_SOURCE="local"
     CONTRIB_DIR="$SCRIPT_DIR/contrib"
+  elif [ -d "$SCRIPT_DIR/../contrib" ]; then
+    CONTRIB_SOURCE="local"
+    CONTRIB_DIR="$SCRIPT_DIR/../contrib"
   else
     CONTRIB_SOURCE="remote"
     CONTRIB_DIR=""

@@ -137,8 +137,18 @@ function Resolve-Paths {
     }
 
     $script:SCRIPT_DIR = Split-Path $MyInvocation.ScriptName -Parent
-    $script:CONTRIB_SOURCE = if (Test-Path (Join-Path $SCRIPT_DIR "contrib")) { "local" } else { "remote" }
-    $script:CONTRIB_DIR = if ($CONTRIB_SOURCE -eq "local") { Join-Path $SCRIPT_DIR "contrib" } else { $null }
+    $contribLocal = Join-Path $SCRIPT_DIR "contrib"
+    $contribParent = Join-Path (Split-Path $SCRIPT_DIR -Parent) "contrib"
+    if (Test-Path $contribLocal) {
+        $script:CONTRIB_SOURCE = "local"
+        $script:CONTRIB_DIR = $contribLocal
+    } elseif (Test-Path $contribParent) {
+        $script:CONTRIB_SOURCE = "local"
+        $script:CONTRIB_DIR = $contribParent
+    } else {
+        $script:CONTRIB_SOURCE = "remote"
+        $script:CONTRIB_DIR = $null
+    }
 
     $script:CONTRIB_URL_PREFIX = "https://raw.githubusercontent.com/${Repo}/refs/heads/${Branch}/contrib"
 }

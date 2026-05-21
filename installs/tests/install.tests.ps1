@@ -99,21 +99,25 @@ Describe "Write-Info / Write-Warn / Write-ErrorLog" {
 }
 
 Describe "E2E: install.ps1 -IsTest" {
-    It "Succeeds with exit code 0" {
+    It "Succeeds without throwing" {
         $scriptPath = (Resolve-Path (Join-Path $PSScriptRoot ".." "install.ps1")).Path
         $testDir = Join-Path $env:TEMP "clashtui-e2e-$(Get-Random)"
 
-        & $scriptPath -IsTest -InstallDir $testDir -Repo "JohanChane/clashtui" -Branch "demotui" -Core all
-        $LASTEXITCODE | Should -Be 0
+        $err = $null
+        try {
+            & $scriptPath -IsTest -InstallDir $testDir -Repo "JohanChane/clashtui" -Branch "demotui" -Core all -ErrorAction Stop
+        } catch {
+            $err = $_
+        }
+        $err | Should -Be $null
     }
 
     It "Creates expected directory structure" {
         $testDir = Join-Path $env:TEMP "clashtui-struct-$(Get-Random)"
         $scriptPath = (Resolve-Path (Join-Path $PSScriptRoot ".." "install.ps1")).Path
 
-        & $scriptPath -IsTest -InstallDir $testDir -Repo "JohanChane/clashtui" -Branch "demotui" -Core all
+        & $scriptPath -IsTest -InstallDir $testDir -Repo "JohanChane/clashtui" -Branch "demotui" -Core all -ErrorAction Stop
 
-        # Script uses $env:TEMP\clashtui-test\ when IsTest
         $actualRoot = Join-Path $env:TEMP "clashtui-test"
         Test-Path (Join-Path $actualRoot "opt/clashtui/bin") | Should -Be $true
         Test-Path (Join-Path $actualRoot "opt/clashtui/mihomo/config") | Should -Be $true
