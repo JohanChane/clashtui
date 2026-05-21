@@ -44,7 +44,7 @@ ClashTui is a terminal user interface (TUI) proxy management tool supporting bot
 
 -   [x] Linux
 -   [x] macOs
--   [ ] Windows
+-   [x] Windows
 
 ## Installation
 
@@ -54,6 +54,8 @@ ClashTui is a terminal user interface (TUI) proxy management tool supporting bot
 -   fzf
 
 ### With root access (for TUN mode)
+
+#### Linux
 
 1. \[Optional\] Install mihomo and clashtui from your package repository:
 
@@ -79,11 +81,103 @@ sudo systemctl enable clashtui_mihomo.service
 sudo systemctl enable clashtui_singbox.service
 ```
 
+#### macOS
+
+1. \[Optional\] Install mihomo and clashtui from Homebrew:
+
+```sh
+brew install mihomo sing-box clashtui  # Note: the latest clashtui may not be uploaded yet — please build and install it manually
+```
+
+2. Run the install script (same as Linux):
+
+```sh
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/installs/install) --repo JohanChane/clashtui --branch demotui --core all
+```
+
+3. \[Optional\] Enable `clashtui_mihomo` / `clashtui_singbox` launchd plists on boot:
+
+```sh
+sudo launchctl load -w /Library/LaunchDaemons/clashtui_mihomo.plist
+# OR
+sudo launchctl load -w /Library/LaunchDaemons/clashtui_singbox.plist
+```
+
+#### Windows
+
+1. \[Optional\] Install mihomo and clashtui from Scoop:
+
+```powershell
+scoop install mihomo sing-box clashtui
+# Verify
+Get-Command mihomo sing-box clashtui
+```
+
+This step ensures mihomo, sing-box, and clashtui are in PATH so the install script will skip downloading them.
+
+2. Run the install script (as Administrator):
+
+```powershell
+# Default install to D:\ClashTui
+.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core all
+
+# Custom directory (no spaces allowed)
+.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core all -InstallDir "D:\MyTools\ClashTui"
+
+# Only install mihomo core
+.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core mihomo
+```
+
+3. Start clashtui, then use CoreSrvCtl to install and start core services:
+
+The install script does NOT register Windows Services. Launch clashtui and use the built-in CoreSrvCtl to manage services. Enable only one core service at boot (do not enable both simultaneously).
+
 ### Without root access (no TUN)
+
+#### Linux
 
 ```sh
 bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/installs/install) --repo JohanChane/clashtui --branch demotui --core all --is-user
 ```
+
+Enable on boot:
+
+```sh
+systemctl --user enable clashtui_mihomo.service
+# OR
+systemctl --user enable clashtui_singbox.service
+```
+
+#### macOS
+
+```sh
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/installs/install) --repo JohanChane/clashtui --branch demotui --core all --is-user
+```
+
+Enable on boot:
+
+```sh
+launchctl load -w ~/Library/LaunchAgents/clashtui_mihomo.plist
+# OR
+launchctl load -w ~/Library/LaunchAgents/clashtui_singbox.plist
+```
+
+#### Windows
+
+The Windows install script defaults to `D:\ClashTui` which does not require Administrator. To install to a user directory, just run as a normal user:
+
+```powershell
+# Default install to D:\ClashTui
+.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core all
+
+# Custom directory
+.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core all -InstallDir "D:\MyTools\ClashTui"
+
+# Only install mihomo core
+.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core mihomo
+```
+
+Start clashtui, then use CoreSrvCtl to install and manage core services.
 
 ## Documentation
 

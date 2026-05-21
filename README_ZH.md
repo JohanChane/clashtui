@@ -40,16 +40,22 @@ ClashTui 是一个终端用户界面（TUI）代理管理工具，支持 **Mihom
 
 -   [x] Linux
 -   [x] macOs
--   [ ] Windows
+-   [x] Windows
 
 ## 安装
 
 ### 依赖
 
+Linux and macOS:
 -   sudo
 -   fzf
 
+Windows:
+-   nssm
+
 ### 想开启 tun 并有 root 权限
+
+#### Linux
 
 1. \[可选\] 从仓库中安装 mihomo 和 clashtui:
 
@@ -75,11 +81,98 @@ sudo systemctl enable clashtui_mihomo.service
 sudo systemctl enable clashtui_singbox.service
 ```
 
+#### macOS
+
+1. \[可选\] 从仓库中安装 mihomo 和 clashtui:
+
+```sh
+brew install mihomo sing-box clashtui     # 目前 clashtui 还没有上传最新的, 请手动编译安装 clashtui
+```
+
+2. 运行安装脚本
+
+和 Linux 一样
+
+3. \[可选\] 将 `clashtui_mihomo.service/clashtui_singbox.service` 设置为开机启动
+
+```sh
+sudo launchctl load -w /Library/LaunchDaemons/clashtui_mihomo.plist
+# 或
+sudo launchctl load -w /Library/LaunchDaemons/clashtui_singbox.plist
+```
+
+#### Windows
+
+1. \[可选\] 从仓库中安装 mihomo 和 clashtui:
+
+```powershell
+scoop install mihomo sing-box clashtui    # 目前 clashtui 还没有上传最新的, 请手动编译安装 clashtui
+# 验证
+Get-Command mihomo sing-box clashtui
+```
+
+2. 运行安装脚本
+
+```powershell
+# 默认安装到 D:\ClashTui
+.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core all
+
+# 安装到自定义目录 (路径不能有空格)
+.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core all -InstallDir "D:\MyTools\ClashTui"
+
+# 只安装 mihomo core
+.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core mihomo
+```
+
+3. 启动 clashtui 安装 clashtui_mihomo/clashtui_singbox 服务
+
+安装脚本不注册 Windows Service。启动 clashtui 后，使用 CoreSrvCtl 安装并启动 core 服务。
+将其中一个服务设置为开机启动即可 (不要两个同时开机启动)
+
 ### 没有 root 权限 (不开启 tun)
+
+#### Linux
 
 ```sh
 bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/installs/install) --repo JohanChane/clashtui --branch demotui --core all --is-user
 ```
+
+开机启动:
+
+```sh
+systemctl --user enable clashtui_mihomo.service
+# 或
+systemctl --user enable clashtui_singbox.service
+```
+
+#### macOS
+
+```sh
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/installs/install) --repo JohanChane/clashtui --branch demotui --core all --is-user
+```
+
+开机启动:
+
+```sh
+launchctl load -w ~/Library/LaunchAgents/clashtui_mihomo.plist
+# 或
+launchctl load -w ~/Library/LaunchAgents/clashtui_singbox.plist
+```
+
+#### Windows
+
+Windows 安装脚本默认安装到 `D:\ClashTui`，无需管理员权限即可运行。如果安装到用户目录（如 `D:\MyTools\ClashTui`），以普通用户身份运行即可：
+
+```powershell
+# 下载 install.ps1，普通用户身份运行
+# 默认安装到 D:\ClashTui
+.\installs\install.ps1
+
+# 安装到自定义目录
+.\installs\install.ps1 -InstallDir "D:\MyTools\ClashTui"
+```
+
+启动 clashtui 后，使用 CoreSrvCtl 安装并启动 core 服务。
 
 ## 文档
 
