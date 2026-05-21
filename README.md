@@ -162,23 +162,6 @@ launchctl load -w ~/Library/LaunchAgents/clashtui_mihomo.plist
 launchctl load -w ~/Library/LaunchAgents/clashtui_singbox.plist
 ```
 
-#### Windows
-
-The Windows install script defaults to `D:\ClashTui` which does not require Administrator. To install to a user directory, just run as a normal user:
-
-```powershell
-# Default install to D:\ClashTui
-.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core all
-
-# Custom directory
-.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core all -InstallDir "D:\MyTools\ClashTui"
-
-# Only install mihomo core
-.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core mihomo
-```
-
-Start clashtui, then use CoreSrvCtl to install and manage core services.
-
 ## Documentation
 
 | Document | Description |

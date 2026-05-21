@@ -159,21 +159,6 @@ launchctl load -w ~/Library/LaunchAgents/clashtui_mihomo.plist
 launchctl load -w ~/Library/LaunchAgents/clashtui_singbox.plist
 ```
 
-#### Windows
-
-Windows 安装脚本默认安装到 `D:\ClashTui`，无需管理员权限即可运行。如果安装到用户目录（如 `D:\MyTools\ClashTui`），以普通用户身份运行即可：
-
-```powershell
-# 下载 install.ps1，普通用户身份运行
-# 默认安装到 D:\ClashTui
-.\installs\install.ps1
-
-# 安装到自定义目录
-.\installs\install.ps1 -InstallDir "D:\MyTools\ClashTui"
-```
-
-启动 clashtui 后，使用 CoreSrvCtl 安装并启动 core 服务。
-
 ## 文档
 
 | 文档 | 说明 |

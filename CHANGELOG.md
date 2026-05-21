@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0-beta.2] - 2026-05-21
+
+### Added
+- Windows support: TUI, CLI, and CoreSrvCtl (Windows Service management via SCM API) (#71)
+- Windows install script (`install.ps1`) for automated deployment (#72)
+- Install script test suite: bats (18 tests) for bash, Pester (16 tests) for PowerShell (#80)
+- CI workflow `install_testing.yml` — cross-platform (Linux/macOS/Windows), path-filtered + `workflow_dispatch`
+- `--is-test` flag on both install scripts: skips downloads/prompts/sudo, uses temp directories
+- Sourcing guard on install scripts so test frameworks can load functions without executing main
+- Contributor file validation test: all 14 contrib files referenced by install scripts are verified to exist
+- Clashtui binary release for Windows (exe)
+
+### Changed
+- Install scripts moved from repo root to `installs/` directory
+- README: added macOS and Windows install instructions, aligned EN/ZH structure, added `--repo`/`--branch`/`--core` to all install commands
+- Mihomo template improvements: better proxy group and rule organization (#73)
+- Updated sing-box configs and templates (v1.12)
+- Unified prerelease binary naming: `-prerelease` suffix for GitHub Releases
+- CI: fixed macOS runner labels
+
+### Fixed
+- Template generating regression (#78)
+- sniffer configuration missing for TUN mode core override configs
+- `edit_cmd` and `open_dir_cmd` documentation
+- sing-box template reference: `v1.12-common_tpl.json` → `v1.12-tun_common_tpl.json`
+- Contrib detection in install scripts: now checks `SCRIPT_DIR/../contrib` after move to `installs/`
+
+### Dependencies
+- md5: 0.7.0 → 0.8.0 (#79)
+
+## [0.3.0-beta.1] - 2026-05-17
+
+### Changed
+- Unified prerelease binary naming
+- CI: fixed macOS runner labels (#69)
+
+### Fixed
+- macOS: services no longer auto-start at boot; `launchctl load -w` removed from install script and TUI (#69)
+
 ## [0.3.0-alpha.2] - 2026-05-17
 
 ### Added
