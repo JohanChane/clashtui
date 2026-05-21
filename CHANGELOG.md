@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.0-beta.2] - 2026-05-21
+## [0.3.0-beta.2] - 2026-05-22
 
 ### Added
 - Windows support: TUI, CLI, and CoreSrvCtl (Windows Service management via SCM API) (#71)
@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sourcing guard on install scripts so test frameworks can load functions without executing main
 - Contributor file validation test: all 14 contrib files referenced by install scripts are verified to exist
 - Clashtui binary release for Windows (exe)
+- Windows aarch64 CI build (#81)
+- Unit tests: app, connections, settings, srvctl, proxies/content modules (#82)
 
 ### Changed
 - Install scripts moved from repo root to `installs/` directory
