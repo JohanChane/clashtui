@@ -49,6 +49,20 @@ jobs:
             cache-suffix: macos-aarch64
             run-test: false
 
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact-name: Windows_amd64_Build
+            binary-name: clashtui-windows-amd64-debug.exe
+            cache-suffix: windows-amd64
+            run-test: false
+
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            artifact-name: Windows_arm64_Build
+            binary-name: clashtui-windows-arm64-debug.exe
+            cache-suffix: windows-arm64
+            run-test: false
+
     steps:
       - uses: actions/checkout@v4
 
@@ -80,9 +94,12 @@ jobs:
         run: ./target/${{ matrix.target }}/debug/clashtui --version
 
       - name: Pre Upload
+        shell: bash
         run: |
-          mkdir artifacts
-          mv ./target/${{ matrix.target }}/debug/clashtui ./artifacts/${{ matrix.binary-name }}
+          mkdir -p artifacts
+          SRC="./target/${{ matrix.target }}/debug/clashtui"
+          [ "${{ runner.os }}" = "Windows" ] && SRC="${SRC}.exe"
+          mv "$SRC" "./artifacts/${{ matrix.binary-name }}"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

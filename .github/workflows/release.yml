@@ -60,6 +60,22 @@ jobs:
             cache-suffix: macos-aarch64
             extract-version: false
 
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            zig-target: ''
+            artifact-name: Windows_amd64_Release
+            binary-name: clashtui-windows-amd64.exe
+            cache-suffix: windows-amd64
+            extract-version: false
+
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            zig-target: ''
+            artifact-name: Windows_arm64_Release
+            binary-name: clashtui-windows-arm64.exe
+            cache-suffix: windows-arm64
+            extract-version: false
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -99,9 +115,12 @@ jobs:
         run: ./target/${{ matrix.target }}/release/clashtui --version | awk '{print $2}' > version.txt
 
       - name: Pre Upload
+        shell: bash
         run: |
-          mkdir artifacts
-          mv ./target/${{ matrix.target }}/release/clashtui    ./artifacts/${{ matrix.binary-name }}
+          mkdir -p artifacts
+          SRC="./target/${{ matrix.target }}/release/clashtui"
+          [ "${{ runner.os }}" = "Windows" ] && SRC="${SRC}.exe"
+          mv "$SRC" "./artifacts/${{ matrix.binary-name }}"
           if [ -f version.txt ]; then mv version.txt ./artifacts/version.txt; fi
 
       - name: Upload artifacts
@@ -166,6 +185,8 @@ jobs:
           gzip -c ./artifacts/clashtui-arm64 > clashtui-linux-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
           gzip -c ./artifacts/clashtui-darwin-amd64 > clashtui-darwin-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
           gzip -c ./artifacts/clashtui-darwin-arm64 > clashtui-darwin-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
+          zip -j clashtui-windows-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.zip ./artifacts/clashtui-windows-amd64.exe
+          zip -j clashtui-windows-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.zip ./artifacts/clashtui-windows-arm64.exe
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
@@ -176,3 +197,5 @@ jobs:
             clashtui-linux-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
             clashtui-darwin-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
             clashtui-darwin-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
+            clashtui-windows-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.zip
+            clashtui-windows-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.zip
