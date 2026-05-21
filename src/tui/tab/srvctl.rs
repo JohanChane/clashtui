@@ -611,3 +611,90 @@ impl TabContent for SrvCtlContent {
         f.render_stateful_widget(list, area, state);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mk_key(code: KeyCode) -> crate::tui::Key {
+        crate::tui::Key {
+            code,
+            shift: matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase()),
+            ctrl: false,
+            alt: false,
+            super_: false,
+        }
+    }
+
+    #[test]
+    fn srvctl_key_agent_contains_expected() {
+        let a = agent();
+        assert!(a.contains_key(&mk_key(KeyCode::Enter)));
+        assert!(a.contains_key(&mk_key(KeyCode::Esc)));
+        assert!(a.contains_key(&mk_key(KeyCode::Up)));
+        assert!(a.contains_key(&mk_key(KeyCode::Down)));
+        assert!(a.contains_key(&mk_key(KeyCode::Char('k'))));
+        assert!(a.contains_key(&mk_key(KeyCode::Char('j'))));
+    }
+
+    #[test]
+    fn srvctl_key_try_from_correct_actions() {
+        assert!(matches!(
+            SrvCtlKey::try_from(&mk_key(KeyCode::Enter)),
+            Ok(SrvCtlKey::Execute)
+        ));
+        assert!(matches!(
+            SrvCtlKey::try_from(&mk_key(KeyCode::Esc)),
+            Ok(SrvCtlKey::Esc)
+        ));
+        assert!(matches!(
+            SrvCtlKey::try_from(&mk_key(KeyCode::Up)),
+            Ok(SrvCtlKey::MoveUp)
+        ));
+        assert!(matches!(
+            SrvCtlKey::try_from(&mk_key(KeyCode::Down)),
+            Ok(SrvCtlKey::MoveDown)
+        ));
+    }
+
+    #[test]
+    fn srvctl_key_try_from_unknown_is_err() {
+        assert!(SrvCtlKey::try_from(&mk_key(KeyCode::Char('x'))).is_err());
+    }
+
+    #[test]
+    fn srvctl_op_all_is_non_empty() {
+        let ops = SrvCtlOp::all();
+        assert!(!ops.is_empty());
+        assert!(ops.contains(&SrvCtlOp::Stop));
+        assert!(ops.contains(&SrvCtlOp::Restart));
+        assert!(ops.contains(&SrvCtlOp::SwitchCore));
+        assert!(ops.contains(&SrvCtlOp::StopAll));
+    }
+
+    #[test]
+    fn srvctl_op_as_str_returns_non_empty() {
+        for op in [
+            SrvCtlOp::Stop,
+            SrvCtlOp::Restart,
+            SrvCtlOp::SwitchCore,
+            SrvCtlOp::StopAll,
+        ] {
+            assert!(!op.as_str().is_empty());
+        }
+    }
+
+    #[test]
+    fn srvctl_op_as_str_unique() {
+        let ops = SrvCtlOp::all();
+        let names: Vec<&str> = ops.iter().map(|op| op.as_str()).collect();
+        let mut unique = names.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(
+            names.len(),
+            unique.len(),
+            "all SrvCtlOp names should be unique"
+        );
+    }
+}

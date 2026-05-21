@@ -540,6 +540,7 @@ fn the_egg(key: crossterm::event::KeyCode) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tui::widget::tab::KeyCombo;
 
     fn kev(code: KeyCode) -> Key {
         Key {
@@ -549,6 +550,37 @@ mod tests {
             alt: false,
             super_: false,
         }
+    }
+
+    fn ctrl(c: char) -> Key {
+        Key {
+            code: KeyCode::Char(c),
+            shift: false,
+            ctrl: true,
+            alt: false,
+            super_: false,
+        }
+    }
+
+    fn mk_app() -> App {
+        let mut app = App {
+            tabs: vec![
+                Tab::from(StatusTab::default()),
+                Tab::from(FileTab::default()),
+                Tab::from(ProxiesTab::default()),
+                Tab::from(ConnectionsTab::default()),
+                Tab::from(LogsTab::default()),
+                Tab::from(SettingsTab::default()),
+                Tab::from(CoreSrvCtlTab::default()),
+            ],
+            popup: PopUp::default(),
+            chord: ChordHandler::default(),
+            global_chord: ChordHandler::default(),
+            help: HelpPanel::default(),
+            tab_index: 0,
+        };
+        app.tabs[0].on_enter();
+        app
     }
 
     #[test]
@@ -568,5 +600,158 @@ mod tests {
         let a = kev(KeyCode::Char('e'));
         let b = kev(KeyCode::Char('e'));
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn global_chord_shortcuts_have_expected_entries() {
+        let shortcuts = &*GLOBAL_CHORD_SHORTCUTS;
+        assert_eq!(shortcuts.len(), 4);
+        assert_eq!(&shortcuts[1].1, &"Open core install dir");
+    }
+
+    #[test]
+    fn global_chord_first_is_ctrl_g_c() {
+        let shortcuts = &*GLOBAL_CHORD_SHORTCUTS;
+        assert_eq!(shortcuts[0].0.len(), 2);
+        assert_eq!(shortcuts[0].1, "Open core data dir");
+    }
+
+    #[test]
+    fn global_chord_ctrl_g_enters_chord_mode() {
+        let g = ctrl('g');
+        let shortcuts: &[(KeyCombo, &str)] = &*GLOBAL_CHORD_SHORTCUTS;
+        let mut ch = ChordHandler::default();
+        let mut dispatched: Vec<Vec<Key>> = vec![];
+        let consumed = ch.handle(&g, shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
+        assert!(consumed);
+        assert!(dispatched.is_empty());
+        assert!(ch.is_active());
+    }
+
+    #[test]
+    fn tab_switch_1_to_4() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
+        let mut app = mk_app();
+        QUIT.store(false, Ordering::Relaxed);
+
+        for (i, c) in ['1', '2', '3', '4'].iter().enumerate() {
+            let key = kev(KeyCode::Char(*c));
+            let result = app.handle_global_kv(&key);
+            assert!(result, "key '{c}' should be handled");
+            assert_eq!(app.tab_index, i as u8);
+        }
+    }
+
+    #[test]
+    fn tab_switch_7() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
+        let mut app = mk_app();
+        QUIT.store(false, Ordering::Relaxed);
+        let key = kev(KeyCode::Char('7'));
+        let result = app.handle_global_kv(&key);
+        assert!(result);
+        assert_eq!(app.tab_index, 6);
+    }
+
+    #[test]
+    fn tab_switch_out_of_range_ignored() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
+        let mut app = mk_app();
+        QUIT.store(false, Ordering::Relaxed);
+        let key = kev(KeyCode::Char('8'));
+        let result = app.handle_global_kv(&key);
+        assert!(!result);
+        assert_eq!(app.tab_index, 0);
+    }
+
+    #[test]
+    fn tab_cycle_forward_with_tab_key() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
+        let mut app = mk_app();
+        QUIT.store(false, Ordering::Relaxed);
+
+        let tab_count = app.tabs.len() as u8;
+        for i in 1..=tab_count {
+            let key = kev(KeyCode::Tab);
+            let result = app.handle_global_kv(&key);
+            assert!(result);
+            assert_eq!(app.tab_index, i % tab_count);
+        }
+    }
+
+    #[test]
+    fn quit_with_q() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
+        let mut app = mk_app();
+        QUIT.store(false, Ordering::Relaxed);
+        let key = kev(KeyCode::Char('q'));
+        let result = app.handle_global_kv(&key);
+        assert!(result);
+        assert!(QUIT.load(Ordering::Relaxed));
+        QUIT.store(false, Ordering::Relaxed);
+    }
+
+    #[test]
+    fn quit_with_ctrl_c() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
+        let mut app = mk_app();
+        QUIT.store(false, Ordering::Relaxed);
+        let key = ctrl('c');
+        let result = app.handle_global_kv(&key);
+        assert!(result);
+        assert!(QUIT.load(Ordering::Relaxed));
+        QUIT.store(false, Ordering::Relaxed);
+    }
+
+    #[test]
+    fn help_toggle_with_question_mark() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
+        let mut app = mk_app();
+        QUIT.store(false, Ordering::Relaxed);
+
+        assert!(!app.help.is_active());
+        let key = kev(KeyCode::Char('?'));
+        let result = app.handle_global_kv(&key);
+        assert!(result);
+        assert!(app.help.is_active());
+
+        let result = app.handle_global_kv(&key);
+        assert!(result);
+        assert!(!app.help.is_active());
+    }
+
+    #[test]
+    fn unhandled_key_returns_false() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
+        let mut app = mk_app();
+        QUIT.store(false, Ordering::Relaxed);
+        let key = kev(KeyCode::Char('x'));
+        let result = app.handle_global_kv(&key);
+        assert!(!result);
+    }
+
+    #[test]
+    fn ctrl_tab_not_handled_by_global() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let _guard = rt.enter();
+        let mut app = mk_app();
+        QUIT.store(false, Ordering::Relaxed);
+        let key = Key {
+            code: KeyCode::Tab,
+            shift: false,
+            ctrl: true,
+            alt: false,
+            super_: false,
+        };
+        let result = app.handle_global_kv(&key);
+        assert!(!result);
     }
 }

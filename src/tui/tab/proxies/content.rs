@@ -398,3 +398,181 @@ impl TabContent for Proxies {
         super::render::render(self, f, area, state);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::functions::restful::proxies::ProxiesResponse;
+    use ratatui::widgets::ListState;
+
+    fn load_fixture() -> (Proxies, ListState) {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/tui/tab/proxies/tests/fixtures/proxies.json"
+        );
+        let data = std::fs::read_to_string(path).unwrap();
+        let response: ProxiesResponse = serde_json::from_str(&data).unwrap();
+        let content = Proxies {
+            tree: ProxyTree::build(ProxiesResponse {
+                proxies: response.proxies.clone(),
+            }),
+            proxies: response.proxies,
+            ..Default::default()
+        };
+        let mut state = ListState::default();
+        state.select(Some(0));
+        (content, state)
+    }
+
+    #[test]
+    fn selection_key_returns_folder_identity() {
+        let (content, mut state) = load_fixture();
+        let folder_idx = content
+            .tree
+            .nodes
+            .iter()
+            .position(|n| n.node_type == NodeType::Folder && n.name == "Sl-pvd0")
+            .unwrap();
+        state.select(Some(folder_idx));
+        let key = content.selection_key(&state).unwrap();
+        assert_eq!(key.0, "Sl-pvd0");
+        assert_eq!(key.2, NodeType::Folder);
+    }
+
+    #[test]
+    fn selection_key_none_when_no_selection() {
+        let (content, state) = load_fixture();
+        let mut s = state.clone();
+        s.select(None);
+        assert!(content.selection_key(&s).is_none());
+    }
+
+    #[test]
+    fn restore_selection_finds_node() {
+        let (content, mut state) = load_fixture();
+        let folder_idx = content
+            .tree
+            .nodes
+            .iter()
+            .position(|n| n.node_type == NodeType::Folder && n.name == "Sl-pvd0")
+            .unwrap();
+        let node = content.tree.node_at(folder_idx).unwrap();
+        let key = (
+            node.name.clone(),
+            node.parent.clone(),
+            node.node_type.clone(),
+        );
+        state.select(None);
+        content.restore_selection(Some(key), &mut state);
+        assert_eq!(state.selected(), Some(folder_idx));
+    }
+
+    #[test]
+    fn restore_selection_none_clears_selection() {
+        let (content, mut state) = load_fixture();
+        content.restore_selection(None, &mut state);
+        assert!(state.selected().is_none());
+    }
+
+    #[test]
+    fn resolve_group_for_sort_returns_folder_name() {
+        let (content, _) = load_fixture();
+        let folder_idx = content
+            .tree
+            .nodes
+            .iter()
+            .position(|n| n.node_type == NodeType::Folder && n.name == "Entry")
+            .unwrap();
+        let group = content.resolve_group_for_sort(folder_idx).unwrap();
+        assert_eq!(group, "Entry");
+    }
+
+    #[test]
+    fn resolve_group_for_sort_returns_parent_for_child() {
+        use crate::tui::widget::tab::{FutureSet, wrapper};
+        let (mut content, mut state) = load_fixture();
+
+        // Expand the first folder to reveal its children
+        let folder_idx = content
+            .tree
+            .nodes
+            .iter()
+            .position(|n| n.node_type == NodeType::Folder && n.name == "Entry")
+            .unwrap();
+        state.select(Some(folder_idx));
+        let key = content.selection_key(&state).unwrap();
+        content.tree.expand_at("Entry", &content.proxies);
+        content.tree.rebuild_from_proxies(&content.proxies);
+        content.restore_selection(Some(key), &mut state);
+
+        // Now find a child under Entry
+        let child_idx = content
+            .tree
+            .nodes
+            .iter()
+            .position(|n| n.name == "Sl-pvd0" && n.parent.as_deref() == Some("Entry"))
+            .expect("Sl-pvd0 should exist as child of Entry after expand");
+        let group = content.resolve_group_for_sort(child_idx).unwrap();
+        assert_eq!(group, "Entry");
+    }
+
+    #[test]
+    fn fzf_display_includes_proxy_type() {
+        let node = NodeItem {
+            name: "test-proxy".into(),
+            node_type: NodeType::Link,
+            parent: None,
+            proxy_type: "vmess".into(),
+            depth: 0,
+            delay: None,
+            expanded: false,
+            is_now: false,
+            sort_mode: SortMode::None,
+            tcp: false,
+            udp: false,
+        };
+        let display = Proxies::fzf_display(&node);
+        assert!(display.contains("[vmess]"));
+        assert!(display.contains("test-proxy"));
+    }
+
+    #[test]
+    fn fzf_display_includes_tcp_udp() {
+        let node = NodeItem {
+            name: "test-proxy".into(),
+            node_type: NodeType::Link,
+            parent: None,
+            proxy_type: "".into(),
+            depth: 0,
+            delay: None,
+            expanded: false,
+            is_now: false,
+            sort_mode: SortMode::None,
+            tcp: true,
+            udp: true,
+        };
+        let display = Proxies::fzf_display(&node);
+        assert!(display.contains("TCP"));
+        assert!(display.contains("UDP"));
+    }
+
+    #[test]
+    fn fzf_display_folder_omits_tcp_udp() {
+        let node = NodeItem {
+            name: "TestGroup".into(),
+            node_type: NodeType::Folder,
+            parent: None,
+            proxy_type: "".into(),
+            depth: 0,
+            delay: None,
+            expanded: false,
+            is_now: false,
+            sort_mode: SortMode::None,
+            tcp: true,
+            udp: false,
+        };
+        let display = Proxies::fzf_display(&node);
+        assert!(!display.contains("TCP"));
+        assert!(!display.contains("UDP"));
+    }
+}

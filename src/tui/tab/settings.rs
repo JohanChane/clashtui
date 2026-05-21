@@ -473,6 +473,82 @@ impl TabContent for SettingsContent {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mk_key(code: KeyCode) -> crate::tui::Key {
+        crate::tui::Key {
+            code,
+            shift: matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase()),
+            ctrl: false,
+            alt: false,
+            super_: false,
+        }
+    }
+
+    #[test]
+    fn settings_key_agent_contains_expected() {
+        let a = agent();
+        assert!(a.contains_key(&mk_key(KeyCode::Enter)));
+        assert!(a.contains_key(&mk_key(KeyCode::Esc)));
+        assert!(a.contains_key(&mk_key(KeyCode::Up)));
+        assert!(a.contains_key(&mk_key(KeyCode::Down)));
+        assert!(a.contains_key(&mk_key(KeyCode::Char('k'))));
+        assert!(a.contains_key(&mk_key(KeyCode::Char('j'))));
+    }
+
+    #[test]
+    fn settings_key_try_from_correct_actions() {
+        assert!(matches!(
+            SettingsKey::try_from(&mk_key(KeyCode::Enter)),
+            Ok(SettingsKey::Execute)
+        ));
+        assert!(matches!(
+            SettingsKey::try_from(&mk_key(KeyCode::Esc)),
+            Ok(SettingsKey::Esc)
+        ));
+        assert!(matches!(
+            SettingsKey::try_from(&mk_key(KeyCode::Up)),
+            Ok(SettingsKey::MoveUp)
+        ));
+        assert!(matches!(
+            SettingsKey::try_from(&mk_key(KeyCode::Down)),
+            Ok(SettingsKey::MoveDown)
+        ));
+        assert!(matches!(
+            SettingsKey::try_from(&mk_key(KeyCode::Char('k'))),
+            Ok(SettingsKey::MoveUp)
+        ));
+        assert!(matches!(
+            SettingsKey::try_from(&mk_key(KeyCode::Char('j'))),
+            Ok(SettingsKey::MoveDown)
+        ));
+    }
+
+    #[test]
+    fn settings_key_try_from_unknown_key_is_err() {
+        assert!(SettingsKey::try_from(&mk_key(KeyCode::Char('x'))).is_err());
+        assert!(SettingsKey::try_from(&mk_key(KeyCode::Backspace)).is_err());
+    }
+
+    #[test]
+    fn settings_op_all_is_non_empty() {
+        let ops = SettingsOp::all();
+        assert!(!ops.is_empty());
+        assert!(ops.contains(&SettingsOp::SwitchMode));
+        assert!(ops.contains(&SettingsOp::AllowLan));
+    }
+
+    #[test]
+    fn settings_content_default_has_empty_ops() {
+        let c = SettingsContent::default();
+        assert!(c.ops.is_empty());
+        assert!(!c.mode_selector_visible);
+        assert!(!c.tun_selector_visible);
+    }
+}
+
 fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
     let popup_layout = Layout::vertical([
         Constraint::Percentage((100 - percent_y) / 2),
