@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-23
+
+### Added
+- Cross-platform support: Windows, macOS, and Linux
+- Windows: TUI, CLI, and CoreSrvCtl (Windows Service management via SCM API) (#71)
+- Windows install script (`install.ps1`) for automated deployment (#72)
+- Dual core support: sing-box alongside Mihomo
+- Template system for auto-generating config files with variable expansion
+- Custom themes via `theme.yaml`
+- Custom key bindings via `keymap.yaml` with yazi-style multi-key and chord support (#48)
+- fzf integration for group-select and fzf-find on proxies page (#62)
+- In-program download and update
+- Connection management: view and close individual or all connections
+- Protocol type display on proxy nodes (#43)
+- Settings panel: flush cache, Allow LAN, TUN controls (#49)
+- sing-box v1.12 templates: TUN IPv4/IPv6 + FakeIP bypass (#50)
+- Profile preview in profile tab
+- Clash info display (version, mode, etc.)
+- CLI `profile list --name-only` argument
+- Environment variable templates
+- Systemd timer documentation
+
+### Changed
+- **Complete TUI rewrite** with async frontend/backend architecture
+- Replaced `clashcli` with integrated CLI subsystem
+- Merged lib into single binary
+- Configurable install script with user-mode support (#35)
+- Install scripts moved to `installs/` directory
+- README: macOS/Windows install instructions, aligned EN/ZH structure (#52, #68)
+- Mihomo template improvements: better proxy group and rule organization (#73)
+- Updated sing-box configs and templates (v1.12)
+- Renamed theme fields: secondary/accent → muted/title (#46)
+- Simplified version format to `{semver}-{short_hash}[-dirty]` (#44)
+- Switched serialization: `serde_yaml` → `serde_yml`, `encoding` → `encoding_rs`
+- Migrated HTTP from `reqwest` to `minreq`
+- Separated config: `data.yaml` for data, `config.yaml` for user config
+- CI: matrix strategy with cross-platform builds and tests (#65)
+- Unified prerelease binary naming: `-prerelease` suffix
+- Enabled release build optimization (`opt = "s"`)
+- Profile list maintains stable sort order
+- Database state persists to disk
+
+### Fixed
+- macOS: services no longer auto-start at boot (#69)
+- Windows build (#71, #81)
+- Template generation regression (#78)
+- sniffer configuration missing for TUN mode core override configs
+- `edit_cmd` and `open_dir_cmd` documentation
+- Service message display (now multi-line)
+- `SetPermission` not working
+- Terminate connection support in TUI (#39)
+- TUN status display error
+- Config reload and profile update issues
+- Deadlock during profile refresh
+- Tab bar foreground color
+- Permission issues with config directory files
+- YAML validation (must be mapping)
+- Various CI and build issues
+
+### Removed
+- `clashcli` standalone CLI tool
+- Geo data update (deprecated; cores handle natively)
+
 ## [0.3.0-beta.2] - 2026-05-22
 
 ### Added
@@ -236,7 +299,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Profile switching
 - Service start/stop control
 
-[Unreleased]: https://github.com/JohanChane/clashtui/compare/v0.3.0-alpha.2...HEAD
+[Unreleased]: https://github.com/JohanChane/clashtui/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/JohanChane/clashtui/compare/v0.2.3...v0.3.0
+[0.3.0-beta.2]: https://github.com/JohanChane/clashtui/compare/v0.3.0-beta.1...v0.3.0-beta.2
+[0.3.0-beta.1]: https://github.com/JohanChane/clashtui/compare/v0.3.0-alpha.2...v0.3.0-beta.1
 [0.3.0-alpha.2]: https://github.com/JohanChane/clashtui/compare/v0.3.0-reborn...v0.3.0-alpha.2
 [0.3.0-reborn]: https://github.com/JohanChane/clashtui/compare/v0.2.3...v0.3.0-reborn
 [0.2.3]: https://github.com/JohanChane/clashtui/compare/v0.2.1...v0.2.3

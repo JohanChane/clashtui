@@ -1,11 +1,3 @@
-> **Important Notice**
->
-> clashtui v0.3.0 is now pre-released. Barring any critical issues, it will go into full release after May 23. The following changes will be made to the repository:
-> - The `main` and `dev` branches will be renamed to `archive/main` and `archive/dev`, respectively. They have been tagged as `archive/v0.2.3` and `archive/v0.2.3-dev`.
-> - The `demotui` branch will be renamed to `main`, and a new `dev` branch will be created.
->
-> ***Package maintainers, please take note.***
-
 # ClashTui
 
 <p>
@@ -50,8 +42,12 @@ ClashTui is a terminal user interface (TUI) proxy management tool supporting bot
 
 ### Requirements
 
+Linux and macOS:
 -   sudo
 -   fzf
+
+Windows:
+-   nssm
 
 ### With root access (for TUN mode)
 
@@ -68,7 +64,7 @@ This step ensures mihomo, sing-box, and clashtui are available in your environme
 2. Run the install script:
 
 ```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/installs/install) --repo JohanChane/clashtui --branch demotui --core all
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install) --core all
 ```
 
 Tip: The install script downloads resources from GitHub. If downloads keep failing, try enabling a proxy before running the script.
@@ -92,7 +88,7 @@ brew install mihomo sing-box clashtui  # Note: the latest clashtui may not be up
 2. Run the install script (same as Linux):
 
 ```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/installs/install) --repo JohanChane/clashtui --branch demotui --core all
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install) --core all
 ```
 
 3. \[Optional\] Enable `clashtui_mihomo` / `clashtui_singbox` launchd plists on boot:
@@ -108,7 +104,7 @@ sudo launchctl load -w /Library/LaunchDaemons/clashtui_singbox.plist
 1. \[Optional\] Install mihomo and clashtui from Scoop:
 
 ```powershell
-scoop install mihomo sing-box clashtui
+scoop install mihomo sing-box clashtui  # Note: the latest clashtui may not be uploaded yet — please build and install it manually
 # Verify
 Get-Command mihomo sing-box clashtui
 ```
@@ -119,13 +115,13 @@ This step ensures mihomo, sing-box, and clashtui are in PATH so the install scri
 
 ```powershell
 # Default install to D:\ClashTui
-.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core all
+.\installs\install.ps1 --core all
 
 # Custom directory (no spaces allowed)
-.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core all -InstallDir "D:\MyTools\ClashTui"
+.\installs\install.ps1 --core all -InstallDir "D:\MyTools\ClashTui"
 
 # Only install mihomo core
-.\installs\install.ps1 --repo JohanChane/clashtui --branch demotui --core mihomo
+.\installs\install.ps1 --core mihomo
 ```
 
 3. Start clashtui, then use CoreSrvCtl to install and start core services:
@@ -137,7 +133,7 @@ The install script does NOT register Windows Services. Launch clashtui and use t
 #### Linux
 
 ```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/installs/install) --repo JohanChane/clashtui --branch demotui --core all --is-user
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install) --core all --is-user
 ```
 
 Enable on boot:
@@ -151,7 +147,7 @@ systemctl --user enable clashtui_singbox.service
 #### macOS
 
 ```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/demotui/installs/install) --repo JohanChane/clashtui --branch demotui --core all --is-user
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install) --core all --is-user
 ```
 
 Enable on boot:
