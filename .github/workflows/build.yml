@@ -3,7 +3,8 @@ name: Build
 on:
   push:
     branches:
-      - demotui
+      - main
+      - dev
     paths:
       - '.github/workflows/build.yml'
       - 'src/**'

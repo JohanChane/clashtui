@@ -2,11 +2,17 @@ name: Install Script Tests
 
 on:
   push:
+    branches:
+      - main
+      - dev
     paths:
       - 'installs/**'
       - 'contrib/**'
       - '.github/workflows/install_testing.yml'
   pull_request:
+    branches:
+      - main
+      - dev
     paths:
       - 'installs/**'
       - 'contrib/**'
