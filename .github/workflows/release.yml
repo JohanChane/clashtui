@@ -179,6 +179,21 @@ jobs:
             echo "CLASHTUI_IS_PRERELEASE=false" >> $GITHUB_ENV
           fi
 
+      - name: Generate release body
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CHANGELOG=$(gh api repos/${{ github.repository }}/contents/CHANGELOG.md?ref=${{ github.sha }} --jq '.content' | base64 -d)
+          VERSION="${CLASHTUI_RELEASE_VERSION#v}"
+          HEADING=$(echo "$CHANGELOG" | grep "^## \[$VERSION\] " | head -1)
+          if [ -z "$HEADING" ]; then
+            echo "Please see [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md)" > release.txt
+          else
+            HEADING_TEXT="${HEADING#\#\# }"
+            ANCHOR=$(echo "$HEADING_TEXT" | tr '[:upper:]' '[:lower:]' | tr -d '[].,;:!?()/' | tr ' ' '-')
+            echo "Please see [CHANGELOG-${CLASHTUI_RELEASE_VERSION}](https://github.com/${{ github.repository }}/blob/${CLASHTUI_RELEASE_VERSION}/CHANGELOG.md#${ANCHOR})" > release.txt
+          fi
+
       - name: Archive Release
         run: |
           gzip -c ./artifacts/clashtui-amd64 > clashtui-linux-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
@@ -192,6 +207,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           prerelease: ${{ env.CLASHTUI_IS_PRERELEASE == 'true' }}
+          body_path: release.txt
           files: |
             clashtui-linux-amd64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
             clashtui-linux-arm64-${{ env.CLASHTUI_RELEASE_VERSION }}.gz
