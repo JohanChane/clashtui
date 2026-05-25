@@ -243,42 +243,6 @@ impl BasicInfo {
     }
 }
 
-#[cfg(feature = "migration_v0_3_0")]
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-#[serde(default)]
-pub struct Basic {
-    pub clash_config_dir: String,
-    pub clash_bin_path: String,
-    pub clash_config_path: String,
-}
-
-#[cfg(feature = "migration_v0_3_0")]
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-#[serde(default)]
-pub struct Service {
-    #[serde(alias = "clash_srv_name")]
-    pub clash_service_name: String,
-    pub singbox_service_name: String,
-    pub is_user: bool,
-    pub singbox_is_user: bool,
-}
-
-#[cfg(feature = "migration_v0_3_0")]
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-#[serde(default)]
-pub struct Hack {
-    pub service_controller: ServiceController,
-}
-
-#[cfg(feature = "migration_v0_3_0")]
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-#[serde(default)]
-pub struct SingboxBasic {
-    pub singbox_bin_path: String,
-    pub singbox_config_dir: String,
-    pub singbox_config_path: String,
-}
-
 #[cfg(test)]
 mod test {
     use super::*;

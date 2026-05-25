@@ -79,7 +79,6 @@ windows = { version = "0.61", features = [
 
 [features]
 customized-theme = ["tui", "ratatui/serde"]
-migration_v0_3_0 = []
 tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-lite", "dep:signal-hook-tokio", "dep:tungstenite"]
 
 default = ["customized-theme"]

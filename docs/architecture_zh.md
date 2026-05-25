@@ -68,7 +68,7 @@ src/
 
 程序入口在 `src/main.rs`，按顺序执行五个阶段：
 
-1. **CLI 解析** — 解析命令行参数和环境变量（`CLASHTUI_CONFIG_DIR`），处理提前退出（如 `--generate-shell-completion`、`migrate`）
+1. **CLI 解析** — 解析命令行参数和环境变量（`CLASHTUI_CONFIG_DIR`），处理提前退出（如 `--generate-shell-completion`）
 2. **配置初始化** — 确定配置目录，加载 `config.yaml` + `clashtui.db`，创建缺失的目录和文件
 3. **TUI 初始化** — 加载按键映射（`keymap.yaml`）、主题（`theme.yaml`）、设置终端 raw mode、注册 panic hook
 4. **事件循环** — 运行 `App::serve()`，循环处理渲染、事件和异步任务
@@ -200,7 +200,6 @@ src/
 |------|------|------|
 | `customized-theme` | ☑ | 自定义主题支持（自动启用 `tui`） |
 | `tui` | (间接) | ratatui + crossterm + tokio 依赖 |
-| `migration_v0_2_3` | ☐ | v0.2.3 配置迁移 |
 | `deprecated` | ☐ | 废弃功能 |
 
 使用 `#[cfg(feature = "tui")]` 而非 `#[cfg(feature = "customized-theme")]` 进行条件编译，除非是主题专用代码。

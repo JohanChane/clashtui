@@ -83,12 +83,12 @@ jobs:
 
       - name: Run tests
         if: matrix.run-test
-        run: cargo test --all --verbose
+        run: cargo test --all --all-features --verbose
 
       - name: Build
         run: |
           rustup target add ${{ matrix.target }}
-          cargo build --verbose --locked --target ${{ matrix.target }}
+          cargo build --verbose --locked --target ${{ matrix.target }} --all-features
 
       - name: Build Version
         if: matrix.run-test

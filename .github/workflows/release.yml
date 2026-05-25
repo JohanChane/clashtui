@@ -102,13 +102,13 @@ jobs:
         run: |
           rustup target add ${{ matrix.target }}
           cargo install cargo-zigbuild
-          cargo zigbuild --target ${{ matrix.zig-target }} --release --locked
+          cargo zigbuild --target ${{ matrix.zig-target }} --release --locked --all-features
 
       - name: Build (native)
         if: ${{ !matrix.zig-target }}
         run: |
           rustup target add ${{ matrix.target }}
-          cargo build --release --locked --target ${{ matrix.target }}
+          cargo build --release --locked --target ${{ matrix.target }} --all-features
 
       - name: Build Version
         if: matrix.extract-version

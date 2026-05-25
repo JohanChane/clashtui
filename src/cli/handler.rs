@@ -14,7 +14,6 @@ pub fn handle_cli(cmd: Cmds) -> Result<()> {
         ArgCommand::Service { command } => handle_service(command),
         ArgCommand::Mode { mode } => handle_mode(mode),
         ArgCommand::Update { ci, target } => handle_update(ci, target),
-        ArgCommand::Migrate { .. } => unreachable!("migrate handled in handle_early_exit"),
     }
 }
 
