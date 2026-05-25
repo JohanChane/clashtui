@@ -3,10 +3,11 @@ mod config;
 
 use config::CtCfg;
 
-use crate::backend::ProfileType;
+use super::database::ProfileType;
 
 pub fn migrate() -> anyhow::Result<()> {
-    use crate::DataDir;
+    let old_data_dir = super::util::load_home_dir()?;
+
     let CtCfg {
         clash_cfg_dir,
         clash_bin_path,
@@ -16,46 +17,50 @@ pub fn migrate() -> anyhow::Result<()> {
         timeout,
         edit_cmd,
         open_dir_cmd,
-    } = CtCfg::load(&DataDir::get().join("config.yaml"))
+    } = CtCfg::load(&old_data_dir.join("config.yaml"))
         .map_err(|e| anyhow::anyhow!("Loading v0.3.0 config file: {e}"))?;
-    let basic = super::Basic {
-        clash_config_dir: clash_cfg_dir,
-        clash_bin_path,
-        clash_config_path: clash_cfg_path,
-    };
-    let service = super::Service {
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
-        clash_service_name: clash_srv_name,
-        #[cfg(any(target_os = "linux", target_os = "macos"))]
-        is_user,
-    };
-    let extra = super::Extra {
-        edit_cmd,
-        open_dir_cmd,
-    };
-    let config = super::ConfigFile {
-        basic,
-        service,
-        timeout,
-        extra,
-        ..Default::default()
-    };
-    let pm = collect_profiles(DataDir::get())
-        .map_err(|e| anyhow::anyhow!("Collecting profiles: {e}"))?;
-    let basic_map = std::fs::read_to_string(DataDir::get().join("basic_clash_config.yaml"))
+
+    let basic_map = std::fs::read_to_string(old_data_dir.join("basic_clash_config.yaml"))
         .map_err(|e| anyhow::anyhow!("Loading basic clash config: {e}"))?;
 
-    std::fs::remove_dir_all(DataDir::get())
-        .map_err(|e| anyhow::anyhow!("Removing config dir: {e}"))?;
-    super::BuildConfig::init_config().map_err(|e| anyhow::anyhow!("Initing config file: {e}"))?;
+    let pm = collect_profiles(&old_data_dir)
+        .map_err(|e| anyhow::anyhow!("Collecting profiles: {e}"))?;
 
-    use crate::consts::BASIC_PATH;
+    std::fs::remove_dir_all(&old_data_dir)
+        .map_err(|e| anyhow::anyhow!("Removing config dir: {e}"))?;
+
+    super::init(Some(old_data_dir.clone()))?;
+
+    let config = super::core::ConfigFile {
+        mihomo: super::core::MihomoSection {
+            core: super::core::CoreConfig {
+                config_dir: clash_cfg_dir,
+                bin_path: clash_bin_path,
+                config_path: clash_cfg_path,
+            },
+            core_service: super::core::CoreServiceConfig {
+                service_name: clash_srv_name,
+                is_user,
+            },
+        },
+        singbox: super::core::SingboxSection::default(),
+        timeout,
+        extra: super::core::Extra {
+            edit_cmd,
+            open_dir_cmd,
+        },
+    };
+
     config
         .to_file()
         .map_err(|e| anyhow::anyhow!("Saving new config file: {e}"))?;
     pm.to_file()
         .map_err(|e| anyhow::anyhow!("Saving new profiles database: {e}"))?;
-    std::fs::write(BASIC_PATH.as_path(), basic_map)
+
+    let mihomo_override = super::config_dir_path()
+        .join("mihomo")
+        .join(super::util::defs::CORE_OVERRIDE_FILE);
+    std::fs::write(&mihomo_override, basic_map)
         .map_err(|e| anyhow::anyhow!("Saving basic clash config: {e}"))?;
     Ok(())
 }
@@ -64,8 +69,8 @@ pub fn migrate() -> anyhow::Result<()> {
 /// and set the current profile to the one specified in `config_dir/data.yml`
 ///
 /// 'no_pp' is ignored, all file under `config_dir/profiles` are treated as profile(url)
-fn collect_profiles(config_dir: &std::path::Path) -> anyhow::Result<super::ProfileManager> {
-    let profiles = super::ProfileManager::default();
+fn collect_profiles(config_dir: &std::path::Path) -> anyhow::Result<super::database::ProfileManager> {
+    let mut profiles = super::database::ProfileManager::default();
     for entry in std::fs::read_dir(config_dir.join("profiles"))
         .map_err(|e| anyhow::anyhow!("iter /profiles: {e}"))?
     {

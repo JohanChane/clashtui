@@ -68,7 +68,7 @@ src/
 
 The program entry point is `src/main.rs`, which executes five phases in order:
 
-1. **CLI Parse** — Parse command-line arguments and environment variables (`CLASHTUI_CONFIG_DIR`), handle early exits (e.g. `--generate-shell-completion`, `migrate`)
+1. **CLI Parse** — Parse command-line arguments and environment variables (`CLASHTUI_CONFIG_DIR`), handle early exits (e.g. `--generate-shell-completion`)
 2. **Config Init** — Determine config directory, load `config.yaml` + `clashtui.db`, create missing directories and files
 3. **TUI Init** — Load keymap (`keymap.yaml`), theme (`theme.yaml`), set terminal raw mode, register panic hook
 4. **Event Loop** — Run `App::serve()`, looping to process rendering, events, and async tasks
@@ -200,7 +200,6 @@ Supports two keymap.yaml formats:
 |---------|---------|-------------|
 | `customized-theme` | ☑ | Custom theme support (auto-enables `tui`) |
 | `tui` | (indirect) | ratatui + crossterm + tokio dependencies |
-| `migration_v0_2_3` | ☐ | v0.2.3 config migration |
 | `deprecated` | ☐ | Deprecated functionality |
 
 Use `#[cfg(feature = "tui")]` rather than `#[cfg(feature = "customized-theme")]` for conditional compilation, unless it's theme-specific code.

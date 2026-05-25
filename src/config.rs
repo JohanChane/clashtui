@@ -24,8 +24,6 @@ pub use core::{CoreType, ServiceController};
 #[macro_use]
 mod util;
 pub mod database;
-#[cfg(feature = "migration_v0_3_0")]
-pub mod v0_3_0;
 
 /// Load using [init]
 pub const CONFIG: Wrapper = Wrapper;

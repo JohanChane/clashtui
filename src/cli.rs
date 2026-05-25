@@ -58,20 +58,6 @@ impl Cmds {
             return None;
         }
 
-        if let Some(ArgCommand::Migrate { version }) = self.command {
-            if let Err(e) = match version {
-                #[cfg(feature = "migration_v0_3_0")]
-                OldVersion::V0_3_0 => crate::utils::config::v0_3_0::migrate(),
-                #[cfg(not(any(feature = "migration_v0_3_0")))]
-                OldVersion::NotSupported => {
-                    Err::<(), anyhow::Error>(anyhow::anyhow!("unsupported version"))
-                }
-            } {
-                eprintln!("migrate error: {e}");
-            }
-            return None;
-        }
-
         #[cfg(feature = "customized-theme")]
         if self.load_theme_realtime {
             crate::tui::Theme::enable_realtime();
@@ -110,22 +96,6 @@ pub(crate) enum ArgCommand {
         #[command(subcommand)]
         target: Target,
     },
-    /// migrate config from old version
-    Migrate {
-        /// the old version
-        #[command(subcommand)]
-        version: OldVersion,
-    },
-}
-
-#[derive(Debug, clap::Subcommand)]
-enum OldVersion {
-    #[cfg(feature = "migration_v0_3_0")]
-    /// v0.3.0
-    V0_3_0,
-    #[cfg(not(any(feature = "migration_v0_3_0")))]
-    /// not support any version
-    NotSupported,
 }
 
 #[derive(Debug, clap::Subcommand)]
