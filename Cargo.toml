@@ -18,7 +18,7 @@ pre-release-commands = ["cargo test"]
 publish = true
 
 [dependencies]
-log = "0.4.22"
+log = "0.4.30"
 env_logger = { version = "0.11.7", default-features = false, features = [
     "humantime",
 ] }
