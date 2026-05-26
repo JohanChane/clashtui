@@ -71,6 +71,17 @@ pub mod cache {
     }
 }
 
+pub mod geo {
+    use super::*;
+
+    /// Update GEO databases
+    ///
+    /// API: POST /configs/geo
+    pub fn upgrade_geo() -> Result<()> {
+        request(Method::Post, "/configs/geo", None).map(|_| ())
+    }
+}
+
 pub mod config {
     use super::*;
 
