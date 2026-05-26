@@ -69,7 +69,7 @@ libc = "0.2"
 signal-hook-tokio = { version = "0", features = ["futures-v0_3"], optional = true }
 
 [target.'cfg(windows)'.dependencies]
-winreg = "0.55"
+winreg = "0.56"
 windows = { version = "0.61", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_Foundation",
