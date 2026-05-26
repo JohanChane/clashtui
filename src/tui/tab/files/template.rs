@@ -293,7 +293,7 @@ impl DualTabContentMate for Template {
         let block = if let Some(filter) = self.filter.as_ref() {
             block.title_bottom(Line::raw(format!(" {filter} ")).right_aligned().reversed())
         } else {
-            block.title_bottom(Line::raw(format!(" /: Search ")).right_aligned().reversed())
+            block
         };
 
         let iter = self

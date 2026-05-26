@@ -852,12 +852,16 @@ mod tests {
         let mut title = if let Some(filter) = self.filter.as_ref() {
             format!(" / {filter} ")
         } else {
-            " /: Search ".to_owned()
+            String::new()
         };
         if self.paused {
             title.push_str(" [PAUSED]");
         }
-        let block = block.title_bottom(Line::raw(title).right_aligned().reversed());
+        let block = if title.is_empty() {
+            block
+        } else {
+            block.title_bottom(Line::raw(title).right_aligned().reversed())
+        };
 
         if !self.error.as_deref().unwrap_or("").is_empty() && self.display_rows.is_empty() {
             let widget =

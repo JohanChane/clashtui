@@ -439,13 +439,15 @@ impl TabContent for Logs {
         title_parts.push(self.current_log_level.clone());
         if let Some(ref filter) = self.filter {
             title_parts.push(format!(" / {filter} "));
-        } else {
-            title_parts.push(" /: Search ".to_owned());
         }
         if self.paused {
             title_parts.push(" [PAUSED]".to_owned());
         }
-        let block = block.title_bottom(Line::raw(title_parts.join(" ")).right_aligned().reversed());
+        let block = if title_parts.len() > 1 {
+            block.title_bottom(Line::raw(title_parts.join(" ")).right_aligned().reversed())
+        } else {
+            block
+        };
 
         if !self.error.as_deref().unwrap_or("").is_empty() && self.buffer.is_empty() {
             let widget =
