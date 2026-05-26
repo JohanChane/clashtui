@@ -70,7 +70,7 @@ signal-hook-tokio = { version = "0", features = ["futures-v0_3"], optional = tru
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_Foundation",
     "Win32_Security",
