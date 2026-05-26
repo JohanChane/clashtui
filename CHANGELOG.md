@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-26
+
+### Added
+- Update GEO data in Settings panel (#84)
+
+### Changed
+- Clean up default shortcut hints in UI (#84)
+- Remove `migration_v0_3_0` feature flag, enable all-features in CI (#83)
+- Auto-generate release body in release workflow
+
 ## [0.3.0] - 2026-05-23
 
 ### Added
@@ -299,7 +309,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Profile switching
 - Service start/stop control
 
-[Unreleased]: https://github.com/JohanChane/clashtui/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/JohanChane/clashtui/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/JohanChane/clashtui/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/JohanChane/clashtui/compare/v0.2.3...v0.3.0
 [0.3.0-beta.2]: https://github.com/JohanChane/clashtui/compare/v0.3.0-beta.1...v0.3.0-beta.2
 [0.3.0-beta.1]: https://github.com/JohanChane/clashtui/compare/v0.3.0-alpha.2...v0.3.0-beta.1
