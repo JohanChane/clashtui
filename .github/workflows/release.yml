@@ -97,6 +97,9 @@ jobs:
       - name: Download Dependencies
         run: cargo fetch
 
+      - name: Run Tests
+        run: cargo test --release --locked --all-features
+
       - name: Build (zig + glibc 2.17)
         if: matrix.zig-target
         run: |
