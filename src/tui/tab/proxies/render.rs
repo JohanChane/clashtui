@@ -100,8 +100,6 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
     // Filter indicator
     if let Some(ref f) = content.filter {
         footer_parts.push(format!("/ {f} "));
-    } else {
-        footer_parts.push("/: Filter ".to_owned());
     }
 
     let footer = footer_parts.join("");
