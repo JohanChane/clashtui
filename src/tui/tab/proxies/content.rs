@@ -98,23 +98,10 @@ impl Proxies {
                 let info = self
                     .tree
                     .node_at(current)
-                    .map(|n| (n.name.clone(), n.node_type.clone(), n.parent.clone()));
-                if let Some((name, ntype, parent)) = info {
-                    match ntype {
-                        NodeType::Folder => {
-                            self.tree.collapse_at(&name, &self.proxies);
-                            if let Some(idx) = self.tree.find_folder_index(&name) {
-                                state.select(Some(idx));
-                            }
-                        }
-                        _ => {
-                            if let Some(ref parent) = parent {
-                                self.tree.collapse_at(parent, &self.proxies);
-                                if let Some(idx) = self.tree.find_folder_index(parent) {
-                                    state.select(Some(idx));
-                                }
-                            }
-                        }
+                    .map(|n| n.parent.clone());
+                if let Some(Some(ref parent)) = info {
+                    if let Some(idx) = self.tree.find_folder_index(parent) {
+                        state.select(Some(idx));
                     }
                 }
             }

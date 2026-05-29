@@ -16,7 +16,7 @@ mod_agent!(
         ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
         ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
         ([KeyCode::Char('h')], Key::Parent, "Go to parent"),
-        ([KeyCode::Char('l')], Key::Expand, "Expand"),
+        ([KeyCode::Char('l')], Key::Expand, "Expand/Jump to group"),
         ([KeyCode::Enter], Key::Select, "Select"),
         (
             [KeyCode::Char('g'), KeyCode::Char('g')],
