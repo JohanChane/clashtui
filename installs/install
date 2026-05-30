@@ -33,6 +33,16 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+backup_dir() {
+  [ -d "$1" ] || return 0
+  local i=1
+  while [ -d "${1}_$i" ]; do
+    ((i++))
+  done
+  cp -r "$1" "${1}_$i"
+  log_info "Backed up directory: $1 -> ${1}_$i"
+}
+
 backup_file() {
   [ -e "$1" ] || return 1
   local i=1
@@ -764,6 +774,7 @@ create_core_configs() {
   log_info "Creating core config files..."
 
   if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then
+    backup_dir "$MIHOMO_CONFIG_DIR"
     $SUDO mkdir -p "$MIHOMO_CONFIG_DIR"
 
     local mihomo_cfg_src
@@ -778,6 +789,7 @@ create_core_configs() {
     log_info "Mihomo core config written to: ${MIHOMO_CONFIG_DIR}/config.yaml"
 
     # Also copy to clashtui config dir for profile management
+    backup_dir "$MIHOMO_USER_CONFIG_DIR"
     mkdir -p "$MIHOMO_USER_CONFIG_DIR"
     copy_contrib "$mihomo_cfg_src" "${MIHOMO_USER_CONFIG_DIR}/core_override_config.yaml"
     log_info "Mihomo core override written to: ${MIHOMO_USER_CONFIG_DIR}/core_override_config.yaml"
@@ -793,6 +805,7 @@ create_core_configs() {
   fi
 
   if [ "$core_type" = "sing-box" ] || [ "$core_type" = "all" ]; then
+    backup_dir "$SINGBOX_CONFIG_DIR"
     $SUDO mkdir -p "$SINGBOX_CONFIG_DIR"
 
     local singbox_cfg_src
@@ -806,6 +819,7 @@ create_core_configs() {
     log_info "Sing-box core config written to: ${SINGBOX_CONFIG_DIR}/config.json"
 
     # Also copy to clashtui config dir for profile management
+    backup_dir "$SINGBOX_USER_CONFIG_DIR"
     mkdir -p "$SINGBOX_USER_CONFIG_DIR"
     copy_contrib "$singbox_cfg_src" "${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
     log_info "Sing-box core override written to: ${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
@@ -826,6 +840,7 @@ create_clashtui_config() {
   local core_type="$1"
   log_info "Creating clashtui config..."
 
+  backup_dir "$CLASHTUI_CONFIG_DIR"
   mkdir -p "$CLASHTUI_CONFIG_DIR"
 
   # Copy contrib default_keymap.yaml and default_theme.yaml
@@ -834,8 +849,6 @@ create_clashtui_config() {
   log_info "Copied default configs to: $CLASHTUI_CONFIG_DIR"
 
   # Generate single config.yaml with both core sections
-  backup_file "$CLASHTUI_CONFIG_DIR/config.yaml"
-
   cat >"$CLASHTUI_CONFIG_DIR/config.yaml" <<EOF
 mihomo:
   core:
