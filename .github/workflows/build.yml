@@ -76,23 +76,18 @@ jobs:
       - uses: goto-bus-stop/setup-zig@v2
         if: matrix.zig-target
 
-      - name: Cache Target
+      - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
-          path: |
-            ./target
-            ~/.cargo
+          path: ~/.cargo
           key: ci-${{ matrix.cache-suffix }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            ci-${{ matrix.cache-suffix }}-${{ hashFiles('Cargo.lock') }}
-            ci-${{ matrix.cache-suffix }}-
 
       - name: Download Dependencies
         run: cargo fetch
 
       - name: Run tests
         if: matrix.run-test
-        run: cargo test --all --all-features
+        run: cargo test --locked --all --all-features
 
       - name: Build (zig + glibc 2.17)
         if: matrix.zig-target
