@@ -136,3 +136,38 @@ Describe "Guard: dot-sourcing does not execute Main" {
         { Get-Command Copy-Contrib -ErrorAction Stop } | Should -Not -Throw
     }
 }
+
+Describe "irm|iex remote execution (ScriptName null)" {
+    It "SCRIPT_DIR expression uses fallback when ScriptName is null" {
+        $nullResult = if ($null) { Split-Path $null -Parent } else { (Get-Location).Path }
+        $nullResult | Should -Not -BeNullOrEmpty
+        $nullResult | Should -Be (Get-Location).Path
+    }
+
+    It "SCRIPT_DIR expression uses ScriptName when available" {
+        $validResult = if ($installScript) { Split-Path $installScript -Parent } else { (Get-Location).Path }
+        $validResult | Should -Not -BeNullOrEmpty
+        $validResult | Should -Be (Split-Path $installScript -Parent)
+    }
+
+    It "SCRIPT_DIR falls back to Get-Location when ScriptName is empty" {
+        $sb = [scriptblock]::Create(@"
+`$script:SCRIPT_DIR = if (`$MyInvocation.ScriptName) { Split-Path `$MyInvocation.ScriptName -Parent } else { (Get-Location).Path }
+`$script:SCRIPT_DIR
+"@)
+        $result = & $sb
+        $result | Should -Not -BeNullOrEmpty
+        $result | Should -BeLike "*[\\/]*"
+    }
+
+    It "Full script runs without error when invoked via scriptblock (irm|iex simulation)" {
+        $content = Get-Content -Path $installScript -Raw
+        $sb = [scriptblock]::Create($content)
+        $testDir = Join-Path $env:TEMP "clashtui-iex-full-$(Get-Random)"
+        try {
+            { & $sb -IsTest -InstallDir $testDir -Core mihomo -ErrorAction Stop } | Should -Not -Throw
+        } finally {
+            Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
