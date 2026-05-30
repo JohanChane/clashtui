@@ -152,6 +152,11 @@ mod_agent!(
             "Toggle no proxy-provider"
         ),
         (
+            key("O"),
+            Key::Action(Action::ToggleUpdateWithProxy),
+            "Toggle update with proxy"
+        ),
+        (
             key("n"),
             Key::Action(Action::TrafficNext),
             "Traffic display next"
@@ -243,6 +248,7 @@ impl<'de> serde::Deserialize<'de> for Key {
                         "GoTop" => Ok(Key::Action(Action::GoTop)),
                         "GoEnd" => Ok(Key::Action(Action::GoEnd)),
                         "ToggleNoPp" => Ok(Key::Action(Action::ToggleNoPp)),
+                        "ToggleUpdateWithProxy" => Ok(Key::Action(Action::ToggleUpdateWithProxy)),
                         "TrafficNext" => Ok(Key::Action(Action::TrafficNext)),
                         "TrafficPrev" => Ok(Key::Action(Action::TrafficPrev)),
                         s => Err(de::Error::unknown_variant(
@@ -263,6 +269,7 @@ impl<'de> serde::Deserialize<'de> for Key {
                                 "GoTop",
                                 "GoEnd",
                                 "ToggleNoPp",
+                                "ToggleUpdateWithProxy",
                                 "TrafficNext",
                                 "TrafficPrev",
                             ],
@@ -295,6 +302,7 @@ pub enum Action {
     GoTop,
     GoEnd,
     ToggleNoPp,
+    ToggleUpdateWithProxy,
     TrafficNext,
     TrafficPrev,
 }
@@ -549,6 +557,7 @@ mod actions {
                 Self::Check => check(name).await,
                 Self::CopyUrl => copy_url(name).await,
                 Self::ToggleNoPp => toggle_no_pp(name).await,
+                Self::ToggleUpdateWithProxy => toggle_update_with_proxy(name).await,
                 Self::TrafficNext | Self::TrafficPrev => {
                     unreachable!("traffic toggle handled in handle_key_event directly")
                 }
@@ -690,6 +699,15 @@ mod actions {
         })
     }
 
+    async fn toggle_update_with_proxy(name: String) -> CB {
+        tri!(db::toggle_update_with_proxy(&name));
+
+        let (names, atime) = get_profiles_with_readable_atime();
+        wrapper(move |(content, _): &mut C| {
+            sync_helper(content, names, atime);
+        })
+    }
+
     async fn delete(name: String) -> CB {
         let rx = Confirm::title(format!("Delete profile?"))
             .with_prompt(format!("Delete {name}?\nEnter to confirm, Esc to cancel"))
@@ -729,7 +747,7 @@ mod actions {
     }
 
     async fn update(name: String) -> CB {
-        let with_proxy = false;
+        let with_proxy = db::get(&name).map(|pf| pf.update_with_proxy).unwrap_or(false);
         // Fetch traffic info before updating
         if let Some(pf) = db::get(&name) {
             if let crate::config::database::ProfileType::Url(ref url) = pf.dtype {
@@ -763,7 +781,8 @@ mod actions {
     pub(super) async fn update_all(names: Vec<String>) -> CB {
         let mut results = Vec::with_capacity(names.len());
         for name in &names {
-            let result = update_profile(db::get(name).unwrap(), false).await;
+            let with_proxy = db::get(name).map(|pf| pf.update_with_proxy).unwrap_or(false);
+            let result = update_profile(db::get(name).unwrap(), with_proxy).await;
             results.push((name.clone(), result));
         }
 
@@ -877,6 +896,7 @@ pub(super) fn get_profiles_with_readable_atime() -> (Vec<String>, Vec<String>) {
         .map(|pf| {
             let name = pf.name.clone();
             let no_pp = pf.no_pp;
+            let update_with_proxy = pf.update_with_proxy;
             let is_singbox = pf.dtype == ProfileType::Singbox
                 || crate::config::CONFIG
                     .data
@@ -902,7 +922,8 @@ pub(super) fn get_profiles_with_readable_atime() -> (Vec<String>, Vec<String>) {
             } else {
                 ""
             };
-            (name, format!("{domain}|{atime}|{no_pp_str}"))
+            let pxy_str = if update_with_proxy { "proxy" } else { "" };
+            (name, format!("{domain}|{atime}|{no_pp_str}|{pxy_str}"))
         })
         .collect();
     composed.sort_unstable();
