@@ -1240,3 +1240,101 @@ D:\clashtui\
 #### Service Registration
 
 The script registers Windows Services via clashtui's own `clashtui service install` subcommand, which uses the `windows-service` crate to call the SCM API — no external tools required.
+
+## Linux Platform Support for `openrc` Service Controller
+
+### Overview
+
+ClashTui defaults to `systemd` as the service manager on Linux. Support for `openrc` is added for Linux distributions running OpenRC (e.g. Gentoo, Alpine).
+
+### Configuration Field
+
+The `service_controller` field is added to `core_service` sections in `config.yaml`:
+
+```yaml
+core_service:
+  service_name: clashtui_mihomo
+  is_user: false
+  service_controller: openrc   # Optional: systemd (default) / openrc
+```
+
+- `"systemd"` or absent → uses systemd
+- `"openrc"` → uses OpenRC (`rc-service`/`rc-update`)
+- Non-Linux platforms ignore this field, using platform default
+
+### Runtime Behavior
+
+| Operation    | systemd Command                    | OpenRC Command                    |
+|-------------|------------------------------------|----------------------------------|
+| Start        | `systemctl start <name>`           | `rc-service <name> start`        |
+| Stop         | `systemctl stop <name>`            | `rc-service <name> stop`         |
+| Restart      | `systemctl restart <name>`         | `rc-service <name> restart`      |
+| Reload       | `systemctl reload <name>`          | `rc-service <name> restart`      |
+| Status       | `systemctl is-active <name>`       | `rc-service <name> status`       |
+
+`is_user` determines sudo/--user prefix:
+
+- `is_user: false`: `sudo rc-service <name> <op>` (system mode)
+- `is_user: true`: `rc-service --user <name> <op>` (user mode)
+- OpenRC has supported user services since v0.60; scripts go in `/etc/user/init.d/`; requires `XDG_RUNTIME_DIR` to be set
+
+### Install Script (`installs/install`)
+
+The `install` script accepts a `--service-controller` argument:
+
+```bash
+# Default: systemd
+./install --core all
+
+# OpenRC (system mode)
+./install --service-controller openrc --core all
+
+# OpenRC (user mode)
+./install --service-controller openrc --is-user --core all
+```
+
+When `--service-controller openrc`:
+- System mode: generates OpenRC init scripts in `/etc/init.d/`, uses `command_user` for the service user
+- User mode: generates OpenRC init scripts in `/etc/user/init.d/` (requires sudo to write), no `command_user` (runs as current user)
+- `config.yaml` is written with `service_controller: openrc` and the corresponding `is_user` value
+- Uses `supervise-daemon` to manage foreground processes
+
+Generated OpenRC init script — system mode (mihomo):
+
+```sh
+#!/sbin/openrc-run
+
+supervisor="supervise-daemon"
+name="clashtui_mihomo"
+description="mihomo Daemon, Another Clash Kernel."
+command="/opt/clashtui/mihomo/mihomo"
+command_args="-d /opt/clashtui/mihomo/config"
+command_user="mihomo:mihomo"
+pidfile="/run/${RC_SVCNAME}.pid"
+
+depend() {
+    need net
+}
+```
+
+Generated OpenRC init script — user mode (mihomo):
+
+```sh
+#!/sbin/openrc-run
+
+supervisor="supervise-daemon"
+name="clashtui_mihomo"
+description="mihomo Daemon, Another Clash Kernel."
+command="/home/<user>/.local/clashtui/mihomo/mihomo"
+command_args="-d /home/<user>/.local/clashtui/mihomo/config"
+
+depend() {
+    need net
+}
+```
+
+### Uninstall (`--uninstall`)
+
+`install --uninstall` correctly handles openrc mode:
+- System mode: runs `sudo rc-update del`, `sudo rc-service stop`, removes scripts from `/etc/init.d/`
+- User mode: runs `rc-update --user del`, `rc-service --user stop`, removes scripts from `/etc/user/init.d/`

@@ -150,8 +150,14 @@ pub fn is_core_service_running() -> Option<bool> {
     }
 
     if matches!(host, ServiceController::OpenRc) {
+        let mut args = vec![];
+        if is_user {
+            args.push("--user");
+        }
+        args.push(service_name.as_str());
+        args.push("status");
         return std::process::Command::new(host.bin_name())
-            .args([service_name.as_str(), "status"])
+            .args(&args)
             .output()
             .map(|o| Some(String::from_utf8_lossy(&o.stdout).contains("started")))
             .unwrap_or(None);

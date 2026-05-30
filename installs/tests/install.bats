@@ -294,7 +294,7 @@ teardown() {
   [[ "$output" == *"SYSTEMD_RELOAD=NOT_SET"* ]]
 }
 
-@test "resolve_paths with SERVICE_CONTROLLER=openrc and IS_USER=true forces IS_USER=false" {
+@test "resolve_paths with SERVICE_CONTROLLER=openrc and IS_USER=true keeps IS_USER=true" {
   run bash -c "
     source '${PROJECT_ROOT}/installs/install'
     SERVICE_CONTROLLER=openrc
@@ -304,8 +304,8 @@ teardown() {
     echo \"SERVICE_IS_USER=\$SERVICE_IS_USER\"
   "
   [ "$status" -eq 0 ]
-  [[ "$output" == *"IS_USER=false"* ]]
-  [[ "$output" == *"SERVICE_IS_USER=false"* ]]
+  [[ "$output" == *"IS_USER=true"* ]]
+  [[ "$output" == *"SERVICE_IS_USER=true"* ]]
 }
 
 # ---------------------------------------------------------------------------
@@ -334,7 +334,7 @@ teardown() {
   [[ "$output" != *"/usr/lib/systemd/system"* ]]
 }
 
-@test "install --is-test --service-controller openrc --is-user ignores --is-user" {
+@test "install --is-test --service-controller openrc --is-user works in user mode" {
   run bash "${PROJECT_ROOT}/installs/install" \
     --is-test \
     --service-controller openrc \
@@ -345,13 +345,12 @@ teardown() {
 
   [ "$status" -eq 0 ]
 
-  # Should warn about ignoring --is-user
-  [[ "$output" == *"OpenRC does not support user services"* ]]
+  # Should NOT warn about ignoring --is-user (OpenRC supports user services)
+  [[ "$output" != *"does not support user services"* ]]
 
   local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
   if [ -n "$test_dir" ]; then
-    # Should use system install path (opt/clashtui), not user path
-    [ -d "$test_dir/opt/clashtui" ]
+    [ -d "$test_dir/config/clashtui" ]
   fi
 }
 

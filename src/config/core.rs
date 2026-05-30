@@ -210,6 +210,9 @@ impl ServiceController {
         match self {
             ServiceController::Systemd if is_user => vec!["--user", work_type, service_name],
             ServiceController::Systemd => vec![work_type, service_name],
+            ServiceController::OpenRc if is_user => {
+                vec!["--user", service_name, work_type]
+            }
             ServiceController::OpenRc => vec![service_name, work_type],
             ServiceController::Nssm => vec![work_type, service_name],
             // Launchd args are constructed inline in svc_operation
@@ -414,7 +417,7 @@ open_dir_cmd: ""
     #[test]
     fn service_controller_args_openrc_user() {
         let args = ServiceController::OpenRc.args("restart", "svc", true);
-        assert_eq!(args, vec!["svc", "restart"]);
+        assert_eq!(args, vec!["--user", "svc", "restart"]);
     }
 
     #[test]
@@ -529,7 +532,7 @@ open_dir_cmd: ""
         assert_eq!(ctrl.args("stop", "clashtui_test", false), vec!["clashtui_test", "stop"]);
         assert_eq!(
             ctrl.args("restart", "clashtui_test", true),
-            vec!["clashtui_test", "restart"]
+            vec!["--user", "clashtui_test", "restart"]
         );
     }
 }

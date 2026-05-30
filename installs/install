@@ -46,11 +46,6 @@ backup_file() {
 resolve_paths() {
   detect_is_macos
 
-  if [ "$SERVICE_CONTROLLER" = "openrc" ] && $IS_USER; then
-    log_warn "OpenRC does not support user services; ignoring --is-user flag"
-    IS_USER=false
-  fi
-
   if $IS_USER; then
     INSTALL_DIR="$HOME/.local/clashtui"
     INSTALL_DIR_MIHOMO="$INSTALL_DIR/mihomo"
@@ -65,6 +60,11 @@ resolve_paths() {
       SERVICE_UNLOAD_CMD="launchctl unload"
       SERVICE_ENABLE_CMD="launchctl load -w"
       LAUNCHD_DOMAIN="gui/\$(id -u)"
+    elif [ "$SERVICE_CONTROLLER" = "openrc" ]; then
+      UNIT_DIR="/etc/user/init.d"
+      SERVICE_LOAD_CMD=""
+      SERVICE_UNLOAD_CMD=""
+      SERVICE_ENABLE_CMD="rc-update --user add"
     else
       SYSTEMCTL_FLAGS="--user"
       UNIT_DIR="$HOME/.config/systemd/user"
@@ -539,8 +539,14 @@ name="${service_name}"
 description="mihomo Daemon, Another Clash Kernel."
 command="${INSTALL_DIR_MIHOMO}/mihomo"
 command_args="-d ${MIHOMO_CONFIG_DIR}"
+EOF
+    if ! $IS_USER; then
+      $SUDO tee -a "$init_path" >/dev/null <<EOF
 command_user="mihomo:mihomo"
 pidfile="/run/\${RC_SVCNAME}.pid"
+EOF
+    fi
+    $SUDO tee -a "$init_path" >/dev/null <<EOF
 
 depend() {
     need net
@@ -664,16 +670,28 @@ EOF
     # ── Linux: OpenRC init script ──
     log_info "Creating sing-box OpenRC init script..."
     local init_path="$UNIT_DIR/${service_name}"
+    local singbox_cmd
+    if $IS_USER; then
+      singbox_cmd="${INSTALL_DIR_SINGBOX}/sing-box"
+    else
+      singbox_cmd="/usr/bin/sing-box"
+    fi
     $SUDO tee "$init_path" >/dev/null <<EOF
 #!/sbin/openrc-run
 
 supervisor="supervise-daemon"
 name="${service_name}"
 description="sing-box Daemon, The universal proxy platform."
-command="/usr/bin/sing-box"
+command="${singbox_cmd}"
 command_args="-D ${SINGBOX_CONFIG_DIR} -c ${SINGBOX_CONFIG_DIR}/config.json run"
+EOF
+    if ! $IS_USER; then
+      $SUDO tee -a "$init_path" >/dev/null <<EOF
 command_user="sing-box:sing-box"
 pidfile="/run/\${RC_SVCNAME}.pid"
+EOF
+    fi
+    $SUDO tee -a "$init_path" >/dev/null <<EOF
 
 depend() {
     need net
@@ -1033,9 +1051,18 @@ uninstall() {
       rm -f "$UNIT_DIR/clashtui_mihomo.plist"
       rm -f "$UNIT_DIR/clashtui_singbox.plist"
     else
-      rm -f "$UNIT_DIR/clashtui_mihomo.service"
-      rm -f "$UNIT_DIR/clashtui_singbox.service"
-      systemctl --user daemon-reload
+      if [ "$SERVICE_CONTROLLER" = "openrc" ]; then
+        rc-service --user clashtui_mihomo stop 2>/dev/null
+        rc-service --user clashtui_singbox stop 2>/dev/null
+        rc-update --user del clashtui_mihomo default 2>/dev/null
+        rc-update --user del clashtui_singbox default 2>/dev/null
+        sudo rm -f "$UNIT_DIR/clashtui_mihomo"
+        sudo rm -f "$UNIT_DIR/clashtui_singbox"
+      else
+        rm -f "$UNIT_DIR/clashtui_mihomo.service"
+        rm -f "$UNIT_DIR/clashtui_singbox.service"
+        systemctl --user daemon-reload
+      fi
     fi
     rm -rf "$INSTALL_DIR"
   else
@@ -1094,14 +1121,15 @@ show_help() {
   if $IS_MACOS; then
     echo "  - Uses user-scoped launchd plists (~/Library/LaunchAgents)"
   else
-    echo "  - Uses user-scoped systemd units (systemctl --user)"
+    echo "  - Uses user-scoped units (systemctl --user or /etc/user/init.d for openrc)"
   fi
   echo "  - Uses no-TUN core configs (TUN requires root capabilities)"
   echo "  - Skips creating system users/groups"
   echo
   echo "When --service-controller openrc is set on Linux:"
-  echo "  - Creates OpenRC init scripts in /etc/init.d/"
-  echo "  - --is-user is ignored (OpenRC does not support user services)"
+  echo "  - System mode: creates OpenRC init scripts in /etc/init.d/"
+  echo "  - User mode:   creates OpenRC init scripts in /etc/user/init.d/"
+  echo "  - User mode requires XDG_RUNTIME_DIR (e.g. via elogind or shell rc)"
   echo
   echo "If no options are provided, the script will install clashtui with all cores"
   if $IS_MACOS; then
@@ -1241,11 +1269,21 @@ main() {
       log_info "  Stop + disable:    launchctl unload ~/Library/LaunchAgents/clashtui_mihomo.plist"
       log_warn "Services will stop when you log out. To keep them running, keep the session active."
     else
-      log_info "User mode: unit files created in ~/.config/systemd/user/"
-      log_info "Services are NOT started automatically. Use these commands:"
-      log_info "  Start now:         systemctl --user start clashtui_mihomo"
-      log_info "  Start + autostart: systemctl --user enable --now clashtui_mihomo"
-      log_warn "To keep services running after logout, run: loginctl enable-linger"
+      if [ "$SERVICE_CONTROLLER" = "openrc" ]; then
+        log_info "User mode (OpenRC): init scripts created in /etc/user/init.d/"
+        log_info "Services are NOT started automatically. Use these commands:"
+        log_info "  Start now:         rc-service --user clashtui_mihomo start"
+        log_info "  Start + autostart: rc-update --user add clashtui_mihomo default && rc-service --user clashtui_mihomo start"
+        log_info "  Stop:              rc-service --user clashtui_mihomo stop"
+        log_info "  Disable autostart: rc-update --user del clashtui_mihomo default"
+        log_warn "OpenRC user services require XDG_RUNTIME_DIR to be set (e.g. via elogind or shell rc)"
+      else
+        log_info "User mode: unit files created in ~/.config/systemd/user/"
+        log_info "Services are NOT started automatically. Use these commands:"
+        log_info "  Start now:         systemctl --user start clashtui_mihomo"
+        log_info "  Start + autostart: systemctl --user enable --now clashtui_mihomo"
+        log_warn "To keep services running after logout, run: loginctl enable-linger"
+      fi
     fi
   else
     if $IS_MACOS; then

@@ -1128,3 +1128,102 @@ CoreSrvCtl tab 的操作列表:
 ### Windows 文件路径的格式
 
 统一使用 `D:/Foo/Bar` 的格式, 而不使用 `D:\\Foo\\Bar` 的形式 (觉得不好看, 和不方便处理)。
+
+## Linux 平台支持 `openrc` service controller
+
+### 概述
+
+ClashTui 在 Linux 平台上默认使用 `systemd` 作为服务管理器。为了支持运行 OpenRC 的 Linux 发行版 (如 Gentoo, Alpine), 需要支持 `openrc` service controller。
+
+### 配置字段
+
+在 `config.yaml` 的 `core_service` 段中, 新增 `service_controller` 字段:
+
+```yaml
+core_service:
+  service_name: clashtui_mihomo
+  is_user: false
+  service_controller: openrc   # 可选: systemd (默认) / openrc
+```
+
+- 当值为 `"systemd"` 或不填时, 使用 systemd
+- 当值为 `"openrc"` 时, 使用 OpenRC (`rc-service`/`rc-update`)
+- 非 Linux 平台忽略此字段, 使用平台默认值
+
+### 运行时行为
+
+| 操作         | systemd 命令                          | OpenRC 命令                        |
+|-------------|---------------------------------------|------------------------------------|
+| 启动服务      | `systemctl start <name>`              | `rc-service <name> start`          |
+| 停止服务      | `systemctl stop <name>`               | `rc-service <name> stop`           |
+| 重启服务      | `systemctl restart <name>`            | `rc-service <name> restart`        |
+| 重载         | `systemctl reload <name>`             | `rc-service <name> restart`        |
+| 查询状态      | `systemctl is-active <name>`          | `rc-service <name> status`         |
+
+通过 config 内的 `is_user` 参数判断是否使用 `--user` 或 `sudo` 前缀:
+
+- `is_user: false`: 使用 `sudo rc-service <name> <op>` (system 模式)
+- `is_user: true`: 使用 `rc-service --user <name> <op>` (user 模式)
+- OpenRC 从 v0.60 起支持 user service, 脚本放在 `/etc/user/init.d/`, 需要 `XDG_RUNTIME_DIR` 已设置
+
+### install 脚本 (installs/install)
+
+`install` 脚本新增 `--service-controller` 参数:
+
+```bash
+# 默认 systemd
+./install --core all
+
+# 使用 OpenRC (system 模式)
+./install --service-controller openrc --core all
+
+# 使用 OpenRC (user 模式)
+./install --service-controller openrc --is-user --core all
+```
+
+当 `--service-controller openrc` 时:
+- System 模式: 在 `/etc/init.d/` 下生成 OpenRC init 脚本, 使用 `command_user` 指定运行用户
+- User 模式: 在 `/etc/user/init.d/` 下生成 OpenRC init 脚本 (需要 sudo 写入), 不使用 `command_user` (以当前用户运行)
+- config.yaml 中写入 `service_controller: openrc` 和相应的 `is_user` 值
+- init 脚本使用 `supervise-daemon` 管理前台进程
+
+生成的 OpenRC init 脚本示例 — system 模式 (mihomo):
+
+```sh
+#!/sbin/openrc-run
+
+supervisor="supervise-daemon"
+name="clashtui_mihomo"
+description="mihomo Daemon, Another Clash Kernel."
+command="/opt/clashtui/mihomo/mihomo"
+command_args="-d /opt/clashtui/mihomo/config"
+command_user="mihomo:mihomo"
+pidfile="/run/${RC_SVCNAME}.pid"
+
+depend() {
+    need net
+}
+```
+
+生成的 OpenRC init 脚本示例 — user 模式 (mihomo):
+
+```sh
+#!/sbin/openrc-run
+
+supervisor="supervise-daemon"
+name="clashtui_mihomo"
+description="mihomo Daemon, Another Clash Kernel."
+command="/home/<user>/.local/clashtui/mihomo/mihomo"
+command_args="-d /home/<user>/.local/clashtui/mihomo/config"
+
+depend() {
+    need net
+}
+```
+
+### 卸载 (--uninstall)
+
+`install --uninstall` 能正确识别 openrc 模式:
+- System 模式: 执行 `sudo rc-update del` 和 `sudo rc-service stop`, 删除 `/etc/init.d/` 下的脚本
+- User 模式: 执行 `rc-update --user del` 和 `rc-service --user stop`, 删除 `/etc/user/init.d/` 下的脚本
+
