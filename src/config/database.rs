@@ -178,7 +178,11 @@ impl<'de> serde::Deserialize<'de> for ProfileData {
                 .get(&serde_yml::Value::String("update_with_proxy".into()))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
-            Ok(ProfileData { dtype, no_pp, update_with_proxy })
+            Ok(ProfileData {
+                dtype,
+                no_pp,
+                update_with_proxy,
+            })
         } else {
             let dtype = serde_yml::from_value(value).map_err(serde::de::Error::custom)?;
             Ok(ProfileData {
@@ -463,7 +467,10 @@ singbox:
   profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().update_with_proxy, false);
+        assert_eq!(
+            db.mihomo.profiles.get("pf1").unwrap().update_with_proxy,
+            false
+        );
     }
 
     #[test]

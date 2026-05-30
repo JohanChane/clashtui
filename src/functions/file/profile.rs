@@ -56,7 +56,10 @@ pub mod db {
     }
     pub fn toggle_update_with_proxy(name: impl AsRef<str>) -> anyhow::Result<bool> {
         let mut pm = pm!();
-        let current = pm.get(name.as_ref()).map(|pf| pf.update_with_proxy).unwrap_or(false);
+        let current = pm
+            .get(name.as_ref())
+            .map(|pf| pf.update_with_proxy)
+            .unwrap_or(false);
         let new = !current;
         pm.set_update_with_proxy(name.as_ref(), new);
         pm.to_file()?;

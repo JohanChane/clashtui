@@ -19,7 +19,6 @@ pub struct TrafficInfo {
     pub expire: u64,
 }
 
-
 static TRAFFIC_CACHE: std::sync::LazyLock<Mutex<HashMap<String, TrafficInfo>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
 
@@ -149,11 +148,7 @@ mod_agent!(
             Key::Action(Action::ToggleUpdateWithProxy),
             "Toggle update with proxy"
         ),
-        (
-            key("n"),
-            Key::Action(Action::Traffic),
-            "Show traffic"
-        ),
+        (key("n"), Key::Action(Action::Traffic), "Show traffic"),
     ]
 );
 
@@ -676,7 +671,9 @@ mod actions {
     }
 
     async fn update(name: String) -> CB {
-        let with_proxy = db::get(&name).map(|pf| pf.update_with_proxy).unwrap_or(false);
+        let with_proxy = db::get(&name)
+            .map(|pf| pf.update_with_proxy)
+            .unwrap_or(false);
         // Fetch traffic info before updating
         if let Some(pf) = db::get(&name) {
             if let crate::config::database::ProfileType::Url(ref url) = pf.dtype {
@@ -710,7 +707,9 @@ mod actions {
     pub(super) async fn update_all(names: Vec<String>) -> CB {
         let mut results = Vec::with_capacity(names.len());
         for name in &names {
-            let with_proxy = db::get(name).map(|pf| pf.update_with_proxy).unwrap_or(false);
+            let with_proxy = db::get(name)
+                .map(|pf| pf.update_with_proxy)
+                .unwrap_or(false);
             let result = update_profile(db::get(name).unwrap(), with_proxy).await;
             results.push((name.clone(), result));
         }
@@ -768,8 +767,8 @@ mod actions {
                     cache.get(url).cloned()
                 };
                 if let Some(info) = cached {
-                    let domain = crate::functions::file::profile::extract_domain(url)
-                        .unwrap_or(url);
+                    let domain =
+                        crate::functions::file::profile::extract_domain(url).unwrap_or(url);
                     let used = info.upload + info.download;
                     let total_str = if info.total == 0 {
                         "unlimited".to_owned()
@@ -781,11 +780,7 @@ mod actions {
                         )
                     };
                     lines.push(format!("[{name}] {domain}"));
-                    lines.push(format!(
-                        "  [Used: {} / {}]",
-                        human_bytes(used),
-                        total_str
-                    ));
+                    lines.push(format!("  [Used: {} / {}]", human_bytes(used), total_str));
                 } else {
                     urls_to_fetch.push((name.clone(), url.clone()));
                 }
@@ -861,8 +856,8 @@ mod actions {
                     let mut cache = TRAFFIC_CACHE.lock().unwrap();
                     cache.insert(entry_url.clone(), info.clone());
                 }
-                let domain =
-                    crate::functions::file::profile::extract_domain(&entry_url).unwrap_or(&entry_url);
+                let domain = crate::functions::file::profile::extract_domain(&entry_url)
+                    .unwrap_or(&entry_url);
                 let used = info.upload + info.download;
                 let total_str = if info.total == 0 {
                     "unlimited".to_owned()
@@ -877,11 +872,7 @@ mod actions {
                     lines.push(String::new());
                 }
                 lines.push(format!("[{entry_name}] {domain}"));
-                lines.push(format!(
-                    "  [Used: {} / {}]",
-                    human_bytes(used),
-                    total_str
-                ));
+                lines.push(format!("  [Used: {} / {}]", human_bytes(used), total_str));
             }
         }
 
@@ -1187,11 +1178,7 @@ mod tests {
                 )
             };
             lines.push(format!("[{name}] example.com"));
-            lines.push(format!(
-                "  [Used: {} / {}]",
-                human_bytes(used),
-                total_str
-            ));
+            lines.push(format!("  [Used: {} / {}]", human_bytes(used), total_str));
         }
 
         let result = lines.join("\n");
@@ -1212,7 +1199,10 @@ mod tests {
 
         // Simulate proxy-provider traffic
         let pp_headers = [
-            ("hajimi", "upload=100000000; download=200000000; total=5368709120"),
+            (
+                "hajimi",
+                "upload=100000000; download=200000000; total=5368709120",
+            ),
             ("mojie", "upload=50000000; download=0; total=0"),
         ];
 
@@ -1247,11 +1237,7 @@ mod tests {
             };
             lines.push(String::new());
             lines.push(format!("[{name}] pp.example.com"));
-            lines.push(format!(
-                "  [Used: {} / {}]",
-                human_bytes(used),
-                total_str
-            ));
+            lines.push(format!("  [Used: {} / {}]", human_bytes(used), total_str));
         }
 
         let result = lines.join("\n");
