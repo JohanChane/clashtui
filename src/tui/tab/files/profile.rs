@@ -19,13 +19,6 @@ pub struct TrafficInfo {
     pub expire: u64,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
-pub enum TrafficDisplayMode {
-    #[default]
-    Off,
-    Text,
-    Gauge,
-}
 
 static TRAFFIC_CACHE: std::sync::LazyLock<Mutex<HashMap<String, TrafficInfo>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -158,13 +151,8 @@ mod_agent!(
         ),
         (
             key("n"),
-            Key::Action(Action::TrafficNext),
-            "Traffic display next"
-        ),
-        (
-            key("N"),
-            Key::Action(Action::TrafficPrev),
-            "Traffic display prev"
+            Key::Action(Action::Traffic),
+            "Show traffic"
         ),
     ]
 );
@@ -249,8 +237,7 @@ impl<'de> serde::Deserialize<'de> for Key {
                         "GoEnd" => Ok(Key::Action(Action::GoEnd)),
                         "ToggleNoPp" => Ok(Key::Action(Action::ToggleNoPp)),
                         "ToggleUpdateWithProxy" => Ok(Key::Action(Action::ToggleUpdateWithProxy)),
-                        "TrafficNext" => Ok(Key::Action(Action::TrafficNext)),
-                        "TrafficPrev" => Ok(Key::Action(Action::TrafficPrev)),
+                        "Traffic" => Ok(Key::Action(Action::Traffic)),
                         s => Err(de::Error::unknown_variant(
                             s,
                             &[
@@ -270,8 +257,7 @@ impl<'de> serde::Deserialize<'de> for Key {
                                 "GoEnd",
                                 "ToggleNoPp",
                                 "ToggleUpdateWithProxy",
-                                "TrafficNext",
-                                "TrafficPrev",
+                                "Traffic",
                             ],
                         )),
                     }
@@ -303,8 +289,7 @@ pub enum Action {
     GoEnd,
     ToggleNoPp,
     ToggleUpdateWithProxy,
-    TrafficNext,
-    TrafficPrev,
+    Traffic,
 }
 
 impl TryFrom<&crate::tui::Key> for Key {
@@ -336,7 +321,6 @@ pub struct Profile {
     filter: Option<String>,
     updating: HashSet<String>,
     jump_target: Cell<Option<usize>>,
-    traffic_display_mode: TrafficDisplayMode,
 }
 
 impl BasicTabContent for Profile {
@@ -381,19 +365,9 @@ impl DualTabContent for Profile {
             Key::Action(action) => match action {
                 Action::GoTop => state.select_first(),
                 Action::GoEnd => state.select_last(),
-                Action::TrafficNext => {
-                    self.traffic_display_mode = match self.traffic_display_mode {
-                        TrafficDisplayMode::Off => TrafficDisplayMode::Text,
-                        TrafficDisplayMode::Text => TrafficDisplayMode::Gauge,
-                        TrafficDisplayMode::Gauge => TrafficDisplayMode::Off,
-                    };
-                }
-                Action::TrafficPrev => {
-                    self.traffic_display_mode = match self.traffic_display_mode {
-                        TrafficDisplayMode::Off => TrafficDisplayMode::Gauge,
-                        TrafficDisplayMode::Text => TrafficDisplayMode::Off,
-                        TrafficDisplayMode::Gauge => TrafficDisplayMode::Text,
-                    };
+                Action::Traffic => {
+                    let name = get_name!(self, state);
+                    actions::show_traffic(name).spawn_at(task_set);
                 }
                 Action::FzfFind => {
                     let items = self.items.clone();
@@ -483,51 +457,6 @@ impl DualTabContent for Profile {
                 spans.push(Span::raw(" "));
                 spans.push(Span::raw(extra.as_str()).style(section.muted));
 
-                // Traffic info
-                if self.traffic_display_mode != TrafficDisplayMode::Off {
-                    let cache = TRAFFIC_CACHE.lock().unwrap();
-                    // Look up traffic by profile name from its URL
-                    if let Some(pf) = crate::config::CONFIG
-                        .data
-                        .lock()
-                        .unwrap()
-                        .get(value.as_str())
-                    {
-                        if let crate::config::database::ProfileType::Url(ref url) = pf.dtype {
-                            if let Some(info) = cache.get(url) {
-                                let used = info.upload + info.download;
-                                match self.traffic_display_mode {
-                                    TrafficDisplayMode::Text => {
-                                        let total_str = if info.total == 0 {
-                                            "unlimited".to_owned()
-                                        } else {
-                                            format!(
-                                                "{} ({:.0}%)",
-                                                human_bytes(info.total),
-                                                traffic_percentage(used, info.total)
-                                            )
-                                        };
-                                        spans.push(Span::raw(format!(
-                                            " [Used: {} / {}]",
-                                            human_bytes(used),
-                                            total_str
-                                        )));
-                                    }
-                                    TrafficDisplayMode::Gauge => {
-                                        let pct = traffic_percentage(used, info.total) as usize;
-                                        let filled = pct / 5;
-                                        let bar: String = (0..20)
-                                            .map(|i| if i < filled { '=' } else { ' ' })
-                                            .collect();
-                                        spans.push(Span::raw(format!(" [{bar}] {pct}%")));
-                                    }
-                                    TrafficDisplayMode::Off => {}
-                                }
-                            }
-                        }
-                    }
-                }
-
                 ListItem::new(Line::from(spans))
             });
         let widget = List::from_iter(iter)
@@ -558,8 +487,8 @@ mod actions {
                 Self::CopyUrl => copy_url(name).await,
                 Self::ToggleNoPp => toggle_no_pp(name).await,
                 Self::ToggleUpdateWithProxy => toggle_update_with_proxy(name).await,
-                Self::TrafficNext | Self::TrafficPrev => {
-                    unreachable!("traffic toggle handled in handle_key_event directly")
+                Self::Traffic => {
+                    unreachable!("traffic handled in handle_key_event directly")
                 }
                 Self::FzfFind => unreachable!("FzfFind handled directly"),
                 Self::GoTop | Self::GoEnd => do_nothing(),
@@ -822,6 +751,151 @@ mod actions {
         })
     }
 
+    pub(super) async fn show_traffic(name: String) -> CB {
+        use crate::config::database::ProfileType;
+        use crate::functions::file::net_resource::{ExtractNetResources, ResourceSection};
+
+        let pf = db::get(&name);
+        let with_proxy = pf.as_ref().map(|p| p.update_with_proxy).unwrap_or(false);
+
+        let mut lines = Vec::new();
+        let mut urls_to_fetch: Vec<(String, String)> = Vec::new();
+
+        if let Some(ref p) = pf {
+            if let ProfileType::Url(ref url) = p.dtype {
+                let cached = {
+                    let cache = TRAFFIC_CACHE.lock().unwrap();
+                    cache.get(url).cloned()
+                };
+                if let Some(info) = cached {
+                    let domain = crate::functions::file::profile::extract_domain(url)
+                        .unwrap_or(url);
+                    let used = info.upload + info.download;
+                    let total_str = if info.total == 0 {
+                        "unlimited".to_owned()
+                    } else {
+                        format!(
+                            "{} ({:.0}%)",
+                            human_bytes(info.total),
+                            traffic_percentage(used, info.total)
+                        )
+                    };
+                    lines.push(format!("[{name}] {domain}"));
+                    lines.push(format!(
+                        "  [Used: {} / {}]",
+                        human_bytes(used),
+                        total_str
+                    ));
+                } else {
+                    urls_to_fetch.push((name.clone(), url.clone()));
+                }
+            }
+        }
+
+        let mut pp_urls: Vec<(String, String)> = Vec::new();
+
+        if let Ok(groups) = crate::functions::file::template::read_profile_ppg(&name) {
+            for providers in groups.values() {
+                for (pp_name, pp_url) in providers {
+                    if !pp_urls.iter().any(|(_, u)| u == pp_url) {
+                        pp_urls.push((pp_name.clone(), pp_url.clone()));
+                    }
+                }
+            }
+        }
+
+        let profile_yaml_path =
+            crate::functions::file::PROFILE_YAMLS_PATH.join(format!("{name}.yaml"));
+        if let Ok(content) = std::fs::read_to_string(&profile_yaml_path) {
+            if let Ok(mapping) = serde_yml::from_str::<serde_yml::Mapping>(&content) {
+                for resource in mapping.extract(&[ResourceSection::ProxyProvider]) {
+                    if !pp_urls.iter().any(|(_, u)| u == &resource.url) {
+                        pp_urls.push((resource.name.clone(), resource.url.clone()));
+                    }
+                }
+            }
+        }
+
+        let profile_json_path =
+            crate::functions::file::PROFILE_JSONS_PATH.join(format!("{name}.json"));
+        if let Ok(content) = std::fs::read_to_string(&profile_json_path) {
+            if let Ok(mapping) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(pp_map) = mapping.get("proxy-providers") {
+                    if let Some(obj) = pp_map.as_object() {
+                        for (pp_name, pp_val) in obj {
+                            if let Some(pp_url) = pp_val.get("url").and_then(|v| v.as_str()) {
+                                let url = pp_url.to_string();
+                                if !pp_urls.iter().any(|(_, u)| u == &url) {
+                                    pp_urls.push((pp_name.clone(), url));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for (pp_name, pp_url) in &pp_urls {
+            if !urls_to_fetch.iter().any(|(_, u)| u == pp_url) {
+                urls_to_fetch.push((pp_name.clone(), pp_url.clone()));
+            }
+        }
+
+        let mut fetch_handles = Vec::with_capacity(urls_to_fetch.len());
+        for (entry_name, entry_url) in &urls_to_fetch {
+            let entry_url_c = entry_url.clone();
+            let entry_name_c = entry_name.clone();
+            let wp = with_proxy;
+            fetch_handles.push(tokio::task::spawn_blocking(move || {
+                match download::fetch_subscription_userinfo(&entry_url_c, wp) {
+                    Ok(Some(userinfo)) => Some((entry_name_c, entry_url_c, userinfo)),
+                    _ => None,
+                }
+            }));
+        }
+
+        for handle in fetch_handles {
+            if let Ok(Some((entry_name, entry_url, userinfo))) = handle.await {
+                let info = parse_traffic_info(&userinfo);
+                {
+                    let mut cache = TRAFFIC_CACHE.lock().unwrap();
+                    cache.insert(entry_url.clone(), info.clone());
+                }
+                let domain =
+                    crate::functions::file::profile::extract_domain(&entry_url).unwrap_or(&entry_url);
+                let used = info.upload + info.download;
+                let total_str = if info.total == 0 {
+                    "unlimited".to_owned()
+                } else {
+                    format!(
+                        "{} ({:.0}%)",
+                        human_bytes(info.total),
+                        traffic_percentage(used, info.total)
+                    )
+                };
+                if !lines.is_empty() {
+                    lines.push(String::new());
+                }
+                lines.push(format!("[{entry_name}] {domain}"));
+                lines.push(format!(
+                    "  [Used: {} / {}]",
+                    human_bytes(used),
+                    total_str
+                ));
+            }
+        }
+
+        if lines.is_empty() {
+            lines.push("No traffic data available.".to_owned());
+        }
+
+        Confirm::dismiss_any("Traffic".to_owned())
+            .with_prompt(lines.join("\n"))
+            .build_and_send();
+
+        do_nothing()
+    }
+
     async fn test(name: String) -> CB {
         let pf = tri!(db::get(name).unwrap().load_local_profile());
         let result = test_config(Some(&pf.path), false);
@@ -949,5 +1023,243 @@ fn display_duration(t: std::time::Duration) -> String {
     } else {
         let day = t.as_secs() / (3600 * 24);
         format!("In about {day} days")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_traffic_info_all_fields() {
+        let header = "upload=1000; download=2000; total=5000; expire=1234567890";
+        let info = parse_traffic_info(header);
+        assert_eq!(info.upload, 1000);
+        assert_eq!(info.download, 2000);
+        assert_eq!(info.total, 5000);
+        assert_eq!(info.expire, 1234567890);
+    }
+
+    #[test]
+    fn parse_traffic_info_partial_fields() {
+        let header = "upload=500; download=800";
+        let info = parse_traffic_info(header);
+        assert_eq!(info.upload, 500);
+        assert_eq!(info.download, 800);
+        assert_eq!(info.total, 0);
+        assert_eq!(info.expire, 0);
+    }
+
+    #[test]
+    fn parse_traffic_info_empty() {
+        let info = parse_traffic_info("");
+        assert_eq!(info.upload, 0);
+        assert_eq!(info.download, 0);
+        assert_eq!(info.total, 0);
+        assert_eq!(info.expire, 0);
+    }
+
+    #[test]
+    fn parse_traffic_info_with_spaces() {
+        let header = " upload = 1024 ; download = 2048 ; total = 4096 ";
+        let info = parse_traffic_info(header);
+        assert_eq!(info.upload, 1024);
+        assert_eq!(info.download, 2048);
+        assert_eq!(info.total, 4096);
+    }
+
+    #[test]
+    fn parse_traffic_info_unknown_key_ignored() {
+        let header = "upload=100; foo=bar; download=200";
+        let info = parse_traffic_info(header);
+        assert_eq!(info.upload, 100);
+        assert_eq!(info.download, 200);
+    }
+
+    #[test]
+    fn parse_traffic_info_invalid_number_defaults_zero() {
+        let header = "upload=abc; download=200";
+        let info = parse_traffic_info(header);
+        assert_eq!(info.upload, 0);
+        assert_eq!(info.download, 200);
+    }
+
+    #[test]
+    fn parse_traffic_info_missing_equals() {
+        let header = "upload=100; invalid; download=200";
+        let info = parse_traffic_info(header);
+        assert_eq!(info.upload, 100);
+        assert_eq!(info.download, 200);
+    }
+
+    #[test]
+    fn traffic_percentage_normal() {
+        // 50 used of 200 total = 25%
+        assert!((traffic_percentage(50, 200) - 25.0).abs() < 0.01);
+        // 100 used of 100 total = 100%
+        assert!((traffic_percentage(100, 100) - 100.0).abs() < 0.01);
+        // 0 used of 100 total = 0%
+        assert!((traffic_percentage(0, 100) - 0.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn traffic_percentage_zero_total() {
+        assert_eq!(traffic_percentage(100, 0), 0.0);
+        assert_eq!(traffic_percentage(0, 0), 0.0);
+    }
+
+    #[test]
+    fn traffic_percentage_capped_at_100() {
+        assert_eq!(traffic_percentage(200, 100), 100.0);
+        assert_eq!(traffic_percentage(1000, 10), 100.0);
+    }
+
+    #[test]
+    fn human_bytes_units() {
+        assert_eq!(human_bytes(0), "0 B");
+        assert_eq!(human_bytes(500), "500 B");
+        assert_eq!(human_bytes(1023), "1023 B");
+        assert_eq!(human_bytes(1024), "1.0 KB");
+        assert_eq!(human_bytes(1536), "1.5 KB");
+        assert_eq!(human_bytes(1_048_576), "1.0 MB");
+        assert_eq!(human_bytes(1_073_741_824), "1.0 GB");
+        assert_eq!(human_bytes(1_099_511_627_776), "1.0 TB");
+    }
+
+    /// Simulate the full traffic data flow without real URLs:
+    /// parse header, format output, verify the exact display string.
+    #[test]
+    fn simulated_traffic_display_url_profile() {
+        let header = "upload=123456789; download=987654321; total=5368709120";
+        let info = parse_traffic_info(header);
+        let used = info.upload + info.download;
+        // 123456789 + 987654321 = 1111111110 bytes ≈ 1.0 GB
+        // total = 5368709120 bytes = 5.0 GB
+        // percentage = 1111111110 / 5368709120 * 100 ≈ 20.7%
+        let total_str = format!(
+            "{} ({:.0}%)",
+            human_bytes(info.total),
+            traffic_percentage(used, info.total)
+        );
+        let line = format!("  [Used: {} / {}]", human_bytes(used), total_str);
+        assert!(line.contains("1.0 GB"), "expected ~1.0 GB used");
+        assert!(line.contains("5.0 GB"), "expected 5.0 GB total");
+    }
+
+    /// Simulate unlimited traffic: total = 0, expect "unlimited".
+    #[test]
+    fn simulated_traffic_display_unlimited() {
+        let header = "upload=500000; download=1500000; total=0";
+        let info = parse_traffic_info(header);
+        let used = info.upload + info.download;
+        let total_str = if info.total == 0 {
+            "unlimited".to_owned()
+        } else {
+            format!(
+                "{} ({:.0}%)",
+                human_bytes(info.total),
+                traffic_percentage(used, info.total)
+            )
+        };
+        let line = format!("  [Used: {} / {}]", human_bytes(used), total_str);
+        assert!(line.contains("unlimited"), "expected unlimited total");
+    }
+
+    /// Simulate proxy-provider traffic from subscription-userinfo header.
+    #[test]
+    fn simulated_proxy_provider_traffic() {
+        let pp_headers = [
+            ("pvd0", "upload=0; download=31457280; total=104857600"),
+            ("bak", "upload=5242880; download=0; total=0"),
+        ];
+
+        let mut lines = Vec::new();
+        for (name, header) in &pp_headers {
+            let info = parse_traffic_info(header);
+            let used = info.upload + info.download;
+            let total_str = if info.total == 0 {
+                "unlimited".to_owned()
+            } else {
+                format!(
+                    "{} ({:.0}%)",
+                    human_bytes(info.total),
+                    traffic_percentage(used, info.total)
+                )
+            };
+            lines.push(format!("[{name}] example.com"));
+            lines.push(format!(
+                "  [Used: {} / {}]",
+                human_bytes(used),
+                total_str
+            ));
+        }
+
+        let result = lines.join("\n");
+        assert!(result.contains("[pvd0]"));
+        assert!(result.contains("[bak]"));
+        assert!(result.contains("unlimited")); // total = 0 => unlimited
+        assert!(result.contains("100.0 MB")); // pvd0 total = 100 MB
+    }
+
+    /// Simulate all cached: profile traffic from cache, proxy-provider from header.
+    #[test]
+    fn simulated_full_traffic_popup() {
+        // Simulate profile traffic (from cache)
+        let pf_header = "upload=500000000; download=2500000000; total=10737418240";
+        let pf_info = parse_traffic_info(pf_header);
+        let pf_used = pf_info.upload + pf_info.download;
+        // pf_used = 3,000,000,000 ≈ 2.8 GB, total = 10 GB
+
+        // Simulate proxy-provider traffic
+        let pp_headers = [
+            ("hajimi", "upload=100000000; download=200000000; total=5368709120"),
+            ("mojie", "upload=50000000; download=0; total=0"),
+        ];
+
+        let mut lines = Vec::new();
+
+        // Profile entry
+        {
+            let total_str = format!(
+                "{} ({:.0}%)",
+                human_bytes(pf_info.total),
+                traffic_percentage(pf_used, pf_info.total)
+            );
+            lines.push("[mojie-profile] sub.example.com".to_string());
+            lines.push(format!(
+                "  [Used: {} / {}]",
+                human_bytes(pf_used),
+                total_str
+            ));
+        }
+
+        for (name, header) in &pp_headers {
+            let info = parse_traffic_info(header);
+            let used = info.upload + info.download;
+            let total_str = if info.total == 0 {
+                "unlimited".to_owned()
+            } else {
+                format!(
+                    "{} ({:.0}%)",
+                    human_bytes(info.total),
+                    traffic_percentage(used, info.total)
+                )
+            };
+            lines.push(String::new());
+            lines.push(format!("[{name}] pp.example.com"));
+            lines.push(format!(
+                "  [Used: {} / {}]",
+                human_bytes(used),
+                total_str
+            ));
+        }
+
+        let result = lines.join("\n");
+        assert!(result.contains("[mojie-profile]"));
+        assert!(result.contains("10.0 GB")); // total 10 GB
+        assert!(result.contains("[hajimi]"));
+        assert!(result.contains("5.0 GB")); // total 5 GB
+        assert!(result.contains("[mojie]"));
+        assert!(result.contains("unlimited")); // mojie PP unlimited
     }
 }
