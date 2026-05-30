@@ -357,6 +357,38 @@ open_dir_cmd: ""
     }
 
     #[test]
+    fn extra_missing_fields_deserialize_to_none() {
+        let yaml = "{}";
+        let extra: Extra = serde_yml::from_str(yaml).unwrap();
+        assert_eq!(extra.edit_cmd, None);
+        assert_eq!(extra.open_dir_cmd, None);
+    }
+
+    #[test]
+    fn extra_serde_roundtrip_with_none() {
+        let extra = Extra {
+            edit_cmd: None,
+            open_dir_cmd: None,
+        };
+        let serialized = serde_yml::to_string(&extra).unwrap();
+        let deser: Extra = serde_yml::from_str(&serialized).unwrap();
+        assert_eq!(deser.edit_cmd, None);
+        assert_eq!(deser.open_dir_cmd, None);
+    }
+
+    #[test]
+    fn extra_serde_roundtrip_with_some() {
+        let extra = Extra {
+            edit_cmd: Some(r#"notepad.exe "%s""#.into()),
+            open_dir_cmd: Some(r#"explorer "%s""#.into()),
+        };
+        let serialized = serde_yml::to_string(&extra).unwrap();
+        let deser: Extra = serde_yml::from_str(&serialized).unwrap();
+        assert_eq!(deser.edit_cmd.as_deref(), Some(r#"notepad.exe "%s""#));
+        assert_eq!(deser.open_dir_cmd.as_deref(), Some(r#"explorer "%s""#));
+    }
+
+    #[test]
     fn service_controller_bin_name() {
         assert_eq!(ServiceController::Launchd.bin_name(), "launchctl");
         assert_eq!(ServiceController::Systemd.bin_name(), "systemctl");
