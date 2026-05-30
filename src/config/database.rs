@@ -7,6 +7,7 @@ pub struct Profile {
     pub name: String,
     pub dtype: ProfileType,
     pub no_pp: bool,
+    pub update_with_proxy: bool,
 }
 
 impl Default for Profile {
@@ -15,6 +16,7 @@ impl Default for Profile {
             name: "Unknown".into(),
             dtype: ProfileType::File,
             no_pp: false,
+            update_with_proxy: false,
         }
     }
 }
@@ -24,6 +26,7 @@ impl Default for Profile {
 pub struct ProfileData {
     pub dtype: ProfileType,
     pub no_pp: bool,
+    pub update_with_proxy: bool,
 }
 
 impl ProfileData {
@@ -31,6 +34,7 @@ impl ProfileData {
         Self {
             dtype,
             no_pp: false,
+            update_with_proxy: false,
         }
     }
 }
@@ -142,9 +146,13 @@ impl serde::Serialize for ProfileData {
         serializer: S,
     ) -> std::result::Result<S::Ok, S::Error> {
         use serde::ser::SerializeMap;
-        let mut map = serializer.serialize_map(Some(2))?;
+        let fields = 2 + self.update_with_proxy as usize;
+        let mut map = serializer.serialize_map(Some(fields))?;
         map.serialize_entry("dtype", &self.dtype)?;
         map.serialize_entry("no_pp", &self.no_pp)?;
+        if self.update_with_proxy {
+            map.serialize_entry("update_with_proxy", &self.update_with_proxy)?;
+        }
         map.end()
     }
 }
@@ -166,12 +174,17 @@ impl<'de> serde::Deserialize<'de> for ProfileData {
                 .get(&serde_yml::Value::String("no_pp".into()))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
-            Ok(ProfileData { dtype, no_pp })
+            let update_with_proxy = map
+                .get(&serde_yml::Value::String("update_with_proxy".into()))
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            Ok(ProfileData { dtype, no_pp, update_with_proxy })
         } else {
             let dtype = serde_yml::from_value(value).map_err(serde::de::Error::custom)?;
             Ok(ProfileData {
                 dtype,
                 no_pp: false,
+                update_with_proxy: false,
             })
         }
     }
@@ -222,6 +235,7 @@ impl ProfileManager {
                 name: name.as_ref().to_string(),
                 dtype: data.dtype,
                 no_pp: data.no_pp,
+                update_with_proxy: data.update_with_proxy,
             })
     }
     pub fn get<S: AsRef<str>>(&self, name: S) -> Option<Profile> {
@@ -235,6 +249,7 @@ impl ProfileManager {
                 name: name.to_string(),
                 dtype: data.dtype,
                 no_pp: data.no_pp,
+                update_with_proxy: data.update_with_proxy,
             })
     }
     /// return all profile names from both sections
@@ -256,6 +271,7 @@ impl ProfileManager {
             name: name.to_string(),
             dtype: data.dtype,
             no_pp: data.no_pp,
+            update_with_proxy: data.update_with_proxy,
         });
         if from_mihomo.is_some() {
             return from_mihomo;
@@ -264,6 +280,7 @@ impl ProfileManager {
             name: name.to_string(),
             dtype: data.dtype,
             no_pp: data.no_pp,
+            update_with_proxy: data.update_with_proxy,
         })
     }
     pub fn get_current(&self) -> Option<Profile> {
@@ -295,6 +312,14 @@ impl ProfileManager {
             data.no_pp = no_pp;
         } else if let Some(data) = self.singbox.profiles.get_mut(name) {
             data.no_pp = no_pp;
+        }
+    }
+    pub fn set_update_with_proxy<S: AsRef<str>>(&mut self, name: S, val: bool) {
+        let name = name.as_ref();
+        if let Some(data) = self.mihomo.profiles.get_mut(name) {
+            data.update_with_proxy = val;
+        } else if let Some(data) = self.singbox.profiles.get_mut(name) {
+            data.update_with_proxy = val;
         }
     }
 }
@@ -423,6 +448,43 @@ singbox:
         db.set_no_pp("pf1", true);
         db.insert("pf2", ProfileType::Url("https://example.com".into()));
         db.set_no_pp("pf2", false);
+
+        let serialized = serde_yml::to_string(&db).unwrap();
+        let deser: ProfileManager = serde_yml::from_str(&serialized).unwrap();
+        assert_eq!(db, deser);
+    }
+    #[test]
+    fn backward_compat_missing_update_with_proxy_defaults_false() {
+        let yaml = r#"core_type: mihomo
+mihomo:
+  profiles:
+    pf1: {dtype: File, no_pp: true}
+singbox:
+  profiles: {}
+"#;
+        let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
+        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().update_with_proxy, false);
+    }
+
+    #[test]
+    fn set_update_with_proxy_toggles_and_persists() {
+        let mut db = ProfileManager::default();
+        db.insert("pf1", ProfileType::File);
+
+        db.set_update_with_proxy("pf1", true);
+        assert!(db.get("pf1").unwrap().update_with_proxy);
+
+        db.set_update_with_proxy("pf1", false);
+        assert!(!db.get("pf1").unwrap().update_with_proxy);
+    }
+
+    #[test]
+    fn update_with_proxy_roundtrip() {
+        let mut db = ProfileManager::default();
+        db.insert("pf1", ProfileType::File);
+        db.set_update_with_proxy("pf1", true);
+        db.insert("pf2", ProfileType::Url("https://example.com".into()));
+        db.set_update_with_proxy("pf2", false);
 
         let serialized = serde_yml::to_string(&db).unwrap();
         let deser: ProfileManager = serde_yml::from_str(&serialized).unwrap();
