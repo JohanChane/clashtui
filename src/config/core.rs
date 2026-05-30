@@ -476,7 +476,10 @@ open_dir_cmd: ""
             service_controller: None,
             ..Default::default()
         };
-        assert_eq!(ServiceController::from_config(&csc), ServiceController::default());
+        assert_eq!(
+            ServiceController::from_config(&csc),
+            ServiceController::default()
+        );
     }
 
     #[test]
@@ -485,7 +488,10 @@ open_dir_cmd: ""
             service_controller: Some("systemd".into()),
             ..Default::default()
         };
-        assert_eq!(ServiceController::from_config(&csc), ServiceController::Systemd);
+        assert_eq!(
+            ServiceController::from_config(&csc),
+            ServiceController::Systemd
+        );
     }
 
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -495,7 +501,10 @@ open_dir_cmd: ""
             service_controller: Some("openrc".into()),
             ..Default::default()
         };
-        assert_eq!(ServiceController::from_config(&csc), ServiceController::OpenRc);
+        assert_eq!(
+            ServiceController::from_config(&csc),
+            ServiceController::OpenRc
+        );
     }
 
     #[cfg(any(windows, target_os = "macos"))]
@@ -505,7 +514,10 @@ open_dir_cmd: ""
             service_controller: Some("openrc".into()),
             ..Default::default()
         };
-        assert_eq!(ServiceController::from_config(&csc), ServiceController::default());
+        assert_eq!(
+            ServiceController::from_config(&csc),
+            ServiceController::default()
+        );
     }
 
     #[test]
@@ -514,7 +526,10 @@ open_dir_cmd: ""
             service_controller: Some("runit".into()),
             ..Default::default()
         };
-        assert_eq!(ServiceController::from_config(&csc), ServiceController::default());
+        assert_eq!(
+            ServiceController::from_config(&csc),
+            ServiceController::default()
+        );
     }
 
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -528,8 +543,14 @@ open_dir_cmd: ""
         let ctrl = ServiceController::from_config(&csc);
         assert_eq!(ctrl, ServiceController::OpenRc);
         assert_eq!(ctrl.bin_name(), "rc-service");
-        assert_eq!(ctrl.args("start", "clashtui_test", false), vec!["clashtui_test", "start"]);
-        assert_eq!(ctrl.args("stop", "clashtui_test", false), vec!["clashtui_test", "stop"]);
+        assert_eq!(
+            ctrl.args("start", "clashtui_test", false),
+            vec!["clashtui_test", "start"]
+        );
+        assert_eq!(
+            ctrl.args("stop", "clashtui_test", false),
+            vec!["clashtui_test", "stop"]
+        );
         assert_eq!(
             ctrl.args("restart", "clashtui_test", true),
             vec!["--user", "clashtui_test", "restart"]
