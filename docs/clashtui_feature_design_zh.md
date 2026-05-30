@@ -1227,3 +1227,57 @@ depend() {
 - System 模式: 执行 `sudo rc-update del` 和 `sudo rc-service stop`, 删除 `/etc/init.d/` 下的脚本
 - User 模式: 执行 `rc-update --user del` 和 `rc-service --user stop`, 删除 `/etc/user/init.d/` 下的脚本
 
+## Windows cmd 字符串的生成的问题分析与解决方案 (三个主要的问题)
+
+### 1. `canonicalize()` 注入 `\\?\` 前缀
+
+`init()` 中对 `DATA_DIR` 调用了 `canonicalize()`，Windows 上会给路径加上 `\\?\` 前缀（verbatim path）。所有派生路径（`core_data_dir`、profile path 等）全部继承此前缀。explorer / cmd 不认 `\\?\` 格式。
+
+**日志证据：**
+```
+core_data_dir=\\?\C:\Users\johan\AppData\Roaming\clashtui\mihomo
+```
+
+**解决：** `canonicalize()` 后使用 [dunce](https://lib.rs/crates/dunce) 取得 app 支持的 path。
+
+References:
+-   [std::fs::canonicalize returns UNC paths on Windows, and a lot of software doesn't support UNC paths](https://github.com/rust-lang/rust/issues/42869)
+
+### 2. Rust `Command::args` 对含引号参数的二次转义
+
+模板经 `%s` 替换后拼出一个含引号的完整命令字符串（如 `start "" "C:\..."`），作为单个参数传给 `Command::args`。Rust 在构造 `CreateProcessW` 命令行时会对含引号的参数再次转义，导致 `cmd /c` 解析出的实际命令错误。
+
+**正确的参数传递方式**（arg 分开传）：
+```rust
+spawn("cmd", vec!["/c", "start", "", path])
+```
+
+**有问题的做法**（arg 内嵌引号）：
+```rust
+spawn("cmd", vec!["/c", "start \"\" \"C:\\path\""])
+```
+
+**解决方法：** 使用 `raw_arg` 绕过 Rust 的二次转义，将命令字符串原样传给 `CreateProcessW`：
+```rust
+use std::os::windows::process::CommandExt;
+let safe_path = path.replace('\\', "/");
+let replaced = template.replace("%s", &safe_path);
+Command::new("cmd")
+    .raw_arg("/c")
+    .raw_arg(replaced)   // 原样，不二次转义
+    .spawn()?;
+```
+
+**之前为什么没触发：** HEAD 版本里空字符串 fallback 用的是 arg 分开传的方式，没问题。但 `Default for Extra` 返回的非空模板走的是拼接路径，同样存在这个 bug——只是用户要么被 bug#1 挡住了，要么配了自定义命令绕过了。
+
+### 3. `explorer.exe` 退出码 1
+
+从子进程以 `explorer "path"` 形式调用 explorer.exe 返回退出码 1（失败）。Windows 上正确做法是用 `cmd /c start "" "path"`（走 ShellExecute）。
+
+### Windows 路径问题的解决方案
+
+因为只是 `%s` 替换为 path, 我觉得只需解决 path 在命令字符串中不出错即可。而且这种问题一般只会出现在 Windows, Unix Like 基本不会有这样的问题。所以 Windows path 只需要解决以下问题即可:
+-   Windows path, 在命令行字符串中时, 使用 `C:/Users/Foo` 的格式, 不要使用 `C:\\Users\\Foo`, 防止转义的问题。
+-   对于 canonicalize 的 UNC paths 问题, 只要将 path 传给 cmd 命令时, 才将 UNC paths 转换为 cmd 命令支持的 path (很多 app 不支持 UNC paths)
+-   不要以 `explorer "path"` 运行命令, 要以 `cmd /c start "" "path"` 的方式运行命令
+-   为防止 Command::args 对引号参数的二次转义, 使用 raw_arg
