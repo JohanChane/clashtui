@@ -425,8 +425,6 @@ After=network.target NetworkManager.service systemd-networkd.service iwd.service
 
 [Service]
 Type=simple
-LimitNPROC=500
-LimitNOFILE=1000000
 Restart=always
 ExecStartPre=/usr/bin/sleep 1s
 ExecStart=<HOME_REPLACE>/.local/clashtui/mihomo/mihomo -d <HOME_REPLACE>/.local/clashtui/mihomo/config

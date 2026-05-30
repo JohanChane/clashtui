@@ -569,8 +569,6 @@ After=network.target
 
 [Service]
 Type=simple
-LimitNPROC=500
-LimitNOFILE=1000000
 Restart=always
 ExecStartPre=/usr/bin/sleep 1s
 ExecStart=${INSTALL_DIR_MIHOMO}/mihomo -d ${MIHOMO_CONFIG_DIR}
