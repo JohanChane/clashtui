@@ -124,17 +124,43 @@ struct SrvCtlContent {
 
 impl SrvCtlContent {
     fn spawn_status_check(&self, task_set: &mut FutureSet<Self>, target: CoreType) {
-        let (service_name, is_user) = match target {
-            CoreType::Mihomo => (self.mihomo_service_name.clone(), self.mihomo_is_user),
-            CoreType::Singbox => (self.singbox_service_name.clone(), self.singbox_is_user),
+        let (service_name, is_user, csc) = match target {
+            CoreType::Mihomo => (
+                self.mihomo_service_name.clone(),
+                self.mihomo_is_user,
+                crate::config::CONFIG.cfg_file.mihomo.core_service.clone(),
+            ),
+            CoreType::Singbox => (
+                self.singbox_service_name.clone(),
+                self.singbox_is_user,
+                crate::config::CONFIG.cfg_file.singbox.core_service.clone(),
+            ),
         };
-        let controller = crate::config::ServiceController::default();
+        let controller = crate::config::ServiceController::from_config(&csc);
         async move {
             let status = match controller {
                 crate::config::ServiceController::Launchd => launchd_status(&service_name, is_user),
                 #[cfg(windows)]
                 crate::config::ServiceController::Nssm => {
                     crate::functions::command::nssm_status(&service_name)
+                }
+                crate::config::ServiceController::OpenRc => {
+                    let mut args = vec![service_name.as_str(), "status"];
+                    let bin = controller.bin_name();
+                    let output = std::process::Command::new(bin).args(&args).output();
+                    match output {
+                        Ok(o) => {
+                            let stdout = String::from_utf8_lossy(&o.stdout);
+                            if stdout.contains("started") {
+                                "active".to_owned()
+                            } else if stdout.contains("stopped") {
+                                "inactive".to_owned()
+                            } else {
+                                stdout.trim().to_owned()
+                            }
+                        }
+                        Err(_) => "?".to_owned(),
+                    }
                 }
                 _ => {
                     let mut args = vec!["is-active"];
@@ -159,13 +185,35 @@ impl SrvCtlContent {
     fn spawn_current_status_check(&self, task_set: &mut FutureSet<Self>) {
         let service_name = self.service_name.clone();
         let is_user = self.is_user;
-        let controller = crate::config::ServiceController::default();
+        let csc = match crate::config::CONFIG.core_type() {
+            CoreType::Mihomo => crate::config::CONFIG.cfg_file.mihomo.core_service.clone(),
+            CoreType::Singbox => crate::config::CONFIG.cfg_file.singbox.core_service.clone(),
+        };
+        let controller = crate::config::ServiceController::from_config(&csc);
         async move {
             let status = match controller {
                 crate::config::ServiceController::Launchd => launchd_status(&service_name, is_user),
                 #[cfg(windows)]
                 crate::config::ServiceController::Nssm => {
                     crate::functions::command::nssm_status(&service_name)
+                }
+                crate::config::ServiceController::OpenRc => {
+                    let mut args = vec![service_name.as_str(), "status"];
+                    let bin = controller.bin_name();
+                    let output = std::process::Command::new(bin).args(&args).output();
+                    match output {
+                        Ok(o) => {
+                            let stdout = String::from_utf8_lossy(&o.stdout);
+                            if stdout.contains("started") {
+                                "active".to_owned()
+                            } else if stdout.contains("stopped") {
+                                "inactive".to_owned()
+                            } else {
+                                stdout.trim().to_owned()
+                            }
+                        }
+                        Err(_) => "?".to_owned(),
+                    }
                 }
                 _ => {
                     let mut args = vec!["is-active"];

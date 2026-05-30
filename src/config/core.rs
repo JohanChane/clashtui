@@ -37,6 +37,10 @@ pub struct CoreServiceConfig {
     /// Controls --user flag (systemd user service) and whether sudo prefix is needed.
     /// When false, `sudo -n true` is used to detect NOPASSWD and skip password prompt.
     pub is_user: bool,
+    /// Init system controller override. Supported values: `"systemd"`, `"openrc"`.
+    /// When absent or unrecognized, the compile-time platform default is used.
+    /// Non-Linux platforms ignore this field.
+    pub service_controller: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -86,6 +90,7 @@ impl Default for ConfigFile {
                     core_service: CoreServiceConfig {
                         service_name: "clashtui_mihomo".into(),
                         is_user: false,
+                        service_controller: None,
                     },
                 },
                 singbox: SingboxSection {
@@ -97,6 +102,7 @@ impl Default for ConfigFile {
                     core_service: CoreServiceConfig {
                         service_name: "clashtui_singbox".into(),
                         is_user: false,
+                        service_controller: None,
                     },
                 },
                 timeout: Default::default(),
@@ -114,6 +120,7 @@ impl Default for ConfigFile {
                 core_service: CoreServiceConfig {
                     service_name: "clashtui_mihomo".into(),
                     is_user: false,
+                    service_controller: None,
                 },
             },
             singbox: SingboxSection {
@@ -125,6 +132,7 @@ impl Default for ConfigFile {
                 core_service: CoreServiceConfig {
                     service_name: "clashtui_singbox".into(),
                     is_user: false,
+                    service_controller: None,
                 },
             },
             timeout: Default::default(),
@@ -180,6 +188,19 @@ impl Default for ServiceController {
     }
 }
 impl ServiceController {
+    pub fn from_config(csc: &CoreServiceConfig) -> Self {
+        match csc.service_controller.as_deref() {
+            Some("systemd") => ServiceController::Systemd,
+            Some("openrc") if cfg!(not(windows)) && cfg!(not(target_os = "macos")) => {
+                ServiceController::OpenRc
+            }
+            Some(v) => {
+                log::warn!("Unknown service_controller '{v}', falling back to platform default");
+                Self::default()
+            }
+            None => Self::default(),
+        }
+    }
     pub fn args<'a>(
         &self,
         work_type: &'a str,
@@ -189,7 +210,6 @@ impl ServiceController {
         match self {
             ServiceController::Systemd if is_user => vec!["--user", work_type, service_name],
             ServiceController::Systemd => vec![work_type, service_name],
-            ServiceController::OpenRc if is_user => vec![service_name, work_type, "--user"],
             ServiceController::OpenRc => vec![service_name, work_type],
             ServiceController::Nssm => vec![work_type, service_name],
             // Launchd args are constructed inline in svc_operation
@@ -394,7 +414,7 @@ open_dir_cmd: ""
     #[test]
     fn service_controller_args_openrc_user() {
         let args = ServiceController::OpenRc.args("restart", "svc", true);
-        assert_eq!(args, vec!["svc", "restart", "--user"]);
+        assert_eq!(args, vec!["svc", "restart"]);
     }
 
     #[test]
@@ -409,5 +429,107 @@ open_dir_cmd: ""
         assert!(args.is_empty());
         let args = ServiceController::Launchd.args("restart", "svc", true);
         assert!(args.is_empty());
+    }
+
+    // --- Deserialization tests ---
+
+    #[test]
+    fn core_service_config_deser_openrc() {
+        let yaml = "service_name: svc\nis_user: false\nservice_controller: openrc";
+        let csc: CoreServiceConfig = serde_yml::from_str(yaml).unwrap();
+        assert_eq!(csc.service_name, "svc");
+        assert!(!csc.is_user);
+        assert_eq!(csc.service_controller.as_deref(), Some("openrc"));
+    }
+
+    #[test]
+    fn core_service_config_deser_absent() {
+        let yaml = "service_name: svc\nis_user: true";
+        let csc: CoreServiceConfig = serde_yml::from_str(yaml).unwrap();
+        assert_eq!(csc.service_name, "svc");
+        assert!(csc.is_user);
+        assert_eq!(csc.service_controller, None);
+    }
+
+    #[test]
+    fn core_service_config_roundtrip() {
+        let csc = CoreServiceConfig {
+            service_name: "roundtrip_svc".into(),
+            is_user: true,
+            service_controller: Some("openrc".into()),
+        };
+        let yaml = serde_yml::to_string(&csc).unwrap();
+        let deser: CoreServiceConfig = serde_yml::from_str(&yaml).unwrap();
+        assert_eq!(deser.service_name, csc.service_name);
+        assert_eq!(deser.is_user, csc.is_user);
+        assert_eq!(deser.service_controller.as_deref(), Some("openrc"));
+    }
+
+    // --- from_config tests ---
+
+    #[test]
+    fn service_controller_from_config_none_is_default() {
+        let csc = CoreServiceConfig {
+            service_controller: None,
+            ..Default::default()
+        };
+        assert_eq!(ServiceController::from_config(&csc), ServiceController::default());
+    }
+
+    #[test]
+    fn service_controller_from_config_systemd() {
+        let csc = CoreServiceConfig {
+            service_controller: Some("systemd".into()),
+            ..Default::default()
+        };
+        assert_eq!(ServiceController::from_config(&csc), ServiceController::Systemd);
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn service_controller_from_config_openrc_linux() {
+        let csc = CoreServiceConfig {
+            service_controller: Some("openrc".into()),
+            ..Default::default()
+        };
+        assert_eq!(ServiceController::from_config(&csc), ServiceController::OpenRc);
+    }
+
+    #[cfg(any(windows, target_os = "macos"))]
+    #[test]
+    fn service_controller_from_config_openrc_non_linux() {
+        let csc = CoreServiceConfig {
+            service_controller: Some("openrc".into()),
+            ..Default::default()
+        };
+        assert_eq!(ServiceController::from_config(&csc), ServiceController::default());
+    }
+
+    #[test]
+    fn service_controller_from_config_unknown_fallback() {
+        let csc = CoreServiceConfig {
+            service_controller: Some("runit".into()),
+            ..Default::default()
+        };
+        assert_eq!(ServiceController::from_config(&csc), ServiceController::default());
+    }
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    #[test]
+    fn service_controller_from_config_openrc_generates_correct_commands() {
+        let csc = CoreServiceConfig {
+            service_name: "clashtui_test".into(),
+            is_user: false,
+            service_controller: Some("openrc".into()),
+        };
+        let ctrl = ServiceController::from_config(&csc);
+        assert_eq!(ctrl, ServiceController::OpenRc);
+        assert_eq!(ctrl.bin_name(), "rc-service");
+        assert_eq!(ctrl.args("start", "clashtui_test", false), vec!["clashtui_test", "start"]);
+        assert_eq!(ctrl.args("stop", "clashtui_test", false), vec!["clashtui_test", "stop"]);
+        assert_eq!(
+            ctrl.args("restart", "clashtui_test", true),
+            vec!["clashtui_test", "restart"]
+        );
     }
 }
