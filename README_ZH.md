@@ -110,13 +110,13 @@ Get-Command mihomo sing-box clashtui
 
 ```powershell
 # 默认安装到 D:\ClashTui
-.\installs\install.ps1 --core all
+irm https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install.ps1 | iex
 
 # 安装到自定义目录 (路径不能有空格)
-.\installs\install.ps1 --core all -InstallDir "D:\MyTools\ClashTui"
+iex "& {$(irm https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install.ps1)} -Core all -InstallDir 'D:\MyTools\ClashTui'"
 
 # 只安装 mihomo core
-.\installs\install.ps1 --core mihomo
+iex "& {$(irm https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install.ps1)} -Core mihomo"
 ```
 
 3. 启动 clashtui 安装 clashtui_mihomo/clashtui_singbox 服务

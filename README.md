@@ -115,13 +115,13 @@ This step ensures mihomo, sing-box, and clashtui are in PATH so the install scri
 
 ```powershell
 # Default install to D:\ClashTui
-.\installs\install.ps1 --core all
+irm https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install.ps1 | iex
 
 # Custom directory (no spaces allowed)
-.\installs\install.ps1 --core all -InstallDir "D:\MyTools\ClashTui"
+iex "& {$(irm https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install.ps1)} -Core all -InstallDir 'D:\MyTools\ClashTui'"
 
 # Only install mihomo core
-.\installs\install.ps1 --core mihomo
+iex "& {$(irm https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install.ps1)} -Core mihomo"
 ```
 
 3. Start clashtui, then use CoreSrvCtl to install and start core services:
