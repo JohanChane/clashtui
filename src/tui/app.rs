@@ -84,6 +84,9 @@ impl App {
     }
     #[cfg(target_family = "unix")]
     fn check_startup_perms(&self) {
+        if crate::config::CONFIG.cfg_file.mihomo.core_service.is_user {
+            return;
+        }
         use std::io::Write;
 
         let dirs_to_check = [

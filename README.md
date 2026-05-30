@@ -163,6 +163,7 @@ launchctl load -w ~/Library/LaunchAgents/clashtui_singbox.plist
 | Document | Description |
 |----------|-------------|
 | [Getting Started](docs/getting_started_en.md) | Detailed usage guide: UI operations, CLI, subscription management, config reference, FAQ |
+| [Manual Installation](docs/install_manually_en.md) | Step-by-step manual installation for system/user mode |
 | [Feature Design](docs/ClashTui_feature_design_en.md) | Feature design: config structure, subscription management, Template expansion, sing-box merge algorithm |
 | [Architecture](docs/architecture_en.md) | Code architecture: module structure, startup flow, TUI event loop, Tab system |
 | [Development Conventions](docs/development_conventions.md) | Branch naming, commit format, CHANGELOG conventions |

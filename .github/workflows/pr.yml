@@ -67,23 +67,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Target
+      - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
-          path: |
-            ./target
-            ~/.cargo
-          key: ci-pr-${{ matrix.cache-suffix }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            ci-pr-${{ matrix.cache-suffix }}-${{ hashFiles('Cargo.lock') }}
-            ci-pr-${{ matrix.cache-suffix }}-
+          path: ~/.cargo
+          key: ci-${{ matrix.cache-suffix }}-${{ hashFiles('Cargo.lock') }}
 
       - name: Download Dependencies
         run: cargo fetch
 
       - name: Run tests
         if: matrix.run-test
-        run: cargo test --all --all-features --verbose
+        run: cargo test --locked --all --all-features --verbose
 
       - name: Build
         run: |

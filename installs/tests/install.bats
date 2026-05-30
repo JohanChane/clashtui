@@ -275,6 +275,121 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
+# OpenRC support tests: internal state verification
+# ---------------------------------------------------------------------------
+
+@test "resolve_paths with SERVICE_CONTROLLER=openrc sets UNIT_DIR to /etc/init.d" {
+  run bash -c "
+    source '${PROJECT_ROOT}/installs/install'
+    SERVICE_CONTROLLER=openrc
+    IS_USER=false
+    resolve_paths
+    echo \"UNIT_DIR=\$UNIT_DIR\"
+    echo \"SERVICE_IS_USER=\$SERVICE_IS_USER\"
+    echo \"SYSTEMD_RELOAD=\${SYSTEMD_RELOAD:-NOT_SET}\"
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"UNIT_DIR=/etc/init.d"* ]]
+  [[ "$output" == *"SERVICE_IS_USER=false"* ]]
+  [[ "$output" == *"SYSTEMD_RELOAD=NOT_SET"* ]]
+}
+
+@test "resolve_paths with SERVICE_CONTROLLER=openrc and IS_USER=true keeps IS_USER=true" {
+  run bash -c "
+    source '${PROJECT_ROOT}/installs/install'
+    SERVICE_CONTROLLER=openrc
+    IS_USER=true
+    resolve_paths
+    echo \"IS_USER=\$IS_USER\"
+    echo \"SERVICE_IS_USER=\$SERVICE_IS_USER\"
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"IS_USER=true"* ]]
+  [[ "$output" == *"SERVICE_IS_USER=true"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# OpenRC support tests
+# ---------------------------------------------------------------------------
+
+@test "install --is-test --service-controller openrc creates init script in /etc/init.d" {
+  run bash "${PROJECT_ROOT}/installs/install" \
+    --is-test \
+    --service-controller openrc \
+    --repo "JohanChane/clashtui" \
+    --branch "demotui" \
+    --core mihomo
+
+  [ "$status" -eq 0 ]
+
+  local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
+  if [ -n "$test_dir" ]; then
+    [ -d "$test_dir/opt/clashtui/mihomo" ]
+    [ -d "$test_dir/config/clashtui" ]
+  fi
+
+  # Should NOT contain "Creating mihomo systemd unit"
+  [[ "$output" != *"Creating mihomo systemd unit"* ]]
+  # Should NOT contain systemd paths
+  [[ "$output" != *"/usr/lib/systemd/system"* ]]
+}
+
+@test "install --is-test --service-controller openrc --is-user works in user mode" {
+  run bash "${PROJECT_ROOT}/installs/install" \
+    --is-test \
+    --service-controller openrc \
+    --is-user \
+    --repo "JohanChane/clashtui" \
+    --branch "demotui" \
+    --core mihomo
+
+  [ "$status" -eq 0 ]
+
+  # Should NOT warn about ignoring --is-user (OpenRC supports user services)
+  [[ "$output" != *"does not support user services"* ]]
+
+  local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
+  if [ -n "$test_dir" ]; then
+    [ -d "$test_dir/config/clashtui" ]
+  fi
+}
+
+@test "install --is-test --service-controller openrc config.yaml contains service_controller" {
+  run bash "${PROJECT_ROOT}/installs/install" \
+    --is-test \
+    --service-controller openrc \
+    --repo "JohanChane/clashtui" \
+    --branch "demotui" \
+    --core all
+
+  [ "$status" -eq 0 ]
+
+  local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
+  if [ -n "$test_dir" ]; then
+    local config_path="$test_dir/config/clashtui/config.yaml"
+    [ -f "$config_path" ]
+    grep -q "service_controller: openrc" "$config_path"
+  fi
+}
+
+@test "install --is-test --service-controller openrc creates init scripts for both services" {
+  run bash "${PROJECT_ROOT}/installs/install" \
+    --is-test \
+    --service-controller openrc \
+    --repo "JohanChane/clashtui" \
+    --branch "demotui" \
+    --core all
+
+  [ "$status" -eq 0 ]
+
+  # Should NOT contain any systemd-specific log messages
+  [[ "$output" != *"Creating mihomo systemd unit"* ]]
+  [[ "$output" != *"Creating sing-box systemd unit"* ]]
+  # Should use system-level paths (not user)
+  [[ "$output" != *"--user"* ]] || true
+}
+
+# ---------------------------------------------------------------------------
 # Test that sourcing does not execute main
 # ---------------------------------------------------------------------------
 

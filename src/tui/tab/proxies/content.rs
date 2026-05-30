@@ -95,10 +95,7 @@ impl Proxies {
                 }
             }
             super::Key::Parent => {
-                let info = self
-                    .tree
-                    .node_at(current)
-                    .map(|n| n.parent.clone());
+                let info = self.tree.node_at(current).map(|n| n.parent.clone());
                 if let Some(Some(ref parent)) = info {
                     if let Some(idx) = self.tree.find_folder_index(parent) {
                         state.select(Some(idx));

@@ -84,15 +84,11 @@ jobs:
       - uses: goto-bus-stop/setup-zig@v2
         if: matrix.zig-target
 
-      - name: Cache Target
+      - name: Cache Cargo registry
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cargo
-            ./target
-          key: ci-release-${{ matrix.cache-suffix }}-${{ hashFiles('Cargo.lock') }}
-          restore-keys: |
-            ci-release-${{ matrix.cache-suffix }}-
+          path: ~/.cargo
+          key: ci-${{ matrix.cache-suffix }}-${{ hashFiles('Cargo.lock') }}
 
       - name: Download Dependencies
         run: cargo fetch

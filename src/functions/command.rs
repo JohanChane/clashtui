@@ -124,18 +124,20 @@ pub fn check_config(profile_path: &Path) -> anyhow::Result<()> {
 }
 
 pub fn is_core_service_running() -> Option<bool> {
-    let host = &ServiceController::default();
     let ct = CONFIG.core_type();
-    let (service_name, is_user) = match ct {
+    let (service_name, is_user, csc) = match ct {
         CoreType::Mihomo => (
             &CONFIG.cfg_file.mihomo.core_service.service_name,
             CONFIG.cfg_file.mihomo.core_service.is_user,
+            &CONFIG.cfg_file.mihomo.core_service,
         ),
         CoreType::Singbox => (
             &CONFIG.cfg_file.singbox.core_service.service_name,
             CONFIG.cfg_file.singbox.core_service.is_user,
+            &CONFIG.cfg_file.singbox.core_service,
         ),
     };
+    let host = &ServiceController::from_config(csc);
 
     if service_name.is_empty() {
         return None;
@@ -147,7 +149,21 @@ pub fn is_core_service_running() -> Option<bool> {
         return Some(s == "active");
     }
 
-    if matches!(host, ServiceController::Systemd | ServiceController::OpenRc) {
+    if matches!(host, ServiceController::OpenRc) {
+        let mut args = vec![];
+        if is_user {
+            args.push("--user");
+        }
+        args.push(service_name.as_str());
+        args.push("status");
+        return std::process::Command::new(host.bin_name())
+            .args(&args)
+            .output()
+            .map(|o| Some(String::from_utf8_lossy(&o.stdout).contains("started")))
+            .unwrap_or(None);
+    }
+
+    if matches!(host, ServiceController::Systemd) {
         let mut args = vec!["is-active"];
         if is_user {
             args.push("--user");
@@ -174,19 +190,21 @@ pub fn is_core_service_running() -> Option<bool> {
 }
 
 fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) -> Result<String> {
-    let host = &ServiceController::default();
     let ct = core_type.unwrap_or(CONFIG.core_type());
 
-    let (service_name, is_user) = match ct {
+    let (service_name, is_user, csc) = match ct {
         CoreType::Mihomo => (
             &CONFIG.cfg_file.mihomo.core_service.service_name,
             CONFIG.cfg_file.mihomo.core_service.is_user,
+            &CONFIG.cfg_file.mihomo.core_service,
         ),
         CoreType::Singbox => (
             &CONFIG.cfg_file.singbox.core_service.service_name,
             CONFIG.cfg_file.singbox.core_service.is_user,
+            &CONFIG.cfg_file.singbox.core_service,
         ),
     };
+    let host = &ServiceController::from_config(csc);
 
     if matches!(host, ServiceController::Launchd) {
         return launchd_operation(op, service_name, is_user, password);
