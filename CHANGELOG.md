@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2-alpha.1] - 2026-05-31
+
+### Added
+- OpenRC service controller support + manual install docs (#92)
+- Traffic display in profile popup (#94)
+
+### Changed
+- Improve h/l help descriptions and simplify h behavior (#91)
+- Update issue templates
+
+### Fixed
+- Resolve three Windows cmd string generation issues and support irm|iex remote install (#96)
+
 ## [0.3.1] - 2026-05-26
 
 ### Added
@@ -309,7 +322,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Profile switching
 - Service start/stop control
 
-[Unreleased]: https://github.com/JohanChane/clashtui/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/JohanChane/clashtui/compare/v0.3.2-alpha.1...HEAD
+[0.3.2-alpha.1]: https://github.com/JohanChane/clashtui/compare/v0.3.1...v0.3.2-alpha.1
 [0.3.1]: https://github.com/JohanChane/clashtui/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/JohanChane/clashtui/compare/v0.2.3...v0.3.0
 [0.3.0-beta.2]: https://github.com/JohanChane/clashtui/compare/v0.3.0-beta.1...v0.3.0-beta.2
