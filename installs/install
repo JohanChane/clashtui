@@ -6,6 +6,7 @@ IS_TEST=false
 REPO="JohanChane/clashtui"
 BRANCH="main"
 CORE_TYPE="all"
+SERVICE_CONTROLLER="systemd"
 
 # --- Constants (canonical upstreams) ---
 MIHOMO_UPSTREAM="MetaCubeX/mihomo"
@@ -45,6 +46,11 @@ backup_file() {
 resolve_paths() {
   detect_is_macos
 
+  if [ "$SERVICE_CONTROLLER" = "openrc" ] && $IS_USER; then
+    log_warn "OpenRC does not support user services; ignoring --is-user flag"
+    IS_USER=false
+  fi
+
   if $IS_USER; then
     INSTALL_DIR="$HOME/.local/clashtui"
     INSTALL_DIR_MIHOMO="$INSTALL_DIR/mihomo"
@@ -79,14 +85,19 @@ resolve_paths() {
       LAUNCHD_DOMAIN="system"
     else
       INSTALL_DIR="/opt/clashtui"
-      UNIT_DIR="/usr/lib/systemd/system"
       SUDO="sudo"
-      SYSTEMCTL_FLAGS=""
-      SYSTEMD_RELOAD="sudo systemctl daemon-reload"
-      UNIT_WANTED_BY="multi-user.target"
       SERVICE_LOAD_CMD=""
       SERVICE_UNLOAD_CMD=""
-      SERVICE_ENABLE_CMD="sudo systemctl enable"
+      if [ "$SERVICE_CONTROLLER" = "openrc" ]; then
+        UNIT_DIR="/etc/init.d"
+        SERVICE_ENABLE_CMD="sudo rc-update add"
+      else
+        UNIT_DIR="/usr/lib/systemd/system"
+        SYSTEMCTL_FLAGS=""
+        SYSTEMD_RELOAD="sudo systemctl daemon-reload"
+        UNIT_WANTED_BY="multi-user.target"
+        SERVICE_ENABLE_CMD="sudo systemctl enable"
+      fi
     fi
     INSTALL_DIR_MIHOMO="$INSTALL_DIR/mihomo"
     INSTALL_DIR_SINGBOX="$INSTALL_DIR/sing-box"
@@ -516,6 +527,27 @@ EOF
     if [ -n "$SERVICE_LOAD_CMD" ]; then
       $SERVICE_LOAD_CMD "$plist_path"
     fi
+  elif [ "$SERVICE_CONTROLLER" = "openrc" ]; then
+    # ── Linux: OpenRC init script ──
+    log_info "Creating mihomo OpenRC init script..."
+    local init_path="$UNIT_DIR/${service_name}"
+    $SUDO tee "$init_path" >/dev/null <<EOF
+#!/sbin/openrc-run
+
+supervisor="supervise-daemon"
+name="${service_name}"
+description="mihomo Daemon, Another Clash Kernel."
+command="${INSTALL_DIR_MIHOMO}/mihomo"
+command_args="-d ${MIHOMO_CONFIG_DIR}"
+command_user="mihomo:mihomo"
+pidfile="/run/\${RC_SVCNAME}.pid"
+
+depend() {
+    need net
+}
+EOF
+    $SUDO chmod +x "$init_path"
+    log_info "Created OpenRC init script: $init_path"
   else
     # ── Linux: systemd unit ──
     log_info "Creating mihomo systemd unit..."
@@ -628,6 +660,27 @@ EOF
     if [ -n "$SERVICE_LOAD_CMD" ]; then
       $SERVICE_LOAD_CMD "$plist_path"
     fi
+  elif [ "$SERVICE_CONTROLLER" = "openrc" ]; then
+    # ── Linux: OpenRC init script ──
+    log_info "Creating sing-box OpenRC init script..."
+    local init_path="$UNIT_DIR/${service_name}"
+    $SUDO tee "$init_path" >/dev/null <<EOF
+#!/sbin/openrc-run
+
+supervisor="supervise-daemon"
+name="${service_name}"
+description="sing-box Daemon, The universal proxy platform."
+command="/usr/bin/sing-box"
+command_args="-D ${SINGBOX_CONFIG_DIR} -c ${SINGBOX_CONFIG_DIR}/config.json run"
+command_user="sing-box:sing-box"
+pidfile="/run/\${RC_SVCNAME}.pid"
+
+depend() {
+    need net
+}
+EOF
+    $SUDO chmod +x "$init_path"
+    log_info "Created OpenRC init script: $init_path"
   else
     # ── Linux: systemd unit ──
     log_info "Creating sing-box systemd unit..."
@@ -776,6 +829,7 @@ mihomo:
   core_service:
     service_name: clashtui_mihomo
     is_user: ${SERVICE_IS_USER}
+    service_controller: ${SERVICE_CONTROLLER}
 singbox:
   core:
     bin_path: ${INSTALL_DIR_SINGBOX}/sing-box
@@ -784,6 +838,7 @@ singbox:
   core_service:
     service_name: clashtui_singbox
     is_user: ${SERVICE_IS_USER}
+    service_controller: ${SERVICE_CONTROLLER}
 timeout:
 extra:
   edit_cmd:
@@ -994,9 +1049,18 @@ uninstall() {
       echo "  sudo rm -f /usr/local/var/log/clashtui_mihomo.log"
       echo "  sudo rm -f /usr/local/var/log/clashtui_singbox.log"
     else
-      sudo rm -f /usr/lib/systemd/system/clashtui_mihomo.service
-      sudo rm -f /usr/lib/systemd/system/clashtui_singbox.service
-      sudo systemctl daemon-reload
+      if [ "$SERVICE_CONTROLLER" = "openrc" ]; then
+        sudo rc-service clashtui_mihomo stop 2>/dev/null
+        sudo rc-service clashtui_singbox stop 2>/dev/null
+        sudo rc-update del clashtui_mihomo default 2>/dev/null
+        sudo rc-update del clashtui_singbox default 2>/dev/null
+        sudo rm -f /etc/init.d/clashtui_mihomo
+        sudo rm -f /etc/init.d/clashtui_singbox
+      else
+        sudo rm -f /usr/lib/systemd/system/clashtui_mihomo.service
+        sudo rm -f /usr/lib/systemd/system/clashtui_singbox.service
+        sudo systemctl daemon-reload
+      fi
       sudo rm -rf /opt/clashtui
 
       echo "[Optional] Delete the mihomo user and group"
@@ -1023,6 +1087,7 @@ show_help() {
   echo "  --repo <R>       GitHub repo for clashtui and contrib (default: $REPO)"
   echo "  --branch <B>     Branch for contrib resources (default: $BRANCH)"
   echo "  --core <TYPE>    Select core: mihomo, sing-box, or all (default: all)"
+  echo "  --service-controller <CTRL>  Init system: systemd or openrc (default: systemd)"
   echo
   echo "When --is-user is set:"
   echo "  - Installs to ~/.local/clashtui"
@@ -1033,6 +1098,10 @@ show_help() {
   fi
   echo "  - Uses no-TUN core configs (TUN requires root capabilities)"
   echo "  - Skips creating system users/groups"
+  echo
+  echo "When --service-controller openrc is set on Linux:"
+  echo "  - Creates OpenRC init scripts in /etc/init.d/"
+  echo "  - --is-user is ignored (OpenRC does not support user services)"
   echo
   echo "If no options are provided, the script will install clashtui with all cores"
   if $IS_MACOS; then
@@ -1086,6 +1155,22 @@ main() {
         ;;
       *)
         log_error "Invalid core type: $2. Valid values: mihomo, sing-box, all"
+        exit 1
+        ;;
+      esac
+      ;;
+    --service-controller)
+      if [ -z "$2" ]; then
+        log_error "--service-controller requires a value: systemd or openrc"
+        exit 1
+      fi
+      case "$2" in
+      systemd | openrc)
+        SERVICE_CONTROLLER="$2"
+        shift
+        ;;
+      *)
+        log_error "Invalid service controller: $2. Valid values: systemd, openrc"
         exit 1
         ;;
       esac
@@ -1170,10 +1255,19 @@ main() {
       log_info "  Start + autostart: sudo launchctl load -w /Library/LaunchDaemons/clashtui_mihomo.plist"
       log_info "  Stop + disable:    sudo launchctl unload /Library/LaunchDaemons/clashtui_mihomo.plist"
     else
-      log_info "System mode: unit files created in /usr/lib/systemd/system/"
-      log_info "Services are NOT started automatically. Use these commands:"
-      log_info "  Start now:         sudo systemctl start clashtui_mihomo"
-      log_info "  Start + autostart: sudo systemctl enable --now clashtui_mihomo"
+      if [ "$SERVICE_CONTROLLER" = "openrc" ]; then
+        log_info "System mode (OpenRC): init scripts created in /etc/init.d/"
+        log_info "Services are NOT started automatically. Use these commands:"
+        log_info "  Start now:         sudo rc-service clashtui_mihomo start"
+        log_info "  Start + autostart: sudo rc-update add clashtui_mihomo default && sudo rc-service clashtui_mihomo start"
+        log_info "  Stop:              sudo rc-service clashtui_mihomo stop"
+        log_info "  Disable autostart: sudo rc-update del clashtui_mihomo default"
+      else
+        log_info "System mode: unit files created in /usr/lib/systemd/system/"
+        log_info "Services are NOT started automatically. Use these commands:"
+        log_info "  Start now:         sudo systemctl start clashtui_mihomo"
+        log_info "  Start + autostart: sudo systemctl enable --now clashtui_mihomo"
+      fi
     fi
   fi
 }
