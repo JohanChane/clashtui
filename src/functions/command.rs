@@ -353,13 +353,13 @@ pub fn stop_all_services(password: Option<&str>) -> Result<String> {
 }
 
 pub fn edit(path: &str) -> Result<()> {
-    let tpl = &CONFIG.cfg_file.extra.edit_cmd;
+    let tpl = CONFIG.cfg_file.extra.edit_cmd.as_deref().unwrap_or("");
     log::debug!("edit: path={path} template={tpl}");
     shell_spawn(tpl, path)
 }
 
 pub fn open_dir(path: &str) -> Result<()> {
-    let tpl = &CONFIG.cfg_file.extra.open_dir_cmd;
+    let tpl = CONFIG.cfg_file.extra.open_dir_cmd.as_deref().unwrap_or("");
     log::debug!("open_dir: path={path} template={tpl}");
     shell_spawn(tpl, path)
 }

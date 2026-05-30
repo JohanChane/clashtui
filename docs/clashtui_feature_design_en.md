@@ -1338,3 +1338,58 @@ depend() {
 `install --uninstall` correctly handles openrc mode:
 - System mode: runs `sudo rc-update del`, `sudo rc-service stop`, removes scripts from `/etc/init.d/`
 - User mode: runs `rc-update --user del`, `rc-service --user stop`, removes scripts from `/etc/user/init.d/`
+
+## Windows Cmd String Generation: Problems and Solutions (Three Major Issues)
+
+### 1. `canonicalize()` Injects `\\?\` Prefix
+
+`init()` calls `canonicalize()` on `DATA_DIR`, which on Windows prepends `\\?\` (verbatim path) to the path. All derived paths (`core_data_dir`, profile path, etc.) inherit this prefix. Neither explorer nor cmd recognize the `\\?\` format.
+
+**Log evidence:**
+```
+core_data_dir=\\?\C:\Users\johan\AppData\Roaming\clashtui\mihomo
+```
+
+**Fix:** After `canonicalize()`, use [dunce](https://lib.rs/crates/dunce) to obtain a path that applications can work with.
+
+References:
+- [std::fs::canonicalize returns UNC paths on Windows, and a lot of software doesn't support UNC paths](https://github.com/rust-lang/rust/issues/42869)
+
+### 2. Rust `Command::args` Double-Escapes Arguments Containing Quotes
+
+After substituting `%s` in the template, a complete command string with embedded quotes is produced (e.g., `start "" "C:\..."`) and passed as a single argument to `Command::args`. Rust re-escapes arguments containing quotes when constructing the `CreateProcessW` command line, causing `cmd /c` to parse an incorrect command.
+
+**Correct way** (separate args):
+```rust
+spawn("cmd", vec!["/c", "start", "", path])
+```
+
+**Problematic way** (embedded quotes in arg):
+```rust
+spawn("cmd", vec!["/c", "start \"\" \"C:\\path\""])
+```
+
+**Fix:** Use `raw_arg` to bypass Rust's re-escaping and pass the command string verbatim to `CreateProcessW`:
+```rust
+use std::os::windows::process::CommandExt;
+let safe_path = path.replace('\\', "/");
+let replaced = template.replace("%s", &safe_path);
+Command::new("cmd")
+    .raw_arg("/c")
+    .raw_arg(replaced)   // verbatim, no re-escaping
+    .spawn()?;
+```
+
+**Why this wasn't triggered before:** The HEAD version's empty-string fallback uses separate args, which is correct. However, `Default for Extra` returned non-empty templates that took the path concatenation path, which has the same bug — users were simply either blocked by bug #1 or had custom commands configured that avoided it.
+
+### 3. `explorer.exe` Exit Code 1
+
+Calling `explorer.exe` from a child process as `explorer "path"` returns exit code 1 (failure). On Windows, the correct approach is `cmd /c start "" "path"` (which goes through ShellExecute).
+
+### Windows Path Solution Summary
+
+Since the only operation is substituting `%s` with a path, the focus is on ensuring the path doesn't break within the command string. This type of issue is mostly Windows-specific; Unix-like systems generally don't have these problems. The Windows path issues can be solved as follows:
+- When a Windows path appears in a command-line string, use `C:/Users/Foo` format instead of `C:\\Users\\Foo` to avoid escaping issues.
+- For the `canonicalize()` UNC paths issue, convert UNC paths to cmd-compatible paths only when passing them to cmd (many applications don't support UNC paths).
+- Do not run `explorer "path"`; use `cmd /c start "" "path"` instead.
+- To prevent `Command::args` from double-escaping quoted arguments, use `raw_arg`.

@@ -144,27 +144,14 @@ impl Default for ConfigFile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Extra {
-    pub edit_cmd: String,
-    pub open_dir_cmd: String,
+    pub edit_cmd: Option<String>,
+    pub open_dir_cmd: Option<String>,
 }
 impl Default for Extra {
     fn default() -> Self {
-        if cfg!(windows) {
-            Self {
-                edit_cmd: r#"notepad.exe "%s""#.to_owned(),
-                open_dir_cmd: r#"explorer "%s""#.to_owned(),
-            }
-        } else if cfg!(target_os = "macos") {
-            Self {
-                edit_cmd: r#"open -t "%s""#.to_owned(),
-                open_dir_cmd: r#"open "%s""#.to_owned(),
-            }
-        } else {
-            let cmd = r#"xdg-open "%s""#.to_owned();
-            Self {
-                edit_cmd: cmd.clone(),
-                open_dir_cmd: cmd,
-            }
+        Self {
+            edit_cmd: None,
+            open_dir_cmd: None,
         }
     }
 }
@@ -310,7 +297,11 @@ extra:
         );
         assert_eq!(cfg.singbox.core_service.service_name, "clashtui_singbox");
         assert_eq!(cfg.timeout, Some(5));
-        assert_eq!(cfg.extra.edit_cmd, r#"kitty -e nvim "%s""#);
+        assert_eq!(cfg.extra.edit_cmd.as_deref(), Some(r#"kitty -e nvim "%s""#));
+        assert_eq!(
+            cfg.extra.open_dir_cmd.as_deref(),
+            Some(r#"kitty -e yazi "%s""#)
+        );
 
         let serialized = serde_yml::to_string(&cfg).unwrap();
         let deser: ConfigFile = serde_yml::from_str(&serialized).unwrap();
@@ -345,28 +336,11 @@ profiles:
         assert_eq!(data.profiles.get("pf2").unwrap().no_pp, false);
     }
 
-    #[cfg(target_os = "macos")]
     #[test]
-    fn extra_default_macos() {
+    fn extra_default_is_none() {
         let extra = Extra::default();
-        assert_eq!(extra.edit_cmd, r#"open -t "%s""#);
-        assert_eq!(extra.open_dir_cmd, r#"open "%s""#);
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn extra_default_windows() {
-        let extra = Extra::default();
-        assert_eq!(extra.edit_cmd, r#"notepad.exe "%s""#);
-        assert_eq!(extra.open_dir_cmd, r#"explorer "%s""#);
-    }
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    #[test]
-    fn extra_default_linux() {
-        let extra = Extra::default();
-        assert_eq!(extra.edit_cmd, r#"xdg-open "%s""#);
-        assert_eq!(extra.open_dir_cmd, r#"xdg-open "%s""#);
+        assert_eq!(extra.edit_cmd, None);
+        assert_eq!(extra.open_dir_cmd, None);
     }
 
     #[test]
@@ -378,8 +352,40 @@ edit_cmd: ""
 open_dir_cmd: ""
 "#;
         let extra: Extra = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(extra.edit_cmd, "");
-        assert_eq!(extra.open_dir_cmd, "");
+        assert_eq!(extra.edit_cmd.as_deref(), Some(""));
+        assert_eq!(extra.open_dir_cmd.as_deref(), Some(""));
+    }
+
+    #[test]
+    fn extra_missing_fields_deserialize_to_none() {
+        let yaml = "{}";
+        let extra: Extra = serde_yml::from_str(yaml).unwrap();
+        assert_eq!(extra.edit_cmd, None);
+        assert_eq!(extra.open_dir_cmd, None);
+    }
+
+    #[test]
+    fn extra_serde_roundtrip_with_none() {
+        let extra = Extra {
+            edit_cmd: None,
+            open_dir_cmd: None,
+        };
+        let serialized = serde_yml::to_string(&extra).unwrap();
+        let deser: Extra = serde_yml::from_str(&serialized).unwrap();
+        assert_eq!(deser.edit_cmd, None);
+        assert_eq!(deser.open_dir_cmd, None);
+    }
+
+    #[test]
+    fn extra_serde_roundtrip_with_some() {
+        let extra = Extra {
+            edit_cmd: Some(r#"notepad.exe "%s""#.into()),
+            open_dir_cmd: Some(r#"explorer "%s""#.into()),
+        };
+        let serialized = serde_yml::to_string(&extra).unwrap();
+        let deser: Extra = serde_yml::from_str(&serialized).unwrap();
+        assert_eq!(deser.edit_cmd.as_deref(), Some(r#"notepad.exe "%s""#));
+        assert_eq!(deser.open_dir_cmd.as_deref(), Some(r#"explorer "%s""#));
     }
 
     #[test]

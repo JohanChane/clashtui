@@ -136,7 +136,7 @@ function Resolve-Paths {
         Write-Info "Test mode: using temp directory $TestTmpDir"
     }
 
-    $script:SCRIPT_DIR = Split-Path $MyInvocation.ScriptName -Parent
+    $script:SCRIPT_DIR = if ($MyInvocation.ScriptName) { Split-Path $MyInvocation.ScriptName -Parent } else { Get-Location }
     $contribLocal = Join-Path $SCRIPT_DIR "contrib"
     $contribParent = Join-Path (Split-Path $SCRIPT_DIR -Parent) "contrib"
     if (Test-Path $contribLocal) {

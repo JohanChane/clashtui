@@ -46,8 +46,8 @@ pub fn migrate() -> anyhow::Result<()> {
         singbox: super::core::SingboxSection::default(),
         timeout,
         extra: super::core::Extra {
-            edit_cmd,
-            open_dir_cmd,
+            edit_cmd: (!edit_cmd.is_empty()).then_some(edit_cmd),
+            open_dir_cmd: (!open_dir_cmd.is_empty()).then_some(open_dir_cmd),
         },
     };
 
