@@ -1,6 +1,10 @@
 # ClashTui 手动安装指南
 
-以 Arch Linux, amd64, systemd (system 模式) 为例。
+以 Arch Linux, amd64, systemd 为例。下面分别给出 system 模式和 user 模式的步骤。
+
+---
+
+# System 模式
 
 ## 目录布局
 
@@ -262,4 +266,250 @@ rm -rf ~/.config/clashtui
 rm -rf ~/.cache/clashtui
 sudo userdel mihomo
 sudo userdel sing-box
+```
+
+---
+
+# User 模式
+
+无需 root 权限安装到 `~/.local/clashtui/`，服务以当前用户身份运行。
+
+## 目录布局
+
+```
+~/.local/clashtui/
+├── bin/
+│   └── clashtui
+├── mihomo/
+│   ├── mihomo
+│   └── config/
+│       └── config.yaml
+└── sing-box/
+    ├── sing-box
+    └── config/
+        └── config.json
+
+~/.config/clashtui/
+├── config.yaml
+├── default_keymap.yaml
+├── default_theme.yaml
+├── mihomo/
+│   ├── core_override_config.yaml
+│   ├── template_proxy_providers.yaml
+│   ├── profiles/
+│   └── templates/
+└── sing-box/
+    ├── core_override_config.json
+    ├── template_proxy_providers.yaml
+    ├── profiles/
+    └── templates/
+```
+
+## 1. 下载 ClashTui
+
+```sh
+curl -LO "https://github.com/JohanChane/clashtui/releases/latest/download/clashtui-linux-amd64-$(curl -s https://api.github.com/repos/JohanChane/clashtui/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/').gz"
+gunzip clashtui-linux-amd64-*.gz
+chmod +x clashtui-linux-amd64-*
+mkdir -p ~/.local/clashtui/bin
+install -m 755 clashtui-linux-amd64-* ~/.local/clashtui/bin/clashtui
+ln -sf ~/.local/clashtui/bin/clashtui ~/.local/bin/clashtui
+```
+
+## 2. 下载 Mihomo
+
+```sh
+mihomo_ver=$(curl -s https://api.github.com/repos/MetaCubeX/mihomo/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+curl -L "https://github.com/MetaCubeX/mihomo/releases/latest/download/mihomo-linux-amd64-${mihomo_ver}.gz" -o /tmp/mihomo.gz
+gunzip -c /tmp/mihomo.gz > /tmp/mihomo
+mkdir -p ~/.local/clashtui/mihomo
+install -m 755 /tmp/mihomo ~/.local/clashtui/mihomo/mihomo
+```
+
+## 3. 下载 sing-box
+
+```sh
+sb_ver=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+curl -L "https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-${sb_ver}-linux-amd64.tar.gz" -o /tmp/sing-box.tar.gz
+tar -xzf /tmp/sing-box.tar.gz -C /tmp/
+mkdir -p ~/.local/clashtui/sing-box
+install -m 755 /tmp/sing-box-*/sing-box ~/.local/clashtui/sing-box/sing-box
+ln -sf ~/.local/clashtui/sing-box/sing-box ~/.local/bin/sing-box
+```
+
+## 4. 创建 ClashTui 主配置
+
+```sh
+mkdir -p ~/.config/clashtui
+```
+
+`~/.config/clashtui/config.yaml`:
+
+```yaml
+mihomo:
+  core:
+    config_dir: <HOME_REPLACE>/.local/clashtui/mihomo/config
+    bin_path: <HOME_REPLACE>/.local/clashtui/mihomo/mihomo
+    config_path: <HOME_REPLACE>/.local/clashtui/mihomo/config/config.yaml
+  core_service:
+    service_name: clashtui_mihomo
+    is_user: true
+    service_controller: systemd
+singbox:
+  core:
+    bin_path: <HOME_REPLACE>/.local/clashtui/sing-box/sing-box
+    config_dir: <HOME_REPLACE>/.local/clashtui/sing-box/config
+    config_path: <HOME_REPLACE>/.local/clashtui/sing-box/config/config.json
+  core_service:
+    service_name: clashtui_singbox
+    is_user: true
+    service_controller: systemd
+timeout: null
+extra:
+  edit_cmd:
+  open_dir_cmd:
+```
+
+> 将 `<HOME_REPLACE>` 替换为你的 home 目录路径, 如 `/home/johan`。不能使用 `~` 或 `$HOME`。
+
+## 5. 创建 Core 配置
+
+```sh
+mkdir -p ~/.local/clashtui/mihomo/config
+mkdir -p ~/.local/clashtui/sing-box/config
+mkdir -p ~/.config/clashtui/mihomo
+mkdir -p ~/.config/clashtui/sing-box
+```
+
+从 GitHub 下载 core override 配置:
+
+```sh
+base="https://raw.githubusercontent.com/JohanChane/clashtui/main/contrib/default_configs"
+
+# Mihomo
+curl -o ~/.config/clashtui/mihomo/core_override_config.yaml \
+  "${base}/mihomo/core_override_config.yaml"
+cp ~/.config/clashtui/mihomo/core_override_config.yaml \
+  ~/.local/clashtui/mihomo/config/config.yaml
+
+# sing-box
+curl -o ~/.config/clashtui/sing-box/core_override_config.json \
+  "${base}/sing-box/core_override_config.json"
+cp ~/.config/clashtui/sing-box/core_override_config.json \
+  ~/.local/clashtui/sing-box/config/config.json
+```
+
+## 6. 下载默认文件
+
+```sh
+curl -o ~/.config/clashtui/default_keymap.yaml \
+  "${base}/default_keymap.yaml"
+curl -o ~/.config/clashtui/default_theme.yaml \
+  "${base}/default_theme.yaml"
+```
+
+> User 模式**不需要**创建系统用户和组。服务以当前用户身份运行。
+
+## 7. 创建 systemd user 服务
+
+**clashtui_mihomo** — 写入 `~/.config/systemd/user/clashtui_mihomo.service`:
+
+```sh
+mkdir -p ~/.config/systemd/user
+```
+
+```ini
+[Unit]
+Description=mihomo Daemon, Another Clash Kernel.
+After=network.target NetworkManager.service systemd-networkd.service iwd.service
+
+[Service]
+Type=simple
+LimitNPROC=500
+LimitNOFILE=1000000
+Restart=always
+ExecStartPre=/usr/bin/sleep 1s
+ExecStart=<HOME_REPLACE>/.local/clashtui/mihomo/mihomo -d <HOME_REPLACE>/.local/clashtui/mihomo/config
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=default.target
+```
+
+**clashtui_singbox** — 写入 `~/.config/systemd/user/clashtui_singbox.service`:
+
+```ini
+[Unit]
+Description=sing-box Daemon, The universal proxy platform.
+After=network.target NetworkManager.service systemd-networkd.service iwd.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/sleep 1s
+ExecStart=<HOME_REPLACE>/.local/clashtui/sing-box/sing-box -D <HOME_REPLACE>/.local/clashtui/sing-box/config -c <HOME_REPLACE>/.local/clashtui/sing-box/config/config.json run
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=10s
+LimitNOFILE=infinity
+
+[Install]
+WantedBy=default.target
+```
+
+> 将 `<HOME_REPLACE>` 替换为你的 home 目录路径。User 模式下**不填** `User=` 和 `Group=`, 也不需要 `CapabilityBoundingSet` 和 `AmbientCapabilities`（这些需要 root 权限才生效）。
+
+启用服务:
+
+```sh
+systemctl --user daemon-reload
+systemctl --user enable clashtui_mihomo
+systemctl --user enable clashtui_singbox
+```
+
+> 默认情况下, user 服务在注销后会停止。如果需要保持运行, 执行: `sudo loginctl enable-linger`
+
+## 8. 创建订阅配置
+
+`~/.config/clashtui/mihomo/template_proxy_providers.yaml`:
+
+```yaml
+# 定义代理提供者的订阅 URL
+# pvd:
+#   pvd0: "https://example.com/sub.yaml"
+```
+
+`~/.config/clashtui/sing-box/template_proxy_providers.yaml` 同理。
+
+创建必要的目录:
+
+```sh
+mkdir -p ~/.config/clashtui/mihomo/{profiles,templates}
+mkdir -p ~/.config/clashtui/sing-box/{profiles,templates}
+```
+
+## 9. 下载规则文件 (可选)
+
+```sh
+curl -Lo ~/.local/clashtui/mihomo/config/geoip.metadb \
+  https://github.com/MetaCubeX/meta-rules-dat/releases/latest/download/geoip.metadb
+curl -Lo ~/.local/clashtui/mihomo/config/GeoSite.dat \
+  https://github.com/MetaCubeX/meta-rules-dat/releases/latest/download/geosite.dat
+```
+
+## 10. 启动
+
+```sh
+clashtui
+```
+
+## 卸载
+
+```sh
+systemctl --user stop clashtui_mihomo clashtui_singbox
+rm -f ~/.config/systemd/user/clashtui_mihomo.service
+rm -f ~/.config/systemd/user/clashtui_singbox.service
+systemctl --user daemon-reload
+rm -rf ~/.local/clashtui
+rm -rf ~/.config/clashtui
+rm -rf ~/.cache/clashtui
 ```
