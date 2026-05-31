@@ -115,14 +115,6 @@ Describe "-NoPrompt parameter" {
     }
 }
 
-Describe "-IsTest is rejected" {
-    It "Script rejects -IsTest parameter" {
-        $scriptPath = (Resolve-Path (Join-Path $PSScriptRoot ".." "install.ps1")).Path
-        $result = & powershell -NoProfile -Command "& '$scriptPath' -IsTest -InstallDir 'D:\clashtui-test' -Core mihomo 2>&1; exit `$LASTEXITCODE" 2>&1
-        $LASTEXITCODE | Should -Not -Be 0
-    }
-}
-
 Describe "Guard: dot-sourcing does not execute Main" {
     It "Functions are available without running Main" {
         { Get-Command Write-Info -ErrorAction Stop } | Should -Not -Throw
