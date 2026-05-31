@@ -14,6 +14,7 @@ import grp
 import os
 import pwd
 import stat
+import subprocess
 import sys
 
 
@@ -41,12 +42,34 @@ def _walk_tree(dirpath: str) -> str:
     return "\n".join(lines)
 
 
+def _run_tree(dirpath: str) -> str | None:
+    try:
+        if sys.platform == "win32":
+            result = subprocess.run(
+                ["cmd", "/c", "tree", "/F", "/A", dirpath],
+                capture_output=True, text=True, timeout=10,
+            )
+        else:
+            result = subprocess.run(
+                ["tree", "--noreport", dirpath],
+                capture_output=True, text=True, timeout=10,
+            )
+        if result.returncode == 0:
+            return result.stdout.rstrip()
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return None
+
+
 def print_tree(label: str, dirpath: str) -> None:
     if not os.path.isdir(dirpath):
         print(f"\n{RED}[MISSING]{NC} {label}: {dirpath}")
         return
     print(f"\n{GREEN}── {label}: {dirpath}{NC}")
-    print(_walk_tree(dirpath))
+    output = _run_tree(dirpath)
+    if output is None:
+        output = _walk_tree(dirpath)
+    print(output)
 
 
 def print_file(label: str, filepath: str) -> None:
@@ -76,6 +99,49 @@ def find_install_roots(cfg: dict) -> set[str]:
                 if root and root not in ("/", "/usr", "/usr/local"):
                     roots.add(root)
     return roots
+
+
+SERVICE_PATHS = {
+    ("linux", "systemd", False): "/usr/lib/systemd/system/{name}.service",
+    ("linux", "systemd", True): "~/.config/systemd/user/{name}.service",
+    ("linux", "openrc", False): "/etc/init.d/{name}",
+    ("linux", "openrc", True): "/etc/user/init.d/{name}",
+    ("darwin", "launchd", False): "/Library/LaunchDaemons/{name}.plist",
+    ("darwin", "launchd", True): "~/Library/LaunchAgents/{name}.plist",
+}
+
+
+def resolve_service_path(name: str, controller: str, is_user: bool) -> str | None:
+    platform = sys.platform
+    if platform.startswith("linux"):
+        plat = "linux"
+    elif platform == "darwin":
+        plat = "darwin"
+    else:
+        return None
+    controller = (controller or "").lower()
+    template = SERVICE_PATHS.get((plat, controller, is_user))
+    if template is None:
+        return None
+    return os.path.expanduser(template.format(name=name))
+
+
+def show_service_files(cfg: dict) -> None:
+    for section_name in ("mihomo", "singbox"):
+        section = cfg.get(section_name, {})
+        if not isinstance(section, dict):
+            continue
+        svc = section.get("core_service", {})
+        if not isinstance(svc, dict):
+            continue
+        name = svc.get("service_name", "")
+        controller = svc.get("service_controller", "")
+        is_user = svc.get("is_user", True)
+        if not name or not controller:
+            continue
+        path = resolve_service_path(name, controller, is_user)
+        if path:
+            print_file(f"{section_name} service file", path)
 
 
 def check_path(label: str, path: str, kind: str) -> None:
@@ -295,6 +361,7 @@ def main() -> None:
                 core = core.get("core", {})
             if isinstance(core, dict) and core.get("config_path"):
                 print_file(f"{core_name} core config", core["config_path"])
+        show_service_files(cfg)
         print()
 
     def get_section(section_name: str) -> dict:
