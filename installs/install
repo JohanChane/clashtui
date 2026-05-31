@@ -762,7 +762,6 @@ create_core_configs() {
   log_info "Creating core config files..."
 
   if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then
-    backup_dir "$MIHOMO_CONFIG_DIR"
     backup_file "${MIHOMO_CONFIG_DIR}/config.yaml" || true
     $SUDO mkdir -p "$MIHOMO_CONFIG_DIR"
 
@@ -777,8 +776,6 @@ create_core_configs() {
     copy_contrib "$mihomo_cfg_src" "${MIHOMO_CONFIG_DIR}/config.yaml"
     log_info "Mihomo core config written to: ${MIHOMO_CONFIG_DIR}/config.yaml"
 
-    # Also copy to clashtui config dir for profile management
-    backup_dir "$MIHOMO_USER_CONFIG_DIR"
     mkdir -p "$MIHOMO_USER_CONFIG_DIR"
     copy_contrib "$mihomo_cfg_src" "${MIHOMO_USER_CONFIG_DIR}/core_override_config.yaml"
     log_info "Mihomo core override written to: ${MIHOMO_USER_CONFIG_DIR}/core_override_config.yaml"
@@ -794,7 +791,6 @@ create_core_configs() {
   fi
 
   if [ "$core_type" = "sing-box" ] || [ "$core_type" = "all" ]; then
-    backup_dir "$SINGBOX_CONFIG_DIR"
     backup_file "${SINGBOX_CONFIG_DIR}/config.json" || true
     $SUDO mkdir -p "$SINGBOX_CONFIG_DIR"
 
@@ -809,7 +805,6 @@ create_core_configs() {
     log_info "Sing-box core config written to: ${SINGBOX_CONFIG_DIR}/config.json"
 
     # Also copy to clashtui config dir for profile management
-    backup_dir "$SINGBOX_USER_CONFIG_DIR"
     mkdir -p "$SINGBOX_USER_CONFIG_DIR"
     copy_contrib "$singbox_cfg_src" "${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
     log_info "Sing-box core override written to: ${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"

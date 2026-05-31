@@ -177,7 +177,7 @@ jobs:
         run: |
           hash -r
           tmux new-session -d -s test 'clashtui; exec $SHELL'
-          sleep 120
+          sleep 30
           tmux kill-session -t test 2>/dev/null || true
 
       - name: Verify clashtui startup (Windows)
@@ -185,7 +185,7 @@ jobs:
         shell: pwsh
         run: |
           $p = Start-Process -FilePath 'D:\ClashTui\bin\clashtui.exe' -PassThru -NoNewWindow
-          $p | Wait-Process -Timeout 120 -ErrorAction SilentlyContinue
+          $p | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
           if (!$p.HasExited) { $p.Kill() }
 
   install-test-user:
@@ -260,5 +260,5 @@ jobs:
       - name: Verify clashtui startup
         run: |
           tmux new-session -d -s test '~/.local/clashtui/bin/clashtui; exec $SHELL'
-          sleep 120
+          sleep 30
           tmux kill-session -t test 2>/dev/null || true
