@@ -23,27 +23,71 @@ jobs:
   real-install:
     name: Real Install (System Mode, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         os:
           - ubuntu-latest
+          - macos-latest
+          - windows-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run install script (system mode)
-        run: sudo ./installs/install --no-prompt --core all
+      - name: Run install script (bash)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./installs/install --no-prompt --core all
 
-      - name: Verify installed files
+      - name: Run install script (PowerShell)
+        if: runner.os == 'Windows'
+        run: ./installs/install.ps1 -NoPrompt -Core all -InstallDir D:\ClashTui
+        shell: pwsh
+
+      - name: Install Python deps (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: python3 -m pip install ruamel.yaml || python3 -m pip install --break-system-packages ruamel.yaml
+
+      - name: Install Python deps (Windows)
+        if: runner.os == 'Windows'
+        run: pip install ruamel.yaml
+        shell: pwsh
+
+      - name: Verify installed files (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
-          pip install ruamel.yaml
+          cat ~/.config/clashtui/config.yaml
           ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
 
-      - name: Verify clashtui binary
+      - name: Verify installed files (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          Get-Content $env:APPDATA\clashtui\config.yaml
+          ./installs/tests/verify_install.py $env:APPDATA\clashtui\config.yaml
+        shell: pwsh
+
+      - name: Verify clashtui binary (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: clashtui --version
 
-      - name: Verify clashtui startup
+      - name: Verify clashtui binary (Windows)
+        if: runner.os == 'Windows'
+        run: D:\ClashTui\bin\clashtui.exe --version
+        shell: pwsh
+
+      - name: Verify clashtui startup (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
           hash -r
-          clashtui
+          clashtui & PID=$! ; sleep 120 && kill $PID 2>/dev/null ; wait $PID 2>/dev/null
+
+      - name: Verify clashtui startup (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $p = Start-Process -FilePath 'D:\ClashTui\bin\clashtui.exe' -PassThru -NoNewWindow
+          $p | Wait-Process -Timeout 120 -ErrorAction SilentlyContinue
+          if (!$p.HasExited) { $p.Kill() }
+        shell: pwsh

@@ -267,7 +267,7 @@ function Install-Mihomo {
         Invoke-WebRequest -Uri $assetUrl -OutFile $zipPath -UseBasicParsing
         Expand-Archive -Path $zipPath -DestinationPath $tempDir -Force
 
-        $binary = Get-ChildItem -Path $tempDir -Recurse -Name "mihomo.exe" | Select-Object -First 1
+        $binary = Get-ChildItem -Path $tempDir -Recurse -Filter "*mihomo*.exe" -Name | Select-Object -First 1
         if (-not $binary) {
             Write-ErrorLog "Could not find mihomo.exe in the downloaded archive"
             exit 1
@@ -335,7 +335,7 @@ function Install-SingBox {
         Invoke-WebRequest -Uri $assetUrl -OutFile $zipPath -UseBasicParsing
         Expand-Archive -Path $zipPath -DestinationPath $tempDir -Force
 
-        $binary = Get-ChildItem -Path $tempDir -Recurse -Name "sing-box.exe" | Select-Object -First 1
+        $binary = Get-ChildItem -Path $tempDir -Recurse -Filter "*sing-box*.exe" -Name | Select-Object -First 1
         if (-not $binary) {
             Write-ErrorLog "Could not find sing-box.exe in the downloaded archive"
             exit 1
@@ -403,7 +403,7 @@ function Install-ClashTui {
         Invoke-WebRequest -Uri $assetUrl -OutFile $zipPath -UseBasicParsing
         Expand-Archive -Path $zipPath -DestinationPath $tempDir -Force
 
-        $binary = Get-ChildItem -Path $tempDir -Recurse -Name "clashtui.exe" | Select-Object -First 1
+        $binary = Get-ChildItem -Path $tempDir -Recurse -Filter "*clashtui*.exe" -Name | Select-Object -First 1
         if (-not $binary) {
             Write-ErrorLog "Could not find clashtui.exe in the downloaded archive"
             exit 1
