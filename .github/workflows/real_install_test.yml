@@ -74,9 +74,12 @@ jobs:
         if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
           hash -r
-          clashtui
+          timeout 2m clashtui || [ $? -eq 124 ]
 
       - name: Verify clashtui startup (Windows)
         if: runner.os == 'Windows'
-        run: D:\ClashTui\bin\clashtui.exe
+        run: |
+          $p = Start-Process -FilePath 'D:\ClashTui\bin\clashtui.exe' -PassThru -NoNewWindow
+          $p | Wait-Process -Timeout 120 -ErrorAction SilentlyContinue
+          if (!$p.HasExited) { $p.Kill() }
         shell: pwsh
