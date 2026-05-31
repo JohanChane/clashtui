@@ -20,7 +20,48 @@ on:
   workflow_dispatch:
 
 jobs:
+  unit-test-bash:
+    name: Unit Test (Bash, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bats (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo npm install -g bats
+
+      - name: Install bats (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install bats-core
+
+      - name: Run bats tests
+        run: bats installs/tests/install.bats
+
+  unit-test-powershell:
+    name: Unit Test (PowerShell, Windows)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Pester tests
+        run: |
+          Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser
+          Import-Module Pester
+          Invoke-Pester -Path installs/tests/install.tests.ps1 -Output Detailed
+        shell: pwsh
+
   real-install-sys:
+    needs: [unit-test-bash, unit-test-powershell]
     name: Real Install (System Mode, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     permissions:
@@ -93,6 +134,7 @@ jobs:
         shell: pwsh
 
   real-install-user:
+    needs: [unit-test-bash, unit-test-powershell]
     name: Real Install (User Mode, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     permissions:
