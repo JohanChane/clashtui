@@ -8,7 +8,7 @@ on:
     paths:
       - 'installs/**'
       - 'contrib/**'
-      - '.github/workflows/installs/real_install_test.yml'
+      - '.github/workflows/real_install_test.yml'
   pull_request:
     branches:
       - main
@@ -16,7 +16,7 @@ on:
     paths:
       - 'installs/**'
       - 'contrib/**'
-      - '.github/workflows/installs/real_install_test.yml'
+      - '.github/workflows/real_install_test.yml'
   workflow_dispatch:
 
 jobs:
