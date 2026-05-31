@@ -76,7 +76,7 @@ jobs:
         if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
           hash -r
-          timeout 2m clashtui || [ $? -eq 124 ]
+          clashtui & PID=$! ; sleep 120 && kill $PID 2>/dev/null ; wait $PID 2>/dev/null
 
       - name: Verify clashtui startup (Windows)
         if: runner.os == 'Windows'
