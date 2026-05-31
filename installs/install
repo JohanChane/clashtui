@@ -34,6 +34,14 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+github_api_curl() {
+  if [ -n "$GITHUB_TOKEN" ]; then
+    curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "$@"
+  else
+    curl -s "$@"
+  fi
+}
+
 backup_dir() {
   [ -d "$1" ] || return 0
   local i=1
@@ -295,11 +303,17 @@ download_mihomo() {
   local os=$(detect_os)
 
   local temp_dir=$(mktemp -d)
-  latest_version=$(curl -s "https://api.github.com/repos/${MIHOMO_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  latest_version=$(github_api_curl "https://api.github.com/repos/${MIHOMO_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
   local download_url
 
   if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
     log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  if [ -z "$latest_version" ]; then
+    log_error "Failed to determine latest mihomo version (API rate limit or network issue)"
     rm -rf "$temp_dir"
     return 1
   fi
@@ -313,10 +327,14 @@ download_mihomo() {
     rm -rf "$temp_dir"
     return 1
   }
-  gunzip -c "$temp_dir/mihomo.gz" >"$temp_dir/mihomo"
+  gunzip -c "$temp_dir/mihomo.gz" >"$temp_dir/mihomo" || {
+    log_error "Failed to extract mihomo archive (possibly not a valid gzip file)"
+    rm -rf "$temp_dir"
+    return 1
+  }
 
   local binary_path
-  if [ -f "$temp_dir/mihomo" ]; then
+  if [ -f "$temp_dir/mihomo" ] && [ -s "$temp_dir/mihomo" ]; then
     binary_path="$temp_dir/mihomo"
   else
     log_error "Could not find binary in the downloaded archive"
@@ -335,7 +353,10 @@ download_singbox() {
   local os=$(detect_os)
 
   local temp_dir=$(mktemp -d)
-  latest_version=$(curl -s "https://api.github.com/repos/${SINGBOX_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  local tag_name
+  tag_name=$(github_api_curl "https://api.github.com/repos/${SINGBOX_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  # sing-box asset names strip the 'v' prefix (v1.12.3 → 1.12.3)
+  latest_version="${tag_name#v}"
 
   if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
     log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
@@ -343,8 +364,14 @@ download_singbox() {
     return 1
   fi
 
+  if [ -z "$tag_name" ]; then
+    log_error "Failed to determine latest sing-box version (API rate limit or network issue)"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
   download_url="https://github.com/${SINGBOX_UPSTREAM}/releases/latest/download/sing-box-${latest_version}-${os}-${arch}.tar.gz"
-  log_info "Detected: OS=$os, Arch=$arch, LatestVersion=$latest_version"
+  log_info "Detected: OS=$os, Arch=$arch, Version=$latest_version"
   log_info "Downloading: $download_url"
 
   curl -L "$download_url" -o "$temp_dir/sing-box.tar.gz" || {
@@ -352,12 +379,16 @@ download_singbox() {
     rm -rf "$temp_dir"
     return 1
   }
-  tar -xzf "$temp_dir/sing-box.tar.gz" -C "$temp_dir"
+  tar -xzf "$temp_dir/sing-box.tar.gz" -C "$temp_dir" || {
+    log_error "Failed to extract sing-box archive (possibly not a valid tar.gz file)"
+    rm -rf "$temp_dir"
+    return 1
+  }
 
   local binary_path
   binary_path=$(find "$temp_dir" -name "sing-box" -type f | head -1)
 
-  if [ -f "$binary_path" ]; then
+  if [ -f "$binary_path" ] && [ -s "$binary_path" ]; then
     $SUDO mkdir -p "$INSTALL_DIR_SINGBOX"
     $SUDO install -m 755 "$binary_path" "$INSTALL_DIR_SINGBOX/sing-box"
     if ! $IS_USER; then
@@ -378,10 +409,16 @@ download_clashtui() {
   local os=$(detect_os)
 
   local temp_dir=$(mktemp -d)
-  latest_version=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  latest_version=$(github_api_curl "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
   if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
     log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  if [ -z "$latest_version" ]; then
+    log_error "Failed to determine latest clashtui version (API rate limit or network issue)"
     rm -rf "$temp_dir"
     return 1
   fi
@@ -395,10 +432,14 @@ download_clashtui() {
     rm -rf "$temp_dir"
     return 1
   }
-  gunzip -c "$temp_dir/clashtui.gz" >"$temp_dir/clashtui"
+  gunzip -c "$temp_dir/clashtui.gz" >"$temp_dir/clashtui" || {
+    log_error "Failed to extract clashtui archive (possibly not a valid gzip file)"
+    rm -rf "$temp_dir"
+    return 1
+  }
 
   local binary_path
-  if [ -f "$temp_dir/clashtui" ]; then
+  if [ -f "$temp_dir/clashtui" ] && [ -s "$temp_dir/clashtui" ]; then
     binary_path="$temp_dir/clashtui"
   else
     log_error "Could not find binary in the downloaded archive"
@@ -721,7 +762,6 @@ create_core_configs() {
   log_info "Creating core config files..."
 
   if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then
-    backup_dir "$MIHOMO_CONFIG_DIR"
     backup_file "${MIHOMO_CONFIG_DIR}/config.yaml" || true
     $SUDO mkdir -p "$MIHOMO_CONFIG_DIR"
 
@@ -736,8 +776,6 @@ create_core_configs() {
     copy_contrib "$mihomo_cfg_src" "${MIHOMO_CONFIG_DIR}/config.yaml"
     log_info "Mihomo core config written to: ${MIHOMO_CONFIG_DIR}/config.yaml"
 
-    # Also copy to clashtui config dir for profile management
-    backup_dir "$MIHOMO_USER_CONFIG_DIR"
     mkdir -p "$MIHOMO_USER_CONFIG_DIR"
     copy_contrib "$mihomo_cfg_src" "${MIHOMO_USER_CONFIG_DIR}/core_override_config.yaml"
     log_info "Mihomo core override written to: ${MIHOMO_USER_CONFIG_DIR}/core_override_config.yaml"
@@ -752,15 +790,33 @@ create_core_configs() {
     fi
   fi
 
-  if [ ${#BACKED_UP_LIST[@]} -gt 0 ]; then
-    echo ""
-    log_info "Backups created:"
-    for entry in "${BACKED_UP_LIST[@]}"; do
-      echo "  $entry"
-    done
-  else
-    echo ""
-    log_info "No existing configs to backup"
+  if [ "$core_type" = "sing-box" ] || [ "$core_type" = "all" ]; then
+    backup_file "${SINGBOX_CONFIG_DIR}/config.json" || true
+    $SUDO mkdir -p "$SINGBOX_CONFIG_DIR"
+
+    local singbox_cfg_src
+    if $IS_USER; then
+      singbox_cfg_src="default_configs/sing-box/core_override_config_no_tun.json"
+    else
+      singbox_cfg_src="default_configs/sing-box/core_override_config.json"
+    fi
+
+    copy_contrib "$singbox_cfg_src" "${SINGBOX_CONFIG_DIR}/config.json"
+    log_info "Sing-box core config written to: ${SINGBOX_CONFIG_DIR}/config.json"
+
+    # Also copy to clashtui config dir for profile management
+    mkdir -p "$SINGBOX_USER_CONFIG_DIR"
+    copy_contrib "$singbox_cfg_src" "${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
+    log_info "Sing-box core override written to: ${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
+
+    if ! $IS_USER; then
+      if $IS_MACOS; then
+        $SUDO chmod g+rw "${SINGBOX_CONFIG_DIR}/config.json"
+      else
+        $SUDO chown sing-box:sing-box "${SINGBOX_CONFIG_DIR}/config.json"
+        $SUDO chmod g+r "${SINGBOX_CONFIG_DIR}/config.json"
+      fi
+    fi
   fi
 }
 
@@ -1194,14 +1250,14 @@ main() {
   # Install cores
   case "$CORE_TYPE" in
   mihomo)
-    install_mihomo
+    install_mihomo || { log_error "Failed to install mihomo"; exit 1; }
     ;;
   sing-box)
-    install_singbox
+    install_singbox || { log_error "Failed to install sing-box"; exit 1; }
     ;;
   all)
-    install_mihomo
-    install_singbox
+    install_mihomo || { log_error "Failed to install mihomo"; exit 1; }
+    install_singbox || { log_error "Failed to install sing-box"; exit 1; }
     ;;
   esac
 

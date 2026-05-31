@@ -1,0 +1,258 @@
+name: Install Test
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'installs/**'
+      - 'contrib/**'
+      - '.github/workflows/install_test.yml'
+  pull_request:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'installs/**'
+      - 'contrib/**'
+      - '.github/workflows/install_test.yml'
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: 'GitHub repository (owner/repo)'
+        required: false
+        default: 'JohanChane/clashtui'
+      branch:
+        description: 'Branch for install script and contrib'
+        required: false
+        default: 'main'
+
+jobs:
+  unit-test-bash:
+    name: Unit Test (${{ matrix.os }}, Bash)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install bats (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo npm install -g bats
+      - name: Install bats (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install bats-core
+      - name: Run bats tests
+        run: bats installs/tests/install.bats
+
+  unit-test-powershell:
+    name: Unit Test (Windows, PowerShell)
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Pester tests
+        run: |
+          Import-Module Pester
+          Invoke-Pester -Path installs/tests/install.tests.ps1 -Output Detailed
+        shell: pwsh
+
+  install-test-system:
+    needs: [unit-test-bash, unit-test-powershell]
+    name: Install Test (System, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo
+          key: ci-install-test-${{ matrix.os }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Build clashtui (debug, locked, all-features)
+        run: cargo build --locked --all-features
+
+      - name: Put built clashtui on PATH (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: |
+          sudo cp ./target/debug/clashtui /usr/local/bin/clashtui
+          which clashtui
+          clashtui --version
+
+      - name: Pre-stage built clashtui (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Path D:\ClashTui\bin -Force
+          Copy-Item ./target/debug/clashtui.exe D:\ClashTui\bin\clashtui.exe
+          Get-Command D:\ClashTui\bin\clashtui.exe
+          D:\ClashTui\bin\clashtui.exe --version
+        shell: pwsh
+
+      - name: Set install params
+        id: params
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "repo=${{ inputs.repo }}" >> $GITHUB_OUTPUT
+            echo "branch=${{ inputs.branch }}" >> $GITHUB_OUTPUT
+          else
+            echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+            else
+              echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Run install script (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >
+          ./installs/install
+          --no-prompt --core all
+          --repo "${{ steps.params.outputs.repo }}"
+          --branch "${{ steps.params.outputs.branch }}"
+
+      - name: Run install script (Windows)
+        if: runner.os == 'Windows'
+        run: >
+          ./installs/install.ps1
+          -NoPrompt -Core all
+          -InstallDir D:\ClashTui
+          -Repo "${{ steps.params.outputs.repo }}"
+          -Branch "${{ steps.params.outputs.branch }}"
+        shell: pwsh
+
+      - name: Install Python deps (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: python3 -m pip install ruamel.yaml || python3 -m pip install --break-system-packages ruamel.yaml
+
+      - name: Install Python deps (Windows)
+        if: runner.os == 'Windows'
+        run: pip install ruamel.yaml
+        shell: pwsh
+
+      - name: Verify installed files (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: ./installs/tests/verify_install.py -v ~/.config/clashtui/config.yaml
+
+      - name: Verify installed files (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./installs/tests/verify_install.py -v $env:APPDATA\clashtui\config.yaml
+
+      - name: Verify clashtui binary (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: clashtui --version
+
+      - name: Verify clashtui binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: D:\ClashTui\bin\clashtui.exe --version
+
+      - name: Install tmux (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tmux
+
+      - name: Verify clashtui startup (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: |
+          hash -r
+          tmux new-session -d -s test 'clashtui; exec $SHELL'
+          sleep 30
+          tmux kill-session -t test 2>/dev/null || true
+
+      - name: Verify clashtui startup (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath 'D:\ClashTui\bin\clashtui.exe' -PassThru -NoNewWindow
+          $p | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
+          if (!$p.HasExited) { $p.Kill() }
+
+  install-test-user:
+    needs: [unit-test-bash, unit-test-powershell]
+    name: Install Test (User, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo
+          key: ci-install-test-user-${{ matrix.os }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Build clashtui (debug, locked, all-features)
+        run: cargo build --locked --all-features
+
+      - name: Put built clashtui on PATH
+        run: |
+          sudo cp ./target/debug/clashtui /usr/local/bin/clashtui
+          which clashtui
+          clashtui --version
+
+      - name: Set install params
+        id: params
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "repo=${{ inputs.repo }}" >> $GITHUB_OUTPUT
+            echo "branch=${{ inputs.branch }}" >> $GITHUB_OUTPUT
+          else
+            echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+            else
+              echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Run install script
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >
+          ./installs/install
+          --no-prompt --is-user --core all
+          --repo "${{ steps.params.outputs.repo }}"
+          --branch "${{ steps.params.outputs.branch }}"
+
+      - name: Install Python deps
+        run: python3 -m pip install ruamel.yaml || python3 -m pip install --break-system-packages ruamel.yaml
+
+      - name: Verify installed files
+        run: ./installs/tests/verify_install.py -v ~/.config/clashtui/config.yaml
+
+      - name: Verify clashtui binary
+        run: ~/.local/clashtui/bin/clashtui --version
+
+      - name: Install tmux (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tmux
+
+      - name: Verify clashtui startup
+        run: |
+          tmux new-session -d -s test '~/.local/clashtui/bin/clashtui; exec $SHELL'
+          sleep 30
+          tmux kill-session -t test 2>/dev/null || true
