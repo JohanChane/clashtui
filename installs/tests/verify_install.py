@@ -10,12 +10,17 @@ groups, and file ownership/permissions.
 """
 
 import argparse
-import grp
 import os
-import pwd
 import stat
 import subprocess
 import sys
+
+try:
+    import grp
+    import pwd
+    _HAS_UNIX = True
+except ImportError:
+    _HAS_UNIX = False
 
 
 try:
