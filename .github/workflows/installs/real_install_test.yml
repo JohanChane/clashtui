@@ -1,0 +1,44 @@
+name: Real Install Test
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'installs/**'
+      - 'contrib/**'
+      - '.github/workflows/installs/real_install_test.yml'
+  pull_request:
+    branches:
+      - main
+      - dev
+    paths:
+      - 'installs/**'
+      - 'contrib/**'
+      - '.github/workflows/installs/real_install_test.yml'
+  workflow_dispatch:
+
+jobs:
+  real-install:
+    name: Real Install (System Mode, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run install script (system mode)
+        run: sudo ./installs/install --no-prompt --core all
+
+      - name: Verify installed files
+        run: |
+          pip install ruamel.yaml
+          ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
+
+      - name: Verify clashtui binary
+        run: clashtui --version

@@ -25,7 +25,7 @@ param(
     [string]$Core = "all",
     [string]$Repo = "JohanChane/clashtui",
     [string]$Branch = "main",
-    [switch]$IsTest
+    [switch]$NoPrompt
 )
 
 $ErrorActionPreference = "Stop"
@@ -121,20 +121,6 @@ function Resolve-Paths {
     $script:CLASHTUI_CONFIG_DIR = Join-Path $env:APPDATA "clashtui"
     $script:MIHOMO_USER_CONFIG_DIR = Join-Path $CLASHTUI_CONFIG_DIR "mihomo"
     $script:SINGBOX_USER_CONFIG_DIR = Join-Path $CLASHTUI_CONFIG_DIR "sing-box"
-
-    if ($IsTest) {
-        $script:TestTmpDir = Join-Path $env:TEMP "clashtui-test"
-        $script:INSTALL_DIR = Join-Path $TestTmpDir "opt/clashtui"
-        $script:INSTALL_DIR_MIHOMO = Join-Path $INSTALL_DIR "mihomo"
-        $script:INSTALL_DIR_SINGBOX = Join-Path $INSTALL_DIR "sing-box"
-        $script:MIHOMO_CONFIG_DIR = Join-Path $INSTALL_DIR_MIHOMO "config"
-        $script:SINGBOX_CONFIG_DIR = Join-Path $INSTALL_DIR_SINGBOX "config"
-        $script:INSTALL_BIN = Join-Path $INSTALL_DIR "bin"
-        $script:CLASHTUI_CONFIG_DIR = Join-Path $TestTmpDir "config/clashtui"
-        $script:MIHOMO_USER_CONFIG_DIR = Join-Path $CLASHTUI_CONFIG_DIR "mihomo"
-        $script:SINGBOX_USER_CONFIG_DIR = Join-Path $CLASHTUI_CONFIG_DIR "sing-box"
-        Write-Info "Test mode: using temp directory $TestTmpDir"
-    }
 
     $script:SCRIPT_DIR = if ($MyInvocation.ScriptName) { Split-Path $MyInvocation.ScriptName -Parent } else { Get-Location }
     $contribLocal = Join-Path $SCRIPT_DIR "contrib"
@@ -249,13 +235,6 @@ function Install-Mihomo {
     }
 
     # Not found — download
-    if ($IsTest) {
-        $downloadUrl = "https://github.com/$MIHOMO_UPSTREAM/releases/latest"
-        Write-Info "[TEST] Would download mihomo from: $downloadUrl"
-        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        return
-    }
-
     $arch = Get-Architecture
     $os = Get-OS
 
@@ -325,13 +304,6 @@ function Install-SingBox {
     }
 
     # Not found — download
-    if ($IsTest) {
-        $downloadUrl = "https://github.com/$SINGBOX_UPSTREAM/releases/latest"
-        Write-Info "[TEST] Would download sing-box from: $downloadUrl"
-        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        return
-    }
-
     $arch = Get-Architecture
     $os = Get-OS
 
@@ -403,14 +375,6 @@ function Install-ClashTui {
     }
 
     # Not found — download
-    if ($IsTest) {
-        $downloadUrl = "https://github.com/$Repo/releases/latest"
-        Write-Info "[TEST] Would download clashtui from: $downloadUrl"
-        New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        New-ClashTuiConfig $CoreType
-        return
-    }
-
     $arch = Get-Architecture
     $os = Get-OS
 
@@ -582,14 +546,22 @@ function New-CoreConfigs {
 
 # --- Optional downloads ---
 function Invoke-OptionalDownloads {
-    if ($IsTest) {
-        Write-Info "[TEST] Skipping interactive template/rules-dat download prompts"
-        return
+    if ($NoPrompt) {
+        Write-Info "--no-prompt: downloading all optional items"
     }
 
     if ($Core -eq "mihomo" -or $Core -eq "all") {
-        $response = Read-Host "Do you want to download templates for mihomo? (y/N)"
-        if ($response -eq "y" -or $response -eq "Y") {
+        if ($NoPrompt) {
+            $dlTpl = $true
+            $dlDat = $true
+        } else {
+            $response = Read-Host "Do you want to download templates for mihomo? (y/N)"
+            $dlTpl = ($response -eq "y" -or $response -eq "Y")
+            $response = Read-Host "Do you want to download rules-dat? (y/N)"
+            $dlDat = ($response -eq "y" -or $response -eq "Y")
+        }
+
+        if ($dlTpl) {
             Write-Info "Downloading mihomo templates..."
             Copy-Contrib "templates/mihomo/common_tpl.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates/common_tpl.yaml")
             Copy-Contrib "templates/mihomo/generic_tpl.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates/generic_tpl.yaml")
@@ -598,8 +570,7 @@ function Invoke-OptionalDownloads {
             Copy-Contrib "templates/mihomo/generic_tpl_with_ruleset.yaml" (Join-Path $MIHOMO_USER_CONFIG_DIR "templates/generic_tpl_with_ruleset.yaml")
         }
 
-        $response = Read-Host "Do you want to download rules-dat? (y/N)"
-        if ($response -eq "y" -or $response -eq "Y") {
+        if ($dlDat) {
             Write-Info "Downloading rules-dat..."
             Invoke-WebRequest -Uri "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb" -OutFile (Join-Path $MIHOMO_CONFIG_DIR "geoip.metadb") -UseBasicParsing
             Invoke-WebRequest -Uri "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat" -OutFile (Join-Path $MIHOMO_CONFIG_DIR "GeoSite.dat") -UseBasicParsing
@@ -607,8 +578,14 @@ function Invoke-OptionalDownloads {
     }
 
     if ($Core -eq "sing-box" -or $Core -eq "all") {
-        $response = Read-Host "Do you want to download templates for sing-box? (y/N)"
-        if ($response -eq "y" -or $response -eq "Y") {
+        if ($NoPrompt) {
+            $dlSbtpl = $true
+        } else {
+            $response = Read-Host "Do you want to download templates for sing-box? (y/N)"
+            $dlSbtpl = ($response -eq "y" -or $response -eq "Y")
+        }
+
+        if ($dlSbtpl) {
             Write-Info "Downloading sing-box templates..."
             Copy-Contrib "templates/sing-box/v1.12-tun_common_tpl.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_common_tpl.json")
             Copy-Contrib "templates/sing-box/v1.12-tun_bypass.json" (Join-Path $SINGBOX_USER_CONFIG_DIR "templates/v1.12-tun_bypass.json")
@@ -618,14 +595,12 @@ function Invoke-OptionalDownloads {
 
 # --- Main ---
 function Main {
-    if ((-not $IsTest) -and (Get-OS) -ne "windows") {
+    if ((Get-OS) -ne "windows") {
         Write-ErrorLog "This script is for Windows only. Use the bash install script for Linux/macOS."
         exit 1
     }
 
-    if (-not $IsTest) {
-        Test-ValidInstallDir $InstallDir
-    }
+    Test-ValidInstallDir $InstallDir
     Resolve-Paths
 
     Write-Info "Install directory: $InstallDir"
