@@ -18,6 +18,15 @@ on:
       - 'contrib/**'
       - '.github/workflows/real_install_test.yml'
   workflow_dispatch:
+    inputs:
+      repo:
+        description: 'GitHub repository (owner/repo)'
+        required: false
+        default: 'JohanChane/clashtui'
+      branch:
+        description: 'Branch for install script and contrib'
+        required: false
+        default: 'main'
 
 jobs:
   unit-test-bash:
@@ -168,3 +177,51 @@ jobs:
       - name: Verify clashtui startup
         run: |
           ~/.local/clashtui/bin/clashtui & PID=$! ; sleep 120 && kill $PID 2>/dev/null ; wait $PID 2>/dev/null
+
+  test-triggered-binary:
+    name: Test Triggered Binary (${{ inputs.repo }} @ ${{ inputs.branch }})
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Install clashtui via remote script
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/${{ inputs.repo }}/refs/heads/${{ inputs.branch }}/installs/install" | \
+            bash -s -- --repo "${{ inputs.repo }}" --branch "${{ inputs.branch }}" --no-prompt --core all
+
+      - name: Basic verify - binary installed
+        run: |
+          file /usr/local/bin/clashtui
+          /usr/local/bin/clashtui --version
+
+      - name: Basic verify - config generated
+        run: cat ~/.config/clashtui/config.yaml
+
+      - name: Checkout project
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repo }}
+          ref: ${{ inputs.branch }}
+
+      - name: Install Python deps
+        run: python3 -m pip install ruamel.yaml || python3 -m pip install --break-system-packages ruamel.yaml
+
+      - name: Full verify installed files
+        run: |
+          cat ~/.config/clashtui/config.yaml
+          ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
+
+      - name: Test downloaded binary startup (120s)
+        run: |
+          hash -r
+          clashtui & PID=$! ; sleep 120 && kill $PID 2>/dev/null ; wait $PID 2>/dev/null
+
+      - name: Build release binary (locked, all features)
+        run: cargo build --release --locked --all-features
+
+      - name: Replace installed binary with built one
+        run: sudo cp ./target/release/clashtui /opt/clashtui/bin/clashtui
