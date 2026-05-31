@@ -28,22 +28,49 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
+          - macos-latest
+          - windows-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run install script (system mode)
+      - name: Run install script (bash)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: sudo ./installs/install --no-prompt --core all
 
-      - name: Verify installed files
-        run: |
-          pip install ruamel.yaml
-          ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
+      - name: Run install script (PowerShell)
+        if: runner.os == 'Windows'
+        run: ./installs/install.ps1 -NoPrompt -Core all -InstallDir C:\ClashTui
+        shell: pwsh
 
-      - name: Verify clashtui binary
+      - name: Install Python deps
+        run: pip install ruamel.yaml
+
+      - name: Verify installed files (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
+
+      - name: Verify installed files (Windows)
+        if: runner.os == 'Windows'
+        run: ./installs/tests/verify_install.py $env:APPDATA\clashtui\config.yaml
+        shell: pwsh
+
+      - name: Verify clashtui binary (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: clashtui --version
 
-      - name: Verify clashtui startup
+      - name: Verify clashtui binary (Windows)
+        if: runner.os == 'Windows'
+        run: C:\ClashTui\bin\clashtui.exe --version
+        shell: pwsh
+
+      - name: Verify clashtui startup (Linux/macOS)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
           hash -r
           clashtui
+
+      - name: Verify clashtui startup (Windows)
+        if: runner.os == 'Windows'
+        run: C:\ClashTui\bin\clashtui.exe
+        shell: pwsh
