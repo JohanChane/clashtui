@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  real-install:
+  real-install-sys:
     name: Real Install (System Mode, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     permissions:
@@ -91,3 +91,38 @@ jobs:
           $p | Wait-Process -Timeout 120 -ErrorAction SilentlyContinue
           if (!$p.HasExited) { $p.Kill() }
         shell: pwsh
+
+  real-install-user:
+    name: Real Install (User Mode, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run install script
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./installs/install --no-prompt --is-user --core all
+
+      - name: Install Python deps
+        run: python3 -m pip install ruamel.yaml || python3 -m pip install --break-system-packages ruamel.yaml
+
+      - name: Verify installed files
+        run: |
+          cat ~/.config/clashtui/config.yaml
+          ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
+
+      - name: Verify clashtui binary
+        run: ~/.local/clashtui/bin/clashtui --version
+
+      - name: Verify clashtui startup
+        run: |
+          ~/.local/clashtui/bin/clashtui & PID=$! ; sleep 120 && kill $PID 2>/dev/null ; wait $PID 2>/dev/null
