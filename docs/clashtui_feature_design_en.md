@@ -1393,3 +1393,14 @@ Since the only operation is substituting `%s` with a path, the focus is on ensur
 - For the `canonicalize()` UNC paths issue, convert UNC paths to cmd-compatible paths only when passing them to cmd (many applications don't support UNC paths).
 - Do not run `explorer "path"`; use `cmd /c start "" "path"` instead.
 - To prevent `Command::args` from double-escaping quoted arguments, use `raw_arg`.
+
+## serde_yaml and Windows BOM
+
+```
+❯ ./clashtui
+Failed to load Config
+Failed to parse \\?\C:\Users\johan\AppData\Roaming\clashtui\config.yaml
+```
+
+The error occurs because serde_yaml fails to handle files with a BOM (Byte Order Mark).
+A temporary workaround is to generate BOM-free files in install.ps1; the better approach is to handle this directly in the Rust code of clashtui.

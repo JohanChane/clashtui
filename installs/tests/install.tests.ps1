@@ -149,3 +149,28 @@ Describe "irm|iex remote execution (ScriptName null)" {
         $result | Should -BeLike "*[\\/]*"
     }
 }
+
+Describe "UTF-8 BOM-free file writing" {
+    It "Writes UTF-8 without BOM using [System.IO.File]::WriteAllText" {
+        $testPath = Join-Path $env:TEMP "bom_test_$(Get-Random).txt"
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($testPath, "test", $utf8NoBom)
+
+        $bytes = [System.IO.File]::ReadAllBytes($testPath)
+        $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+        $hasBom | Should -Be $false
+
+        Remove-Item $testPath -Force -ErrorAction SilentlyContinue
+    }
+
+    It "Set-Content -Encoding UTF8 writes with BOM (reference test)" {
+        $testPath = Join-Path $env:TEMP "bom_test2_$(Get-Random).txt"
+        Set-Content -Path $testPath -Value "test" -Encoding UTF8
+
+        $bytes = [System.IO.File]::ReadAllBytes($testPath)
+        $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+        $hasBom | Should -Be $true
+
+        Remove-Item $testPath -Force -ErrorAction SilentlyContinue
+    }
+}

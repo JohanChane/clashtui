@@ -465,7 +465,8 @@ extra:
   open_dir_cmd:
 "@
 
-    Set-Content -Path $configPath -Value $configContent -Encoding UTF8
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($configPath, $configContent, $utf8NoBom)
     Write-Info "Config written to: $configPath"
 
     # Create directories and template_proxy_providers.yaml
@@ -495,7 +496,7 @@ extra:
 
         $tppPath = Join-Path $MIHOMO_USER_CONFIG_DIR "template_proxy_providers.yaml"
         if (-not (Test-Path $tppPath)) {
-            Set-Content -Path $tppPath -Value $tppContent -Encoding UTF8
+            [System.IO.File]::WriteAllText($tppPath, $tppContent, $utf8NoBom)
         }
     }
 
@@ -506,7 +507,7 @@ extra:
 
         $tppPath = Join-Path $SINGBOX_USER_CONFIG_DIR "template_proxy_providers.yaml"
         if (-not (Test-Path $tppPath)) {
-            Set-Content -Path $tppPath -Value $tppContent -Encoding UTF8
+            [System.IO.File]::WriteAllText($tppPath, $tppContent, $utf8NoBom)
         }
     }
 }

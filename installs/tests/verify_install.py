@@ -323,6 +323,18 @@ def is_system_install(cfg: dict) -> bool:
     return False
 
 
+def check_no_bom(label: str, path: str) -> None:
+    global errors
+    with open(path, "rb") as f:
+        head = f.read(3)
+    has_bom = len(head) >= 3 and head[:3] == b"\xef\xbb\xbf"
+    if has_bom:
+        print(f"{RED}[FAIL]{NC} {label} contains UTF-8 BOM (3 bytes EF BB BF): {path}")
+        errors += 1
+    else:
+        print(f"{GREEN}[OK]{NC} {label} no BOM: {path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Verify clashtui install by checking paths in config.yaml."
@@ -357,6 +369,14 @@ def main() -> None:
                 print_file(f"{core_name} core config", core["config_path"])
         show_service_files(cfg)
         print()
+
+    check_no_bom("clashtui config.yaml", config_path)
+
+    mihomo_cfg = cfg.get("mihomo", {})
+    if isinstance(mihomo_cfg, dict):
+        mihomo_cfg = mihomo_cfg.get("core", {})
+    if isinstance(mihomo_cfg, dict) and mihomo_cfg.get("config_path"):
+        check_no_bom("mihomo core config", mihomo_cfg["config_path"])
 
     def get_section(section_name: str) -> dict:
         section = cfg.get(section_name, {})

@@ -1281,3 +1281,16 @@ Command::new("cmd")
 -   对于 canonicalize 的 UNC paths 问题, 只要将 path 传给 cmd 命令时, 才将 UNC paths 转换为 cmd 命令支持的 path (很多 app 不支持 UNC paths)
 -   不要以 `explorer "path"` 运行命令, 要以 `cmd /c start "" "path"` 的方式运行命令
 -   为防止 Command::args 对引号参数的二次转义, 使用 raw_arg
+
+## serde_yaml 与 Windows BOM
+
+```
+❯ ./clashtui
+Failed to load Config
+Failed to parse \\?\C:\Users\johan\AppData\Roaming\clashtui\config.yaml
+```
+
+是因为 serde_yaml 处理有 BOM 的文件时会出错。
+
+临时的解决方案是: install.ps1 生成非 BOM 的文件, 更好的做法是在 clashtui rust 代码中处理。
+
