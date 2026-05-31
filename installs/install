@@ -34,6 +34,14 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+github_api_curl() {
+  if [ -n "$GITHUB_TOKEN" ]; then
+    curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "$@"
+  else
+    curl -s "$@"
+  fi
+}
+
 backup_dir() {
   [ -d "$1" ] || return 0
   local i=1
@@ -295,11 +303,17 @@ download_mihomo() {
   local os=$(detect_os)
 
   local temp_dir=$(mktemp -d)
-  latest_version=$(curl -s "https://api.github.com/repos/${MIHOMO_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  latest_version=$(github_api_curl "https://api.github.com/repos/${MIHOMO_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
   local download_url
 
   if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
     log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  if [ -z "$latest_version" ]; then
+    log_error "Failed to determine latest mihomo version (API rate limit or network issue)"
     rm -rf "$temp_dir"
     return 1
   fi
@@ -313,10 +327,14 @@ download_mihomo() {
     rm -rf "$temp_dir"
     return 1
   }
-  gunzip -c "$temp_dir/mihomo.gz" >"$temp_dir/mihomo"
+  gunzip -c "$temp_dir/mihomo.gz" >"$temp_dir/mihomo" || {
+    log_error "Failed to extract mihomo archive (possibly not a valid gzip file)"
+    rm -rf "$temp_dir"
+    return 1
+  }
 
   local binary_path
-  if [ -f "$temp_dir/mihomo" ]; then
+  if [ -f "$temp_dir/mihomo" ] && [ -s "$temp_dir/mihomo" ]; then
     binary_path="$temp_dir/mihomo"
   else
     log_error "Could not find binary in the downloaded archive"
@@ -336,12 +354,18 @@ download_singbox() {
 
   local temp_dir=$(mktemp -d)
   local tag_name
-  tag_name=$(curl -s "https://api.github.com/repos/${SINGBOX_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  tag_name=$(github_api_curl "https://api.github.com/repos/${SINGBOX_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
   # sing-box asset names strip the 'v' prefix (v1.12.3 → 1.12.3)
   latest_version="${tag_name#v}"
 
   if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
     log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  if [ -z "$tag_name" ]; then
+    log_error "Failed to determine latest sing-box version (API rate limit or network issue)"
     rm -rf "$temp_dir"
     return 1
   fi
@@ -355,12 +379,16 @@ download_singbox() {
     rm -rf "$temp_dir"
     return 1
   }
-  tar -xzf "$temp_dir/sing-box.tar.gz" -C "$temp_dir"
+  tar -xzf "$temp_dir/sing-box.tar.gz" -C "$temp_dir" || {
+    log_error "Failed to extract sing-box archive (possibly not a valid tar.gz file)"
+    rm -rf "$temp_dir"
+    return 1
+  }
 
   local binary_path
   binary_path=$(find "$temp_dir" -name "sing-box" -type f | head -1)
 
-  if [ -f "$binary_path" ]; then
+  if [ -f "$binary_path" ] && [ -s "$binary_path" ]; then
     $SUDO mkdir -p "$INSTALL_DIR_SINGBOX"
     $SUDO install -m 755 "$binary_path" "$INSTALL_DIR_SINGBOX/sing-box"
     if ! $IS_USER; then
@@ -381,10 +409,16 @@ download_clashtui() {
   local os=$(detect_os)
 
   local temp_dir=$(mktemp -d)
-  latest_version=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  latest_version=$(github_api_curl "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
   if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
     log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  if [ -z "$latest_version" ]; then
+    log_error "Failed to determine latest clashtui version (API rate limit or network issue)"
     rm -rf "$temp_dir"
     return 1
   fi
@@ -398,10 +432,14 @@ download_clashtui() {
     rm -rf "$temp_dir"
     return 1
   }
-  gunzip -c "$temp_dir/clashtui.gz" >"$temp_dir/clashtui"
+  gunzip -c "$temp_dir/clashtui.gz" >"$temp_dir/clashtui" || {
+    log_error "Failed to extract clashtui archive (possibly not a valid gzip file)"
+    rm -rf "$temp_dir"
+    return 1
+  }
 
   local binary_path
-  if [ -f "$temp_dir/clashtui" ]; then
+  if [ -f "$temp_dir/clashtui" ] && [ -s "$temp_dir/clashtui" ]; then
     binary_path="$temp_dir/clashtui"
   else
     log_error "Could not find binary in the downloaded archive"
@@ -1217,14 +1255,14 @@ main() {
   # Install cores
   case "$CORE_TYPE" in
   mihomo)
-    install_mihomo
+    install_mihomo || { log_error "Failed to install mihomo"; exit 1; }
     ;;
   sing-box)
-    install_singbox
+    install_singbox || { log_error "Failed to install sing-box"; exit 1; }
     ;;
   all)
-    install_mihomo
-    install_singbox
+    install_mihomo || { log_error "Failed to install mihomo"; exit 1; }
+    install_singbox || { log_error "Failed to install sing-box"; exit 1; }
     ;;
   esac
 

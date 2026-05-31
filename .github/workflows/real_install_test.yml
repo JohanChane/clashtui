@@ -23,6 +23,8 @@ jobs:
   real-install:
     name: Real Install (System Mode, ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -36,7 +38,7 @@ jobs:
 
       - name: Run install script (bash)
         if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: sudo ./installs/install --no-prompt --core all
+        run: sudo env GITHUB_TOKEN="${{ github.token }}" ./installs/install --no-prompt --core all
 
       - name: Run install script (PowerShell)
         if: runner.os == 'Windows'
