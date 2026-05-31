@@ -43,8 +43,14 @@ jobs:
         run: ./installs/install.ps1 -NoPrompt -Core all -InstallDir D:\ClashTui
         shell: pwsh
 
-      - name: Install Python deps
-        run: pip install --break-system-packages ruamel.yaml 2>/dev/null || pip install ruamel.yaml
+      - name: Install Python deps (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: python3 -m pip install ruamel.yaml || python3 -m pip install --break-system-packages ruamel.yaml
+
+      - name: Install Python deps (Windows)
+        if: runner.os == 'Windows'
+        run: pip install ruamel.yaml
+        shell: pwsh
 
       - name: Verify installed files (Linux/macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
