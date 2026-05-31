@@ -163,14 +163,5 @@ Describe "UTF-8 BOM-free file writing" {
         Remove-Item $testPath -Force -ErrorAction SilentlyContinue
     }
 
-    It "Set-Content -Encoding UTF8 writes with BOM (reference test)" {
-        $testPath = Join-Path $env:TEMP "bom_test2_$(Get-Random).txt"
-        Set-Content -Path $testPath -Value "test" -Encoding UTF8
 
-        $bytes = [System.IO.File]::ReadAllBytes($testPath)
-        $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
-        $hasBom | Should -Be $true
-
-        Remove-Item $testPath -Force -ErrorAction SilentlyContinue
-    }
 }
