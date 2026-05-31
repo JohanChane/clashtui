@@ -225,12 +225,12 @@ function Install-Mihomo {
         return
     }
 
-    # Found in PATH — link/copy to destination
+    # Found in PATH — create symlink
     $existing = Get-CommandPath "mihomo.exe"
     if ($existing) {
         Write-Info "Found mihomo in PATH: $existing, linking..."
         New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        Copy-Item -Path $existing -Destination $destExe -Force
+        New-Item -ItemType SymbolicLink -Path $destExe -Target $existing -Force | Out-Null
         Write-Info "Linked mihomo to: $destExe"
         return
     }
@@ -294,12 +294,12 @@ function Install-SingBox {
         return
     }
 
-    # Found in PATH — link/copy to destination
+    # Found in PATH — create symlink
     $existing = Get-CommandPath "sing-box.exe"
     if ($existing) {
         Write-Info "Found sing-box in PATH: $existing, linking..."
         New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        Copy-Item -Path $existing -Destination $destExe -Force
+        New-Item -ItemType SymbolicLink -Path $destExe -Target $existing -Force | Out-Null
         Write-Info "Linked sing-box to: $destExe"
         return
     }
@@ -364,12 +364,12 @@ function Install-ClashTui {
         return
     }
 
-    # Found in PATH — link/copy to destination
+    # Found in PATH — create symlink
     $existing = Get-CommandPath "clashtui.exe"
     if ($existing) {
         Write-Info "Found clashtui in PATH: $existing, linking..."
         New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        Copy-Item -Path $existing -Destination $destExe -Force
+        New-Item -ItemType SymbolicLink -Path $destExe -Target $existing -Force | Out-Null
         Write-Info "Linked clashtui to: $destExe"
         New-ClashTuiConfig $CoreType
         return
@@ -517,28 +517,26 @@ function New-CoreConfigs {
     Write-Info "Creating core config files..."
 
     if ($CoreType -eq "mihomo" -or $CoreType -eq "all") {
-        Backup-Dir $MIHOMO_CONFIG_DIR
         New-Item -ItemType Directory -Path $MIHOMO_CONFIG_DIR -Force | Out-Null
 
         $cfgSrc = "default_configs/mihomo/core_override_config.yaml"
+        Backup-File (Join-Path $MIHOMO_CONFIG_DIR "config.yaml")
         Copy-Contrib $cfgSrc (Join-Path $MIHOMO_CONFIG_DIR "config.yaml")
         Write-Info "Mihomo core config written to: $MIHOMO_CONFIG_DIR/config.yaml"
 
-        Backup-Dir $MIHOMO_USER_CONFIG_DIR
         New-Item -ItemType Directory -Path $MIHOMO_USER_CONFIG_DIR -Force | Out-Null
         Copy-Contrib $cfgSrc (Join-Path $MIHOMO_USER_CONFIG_DIR "core_override_config.yaml")
         Write-Info "Mihomo core override written to: $MIHOMO_USER_CONFIG_DIR/core_override_config.yaml"
     }
 
     if ($CoreType -eq "sing-box" -or $CoreType -eq "all") {
-        Backup-Dir $SINGBOX_CONFIG_DIR
         New-Item -ItemType Directory -Path $SINGBOX_CONFIG_DIR -Force | Out-Null
 
         $cfgSrc = "default_configs/sing-box/core_override_config.json"
+        Backup-File (Join-Path $SINGBOX_CONFIG_DIR "config.json")
         Copy-Contrib $cfgSrc (Join-Path $SINGBOX_CONFIG_DIR "config.json")
         Write-Info "Sing-box core config written to: $SINGBOX_CONFIG_DIR/config.json"
 
-        Backup-Dir $SINGBOX_USER_CONFIG_DIR
         New-Item -ItemType Directory -Path $SINGBOX_USER_CONFIG_DIR -Force | Out-Null
         Copy-Contrib $cfgSrc (Join-Path $SINGBOX_USER_CONFIG_DIR "core_override_config.json")
         Write-Info "Sing-box core override written to: $SINGBOX_USER_CONFIG_DIR/core_override_config.json"

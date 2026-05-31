@@ -1,17 +1,26 @@
 #!/usr/bin/env python3
 """Verify that all paths referenced in a clashtui config.yaml exist.
 
-Usage: verify_install.py <path-to-config.yaml>
+Usage: verify_install.py [--verbose] <path-to-config.yaml>
 
 When config.yaml has core_service.is_user: false, also verifies system users,
 groups, and file ownership/permissions.
+
+--verbose / -v  Print file trees of config/core install dirs and file contents.
 """
 
-import grp
+import argparse
 import os
-import pwd
 import stat
+import subprocess
 import sys
+
+try:
+    import grp
+    import pwd
+    _HAS_UNIX = True
+except ImportError:
+    _HAS_UNIX = False
 
 
 try:
@@ -25,6 +34,108 @@ GREEN = "\033[0;32m"
 NC = "\033[0m"
 
 errors = 0
+
+
+def _run_tree(dirpath: str) -> str | None:
+    try:
+        if sys.platform == "win32":
+            result = subprocess.run(
+                ["cmd", "/c", "tree", dirpath, "/F", "/A"],
+                capture_output=True, text=True, timeout=10,
+            )
+        else:
+            result = subprocess.run(
+                ["tree", "--noreport", dirpath],
+                capture_output=True, text=True, timeout=10,
+            )
+        if result.returncode == 0:
+            return result.stdout.rstrip()
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+    return None
+
+
+def print_tree(label: str, dirpath: str) -> None:
+    if not os.path.isdir(dirpath):
+        print(f"\n{RED}[MISSING]{NC} {label}: {dirpath}")
+        return
+    print(f"\n{GREEN}-- {label}: {dirpath}{NC}")
+    output = _run_tree(dirpath)
+    if output is None:
+        output = f"{RED}tree command failed for: {dirpath}{NC}"
+    print(output)
+
+
+def print_file(label: str, filepath: str) -> None:
+    if not os.path.isfile(filepath):
+        print(f"\n{RED}[MISSING]{NC} {label}: {filepath}")
+        return
+    print(f"\n{GREEN}-- {label}: {filepath}{NC}")
+    with open(filepath) as f:
+        print(f.read().rstrip())
+
+
+def _install_root(path: str) -> str:
+    return os.path.dirname(os.path.dirname(path))
+
+
+def find_install_roots(cfg: dict) -> set[str]:
+    roots = set()
+    for section_name in ("mihomo", "singbox"):
+        core = cfg.get(section_name, {})
+        if not isinstance(core, dict):
+            continue
+        core = core.get("core", {}) if isinstance(core, dict) else {}
+        for key in ("bin_path", "config_dir"):
+            p = core.get(key, "")
+            if p and os.path.isabs(p):
+                root = _install_root(p)
+                if root and root not in ("/", "/usr", "/usr/local"):
+                    roots.add(root)
+    return roots
+
+
+SERVICE_PATHS = {
+    ("linux", "systemd", False): "/usr/lib/systemd/system/{name}.service",
+    ("linux", "systemd", True): "~/.config/systemd/user/{name}.service",
+    ("linux", "openrc", False): "/etc/init.d/{name}",
+    ("linux", "openrc", True): "/etc/user/init.d/{name}",
+    ("darwin", "launchd", False): "/Library/LaunchDaemons/{name}.plist",
+    ("darwin", "launchd", True): "~/Library/LaunchAgents/{name}.plist",
+}
+
+
+def resolve_service_path(name: str, controller: str, is_user: bool) -> str | None:
+    platform = sys.platform
+    if platform.startswith("linux"):
+        plat = "linux"
+    elif platform == "darwin":
+        plat = "darwin"
+    else:
+        return None
+    controller = (controller or "").lower()
+    template = SERVICE_PATHS.get((plat, controller, is_user))
+    if template is None:
+        return None
+    return os.path.expanduser(template.format(name=name))
+
+
+def show_service_files(cfg: dict) -> None:
+    for section_name in ("mihomo", "singbox"):
+        section = cfg.get(section_name, {})
+        if not isinstance(section, dict):
+            continue
+        svc = section.get("core_service", {})
+        if not isinstance(svc, dict):
+            continue
+        name = svc.get("service_name", "")
+        controller = svc.get("service_controller", "")
+        is_user = svc.get("is_user", True)
+        if not name or not controller:
+            continue
+        path = resolve_service_path(name, controller, is_user)
+        if path:
+            print_file(f"{section_name} service file", path)
 
 
 def check_path(label: str, path: str, kind: str) -> None:
@@ -213,11 +324,15 @@ def is_system_install(cfg: dict) -> bool:
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        print(f"{RED}[ERROR]{NC} Usage: {sys.argv[0]} <path-to-config.yaml>", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Verify clashtui install by checking paths in config.yaml."
+    )
+    parser.add_argument("config_path", help="Path to clashtui config.yaml")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="Show file trees and config file contents")
+    args = parser.parse_args()
 
-    config_path = sys.argv[1]
+    config_path = args.config_path
     if not os.path.isfile(config_path):
         print(f"{RED}[ERROR]{NC} Config file not found: {config_path}", file=sys.stderr)
         sys.exit(1)
@@ -228,6 +343,20 @@ def main() -> None:
         yaml = YAML(typ="safe")
     with open(config_path) as f:
         cfg = yaml.load(f.read()) or {}
+
+    if args.verbose:
+        print_tree("clashtui config dir", config_dir)
+        for root in sorted(find_install_roots(cfg)):
+            print_tree("core install dir", root)
+        print_file("clashtui config.yaml", config_path)
+        for core_name in ("mihomo", "singbox"):
+            core = cfg.get(core_name, {})
+            if isinstance(core, dict):
+                core = core.get("core", {})
+            if isinstance(core, dict) and core.get("config_path"):
+                print_file(f"{core_name} core config", core["config_path"])
+        show_service_files(cfg)
+        print()
 
     def get_section(section_name: str) -> dict:
         section = cfg.get(section_name, {})
