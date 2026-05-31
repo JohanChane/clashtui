@@ -118,7 +118,7 @@ Describe "-NoPrompt parameter" {
 Describe "-IsTest is rejected" {
     It "Script rejects -IsTest parameter" {
         $scriptPath = (Resolve-Path (Join-Path $PSScriptRoot ".." "install.ps1")).Path
-        $result = & powershell -NoProfile -Command "& '$scriptPath' -IsTest -? 2>&1; exit `$LASTEXITCODE" 2>&1
+        $result = & powershell -NoProfile -Command "& '$scriptPath' -IsTest -InstallDir 'D:\clashtui-test' -Core mihomo 2>&1; exit `$LASTEXITCODE" 2>&1
         $LASTEXITCODE | Should -Not -Be 0
     }
 }
