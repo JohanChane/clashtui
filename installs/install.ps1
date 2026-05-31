@@ -191,6 +191,17 @@ function Get-CommandPath {
     return $null
 }
 
+function Resolve-BinaryPath {
+    param([string]$Name)
+    $source = Get-CommandPath $Name
+    if (-not $source) { return $null }
+    $real = & scoop which $Name 2>$null | Select-Object -First 1
+    if ($real -and (Test-Path $real.Trim())) {
+        return $real.Trim()
+    }
+    return $source
+}
+
 # --- Binary download ---
 function Get-LatestGithubRelease {
     param([string]$Repo)
@@ -225,13 +236,13 @@ function Install-Mihomo {
         return
     }
 
-    # Found in PATH — create symlink
-    $existing = Get-CommandPath "mihomo.exe"
+    # Found in PATH — copy
+    $existing = Resolve-BinaryPath "mihomo.exe"
     if ($existing) {
-        Write-Info "Found mihomo in PATH: $existing, linking..."
+        Write-Info "Found mihomo in PATH: $existing, copying..."
         New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        New-Item -ItemType SymbolicLink -Path $destExe -Target $existing -Force | Out-Null
-        Write-Info "Linked mihomo to: $destExe"
+        Copy-Item $existing $destExe -Force
+        Write-Info "Copied mihomo to: $destExe"
         return
     }
 
@@ -294,13 +305,13 @@ function Install-SingBox {
         return
     }
 
-    # Found in PATH — create symlink
-    $existing = Get-CommandPath "sing-box.exe"
+    # Found in PATH — copy
+    $existing = Resolve-BinaryPath "sing-box.exe"
     if ($existing) {
-        Write-Info "Found sing-box in PATH: $existing, linking..."
+        Write-Info "Found sing-box in PATH: $existing, copying..."
         New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        New-Item -ItemType SymbolicLink -Path $destExe -Target $existing -Force | Out-Null
-        Write-Info "Linked sing-box to: $destExe"
+        Copy-Item $existing $destExe -Force
+        Write-Info "Copied sing-box to: $destExe"
         return
     }
 
@@ -364,13 +375,13 @@ function Install-ClashTui {
         return
     }
 
-    # Found in PATH — create symlink
-    $existing = Get-CommandPath "clashtui.exe"
+    # Found in PATH — copy
+    $existing = Resolve-BinaryPath "clashtui.exe"
     if ($existing) {
-        Write-Info "Found clashtui in PATH: $existing, linking..."
+        Write-Info "Found clashtui in PATH: $existing, copying..."
         New-Item -ItemType Directory -Path $destDir -Force | Out-Null
-        New-Item -ItemType SymbolicLink -Path $destExe -Target $existing -Force | Out-Null
-        Write-Info "Linked clashtui to: $destExe"
+        Copy-Item $existing $destExe -Force
+        Write-Info "Copied clashtui to: $destExe"
         New-ClashTuiConfig $CoreType
         return
     }
