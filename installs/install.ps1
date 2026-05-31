@@ -19,6 +19,7 @@
     .\install.ps1 -Core mihomo
 #>
 
+[CmdletBinding()]
 param(
     [string]$InstallDir = "D:\ClashTui",
     [ValidateSet("mihomo", "sing-box", "all")]
