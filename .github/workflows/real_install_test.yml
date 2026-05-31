@@ -40,11 +40,11 @@ jobs:
 
       - name: Run install script (PowerShell)
         if: runner.os == 'Windows'
-        run: ./installs/install.ps1 -NoPrompt -Core all -InstallDir C:\ClashTui
+        run: ./installs/install.ps1 -NoPrompt -Core all -InstallDir D:\ClashTui
         shell: pwsh
 
       - name: Install Python deps
-        run: pip install ruamel.yaml
+        run: pip install --break-system-packages ruamel.yaml 2>/dev/null || pip install ruamel.yaml
 
       - name: Verify installed files (Linux/macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
@@ -61,7 +61,7 @@ jobs:
 
       - name: Verify clashtui binary (Windows)
         if: runner.os == 'Windows'
-        run: C:\ClashTui\bin\clashtui.exe --version
+        run: D:\ClashTui\bin\clashtui.exe --version
         shell: pwsh
 
       - name: Verify clashtui startup (Linux/macOS)
@@ -72,5 +72,5 @@ jobs:
 
       - name: Verify clashtui startup (Windows)
         if: runner.os == 'Windows'
-        run: C:\ClashTui\bin\clashtui.exe
+        run: D:\ClashTui\bin\clashtui.exe
         shell: pwsh
