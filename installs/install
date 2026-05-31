@@ -755,15 +755,35 @@ create_core_configs() {
     fi
   fi
 
-  if [ ${#BACKED_UP_LIST[@]} -gt 0 ]; then
-    echo ""
-    log_info "Backups created:"
-    for entry in "${BACKED_UP_LIST[@]}"; do
-      echo "  $entry"
-    done
-  else
-    echo ""
-    log_info "No existing configs to backup"
+  if [ "$core_type" = "sing-box" ] || [ "$core_type" = "all" ]; then
+    backup_dir "$SINGBOX_CONFIG_DIR"
+    backup_file "${SINGBOX_CONFIG_DIR}/config.json" || true
+    $SUDO mkdir -p "$SINGBOX_CONFIG_DIR"
+
+    local singbox_cfg_src
+    if $IS_USER; then
+      singbox_cfg_src="default_configs/sing-box/core_override_config_no_tun.json"
+    else
+      singbox_cfg_src="default_configs/sing-box/core_override_config.json"
+    fi
+
+    copy_contrib "$singbox_cfg_src" "${SINGBOX_CONFIG_DIR}/config.json"
+    log_info "Sing-box core config written to: ${SINGBOX_CONFIG_DIR}/config.json"
+
+    # Also copy to clashtui config dir for profile management
+    backup_dir "$SINGBOX_USER_CONFIG_DIR"
+    mkdir -p "$SINGBOX_USER_CONFIG_DIR"
+    copy_contrib "$singbox_cfg_src" "${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
+    log_info "Sing-box core override written to: ${SINGBOX_USER_CONFIG_DIR}/core_override_config.json"
+
+    if ! $IS_USER; then
+      if $IS_MACOS; then
+        $SUDO chmod g+rw "${SINGBOX_CONFIG_DIR}/config.json"
+      else
+        $SUDO chown sing-box:sing-box "${SINGBOX_CONFIG_DIR}/config.json"
+        $SUDO chmod g+r "${SINGBOX_CONFIG_DIR}/config.json"
+      fi
+    fi
   fi
 }
 
