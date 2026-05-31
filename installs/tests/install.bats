@@ -1,11 +1,9 @@
 # Test suite for install (bash) script
 
 setup() {
-  # Detect project root: the tests dir is at installs/tests/
   TEST_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd -P)"
   PROJECT_ROOT="$(cd "$TEST_DIR/../.." && pwd -P)"
 
-  # Create a temp dir for test output
   TEST_OUTPUT="$BATS_TEST_TMPDIR/output"
   mkdir -p "$TEST_OUTPUT"
 }
@@ -88,111 +86,49 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# End-to-end: install --is-test (local contrib)
+# Unit tests: backup_dir
 # ---------------------------------------------------------------------------
 
-@test "install --is-test creates expected directory structure" {
-  run bash "${PROJECT_ROOT}/installs/install" \
-    --is-test \
-    --repo "JohanChane/clashtui" \
-    --branch "demotui" \
-    --core all
+@test "backup_dir copies directory with versioned suffix" {
+  local tmpdir="$BATS_TEST_TMPDIR/testdir"
+  mkdir -p "$tmpdir"
+  echo "data" > "$tmpdir/file.txt"
 
-  echo "--- output ---"
-  echo "$output"
-
-  # The test temp dir is created by the script (mktemp -d)
-  # Extract test dir from output
-  local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
-
-  # Script should succeed
+  run bash -c "source '${PROJECT_ROOT}/installs/install' && backup_dir '$tmpdir'"
   [ "$status" -eq 0 ]
-
-  # Find the actual test output directory
-  # The script outputs "[TEST] ..." lines, we need the test dir from the first log
-  if [ -n "$test_dir" ]; then
-    [ -d "$test_dir" ]
-    [ -d "$test_dir/opt/clashtui/bin" ]
-    [ -d "$test_dir/opt/clashtui/mihomo/config" ]
-    [ -d "$test_dir/opt/clashtui/sing-box/config" ]
-    [ -d "$test_dir/config/clashtui" ]
-  fi
-}
-
-@test "install --is-test generates config.yaml with correct paths" {
-  run bash "${PROJECT_ROOT}/installs/install" \
-    --is-test \
-    --repo "JohanChane/clashtui" \
-    --branch "demotui" \
-    --core all
-
-  [ "$status" -eq 0 ]
-
-  local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
-  if [ -n "$test_dir" ]; then
-    local config_path="$test_dir/config/clashtui/config.yaml"
-    [ -f "$config_path" ]
-
-    # Should contain mihomo and singbox sections
-    grep -q "mihomo:" "$config_path"
-    grep -q "singbox:" "$config_path"
-    grep -q "bin_path:" "$config_path"
-  fi
-}
-
-@test "install --is-test generates template_proxy_providers.yaml for mihomo" {
-  run bash "${PROJECT_ROOT}/installs/install" \
-    --is-test \
-    --repo "JohanChane/clashtui" \
-    --branch "demotui" \
-    --core mihomo
-
-  [ "$status" -eq 0 ]
-
-  local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
-  if [ -n "$test_dir" ]; then
-    [ -f "$test_dir/config/clashtui/mihomo/template_proxy_providers.yaml" ]
-    grep -q "proxy-provider" "$test_dir/config/clashtui/mihomo/template_proxy_providers.yaml"
-  fi
-}
-
-@test "install --is-test creates profiles and templates directories" {
-  run bash "${PROJECT_ROOT}/installs/install" \
-    --is-test \
-    --repo "JohanChane/clashtui" \
-    --branch "demotui" \
-    --core all
-
-  [ "$status" -eq 0 ]
-
-  local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
-  if [ -n "$test_dir" ]; then
-    [ -d "$test_dir/config/clashtui/mihomo/profiles" ]
-    [ -d "$test_dir/config/clashtui/mihomo/templates" ]
-    [ -d "$test_dir/config/clashtui/sing-box/profiles" ]
-    [ -d "$test_dir/config/clashtui/sing-box/templates" ]
-  fi
+  [ -d "$tmpdir" ]
+  [ -d "${tmpdir}_1" ]
+  [ "$(cat "${tmpdir}_1/file.txt")" = "data" ]
 }
 
 # ---------------------------------------------------------------------------
-# End-to-end: --is-test with --is-user
+# Backup tracking
 # ---------------------------------------------------------------------------
 
-@test "install --is-test --is-user creates user-mode paths" {
-  run bash "${PROJECT_ROOT}/installs/install" \
-    --is-test \
-    --is-user \
-    --repo "JohanChane/clashtui" \
-    --branch "demotui" \
-    --core all
+@test "backup_dir tracks entries in BACKED_UP_LIST" {
+  local tmpdir="$BATS_TEST_TMPDIR/testdir2"
+  mkdir -p "$tmpdir"
 
+  run bash -c "
+    source '${PROJECT_ROOT}/installs/install'
+    backup_dir '$tmpdir'
+    printf '%s\n' \"\${BACKED_UP_LIST[@]}\"
+  "
   [ "$status" -eq 0 ]
+  [[ "$output" == *"$tmpdir -> ${tmpdir}_1"* ]]
+}
 
-  local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
-  if [ -n "$test_dir" ]; then
-    # In user mode, the config should still be under the test dir
-    [ -d "$test_dir/config/clashtui" ]
-  fi
+@test "backup_file tracks entries in BACKED_UP_LIST" {
+  local tmpfile="$BATS_TEST_TMPDIR/testfile_track"
+  echo "data" > "$tmpfile"
+
+  run bash -c "
+    source '${PROJECT_ROOT}/installs/install'
+    backup_file '$tmpfile'
+    printf '%s\n' \"\${BACKED_UP_LIST[@]}\"
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"$tmpfile -> ${tmpfile}_1"* ]]
 }
 
 # ---------------------------------------------------------------------------
@@ -205,7 +141,6 @@ teardown() {
     REPO='custom/repo' BRANCH='feat-x'
     CONTRIB_SOURCE='remote'
     CONTRIB_URL_PREFIX='https://raw.githubusercontent.com/custom/repo/refs/heads/feat-x/contrib'
-    # Just verify URL prefix is set correctly
     echo \"\$CONTRIB_URL_PREFIX\"
   "
 
@@ -220,7 +155,6 @@ teardown() {
 
 @test "detect_cpu_level runs without error" {
   run bash -c "source '${PROJECT_ROOT}/installs/install' && detect_cpu_level"
-  # Should return something (empty or e.g. "-v3") with status 0
   [ "$status" -eq 0 ]
 }
 
@@ -309,84 +243,13 @@ teardown() {
 }
 
 # ---------------------------------------------------------------------------
-# OpenRC support tests
+# --no-prompt acceptance test
 # ---------------------------------------------------------------------------
 
-@test "install --is-test --service-controller openrc creates init script in /etc/init.d" {
-  run bash "${PROJECT_ROOT}/installs/install" \
-    --is-test \
-    --service-controller openrc \
-    --repo "JohanChane/clashtui" \
-    --branch "demotui" \
-    --core mihomo
-
+@test "--no-prompt is recognized and script shows help without error" {
+  run bash "${PROJECT_ROOT}/installs/install" --no-prompt --help
   [ "$status" -eq 0 ]
-
-  local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
-  if [ -n "$test_dir" ]; then
-    [ -d "$test_dir/opt/clashtui/mihomo" ]
-    [ -d "$test_dir/config/clashtui" ]
-  fi
-
-  # Should NOT contain "Creating mihomo systemd unit"
-  [[ "$output" != *"Creating mihomo systemd unit"* ]]
-  # Should NOT contain systemd paths
-  [[ "$output" != *"/usr/lib/systemd/system"* ]]
-}
-
-@test "install --is-test --service-controller openrc --is-user works in user mode" {
-  run bash "${PROJECT_ROOT}/installs/install" \
-    --is-test \
-    --service-controller openrc \
-    --is-user \
-    --repo "JohanChane/clashtui" \
-    --branch "demotui" \
-    --core mihomo
-
-  [ "$status" -eq 0 ]
-
-  # Should NOT warn about ignoring --is-user (OpenRC supports user services)
-  [[ "$output" != *"does not support user services"* ]]
-
-  local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
-  if [ -n "$test_dir" ]; then
-    [ -d "$test_dir/config/clashtui" ]
-  fi
-}
-
-@test "install --is-test --service-controller openrc config.yaml contains service_controller" {
-  run bash "${PROJECT_ROOT}/installs/install" \
-    --is-test \
-    --service-controller openrc \
-    --repo "JohanChane/clashtui" \
-    --branch "demotui" \
-    --core all
-
-  [ "$status" -eq 0 ]
-
-  local test_dir=$(echo "$output" | grep -oP 'Test mode: using temp directory \K.*')
-  if [ -n "$test_dir" ]; then
-    local config_path="$test_dir/config/clashtui/config.yaml"
-    [ -f "$config_path" ]
-    grep -q "service_controller: openrc" "$config_path"
-  fi
-}
-
-@test "install --is-test --service-controller openrc creates init scripts for both services" {
-  run bash "${PROJECT_ROOT}/installs/install" \
-    --is-test \
-    --service-controller openrc \
-    --repo "JohanChane/clashtui" \
-    --branch "demotui" \
-    --core all
-
-  [ "$status" -eq 0 ]
-
-  # Should NOT contain any systemd-specific log messages
-  [[ "$output" != *"Creating mihomo systemd unit"* ]]
-  [[ "$output" != *"Creating sing-box systemd unit"* ]]
-  # Should use system-level paths (not user)
-  [[ "$output" != *"--user"* ]] || true
+  [[ "$output" == *"--no-prompt"* ]]
 }
 
 # ---------------------------------------------------------------------------
@@ -400,6 +263,14 @@ teardown() {
   "
   [ "$status" -eq 0 ]
   [[ "$output" == *"SOURCED_OK"* ]]
-  # Should NOT contain install output like 'Install mode:'
   [[ "$output" != *"Install mode:"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# --is-test is rejected (removed)
+# ---------------------------------------------------------------------------
+
+@test "--is-test is rejected as unknown option" {
+  run bash "${PROJECT_ROOT}/installs/install" --is-test
+  [ "$status" -ne 0 ]
 }

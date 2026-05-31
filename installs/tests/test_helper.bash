@@ -6,8 +6,6 @@ setup() {
   BRANCH="main"
   CORE_TYPE="all"
   IS_USER=false
-  IS_TEST=true
-  TEST_TMPDIR="$BATS_TEST_TMPDIR"
   MIHOMO_UPSTREAM="MetaCubeX/mihomo"
   SINGBOX_UPSTREAM="SagerNet/sing-box"
 

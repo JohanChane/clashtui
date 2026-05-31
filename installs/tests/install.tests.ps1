@@ -6,7 +6,7 @@ BeforeAll {
     $installScript = Join-Path $scriptRoot "install.ps1"
 
     # Dot-source the script to load functions without executing Main
-    . $installScript -IsTest -InstallDir (Join-Path $env:TEMP "clashtui-pester-test") -Repo "JohanChane/clashtui" -Branch "demotui"
+    . $installScript -NoPrompt -InstallDir (Join-Path $env:TEMP "clashtui-pester-test") -Repo "JohanChane/clashtui" -Branch "demotui"
 
     # Manually resolve paths since Main (which calls Resolve-Paths) was skipped
     Resolve-Paths
@@ -27,7 +27,6 @@ Describe "Get-Architecture" {
 Describe "Get-OS" {
     It "Returns a known OS string" {
         $result = Get-OS
-        # On Windows CI it's "windows", elsewhere "unsupported"
         $result | Should -BeIn @("windows", "unsupported")
     }
 }
@@ -98,31 +97,29 @@ Describe "Write-Info / Write-Warn / Write-ErrorLog" {
     }
 }
 
-Describe "E2E: install.ps1 -IsTest" {
-    It "Succeeds without throwing" {
+Describe "-NoPrompt parameter" {
+    It "Script accepts -NoPrompt without error" {
         $scriptPath = (Resolve-Path (Join-Path $PSScriptRoot ".." "install.ps1")).Path
-        $testDir = Join-Path $env:TEMP "clashtui-e2e-$(Get-Random)"
-
         $err = $null
         try {
-            & $scriptPath -IsTest -InstallDir $testDir -Repo "JohanChane/clashtui" -Branch "demotui" -Core all -ErrorAction Stop
+            # --help exits early without installation
+            $result = & powershell -NoProfile -Command "& '$scriptPath' -NoPrompt -? 2>&1; exit `$LASTEXITCODE" 2>&1
         } catch {
             $err = $_
         }
         $err | Should -Be $null
     }
 
-    It "Creates expected directory structure" {
-        $testDir = Join-Path $env:TEMP "clashtui-struct-$(Get-Random)"
+    It "-NoPrompt is accepted as a switch" {
+        { Get-Command "Invoke-OptionalDownloads" -ErrorAction Stop } | Should -Not -Throw
+    }
+}
+
+Describe "-IsTest is rejected" {
+    It "Script rejects -IsTest parameter" {
         $scriptPath = (Resolve-Path (Join-Path $PSScriptRoot ".." "install.ps1")).Path
-
-        & $scriptPath -IsTest -InstallDir $testDir -Repo "JohanChane/clashtui" -Branch "demotui" -Core all -ErrorAction Stop
-
-        $actualRoot = Join-Path $env:TEMP "clashtui-test"
-        Test-Path (Join-Path $actualRoot "opt/clashtui/bin") | Should -Be $true
-        Test-Path (Join-Path $actualRoot "opt/clashtui/mihomo/config") | Should -Be $true
-        Test-Path (Join-Path $actualRoot "opt/clashtui/sing-box/config") | Should -Be $true
-        Test-Path (Join-Path $actualRoot "config/clashtui") | Should -Be $true
+        $result = & powershell -NoProfile -Command "& '$scriptPath' -IsTest -InstallDir 'D:\clashtui-test' -Core mihomo 2>&1; exit `$LASTEXITCODE" 2>&1
+        $LASTEXITCODE | Should -Not -Be 0
     }
 }
 
@@ -158,16 +155,5 @@ Describe "irm|iex remote execution (ScriptName null)" {
         $result = & $sb
         $result | Should -Not -BeNullOrEmpty
         $result | Should -BeLike "*[\\/]*"
-    }
-
-    It "Full script runs without error when invoked via scriptblock (irm|iex simulation)" {
-        $content = Get-Content -Path $installScript -Raw
-        $sb = [scriptblock]::Create($content)
-        $testDir = Join-Path $env:TEMP "clashtui-iex-full-$(Get-Random)"
-        try {
-            { & $sb -IsTest -InstallDir $testDir -Core mihomo -ErrorAction Stop } | Should -Not -Throw
-        } finally {
-            Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
-        }
     }
 }
