@@ -335,7 +335,10 @@ download_singbox() {
   local os=$(detect_os)
 
   local temp_dir=$(mktemp -d)
-  latest_version=$(curl -s "https://api.github.com/repos/${SINGBOX_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  local tag_name
+  tag_name=$(curl -s "https://api.github.com/repos/${SINGBOX_UPSTREAM}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  # sing-box asset names strip the 'v' prefix (v1.12.3 → 1.12.3)
+  latest_version="${tag_name#v}"
 
   if [ "$arch" = "unsupported" ] || [ "$os" = "unsupported" ]; then
     log_error "Unsupported architecture ($(uname -m)) or OS ($(uname -s))"
@@ -344,7 +347,7 @@ download_singbox() {
   fi
 
   download_url="https://github.com/${SINGBOX_UPSTREAM}/releases/latest/download/sing-box-${latest_version}-${os}-${arch}.tar.gz"
-  log_info "Detected: OS=$os, Arch=$arch, LatestVersion=$latest_version"
+  log_info "Detected: OS=$os, Arch=$arch, Version=$latest_version"
   log_info "Downloading: $download_url"
 
   curl -L "$download_url" -o "$temp_dir/sing-box.tar.gz" || {
