@@ -42,3 +42,8 @@ jobs:
 
       - name: Verify clashtui binary
         run: clashtui --version
+
+      - name: Verify clashtui startup
+        run: |
+          hash -r
+          clashtui
