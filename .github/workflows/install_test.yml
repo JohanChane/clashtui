@@ -1,4 +1,4 @@
-name: Real Install Test
+name: Install Test
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
     paths:
       - 'installs/**'
       - 'contrib/**'
-      - '.github/workflows/real_install_test.yml'
+      - '.github/workflows/install_test.yml'
   pull_request:
     branches:
       - main
@@ -16,7 +16,7 @@ on:
     paths:
       - 'installs/**'
       - 'contrib/**'
-      - '.github/workflows/real_install_test.yml'
+      - '.github/workflows/install_test.yml'
   workflow_dispatch:
     inputs:
       repo:
@@ -30,7 +30,7 @@ on:
 
 jobs:
   unit-test-bash:
-    name: Unit Test (Bash, ${{ matrix.os }})
+    name: Unit Test (${{ matrix.os }}, Bash)
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -38,30 +38,24 @@ jobs:
         os:
           - ubuntu-latest
           - macos-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Install bats (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
         run: sudo npm install -g bats
-
       - name: Install bats (macOS)
         if: matrix.os == 'macos-latest'
         run: brew install bats-core
-
       - name: Run bats tests
         run: bats installs/tests/install.bats
 
   unit-test-powershell:
-    name: Unit Test (PowerShell, Windows)
+    name: Unit Test (Windows, PowerShell)
     runs-on: windows-latest
     strategy:
       fail-fast: false
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Run Pester tests
         run: |
           Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser
@@ -69,36 +63,97 @@ jobs:
           Invoke-Pester -Path installs/tests/install.tests.ps1 -Output Detailed
         shell: pwsh
 
-  real-install-sys:
+  install-test:
     needs: [unit-test-bash, unit-test-powershell]
-    name: Real Install (System Mode, ${{ matrix.os }})
+    name: Install Test (${{ matrix.os }}, ${{ matrix.mode }})
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
+        os: [ubuntu-latest, macos-latest]
+        mode: [system, user]
+        include:
+          - os: windows-latest
+            mode: system
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run install script (bash)
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo
+          key: ci-install-test-${{ matrix.os }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Build clashtui (debug, locked, all-features)
+        run: cargo build --locked --all-features
+
+      - name: Put built clashtui on PATH (Linux/macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: |
+          sudo cp ./target/debug/clashtui /usr/local/bin/clashtui
+          which clashtui
+          clashtui --version
+
+      - name: Pre-stage built clashtui (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Path D:\ClashTui\bin -Force
+          Copy-Item ./target/debug/clashtui.exe D:\ClashTui\bin\clashtui.exe
+          Get-Command D:\ClashTui\bin\clashtui.exe
+          D:\ClashTui\bin\clashtui.exe --version
+        shell: pwsh
+
+      - name: Set install params
+        id: params
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "repo=${{ inputs.repo }}" >> $GITHUB_OUTPUT
+            echo "branch=${{ inputs.branch }}" >> $GITHUB_OUTPUT
+          else
+            echo "repo=${{ github.repository }}" >> $GITHUB_OUTPUT
+            if [ "${{ github.event_name }}" = "pull_request" ]; then
+              echo "branch=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+            else
+              echo "branch=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Run install script (Linux/macOS, system)
+        if: (runner.os == 'Linux' || runner.os == 'macOS') && matrix.mode == 'system'
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: ./installs/install --no-prompt --core all
+        run: >
+          ./installs/install
+          --no-prompt --core all
+          --repo "${{ steps.params.outputs.repo }}"
+          --branch "${{ steps.params.outputs.branch }}"
 
-      - name: Run install script (PowerShell)
+      - name: Run install script (Linux/macOS, user)
+        if: (runner.os == 'Linux' || runner.os == 'macOS') && matrix.mode == 'user'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: >
+          ./installs/install
+          --no-prompt --is-user --core all
+          --repo "${{ steps.params.outputs.repo }}"
+          --branch "${{ steps.params.outputs.branch }}"
+
+      - name: Run install script (Windows)
         if: runner.os == 'Windows'
-        run: ./installs/install.ps1 -NoPrompt -Core all -InstallDir D:\ClashTui
+        run: >
+          ./installs/install.ps1
+          -NoPrompt -Core all
+          -InstallDir D:\ClashTui
+          -Repo "${{ steps.params.outputs.repo }}"
+          -Branch "${{ steps.params.outputs.branch }}"
         shell: pwsh
 
       - name: Install Python deps (Linux/macOS)
-        if: runner.os != 'Windows'
+        if: runner.os == 'Linux' || runner.os == 'macOS'
         run: python3 -m pip install ruamel.yaml || python3 -m pip install --break-system-packages ruamel.yaml
 
       - name: Install Python deps (Windows)
@@ -114,19 +169,23 @@ jobs:
 
       - name: Verify installed files (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           Get-Content $env:APPDATA\clashtui\config.yaml
           ./installs/tests/verify_install.py $env:APPDATA\clashtui\config.yaml
-        shell: pwsh
 
-      - name: Verify clashtui binary (Linux/macOS)
-        if: runner.os == 'Linux' || runner.os == 'macOS'
+      - name: Verify clashtui binary (Linux/macOS, system)
+        if: (runner.os == 'Linux' || runner.os == 'macOS') && matrix.mode == 'system'
         run: clashtui --version
+
+      - name: Verify clashtui binary (Linux/macOS, user)
+        if: (runner.os == 'Linux' || runner.os == 'macOS') && matrix.mode == 'user'
+        run: ~/.local/clashtui/bin/clashtui --version
 
       - name: Verify clashtui binary (Windows)
         if: runner.os == 'Windows'
-        run: D:\ClashTui\bin\clashtui.exe --version
         shell: pwsh
+        run: D:\ClashTui\bin\clashtui.exe --version
 
       - name: Verify clashtui startup (Linux/macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
@@ -136,92 +195,8 @@ jobs:
 
       - name: Verify clashtui startup (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           $p = Start-Process -FilePath 'D:\ClashTui\bin\clashtui.exe' -PassThru -NoNewWindow
           $p | Wait-Process -Timeout 120 -ErrorAction SilentlyContinue
           if (!$p.HasExited) { $p.Kill() }
-        shell: pwsh
-
-  real-install-user:
-    needs: [unit-test-bash, unit-test-powershell]
-    name: Real Install (User Mode, ${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-latest
-          - macos-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run install script
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: ./installs/install --no-prompt --is-user --core all
-
-      - name: Install Python deps
-        run: python3 -m pip install ruamel.yaml || python3 -m pip install --break-system-packages ruamel.yaml
-
-      - name: Verify installed files
-        run: |
-          cat ~/.config/clashtui/config.yaml
-          ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
-
-      - name: Verify clashtui binary
-        run: ~/.local/clashtui/bin/clashtui --version
-
-      - name: Verify clashtui startup
-        run: |
-          ~/.local/clashtui/bin/clashtui & PID=$! ; sleep 120 && kill $PID 2>/dev/null ; wait $PID 2>/dev/null
-
-  test-triggered-binary:
-    name: Test Triggered Binary (${{ inputs.repo }} @ ${{ inputs.branch }})
-    if: github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - name: Install clashtui via remote script
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          curl -fsSL "https://raw.githubusercontent.com/${{ inputs.repo }}/refs/heads/${{ inputs.branch }}/installs/install" | \
-            bash -s -- --repo "${{ inputs.repo }}" --branch "${{ inputs.branch }}" --no-prompt --core all
-
-      - name: Basic verify - binary installed
-        run: |
-          file /usr/local/bin/clashtui
-          /usr/local/bin/clashtui --version
-
-      - name: Basic verify - config generated
-        run: cat ~/.config/clashtui/config.yaml
-
-      - name: Checkout project
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ inputs.repo }}
-          ref: ${{ inputs.branch }}
-
-      - name: Install Python deps
-        run: python3 -m pip install ruamel.yaml || python3 -m pip install --break-system-packages ruamel.yaml
-
-      - name: Full verify installed files
-        run: |
-          cat ~/.config/clashtui/config.yaml
-          ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
-
-      - name: Test downloaded binary startup (120s)
-        run: |
-          hash -r
-          clashtui & PID=$! ; sleep 120 && kill $PID 2>/dev/null ; wait $PID 2>/dev/null
-
-      - name: Build release binary (locked, all features)
-        run: cargo build --release --locked --all-features
-
-      - name: Replace installed binary with built one
-        run: sudo cp ./target/release/clashtui /opt/clashtui/bin/clashtui
