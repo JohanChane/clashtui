@@ -148,16 +148,12 @@ jobs:
 
       - name: Verify installed files (Linux/macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: |
-          cat ~/.config/clashtui/config.yaml
-          ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
+        run: ./installs/tests/verify_install.py -v ~/.config/clashtui/config.yaml
 
       - name: Verify installed files (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          Get-Content $env:APPDATA\clashtui\config.yaml
-          ./installs/tests/verify_install.py $env:APPDATA\clashtui\config.yaml
+        run: ./installs/tests/verify_install.py -v $env:APPDATA\clashtui\config.yaml
 
       - name: Verify clashtui binary (Linux/macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
@@ -246,9 +242,7 @@ jobs:
         run: python3 -m pip install ruamel.yaml || python3 -m pip install --break-system-packages ruamel.yaml
 
       - name: Verify installed files
-        run: |
-          cat ~/.config/clashtui/config.yaml
-          ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
+        run: ./installs/tests/verify_install.py -v ~/.config/clashtui/config.yaml
 
       - name: Verify clashtui binary
         run: ~/.local/clashtui/bin/clashtui --version

@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Verify that all paths referenced in a clashtui config.yaml exist.
 
-Usage: verify_install.py <path-to-config.yaml>
+Usage: verify_install.py [--verbose] <path-to-config.yaml>
 
 When config.yaml has core_service.is_user: false, also verifies system users,
 groups, and file ownership/permissions.
+
+--verbose / -v  Print file trees of config/core install dirs and file contents.
 """
 
+import argparse
 import grp
 import os
 import pwd
@@ -25,6 +28,54 @@ GREEN = "\033[0;32m"
 NC = "\033[0m"
 
 errors = 0
+
+
+def _walk_tree(dirpath: str) -> str:
+    lines = [dirpath]
+    for root, dirs, files in os.walk(dirpath):
+        dirs.sort()
+        level = root.replace(dirpath, "").count(os.sep) + 1
+        for name in sorted(files):
+            prefix = "│  " * (level - 1) + "├── "
+            lines.append(f"{prefix}{name}")
+    return "\n".join(lines)
+
+
+def print_tree(label: str, dirpath: str) -> None:
+    if not os.path.isdir(dirpath):
+        print(f"\n{RED}[MISSING]{NC} {label}: {dirpath}")
+        return
+    print(f"\n{GREEN}── {label}: {dirpath}{NC}")
+    print(_walk_tree(dirpath))
+
+
+def print_file(label: str, filepath: str) -> None:
+    if not os.path.isfile(filepath):
+        print(f"\n{RED}[MISSING]{NC} {label}: {filepath}")
+        return
+    print(f"\n{GREEN}── {label}: {filepath}{NC}")
+    with open(filepath) as f:
+        print(f.read().rstrip())
+
+
+def _install_root(path: str) -> str:
+    return os.path.dirname(os.path.dirname(path))
+
+
+def find_install_roots(cfg: dict) -> set[str]:
+    roots = set()
+    for section_name in ("mihomo", "singbox"):
+        core = cfg.get(section_name, {})
+        if not isinstance(core, dict):
+            continue
+        core = core.get("core", {}) if isinstance(core, dict) else {}
+        for key in ("bin_path", "config_dir"):
+            p = core.get(key, "")
+            if p and os.path.isabs(p):
+                root = _install_root(p)
+                if root and root not in ("/", "/usr", "/usr/local"):
+                    roots.add(root)
+    return roots
 
 
 def check_path(label: str, path: str, kind: str) -> None:
@@ -213,11 +264,15 @@ def is_system_install(cfg: dict) -> bool:
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        print(f"{RED}[ERROR]{NC} Usage: {sys.argv[0]} <path-to-config.yaml>", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Verify clashtui install by checking paths in config.yaml."
+    )
+    parser.add_argument("config_path", help="Path to clashtui config.yaml")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="Show file trees and config file contents")
+    args = parser.parse_args()
 
-    config_path = sys.argv[1]
+    config_path = args.config_path
     if not os.path.isfile(config_path):
         print(f"{RED}[ERROR]{NC} Config file not found: {config_path}", file=sys.stderr)
         sys.exit(1)
@@ -228,6 +283,19 @@ def main() -> None:
         yaml = YAML(typ="safe")
     with open(config_path) as f:
         cfg = yaml.load(f.read()) or {}
+
+    if args.verbose:
+        print_tree("clashtui config dir", config_dir)
+        for root in sorted(find_install_roots(cfg)):
+            print_tree("core install dir", root)
+        print_file("clashtui config.yaml", config_path)
+        for core_name in ("mihomo", "singbox"):
+            core = cfg.get(core_name, {})
+            if isinstance(core, dict):
+                core = core.get("core", {})
+            if isinstance(core, dict) and core.get("config_path"):
+                print_file(f"{core_name} core config", core["config_path"])
+        print()
 
     def get_section(section_name: str) -> dict:
         section = cfg.get(section_name, {})
