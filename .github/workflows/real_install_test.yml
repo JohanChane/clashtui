@@ -58,11 +58,15 @@ jobs:
 
       - name: Verify installed files (Linux/macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
+        run: |
+          cat ~/.config/clashtui/config.yaml
+          ./installs/tests/verify_install.py ~/.config/clashtui/config.yaml
 
       - name: Verify installed files (Windows)
         if: runner.os == 'Windows'
-        run: ./installs/tests/verify_install.py $env:APPDATA\clashtui\config.yaml
+        run: |
+          Get-Content $env:APPDATA\clashtui\config.yaml
+          ./installs/tests/verify_install.py $env:APPDATA\clashtui\config.yaml
         shell: pwsh
 
       - name: Verify clashtui binary (Linux/macOS)
