@@ -58,7 +58,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run Pester tests
         run: |
-          Install-Module -Name Pester -Force -SkipPublisherCheck -Scope CurrentUser
           Import-Module Pester
           Invoke-Pester -Path installs/tests/install.tests.ps1 -Output Detailed
         shell: pwsh
@@ -169,6 +168,10 @@ jobs:
         shell: pwsh
         run: D:\ClashTui\bin\clashtui.exe --version
 
+      - name: Install tmux (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tmux
+
       - name: Verify clashtui startup (Linux/macOS)
         if: runner.os == 'Linux' || runner.os == 'macOS'
         run: |
@@ -249,6 +252,10 @@ jobs:
 
       - name: Verify clashtui binary
         run: ~/.local/clashtui/bin/clashtui --version
+
+      - name: Install tmux (macOS)
+        if: runner.os == 'macOS'
+        run: brew install tmux
 
       - name: Verify clashtui startup
         run: |
