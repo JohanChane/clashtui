@@ -38,7 +38,9 @@ jobs:
 
       - name: Run install script (bash)
         if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: sudo env GITHUB_TOKEN="${{ github.token }}" ./installs/install --no-prompt --core all
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: ./installs/install --no-prompt --core all
 
       - name: Run install script (PowerShell)
         if: runner.os == 'Windows'
