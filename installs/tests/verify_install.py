@@ -33,7 +33,7 @@ RED = "\033[0;31m"
 GREEN = "\033[0;32m"
 NC = "\033[0m"
 
-errors = 0
+ERROR_COUNT = 0
 
 
 def _run_tree(dirpath: str) -> str | None:
@@ -136,10 +136,14 @@ def show_service_files(cfg: dict) -> None:
         path = resolve_service_path(name, controller, is_user)
         if path:
             print_file(f"{section_name} service file", path)
+        if not os.path.exists(path):
+            print(f"\n{RED}[MISSING]{NC} {section_name} service file not found: {path}")
+            global ERROR_COUNT
+            ERROR_COUNT += 1
 
 
 def check_path(label: str, path: str, kind: str) -> None:
-    global errors
+    global ERROR_COUNT
     if not path:
         return
     missing = False
@@ -151,7 +155,7 @@ def check_path(label: str, path: str, kind: str) -> None:
         missing = not (os.path.isfile(path) and os.access(path, os.X_OK))
     if missing:
         print(f"{RED}[MISSING]{NC} {label} {kind} not found: {path}")
-        errors += 1
+        ERROR_COUNT += 1
     else:
         print(f"{GREEN}[OK]{NC} {label}: {path}")
 
@@ -181,71 +185,71 @@ def user_in_group(user: str, group: str) -> bool:
 
 
 def check_user(label: str, name: str) -> None:
-    global errors
+    global ERROR_COUNT
     if user_exists(name):
         print(f"{GREEN}[OK]{NC} user {label}: {name}")
     else:
         print(f"{RED}[MISSING]{NC} user {label} not found: {name}")
-        errors += 1
+        ERROR_COUNT += 1
 
 
 def check_group(label: str, name: str) -> None:
-    global errors
+    global ERROR_COUNT
     if group_exists(name):
         print(f"{GREEN}[OK]{NC} group {label}: {name}")
     else:
         print(f"{RED}[MISSING]{NC} group {label} not found: {name}")
-        errors += 1
+        ERROR_COUNT += 1
 
 
 def check_user_in_group(user: str, group: str) -> None:
-    global errors
+    global ERROR_COUNT
     if user_in_group(user, group):
         print(f"{GREEN}[OK]{NC} user '{user}' is in group '{group}'")
     else:
         print(f"{RED}[MISSING]{NC} user '{user}' is not in group '{group}'")
-        errors += 1
+        ERROR_COUNT += 1
 
 
 def check_owner(label: str, path: str, expected_user: str, expected_group: str) -> None:
-    global errors
+    global ERROR_COUNT
     st = os.stat(path)
     owner = pwd.getpwuid(st.st_uid).pw_name
     grp_name = grp.getgrgid(st.st_gid).gr_name
     ok = True
     if owner != expected_user:
         print(f"{RED}[FAIL]{NC} {label} owner: expected {expected_user}, got {owner}")
-        errors += 1
+        ERROR_COUNT += 1
         ok = False
     if grp_name != expected_group:
         print(f"{RED}[FAIL]{NC} {label} group: expected {expected_group}, got {grp_name}")
-        errors += 1
+        ERROR_COUNT += 1
         ok = False
     if ok:
         print(f"{GREEN}[OK]{NC} {label} owner: {owner}:{grp_name}")
 
 
 def check_group_readable(label: str, path: str) -> None:
-    global errors
+    global ERROR_COUNT
     st = os.stat(path)
     if st.st_mode & stat.S_IRGRP:
         print(f"{GREEN}[OK]{NC} {label} group-readable: {path}")
     else:
         print(f"{RED}[FAIL]{NC} {label} not group-readable: {path}")
-        errors += 1
+        ERROR_COUNT += 1
 
 
 def check_group_writable(label: str, path: str) -> None:
-    global errors
+    global ERROR_COUNT
     st = os.stat(path)
     if st.st_mode & stat.S_IWGRP:
         print(f"{GREEN}[OK]{NC} {label} group-writable: {path}")
     else:
         print(f"{RED}[FAIL]{NC} {label} not group-writable: {path}")
-        errors += 1
+        ERROR_COUNT += 1
 
 
-def verify_system(cfg: dict) -> None:
+def verify_system_install(cfg: dict) -> None:
     is_linux = sys.platform.startswith("linux")
     is_macos = sys.platform == "darwin"
     if not (is_linux or is_macos):
@@ -301,6 +305,10 @@ def verify_system(cfg: dict) -> None:
                 check_group_writable("singbox config_dir", config_dir)
 
 
+def verify_user_install(cfg: dict) -> None:
+    pass
+
+
 def is_system_install(cfg: dict) -> bool:
     mihomo = cfg.get("mihomo", {})
     if isinstance(mihomo, dict):
@@ -324,53 +332,19 @@ def is_system_install(cfg: dict) -> bool:
 
 
 def check_no_bom(label: str, path: str) -> None:
-    global errors
+    global ERROR_COUNT
     with open(path, "rb") as f:
         head = f.read(3)
     has_bom = len(head) >= 3 and head[:3] == b"\xef\xbb\xbf"
     if has_bom:
         print(f"{RED}[FAIL]{NC} {label} contains UTF-8 BOM (3 bytes EF BB BF): {path}")
-        errors += 1
+        ERROR_COUNT += 1
     else:
         print(f"{GREEN}[OK]{NC} {label} no BOM: {path}")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Verify clashtui install by checking paths in config.yaml."
-    )
-    parser.add_argument("config_path", help="Path to clashtui config.yaml")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="Show file trees and config file contents")
-    args = parser.parse_args()
-
-    config_path = args.config_path
-    if not os.path.isfile(config_path):
-        print(f"{RED}[ERROR]{NC} Config file not found: {config_path}", file=sys.stderr)
-        sys.exit(1)
-
+def check_clashtui_config(config_path, yaml, cfg) -> None:
     config_dir = os.path.dirname(os.path.realpath(config_path))
-
-    with open(config_path) as f:
-        yaml = YAML(typ="safe")
-    with open(config_path) as f:
-        cfg = yaml.load(f.read()) or {}
-
-    if args.verbose:
-        print_tree("clashtui config dir", config_dir)
-        for root in sorted(find_install_roots(cfg)):
-            print_tree("core install dir", root)
-        print_file("clashtui config.yaml", config_path)
-        for core_name in ("mihomo", "singbox"):
-            core = cfg.get(core_name, {})
-            if isinstance(core, dict):
-                core = core.get("core", {})
-            if isinstance(core, dict) and core.get("config_path"):
-                print_file(f"{core_name} core config", core["config_path"])
-        show_service_files(cfg)
-        print()
-
-    check_no_bom("clashtui config.yaml", config_path)
 
     mihomo_cfg = cfg.get("mihomo", {})
     if isinstance(mihomo_cfg, dict):
@@ -397,14 +371,53 @@ def main() -> None:
     check_path("default_keymap.yaml", os.path.join(config_dir, "default_keymap.yaml"), "file")
     check_path("default_theme.yaml", os.path.join(config_dir, "default_theme.yaml"), "file")
 
-    if is_system_install(cfg):
-        verify_system(cfg)
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Verify clashtui install by checking paths in config.yaml."
+    )
+    parser.add_argument("config_path", help="Path to clashtui config.yaml")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="Show file trees and config file contents")
+    args = parser.parse_args()
 
-    if errors == 0:
+    config_path = args.config_path
+    if not os.path.isfile(config_path):
+        print(f"{RED}[ERROR]{NC} Config file not found: {config_path}", file=sys.stderr)
+        sys.exit(1)
+
+    config_dir = os.path.dirname(os.path.realpath(config_path))
+
+    with open(config_path) as f:
+        yaml = YAML(typ="safe")
+    with open(config_path) as f:
+        cfg = yaml.load(f.read()) or {}
+
+    if args.verbose:
+        print_file("clashtui config.yaml", config_path)
+        print_tree("clashtui config dir", config_dir)
+        for root in sorted(find_install_roots(cfg)):
+            print_tree("core install dir", root)
+        for core_name in ("mihomo", "singbox"):
+            core = cfg.get(core_name, {})
+            if isinstance(core, dict):
+                core = core.get("core", {})
+            if isinstance(core, dict) and core.get("config_path"):
+                print_file(f"{core_name} core config", core["config_path"])
+        show_service_files(cfg)
+        print()
+
+    check_clashtui_config(config_path, yaml, cfg)
+
+    if is_system_install(cfg):
+        verify_system_install(cfg)
+    else:
+        verify_user_install(cfg)
+
+    if ERROR_COUNT == 0:
         print(f"{GREEN}All verifications passed.{NC}")
         sys.exit(0)
     else:
-        print(f"{RED}{errors} check(s) failed.{NC}", file=sys.stderr)
+        print(f"{RED}{ERROR_COUNT} check(s) failed.{NC}", file=sys.stderr)
         sys.exit(1)
 
 
