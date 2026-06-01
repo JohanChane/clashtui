@@ -41,6 +41,14 @@ impl Proxies {
                 s.push_str(" UDP");
             }
         }
+        if let Some(d) = node.delay {
+            let delay_str = if d == 0 {
+                "  FAIL".to_owned()
+            } else {
+                format!("  {}ms", d)
+            };
+            s.push_str(&delay_str);
+        }
         s
     }
 
