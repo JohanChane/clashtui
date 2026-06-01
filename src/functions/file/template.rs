@@ -494,14 +494,20 @@ pub async fn update_profile_without_pp(
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_owned();
+            let hash = format!("{:x}", md5::compute(url.as_bytes()));
+            let fallback_path = format!("proxies/{hash}");
             let cfg_dir =
                 std::path::PathBuf::from(&crate::config::CONFIG.cfg_file.mihomo.core.config_dir);
             download_handles.push(tokio::task::spawn_blocking(move || {
-                if !pp_path.is_empty() {
-                    let dest = cfg_dir.join(&pp_path);
+                // Try pp_path first, then fallback to hash-based cache path
+                for candidate in [pp_path.as_str(), fallback_path.as_str()] {
+                    if candidate.is_empty() {
+                        continue;
+                    }
+                    let dest = cfg_dir.join(candidate);
                     if let Ok(buf) = std::fs::read(&dest) {
                         if let Ok(yaml) = serde_yml::from_slice::<serde_yml::Mapping>(&buf) {
-                            return (pp_name_clone, url, pp_path, Ok(yaml));
+                            return (pp_name_clone, url, candidate.to_owned(), Ok(yaml));
                         }
                     }
                 }
