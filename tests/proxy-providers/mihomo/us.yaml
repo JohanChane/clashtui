@@ -1,0 +1,18 @@
+proxies:
+  - name: "🇺🇸 US-01"
+    type: ssr
+    server: us1.example.com
+    port: 443
+    cipher: aes-128-gcm
+    password: "pwd-us-01"
+    protocol: origin
+    obfs: http_simple
+  - name: "🇺🇸 US-02"
+    type: vless
+    server: us2.example.com
+    port: 443
+    uuid: "uuid-us-02"
+    network: grpc
+    servername: us2.example.com
+    grpc-opts:
+      grpc-service-name: proxy

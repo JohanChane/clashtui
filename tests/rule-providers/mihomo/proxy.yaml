@@ -1,0 +1,7 @@
+payload:
+  - DOMAIN-SUFFIX,google.com,Proxy
+  - DOMAIN-SUFFIX,youtube.com,Proxy
+  - DOMAIN-SUFFIX,github.com,Proxy
+  - DOMAIN-KEYWORD,google,Proxy
+  - GEOIP,CN,DIRECT
+  - MATCH,Proxy

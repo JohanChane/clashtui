@@ -1,0 +1,14 @@
+proxies:
+  - name: "🇯🇵 JP-01"
+    type: ss
+    server: jp1.example.com
+    port: 8388
+    cipher: chacha20-ietf-poly1305
+    password: "pwd-jp-01"
+  - name: "🇯🇵 JP-02"
+    type: vmess
+    server: jp2.example.com
+    port: 8080
+    uuid: "uuid-jp-02"
+    alterId: 0
+    cipher: auto

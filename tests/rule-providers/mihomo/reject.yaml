@@ -1,0 +1,7 @@
+payload:
+  - DOMAIN-SUFFIX,ads.example.com,REJECT
+  - DOMAIN-SUFFIX,tracker.example.com,REJECT
+  - DOMAIN-KEYWORD,analytics,REJECT
+  - IP-CIDR,10.0.0.0/8,DIRECT
+  - IP-CIDR,127.0.0.0/8,DIRECT
+  - IP-CIDR6,::1/128,DIRECT

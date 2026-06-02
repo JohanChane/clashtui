@@ -468,16 +468,6 @@ pub async fn update_profile_without_pp(
         #[serde(flatten)]
         __others: serde_yml::Value,
     }
-    #[derive(serde::Deserialize, serde::Serialize, Debug)]
-    struct PGitem {
-        #[serde(rename = "use")]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        us_: Option<Vec<String>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        proxies: Option<Vec<String>>,
-        #[serde(flatten)]
-        __others: serde_yml::Value,
-    }
 
     let pp_proxies = if let Some(pps) = tpl.remove(PROXY_PROVIDERS) {
         let pps: HashMap<String, PPitem> = serde_yml::from_value(pps)?;
@@ -573,38 +563,7 @@ pub async fn update_profile_without_pp(
     };
 
     if !pp_proxies.is_empty() {
-        let pgs = tpl
-            .remove(PROXY_GROUPS)
-            .ok_or(anyhow::anyhow!("{PROXY_GROUPS} not found"))?;
-        let mut pgs: Vec<PGitem> = serde_yml::from_value(pgs)?;
-        for pg in &mut pgs {
-            let mut proxies = pg.proxies.take().unwrap_or_default();
-            if let Some(uses) = pg.us_.take() {
-                for pp_name in uses {
-                    proxies.extend(
-                        pp_proxies
-                            .get(&pp_name)
-                            .iter()
-                            .flat_map(|v| v.iter())
-                            .filter_map(|proxy| proxy.get("name"))
-                            .map(|name| name.as_str().unwrap().to_owned()),
-                    );
-                }
-            }
-            if proxies.is_empty() {
-                pg.proxies = Some(vec!["COMPATIBLE".to_owned()]);
-            } else {
-                pg.proxies = Some(proxies);
-            }
-        }
-        tpl.insert(PROXY_GROUPS.into(), serde_yml::to_value(pgs)?);
-
-        let mut tpl_proxies: Vec<serde_yml::Value> = tpl
-            .remove(PROXIES)
-            .and_then(|v| serde_yml::from_value(v).ok())
-            .unwrap_or_default();
-        tpl_proxies.extend(pp_proxies.into_values().flatten());
-        tpl.insert(PROXIES.into(), tpl_proxies.into());
+        tpl = inline_proxy_providers(tpl, pp_proxies)?;
     }
 
     // --- Rule-Providers ---
@@ -695,17 +654,81 @@ pub async fn update_profile_without_pp(
                 }
             }
         }
-        if !all_rules.is_empty() {
-            let mut existing_rules: Vec<serde_yml::Value> = tpl
-                .remove(RULES)
-                .and_then(|v| serde_yml::from_value(v).ok())
-                .unwrap_or_default();
-            existing_rules.extend(all_rules);
-            tpl.insert(RULES.into(), existing_rules.into());
-        }
+        tpl = inline_rule_providers(tpl, &all_rules);
     }
 
     Ok((tpl, statuses))
+}
+
+pub fn inline_proxy_providers(
+    mut tpl: serde_yml::Mapping,
+    pp_proxies: HashMap<String, Vec<serde_yml::Value>>,
+) -> anyhow::Result<serde_yml::Mapping> {
+    #[derive(serde::Deserialize, serde::Serialize, Debug)]
+    struct PGitem {
+        #[serde(rename = "use")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        us_: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        proxies: Option<Vec<String>>,
+        #[serde(flatten)]
+        __others: serde_yml::Value,
+    }
+
+    if pp_proxies.is_empty() {
+        return Ok(tpl);
+    }
+
+    let pgs = tpl
+        .remove(PROXY_GROUPS)
+        .ok_or(anyhow::anyhow!("{PROXY_GROUPS} not found"))?;
+    let mut pgs: Vec<PGitem> = serde_yml::from_value(pgs)?;
+    for pg in &mut pgs {
+        let mut proxies = pg.proxies.take().unwrap_or_default();
+        if let Some(uses) = pg.us_.take() {
+            for pp_name in uses {
+                proxies.extend(
+                    pp_proxies
+                        .get(&pp_name)
+                        .iter()
+                        .flat_map(|v| v.iter())
+                        .filter_map(|proxy| proxy.get("name"))
+                        .map(|name| name.as_str().unwrap().to_owned()),
+                );
+            }
+        }
+        pg.proxies = if proxies.is_empty() {
+            Some(vec!["COMPATIBLE".to_owned()])
+        } else {
+            Some(proxies)
+        };
+    }
+    tpl.insert(PROXY_GROUPS.into(), serde_yml::to_value(pgs)?);
+
+    let mut tpl_proxies: Vec<serde_yml::Value> = tpl
+        .remove(PROXIES)
+        .and_then(|v| serde_yml::from_value(v).ok())
+        .unwrap_or_default();
+    tpl_proxies.extend(pp_proxies.into_values().flatten());
+    tpl.insert(PROXIES.into(), tpl_proxies.into());
+
+    Ok(tpl)
+}
+
+pub fn inline_rule_providers(
+    mut tpl: serde_yml::Mapping,
+    all_rules: &[serde_yml::Value],
+) -> serde_yml::Mapping {
+    if all_rules.is_empty() {
+        return tpl;
+    }
+    let mut existing_rules: Vec<serde_yml::Value> = tpl
+        .remove(RULES)
+        .and_then(|v| serde_yml::from_value(v).ok())
+        .unwrap_or_default();
+    existing_rules.extend(all_rules.iter().cloned());
+    tpl.insert(RULES.into(), existing_rules.into());
+    tpl
 }
 
 /// Extract net resource URLs from a YAML profile and download them in
@@ -894,6 +917,231 @@ mod tests {
         let pg_names = HashMap::new();
         let result = resolve_template_placeholder("${PPG}", &pg_names, &ppg);
         assert!(result.is_err());
+    }
+
+    fn make_profile_yaml(
+        proxy_groups: serde_yml::Value,
+        proxies: serde_yml::Value,
+    ) -> serde_yml::Mapping {
+        let mut tpl = serde_yml::Mapping::new();
+        tpl.insert("proxy-groups".into(), proxy_groups);
+        tpl.insert("proxies".into(), proxies);
+        tpl
+    }
+
+    fn make_pp_proxies() -> HashMap<String, Vec<serde_yml::Value>> {
+        let mut pp = HashMap::new();
+        pp.insert(
+            "pvd0".to_string(),
+            vec![
+                serde_yml::from_str::<serde_yml::Value>("name: HK-01\ntype: ss\nserver: hk1.example.com\nport: 443").unwrap(),
+                serde_yml::from_str::<serde_yml::Value>("name: HK-02\ntype: vmess\nserver: hk2.example.com\nport: 8443").unwrap(),
+            ],
+        );
+        pp.insert(
+            "pvd1".to_string(),
+            vec![
+                serde_yml::from_str::<serde_yml::Value>("name: JP-01\ntype: ss\nserver: jp1.example.com\nport: 8388").unwrap(),
+            ],
+        );
+        pp
+    }
+
+    #[test]
+    fn inline_pp_replaces_use_with_proxy_names() {
+        let pp_proxies = make_pp_proxies();
+        let pg_str = r#"
+- name: Select
+  type: select
+  proxies:
+    - DIRECT
+- name: Auto
+  type: url-test
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+  use:
+    - pvd0
+    - pvd1
+- name: Direct
+  type: select
+  proxies:
+    - DIRECT
+"#;
+        let pgs = serde_yml::from_str(pg_str).unwrap();
+        let tpl = make_profile_yaml(pgs, serde_yml::Value::Sequence(vec![]));
+
+        let result = inline_proxy_providers(tpl, pp_proxies.clone()).unwrap();
+
+        let result_pgs: Vec<serde_yml::Value> = serde_yml::from_value(
+            result.get("proxy-groups").unwrap().clone(),
+        )
+        .unwrap();
+        let auto = &result_pgs[1];
+        let proxies: Vec<String> = auto
+            .get("proxies")
+            .and_then(|v| serde_yml::from_value(v.clone()).ok())
+            .unwrap();
+        assert_eq!(proxies, vec!["HK-01", "HK-02", "JP-01"]);
+        assert!(auto.get("use").is_none());
+
+        let result_all_proxies: Vec<serde_yml::Value> =
+            serde_yml::from_value(result.get("proxies").unwrap().clone()).unwrap();
+        assert_eq!(result_all_proxies.len(), 3);
+    }
+
+    #[test]
+    fn inline_pp_empty_use_gets_compatible() {
+        let pp_proxies = make_pp_proxies();
+        let pg_str = r#"
+- name: Empty
+  type: select
+  use:
+    - nonexistent
+"#;
+        let pgs = serde_yml::from_str(pg_str).unwrap();
+        let tpl = make_profile_yaml(pgs, serde_yml::Value::Sequence(vec![]));
+
+        let result = inline_proxy_providers(tpl, pp_proxies.clone()).unwrap();
+
+        let result_pgs: Vec<serde_yml::Value> = serde_yml::from_value(
+            result.get("proxy-groups").unwrap().clone(),
+        )
+        .unwrap();
+        let proxies: Vec<String> = result_pgs[0]
+            .get("proxies")
+            .and_then(|v| serde_yml::from_value(v.clone()).ok())
+            .unwrap();
+        assert_eq!(proxies, vec!["COMPATIBLE"]);
+    }
+
+    #[test]
+    fn inline_pp_preserves_direct_proxies() {
+        let pp_proxies = make_pp_proxies();
+        let pg_str = r#"
+- name: Select
+  type: select
+  proxies:
+    - DIRECT
+    - REJECT
+"#;
+        let pgs = serde_yml::from_str(pg_str).unwrap();
+        let tpl = make_profile_yaml(pgs, serde_yml::Value::Sequence(vec![]));
+
+        let result = inline_proxy_providers(tpl, pp_proxies.clone()).unwrap();
+
+        let result_pgs: Vec<serde_yml::Value> = serde_yml::from_value(
+            result.get("proxy-groups").unwrap().clone(),
+        )
+        .unwrap();
+        let proxies: Vec<String> = result_pgs[0]
+            .get("proxies")
+            .and_then(|v| serde_yml::from_value(v.clone()).ok())
+            .unwrap();
+        assert_eq!(proxies, vec!["DIRECT", "REJECT"]);
+    }
+
+    #[test]
+    fn inline_pp_noop_when_empty_pp_proxies() {
+        let pp_proxies: HashMap<String, Vec<serde_yml::Value>> = HashMap::new();
+        let pg_str = r#"
+- name: Select
+  type: select
+  proxies:
+    - DIRECT
+"#;
+        let pgs = serde_yml::from_str(pg_str).unwrap();
+        let tpl = make_profile_yaml(pgs, serde_yml::Value::Sequence(vec![]));
+        let tpl_clone = tpl.clone();
+
+        let result = inline_proxy_providers(tpl, pp_proxies.clone()).unwrap();
+        assert_eq!(result, tpl_clone);
+    }
+
+    #[test]
+    fn inline_rules_extends_existing() {
+        let mut tpl = serde_yml::Mapping::new();
+        tpl.insert(
+            "rules".into(),
+            serde_yml::to_value(vec!["MATCH,DIRECT"]).unwrap(),
+        );
+        let rules: Vec<serde_yml::Value> = vec![
+            serde_yml::Value::String("DOMAIN-SUFFIX,google.com,Proxy".into()),
+            serde_yml::Value::String("IP-CIDR,10.0.0.0/8,DIRECT".into()),
+        ];
+
+        let result = inline_rule_providers(tpl, &rules);
+
+        let result_rules: Vec<String> = result
+            .get("rules")
+            .and_then(|v| serde_yml::from_value(v.clone()).ok())
+            .unwrap();
+        assert_eq!(
+            result_rules,
+            vec![
+                "MATCH,DIRECT",
+                "DOMAIN-SUFFIX,google.com,Proxy",
+                "IP-CIDR,10.0.0.0/8,DIRECT"
+            ]
+        );
+    }
+
+    #[test]
+    fn inline_rules_noop_when_empty() {
+        let mut tpl = serde_yml::Mapping::new();
+        tpl.insert(
+            "rules".into(),
+            serde_yml::to_value(vec!["MATCH,DIRECT"]).unwrap(),
+        );
+        let tpl_clone = tpl.clone();
+
+        let result = inline_rule_providers(tpl, &[]);
+        assert_eq!(result, tpl_clone);
+    }
+
+    #[test]
+    fn inline_rules_creates_rules_when_missing() {
+        let tpl = serde_yml::Mapping::new();
+        let rules: Vec<serde_yml::Value> = vec![
+            serde_yml::Value::String("DOMAIN-SUFFIX,ads.example.com,REJECT".into()),
+        ];
+
+        let result = inline_rule_providers(tpl, &rules);
+
+        let result_rules: Vec<String> = result
+            .get("rules")
+            .and_then(|v| serde_yml::from_value(v.clone()).ok())
+            .unwrap();
+        assert_eq!(result_rules, vec!["DOMAIN-SUFFIX,ads.example.com,REJECT"]);
+    }
+
+    #[test]
+    fn inline_pp_combines_proxies_and_use() {
+        let pp_proxies = make_pp_proxies();
+        let pg_str = r#"
+- name: Combined
+  type: fallback
+  proxies:
+    - DIRECT
+  use:
+    - pvd0
+  url: https://www.gstatic.com/generate_204
+  interval: 300
+"#;
+        let pgs = serde_yml::from_str(pg_str).unwrap();
+        let tpl = make_profile_yaml(pgs, serde_yml::Value::Sequence(vec![]));
+
+        let result = inline_proxy_providers(tpl, pp_proxies.clone()).unwrap();
+
+        let result_pgs: Vec<serde_yml::Value> = serde_yml::from_value(
+            result.get("proxy-groups").unwrap().clone(),
+        )
+        .unwrap();
+        let proxies: Vec<String> = result_pgs[0]
+            .get("proxies")
+            .and_then(|v| serde_yml::from_value(v.clone()).ok())
+            .unwrap();
+        assert_eq!(proxies, vec!["DIRECT", "HK-01", "HK-02"]);
+        assert!(result_pgs[0].get("use").is_none());
     }
 }
 

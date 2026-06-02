@@ -1,0 +1,23 @@
+proxies:
+  - name: "🇭🇰 HK-01"
+    type: ss
+    server: hk1.example.com
+    port: 443
+    cipher: aes-256-gcm
+    password: "pwd-hk-01"
+  - name: "🇭🇰 HK-02"
+    type: vmess
+    server: hk2.example.com
+    port: 8443
+    uuid: "uuid-hk-02"
+    alterId: 0
+    cipher: auto
+    network: ws
+    ws-opts:
+      path: /ws
+  - name: "🇭🇰 HK-03"
+    type: trojan
+    server: hk3.example.com
+    port: 443
+    password: "pwd-hk-03"
+    sni: hk3.example.com
