@@ -746,4 +746,87 @@ mod tests {
         assert_eq!(child.udp, true);
         assert_eq!(child.tcp, false);
     }
+
+    fn load_singbox_fixture() -> IndexMap<String, Proxy> {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/apidata/sing-box/proxies.json"
+        );
+        let data = std::fs::read_to_string(path).expect("Failed to read sing-box fixture");
+        let response: ProxiesResponse =
+            serde_json::from_str(&data).expect("Failed to parse sing-box fixture");
+        response.proxies
+    }
+
+    #[test]
+    fn singbox_tree_builds_correct_top_level_groups() {
+        let proxies = load_singbox_fixture();
+        let tree = ProxyTree::build(ProxiesResponse {
+            proxies: proxies.clone(),
+        });
+        let top_names: Vec<&str> = tree.nodes.iter().map(|n| n.name.as_str()).collect();
+        assert!(top_names.contains(&"Entry"));
+        assert!(top_names.contains(&"Select-hajimi"));
+        assert!(top_names.contains(&"Select-manbo"));
+        assert!(!top_names.contains(&"hidden-node"));
+    }
+
+    #[test]
+    fn singbox_hidden_node_not_in_top_level() {
+        let proxies = load_singbox_fixture();
+        let hidden = proxies.get("hidden-node").expect("hidden-node missing");
+        assert!(hidden.hidden);
+
+        let tree = ProxyTree::build(ProxiesResponse {
+            proxies: proxies.clone(),
+        });
+        let top_names: Vec<&str> = tree.nodes.iter().map(|n| n.name.as_str()).collect();
+        assert!(!top_names.contains(&"hidden-node"));
+    }
+
+    #[test]
+    fn singbox_tcp_defaults_false_when_absent() {
+        let proxies = load_singbox_fixture();
+        let jp = proxies.get("🇯🇵 日本-优化").expect("JP node missing");
+        assert!(!jp.tcp);
+        assert!(jp.udp);
+    }
+
+    #[test]
+    fn singbox_tcp_true_when_explicit() {
+        let proxies = load_singbox_fixture();
+        let tcp_node = proxies.get("tcp-node").expect("tcp-node missing");
+        assert!(tcp_node.tcp);
+        assert!(!tcp_node.udp);
+    }
+
+    #[test]
+    fn singbox_alive_false_node() {
+        let proxies = load_singbox_fixture();
+        let dead = proxies.get("dead-node").expect("dead-node missing");
+        assert!(!dead.alive);
+        assert_eq!(dead.proxy_type, "Shadowsocks");
+    }
+
+    #[test]
+    fn singbox_trojan_node_type() {
+        let proxies = load_singbox_fixture();
+        let trojan = proxies.get("trojan-node").expect("trojan-node missing");
+        assert_eq!(trojan.proxy_type, "Trojan");
+        assert!(trojan.tcp);
+        assert!(trojan.udp);
+    }
+
+    #[test]
+    fn singbox_child_node_in_expanded_group() {
+        let proxies = load_singbox_fixture();
+        let mut tree = ProxyTree::build(ProxiesResponse {
+            proxies: proxies.clone(),
+        });
+        tree.expand_all(&proxies);
+        let tcp_child = tree.nodes.iter().find(|n| n.name == "tcp-node");
+        assert!(tcp_child.is_some());
+        assert_eq!(tcp_child.unwrap().tcp, true);
+        assert_eq!(tcp_child.unwrap().udp, false);
+    }
 }

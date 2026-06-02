@@ -452,3 +452,73 @@ pub mod api_log {
         })
     }
 }
+
+#[cfg(test)]
+mod connection_tests {
+    use super::connection::*;
+
+    fn load_singbox_connections() -> ConnInfo {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/apidata/sing-box/connections.json"
+        );
+        let data = std::fs::read_to_string(path).unwrap();
+        serde_json::from_str(&data).unwrap()
+    }
+
+    #[test]
+    fn singbox_conninfo_totals() {
+        let info = load_singbox_connections();
+        assert!(info.download_total > 0);
+        assert!(info.upload_total > 0);
+    }
+
+    #[test]
+    fn singbox_connections_has_entries() {
+        let info = load_singbox_connections();
+        let conns = info.connections.expect("connections missing");
+        assert!(!conns.is_empty());
+    }
+
+    #[test]
+    fn singbox_conn_has_chains() {
+        let info = load_singbox_connections();
+        let conn = &info.connections.unwrap()[0];
+        assert!(!conn.chains.is_empty());
+    }
+
+    #[test]
+    fn singbox_conn_metadata_empty_process_path() {
+        let info = load_singbox_connections();
+        for conn in info.connections.unwrap() {
+            assert_eq!(conn.metadata.process_path, "");
+        }
+    }
+
+    #[test]
+    fn singbox_conn_rule_is_some() {
+        let info = load_singbox_connections();
+        for conn in info.connections.unwrap() {
+            assert!(conn.rule.is_some());
+        }
+    }
+
+    #[test]
+    fn singbox_conn_udp_connection() {
+        let info = load_singbox_connections();
+        let conns = info.connections.unwrap();
+        let udp = conns
+            .iter()
+            .find(|c| c.metadata.network == "udp")
+            .expect("UDP connection missing");
+        assert_eq!(udp.metadata.destination_port, "53");
+        assert_eq!(udp.metadata.host, "");
+    }
+
+    #[test]
+    fn singbox_conn_has_destination_ip() {
+        let info = load_singbox_connections();
+        let conns = info.connections.unwrap();
+        assert!(conns[0].metadata.destination_ip.is_some());
+    }
+}

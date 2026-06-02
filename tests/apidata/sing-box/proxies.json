@@ -1,0 +1,561 @@
+{
+  "proxies": {
+    "GLOBAL": {
+      "all": [
+        "Entry",
+        "Select-hajimi",
+        "Select-manbo",
+        "Auto-hajimi",
+        "Auto-manbo",
+        "vmess-node001",
+        "过滤掉15条线路",
+        "🇯🇵 日本-优化",
+        "🇯🇵 日本-优化2",
+        "🇯🇵 日本-优化3",
+        "🇸🇬 新加坡-优化-Gemini-GPT",
+        "🇸🇬 新加坡-优化2-Gemini-GPT",
+        "🇸🇬 新加坡-优化3-Gemini",
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港-优化2-Gemini",
+        "🇭🇰 香港-优化3-Gemini",
+        "🇭🇰 香港WAP-优化-Gemini",
+        "🇭🇰 香港WAP-优化2-Gemini",
+        "🇭🇰 香港WAP-优化3-Gemini",
+        "🇮🇳 印度-优化",
+        "🇨🇳 台湾-优化",
+        "🇨🇳 台湾-优化2-GPT",
+        "🇨🇳 台湾-优化3",
+        "🇺🇸 美国LA-优化-GPT",
+        "🇺🇸 美国LA-优化2-GPT",
+        "🇺🇸 美国LA-优化3-GPT",
+        "🇨🇦 加拿大-优化",
+        "🇨🇦 加拿大-优化2",
+        "🇨🇦 加拿大-优化3",
+        "🇩🇪 德国-优化",
+        "🇩🇪 德国-优化2",
+        "🇬🇧 英国-优化-GPT",
+        "🇬🇧 英国-优化2",
+        "🇬🇧 英国-优化3",
+        "hidden-node",
+        "tcp-node",
+        "dead-node",
+        "trojan-node"
+      ],
+      "history": [],
+      "name": "GLOBAL",
+      "now": "Entry",
+      "type": "Fallback",
+      "udp": true
+    },
+    "Entry": {
+      "type": "Selector",
+      "name": "Entry",
+      "udp": true,
+      "history": [],
+      "now": "Select-hajimi",
+      "all": [
+        "Auto-hajimi",
+        "Auto-manbo",
+        "Select-hajimi",
+        "Select-manbo"
+      ]
+    },
+    "Select-hajimi": {
+      "type": "Selector",
+      "name": "Select-hajimi",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.213434923+08:00",
+          "delay": 566
+        }
+      ],
+      "now": "vmess-node001",
+      "all": [
+        "vmess-node001",
+        "tcp-node",
+        "trojan-node"
+      ]
+    },
+    "Select-manbo": {
+      "type": "Selector",
+      "name": "Select-manbo",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:45.156853946+08:00",
+          "delay": 141
+        }
+      ],
+      "now": "🇸🇬 新加坡-优化-Gemini-GPT",
+      "all": [
+        "过滤掉15条线路",
+        "🇯🇵 日本-优化",
+        "🇯🇵 日本-优化2",
+        "🇯🇵 日本-优化3",
+        "🇸🇬 新加坡-优化-Gemini-GPT",
+        "🇸🇬 新加坡-优化2-Gemini-GPT",
+        "🇸🇬 新加坡-优化3-Gemini",
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港-优化2-Gemini",
+        "🇭🇰 香港-优化3-Gemini",
+        "🇭🇰 香港WAP-优化-Gemini",
+        "🇭🇰 香港WAP-优化2-Gemini",
+        "🇭🇰 香港WAP-优化3-Gemini",
+        "🇮🇳 印度-优化",
+        "🇨🇳 台湾-优化",
+        "🇨🇳 台湾-优化2-GPT",
+        "🇨🇳 台湾-优化3",
+        "🇺🇸 美国LA-优化-GPT",
+        "🇺🇸 美国LA-优化2-GPT",
+        "🇺🇸 美国LA-优化3-GPT",
+        "🇨🇦 加拿大-优化",
+        "🇨🇦 加拿大-优化2",
+        "🇨🇦 加拿大-优化3",
+        "🇩🇪 德国-优化",
+        "🇩🇪 德国-优化2",
+        "🇬🇧 英国-优化-GPT",
+        "🇬🇧 英国-优化2",
+        "🇬🇧 英国-优化3",
+        "hidden-node",
+        "dead-node"
+      ]
+    },
+    "Auto-hajimi": {
+      "type": "URLTest",
+      "name": "Auto-hajimi",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.213434923+08:00",
+          "delay": 566
+        }
+      ],
+      "now": "vmess-node001",
+      "all": [
+        "vmess-node001",
+        "tcp-node",
+        "trojan-node"
+      ]
+    },
+    "Auto-manbo": {
+      "type": "URLTest",
+      "name": "Auto-manbo",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:45.156853946+08:00",
+          "delay": 141
+        }
+      ],
+      "now": "🇸🇬 新加坡-优化-Gemini-GPT",
+      "all": [
+        "过滤掉15条线路",
+        "🇯🇵 日本-优化",
+        "🇯🇵 日本-优化2",
+        "🇯🇵 日本-优化3",
+        "🇸🇬 新加坡-优化-Gemini-GPT",
+        "🇸🇬 新加坡-优化2-Gemini-GPT",
+        "🇸🇬 新加坡-优化3-Gemini",
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港-优化2-Gemini",
+        "🇭🇰 香港-优化3-Gemini",
+        "🇭🇰 香港WAP-优化-Gemini",
+        "🇭🇰 香港WAP-优化2-Gemini",
+        "🇭🇰 香港WAP-优化3-Gemini",
+        "🇮🇳 印度-优化",
+        "🇨🇳 台湾-优化",
+        "🇨🇳 台湾-优化2-GPT",
+        "🇨🇳 台湾-优化3",
+        "🇺🇸 美国LA-优化-GPT",
+        "🇺🇸 美国LA-优化2-GPT",
+        "🇺🇸 美国LA-优化3-GPT",
+        "🇨🇦 加拿大-优化",
+        "🇨🇦 加拿大-优化2",
+        "🇨🇦 加拿大-优化3",
+        "🇩🇪 德国-优化",
+        "🇩🇪 德国-优化2",
+        "🇬🇧 英国-优化-GPT",
+        "🇬🇧 英国-优化2",
+        "🇬🇧 英国-优化3",
+        "hidden-node",
+        "dead-node"
+      ]
+    },
+    "direct": {
+      "type": "Direct",
+      "name": "direct",
+      "udp": true,
+      "history": []
+    },
+    "block": {
+      "type": "Reject",
+      "name": "block",
+      "udp": true,
+      "history": []
+    },
+    "vmess-node001": {
+      "type": "VMess",
+      "name": "vmess-node001",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.213434923+08:00",
+          "delay": 566
+        }
+      ]
+    },
+    "过滤掉15条线路": {
+      "type": "VMess",
+      "name": "过滤掉15条线路",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:45.404489321+08:00",
+          "delay": 369
+        }
+      ]
+    },
+    "🇯🇵 日本-优化": {
+      "type": "VMess",
+      "name": "🇯🇵 日本-优化",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:45.396417785+08:00",
+          "delay": 358
+        }
+      ]
+    },
+    "🇯🇵 日本-优化2": {
+      "type": "VMess",
+      "name": "🇯🇵 日本-优化2",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:45.531270605+08:00",
+          "delay": 416
+        }
+      ]
+    },
+    "🇯🇵 日本-优化3": {
+      "type": "VMess",
+      "name": "🇯🇵 日本-优化3",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:47.93174498+08:00",
+          "delay": 440
+        }
+      ]
+    },
+    "🇸🇬 新加坡-优化-Gemini-GPT": {
+      "type": "VMess",
+      "name": "🇸🇬 新加坡-优化-Gemini-GPT",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:45.156853946+08:00",
+          "delay": 141
+        }
+      ]
+    },
+    "🇸🇬 新加坡-优化2-Gemini-GPT": {
+      "type": "VMess",
+      "name": "🇸🇬 新加坡-优化2-Gemini-GPT",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:45.220138481+08:00",
+          "delay": 242
+        }
+      ]
+    },
+    "🇸🇬 新加坡-优化3-Gemini": {
+      "type": "VMess",
+      "name": "🇸🇬 新加坡-优化3-Gemini",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.107385454+08:00",
+          "delay": 138
+        }
+      ]
+    },
+    "🇭🇰 香港-优化-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港-优化-Gemini",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:48.420276964+08:00",
+          "delay": 218
+        }
+      ]
+    },
+    "🇭🇰 香港-优化2-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港-优化2-Gemini",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:50.676719606+08:00",
+          "delay": 2517
+        }
+      ]
+    },
+    "🇭🇰 香港-优化3-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港-优化3-Gemini",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:48.831153379+08:00",
+          "delay": 313
+        }
+      ]
+    },
+    "🇭🇰 香港WAP-优化-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港WAP-优化-Gemini",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:53.113940243+08:00",
+          "delay": 159
+        }
+      ]
+    },
+    "🇭🇰 香港WAP-优化2-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港WAP-优化2-Gemini",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:45.251445269+08:00",
+          "delay": 229
+        }
+      ]
+    },
+    "🇭🇰 香港WAP-优化3-Gemini": {
+      "type": "VMess",
+      "name": "🇭🇰 香港WAP-优化3-Gemini",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.63316159+08:00",
+          "delay": 212
+        }
+      ]
+    },
+    "🇮🇳 印度-优化": {
+      "type": "VMess",
+      "name": "🇮🇳 印度-优化",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:45.766951403+08:00",
+          "delay": 259
+        }
+      ]
+    },
+    "🇨🇳 台湾-优化": {
+      "type": "VMess",
+      "name": "🇨🇳 台湾-优化",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:48.24158376+08:00",
+          "delay": 2698
+        }
+      ]
+    },
+    "🇨🇳 台湾-优化2-GPT": {
+      "type": "VMess",
+      "name": "🇨🇳 台湾-优化2-GPT",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:53.862411476+08:00",
+          "delay": 2638
+        }
+      ]
+    },
+    "🇨🇳 台湾-优化3": {
+      "type": "VMess",
+      "name": "🇨🇳 台湾-优化3",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:47.839261788+08:00",
+          "delay": 273
+        }
+      ]
+    },
+    "🇺🇸 美国LA-优化-GPT": {
+      "type": "VMess",
+      "name": "🇺🇸 美国LA-优化-GPT",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:55.645256522+08:00",
+          "delay": 412
+        }
+      ]
+    },
+    "🇺🇸 美国LA-优化2-GPT": {
+      "type": "VMess",
+      "name": "🇺🇸 美国LA-优化2-GPT",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.344749529+08:00",
+          "delay": 478
+        }
+      ]
+    },
+    "🇺🇸 美国LA-优化3-GPT": {
+      "type": "VMess",
+      "name": "🇺🇸 美国LA-优化3-GPT",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:47.336047536+08:00",
+          "delay": 503
+        }
+      ]
+    },
+    "🇨🇦 加拿大-优化": {
+      "type": "VMess",
+      "name": "🇨🇦 加拿大-优化",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:47.893573752+08:00",
+          "delay": 699
+        }
+      ]
+    },
+    "🇨🇦 加拿大-优化2": {
+      "type": "VMess",
+      "name": "🇨🇦 加拿大-优化2",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:47.803011762+08:00",
+          "delay": 651
+        }
+      ]
+    },
+    "🇨🇦 加拿大-优化3": {
+      "type": "VMess",
+      "name": "🇨🇦 加拿大-优化3",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:48.86530799+08:00",
+          "delay": 628
+        }
+      ]
+    },
+    "🇩🇪 德国-优化": {
+      "type": "VMess",
+      "name": "🇩🇪 德国-优化",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:47.293995547+08:00",
+          "delay": 486
+        }
+      ]
+    },
+    "🇩🇪 德国-优化2": {
+      "type": "VMess",
+      "name": "🇩🇪 德国-优化2",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.451132466+08:00",
+          "delay": 450
+        }
+      ]
+    },
+    "🇬🇧 英国-优化-GPT": {
+      "type": "VMess",
+      "name": "🇬🇧 英国-优化-GPT",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.525757601+08:00",
+          "delay": 418
+        }
+      ]
+    },
+    "🇬🇧 英国-优化2": {
+      "type": "VMess",
+      "name": "🇬🇧 英国-优化2",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.927455339+08:00",
+          "delay": 536
+        }
+      ]
+    },
+    "🇬🇧 英国-优化3": {
+      "type": "VMess",
+      "name": "🇬🇧 英国-优化3",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.959184138+08:00",
+          "delay": 471
+        }
+      ]
+    },
+    "hidden-node": {
+      "type": "VMess",
+      "name": "hidden-node",
+      "udp": true,
+      "hidden": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:00:00+08:00",
+          "delay": 100
+        }
+      ]
+    },
+    "tcp-node": {
+      "type": "VMess",
+      "name": "tcp-node",
+      "udp": false,
+      "tcp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:00:00+08:00",
+          "delay": 50
+        }
+      ]
+    },
+    "dead-node": {
+      "type": "Shadowsocks",
+      "name": "dead-node",
+      "udp": false,
+      "tcp": false,
+      "alive": false,
+      "history": []
+    },
+    "trojan-node": {
+      "type": "Trojan",
+      "name": "trojan-node",
+      "udp": true,
+      "tcp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:00:00+08:00",
+          "delay": 80
+        }
+      ]
+    }
+  }
+}

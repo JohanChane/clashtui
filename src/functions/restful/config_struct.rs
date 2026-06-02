@@ -179,3 +179,67 @@ impl std::fmt::Display for TunStack {
         write!(f, "{}", val)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn load_singbox_config() -> ClashConfig {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/apidata/sing-box/configs.json"
+        );
+        let data = std::fs::read_to_string(path).unwrap();
+        serde_json::from_str(&data).unwrap()
+    }
+
+    #[test]
+    fn singbox_config_mode_is_rule() {
+        let cfg = load_singbox_config();
+        assert!(matches!(cfg.mode, Mode::Rule));
+    }
+
+    #[test]
+    fn singbox_config_tun_is_null() {
+        let cfg = load_singbox_config();
+        assert!(cfg.tun.is_none());
+    }
+
+    #[test]
+    fn singbox_config_log_level_is_error() {
+        let cfg = load_singbox_config();
+        assert!(matches!(cfg.log_level, Some(LogLevel::Error)));
+    }
+
+    #[test]
+    fn singbox_config_ports_are_zero() {
+        let cfg = load_singbox_config();
+        assert_eq!(cfg.port, Some(0));
+        assert_eq!(cfg.mixed_port, Some(0));
+        assert_eq!(cfg.socks_port, Some(0));
+    }
+
+    #[test]
+    fn singbox_config_mode_list() {
+        let cfg = load_singbox_config();
+        let list = cfg.mode_list.expect("mode_list missing");
+        assert_eq!(list, vec!["Rule", "Proxy", "Direct"]);
+    }
+
+    #[test]
+    fn singbox_config_mihomo_fields_are_none() {
+        let cfg = load_singbox_config();
+        assert!(cfg.global_client_fingerprint.is_none());
+        assert!(cfg.tcp_concurrent.is_none());
+        assert!(cfg.global_ua.is_none());
+    }
+
+    #[test]
+    fn singbox_config_build_output() {
+        let cfg = load_singbox_config();
+        let lines = cfg.build();
+        assert!(lines.contains(&"mode:Rule".to_string()));
+        assert!(lines.contains(&"mode_list:Rule, Proxy, Direct".to_string()));
+        assert!(lines.contains(&"log_level:error".to_string()));
+    }
+}

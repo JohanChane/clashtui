@@ -1,0 +1,131 @@
+{
+  "proxies": [
+    {
+      "type": "Selector",
+      "name": "Entry",
+      "udp": true,
+      "history": [],
+      "now": "Select-hajimi",
+      "all": [
+        "Auto-hajimi",
+        "Auto-manbo",
+        "Select-hajimi",
+        "Select-manbo"
+      ]
+    },
+    {
+      "type": "Selector",
+      "name": "Select-hajimi",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.213434923+08:00",
+          "delay": 566
+        }
+      ],
+      "now": "vmess-node001",
+      "all": [
+        "vmess-node001"
+      ]
+    },
+    {
+      "type": "Selector",
+      "name": "Select-manbo",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:45.156853946+08:00",
+          "delay": 141
+        }
+      ],
+      "now": "🇸🇬 新加坡-优化-Gemini-GPT",
+      "all": [
+        "过滤掉15条线路",
+        "🇯🇵 日本-优化",
+        "🇯🇵 日本-优化2",
+        "🇯🇵 日本-优化3",
+        "🇸🇬 新加坡-优化-Gemini-GPT",
+        "🇸🇬 新加坡-优化2-Gemini-GPT",
+        "🇸🇬 新加坡-优化3-Gemini",
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港-优化2-Gemini",
+        "🇭🇰 香港-优化3-Gemini",
+        "🇭🇰 香港WAP-优化-Gemini",
+        "🇭🇰 香港WAP-优化2-Gemini",
+        "🇭🇰 香港WAP-优化3-Gemini",
+        "🇮🇳 印度-优化",
+        "🇨🇳 台湾-优化",
+        "🇨🇳 台湾-优化2-GPT",
+        "🇨🇳 台湾-优化3",
+        "🇺🇸 美国LA-优化-GPT",
+        "🇺🇸 美国LA-优化2-GPT",
+        "🇺🇸 美国LA-优化3-GPT",
+        "🇨🇦 加拿大-优化",
+        "🇨🇦 加拿大-优化2",
+        "🇨🇦 加拿大-优化3",
+        "🇩🇪 德国-优化",
+        "🇩🇪 德国-优化2",
+        "🇬🇧 英国-优化-GPT",
+        "🇬🇧 英国-优化2",
+        "🇬🇧 英国-优化3"
+      ]
+    },
+    {
+      "type": "URLTest",
+      "name": "Auto-hajimi",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:46.213434923+08:00",
+          "delay": 566
+        }
+      ],
+      "now": "vmess-node001",
+      "all": [
+        "vmess-node001"
+      ]
+    },
+    {
+      "type": "URLTest",
+      "name": "Auto-manbo",
+      "udp": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:32:45.156853946+08:00",
+          "delay": 141
+        }
+      ],
+      "now": "🇸🇬 新加坡-优化-Gemini-GPT",
+      "all": [
+        "过滤掉15条线路",
+        "🇯🇵 日本-优化",
+        "🇯🇵 日本-优化2",
+        "🇯🇵 日本-优化3",
+        "🇸🇬 新加坡-优化-Gemini-GPT",
+        "🇸🇬 新加坡-优化2-Gemini-GPT",
+        "🇸🇬 新加坡-优化3-Gemini",
+        "🇭🇰 香港-优化-Gemini",
+        "🇭🇰 香港-优化2-Gemini",
+        "🇭🇰 香港-优化3-Gemini",
+        "🇭🇰 香港WAP-优化-Gemini",
+        "🇭🇰 香港WAP-优化2-Gemini",
+        "🇭🇰 香港WAP-优化3-Gemini",
+        "🇮🇳 印度-优化",
+        "🇨🇳 台湾-优化",
+        "🇨🇳 台湾-优化2-GPT",
+        "🇨🇳 台湾-优化3",
+        "🇺🇸 美国LA-优化-GPT",
+        "🇺🇸 美国LA-优化2-GPT",
+        "🇺🇸 美国LA-优化3-GPT",
+        "🇨🇦 加拿大-优化",
+        "🇨🇦 加拿大-优化2",
+        "🇨🇦 加拿大-优化3",
+        "🇩🇪 德国-优化",
+        "🇩🇪 德国-优化2",
+        "🇬🇧 英国-优化-GPT",
+        "🇬🇧 英国-优化2",
+        "🇬🇧 英国-优化3"
+      ]
+    }
+  ]
+}

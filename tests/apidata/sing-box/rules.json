@@ -1,0 +1,49 @@
+{
+  "rules": [
+    {
+      "type": "default",
+      "payload": "",
+      "proxy": "sniff"
+    },
+    {
+      "type": "default",
+      "payload": "protocol=dns",
+      "proxy": "hijack-dns"
+    },
+    {
+      "type": "default",
+      "payload": "clash_mode=Direct",
+      "proxy": "route(direct)"
+    },
+    {
+      "type": "default",
+      "payload": "clash_mode=Proxy",
+      "proxy": "route(Entry)"
+    },
+    {
+      "type": "default",
+      "payload": "rule_set=geosite-geolocation-!cn",
+      "proxy": "route(Entry)"
+    },
+    {
+      "type": "default",
+      "payload": "rule_set=geosite-geolocation-cn",
+      "proxy": "route(direct)"
+    },
+    {
+      "type": "default",
+      "payload": "rule_set=geoip-cn",
+      "proxy": "route(direct)"
+    },
+    {
+      "type": "default",
+      "payload": "ip_is_private=true",
+      "proxy": "route(direct)"
+    },
+    {
+      "type": "default",
+      "payload": "rule_set=category-ads-all",
+      "proxy": "reject"
+    }
+  ]
+}

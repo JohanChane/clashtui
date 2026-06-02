@@ -1,0 +1,18 @@
+{
+  "port": 0,
+  "socks-port": 0,
+  "redir-port": 0,
+  "tproxy-port": 0,
+  "mixed-port": 0,
+  "allow-lan": false,
+  "bind-address": "*",
+  "mode": "Rule",
+  "mode-list": [
+    "Rule",
+    "Proxy",
+    "Direct"
+  ],
+  "log-level": "error",
+  "ipv6": false,
+  "tun": null
+}

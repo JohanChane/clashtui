@@ -1,0 +1,243 @@
+{
+  "connections": [
+    {
+      "chains": [
+        "vmess-node001",
+        "Select-hajimi",
+        "Entry"
+      ],
+      "download": 118400,
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "destinationIP": "192.0.2.1",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "sub.example.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "192.0.2.1",
+        "sourcePort": "38648",
+        "type": "tun/0"
+      },
+      "rule": "rule_set=geosite-geolocation-!cn => route(Entry)",
+      "rulePayload": "",
+      "start": "2026-06-02T21:35:59.540941702+08:00",
+      "upload": 3003
+    },
+    {
+      "chains": [
+        "vmess-node001",
+        "Select-hajimi",
+        "Entry"
+      ],
+      "download": 9084,
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "destinationIP": "192.0.2.1",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "mobile.events.data.microsoft.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "192.0.2.1",
+        "sourcePort": "46990",
+        "type": "tun/0"
+      },
+      "rule": "rule_set=geosite-geolocation-!cn => route(Entry)",
+      "rulePayload": "",
+      "start": "2026-06-02T21:37:05.597537687+08:00",
+      "upload": 6203
+    },
+    {
+      "chains": [
+        "vmess-node001",
+        "Select-hajimi",
+        "Entry"
+      ],
+      "download": 9450,
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "destinationIP": "192.0.2.1",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "192.0.2.1",
+        "sourcePort": "46160",
+        "type": "tun/0"
+      },
+      "rule": "final",
+      "rulePayload": "",
+      "start": "2026-06-02T21:35:59.828923086+08:00",
+      "upload": 3534
+    },
+    {
+      "chains": [
+        "vmess-node001",
+        "Select-hajimi",
+        "Entry"
+      ],
+      "download": 116543,
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "destinationIP": "192.0.2.1",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "sub.example.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "192.0.2.1",
+        "sourcePort": "45078",
+        "type": "tun/0"
+      },
+      "rule": "rule_set=geosite-geolocation-!cn => route(Entry)",
+      "rulePayload": "",
+      "start": "2026-06-02T21:35:08.259180943+08:00",
+      "upload": 30076
+    },
+    {
+      "chains": [
+        "vmess-node001",
+        "Select-hajimi",
+        "Entry"
+      ],
+      "download": 4094,
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "destinationIP": "192.0.2.1",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "sub.example.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "192.0.2.1",
+        "sourcePort": "41712",
+        "type": "tun/0"
+      },
+      "rule": "rule_set=geosite-geolocation-!cn => route(Entry)",
+      "rulePayload": "",
+      "start": "2026-06-02T21:32:48.454481687+08:00",
+      "upload": 3898
+    },
+    {
+      "chains": [
+        "vmess-node001",
+        "Select-hajimi",
+        "Entry"
+      ],
+      "download": 10583,
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "destinationIP": "192.0.2.1",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "sub.example.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "192.0.2.1",
+        "sourcePort": "42060",
+        "type": "tun/0"
+      },
+      "rule": "rule_set=geosite-geolocation-!cn => route(Entry)",
+      "rulePayload": "",
+      "start": "2026-06-02T21:36:05.376870264+08:00",
+      "upload": 2950
+    },
+    {
+      "chains": [
+        "direct"
+      ],
+      "download": 302128,
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "destinationIP": "192.0.2.1",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "sub.example.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "192.0.2.1",
+        "sourcePort": "48928",
+        "type": "tun/0"
+      },
+      "rule": "rule_set=geosite-geolocation-cn => route(direct)",
+      "rulePayload": "",
+      "start": "2026-06-02T21:37:53.14936451+08:00",
+      "upload": 1622656
+    },
+    {
+      "chains": [
+        "vmess-node001",
+        "Select-hajimi",
+        "Entry"
+      ],
+      "download": 1217,
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "destinationIP": "192.0.2.1",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "sub.example.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "192.0.2.1",
+        "sourcePort": "43176",
+        "type": "tun/0"
+      },
+      "rule": "rule_set=geosite-geolocation-!cn => route(Entry)",
+      "rulePayload": "",
+      "start": "2026-06-02T21:32:48.996506692+08:00",
+      "upload": 3354
+    },
+    {
+      "chains": [
+        "vmess-node001",
+        "Select-hajimi",
+        "Entry"
+      ],
+      "download": 5424,
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "destinationIP": "192.0.2.1",
+        "destinationPort": "443",
+        "dnsMode": "normal",
+        "host": "sub.example.com",
+        "network": "tcp",
+        "processPath": "",
+        "sourceIP": "192.0.2.1",
+        "sourcePort": "36918",
+        "type": "tun/0"
+      },
+      "rule": "final",
+      "rulePayload": "",
+      "start": "2026-06-02T21:33:08.32834049+08:00",
+      "upload": 2657
+    },
+    {
+      "chains": [
+        "direct"
+      ],
+      "download": 0,
+      "id": "dead-conn-0000-0000-000000000000",
+      "metadata": {
+        "destinationIP": "192.0.2.1",
+        "destinationPort": "53",
+        "dnsMode": "normal",
+        "host": "",
+        "network": "udp",
+        "processPath": "",
+        "sourceIP": "192.0.2.1",
+        "sourcePort": "12345",
+        "type": "tun/0"
+      },
+      "rule": "rule_set=geosite-geolocation-cn => route(direct)",
+      "rulePayload": "",
+      "start": "2026-06-02T21:00:00+08:00",
+      "upload": 0
+    }
+  ],
+  "downloadTotal": 13168793,
+  "memory": 30826496,
+  "uploadTotal": 2796849
+}
