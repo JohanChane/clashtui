@@ -427,3 +427,144 @@ pub async fn gen_template_singbox(
 
     Ok(output)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn interval_to_duration_hours() {
+        assert_eq!(interval_to_duration(3600), "1h");
+        assert_eq!(interval_to_duration(7200), "2h");
+    }
+
+    #[test]
+    fn interval_to_duration_minutes() {
+        assert_eq!(interval_to_duration(300), "5m");
+        assert_eq!(interval_to_duration(60), "1m");
+        assert_eq!(interval_to_duration(120), "2m");
+    }
+
+    #[test]
+    fn interval_to_duration_seconds() {
+        assert_eq!(interval_to_duration(0), "0s");
+        assert_eq!(interval_to_duration(45), "45s");
+        assert_eq!(interval_to_duration(59), "59s");
+    }
+
+    #[test]
+    fn interval_to_duration_non_divisible() {
+        assert_eq!(interval_to_duration(3661), "3661s");
+        assert_eq!(interval_to_duration(61), "61s");
+    }
+
+    #[test]
+    fn dedup_no_duplicates_preserves_tags() {
+        let mut providers = HashMap::new();
+        providers.insert(
+            "pvd0".to_string(),
+            vec![
+                json!({"tag": "node1", "type": "ss", "server": "s1.com", "server_port": 443}),
+                json!({"tag": "node2", "type": "vmess", "server": "s2.com", "server_port": 8443}),
+            ],
+        );
+        providers.insert(
+            "pvd1".to_string(),
+            vec![
+                json!({"tag": "node3", "type": "trojan", "server": "s3.com", "server_port": 443}),
+            ],
+        );
+        let result = dedup_singbox_proxy_tags(providers);
+        assert_eq!(result["pvd0"].len(), 2);
+        assert_eq!(result["pvd0"][0]["tag"], "node1");
+        assert_eq!(result["pvd0"][1]["tag"], "node2");
+        assert_eq!(result["pvd1"][0]["tag"], "node3");
+    }
+
+    #[test]
+    fn dedup_renames_colliding_tags() {
+        let mut providers = HashMap::new();
+        providers.insert(
+            "pvd0".to_string(),
+            vec![
+                json!({"tag": "shared", "type": "ss", "server": "a.com", "server_port": 443}),
+            ],
+        );
+        providers.insert(
+            "pvd1".to_string(),
+            vec![
+                json!({"tag": "shared", "type": "vmess", "server": "b.com", "server_port": 8443}),
+            ],
+        );
+        let result = dedup_singbox_proxy_tags(providers);
+        let pvd0_tag = result["pvd0"][0]["tag"].as_str().unwrap();
+        let pvd1_tag = result["pvd1"][0]["tag"].as_str().unwrap();
+        assert_ne!(pvd0_tag, pvd1_tag, "colliding tags should be made unique");
+        assert!(pvd0_tag.starts_with("shared"));
+        assert!(pvd1_tag.starts_with("shared"));
+    }
+
+    #[test]
+    fn dedup_handles_missing_tag() {
+        let mut providers = HashMap::new();
+        providers.insert(
+            "pvd0".to_string(),
+            vec![
+                json!({"type": "ss", "server": "a.com", "server_port": 443}),
+            ],
+        );
+        let result = dedup_singbox_proxy_tags(providers);
+        assert_eq!(result["pvd0"].len(), 1);
+        assert!(result["pvd0"][0].get("tag").is_none());
+    }
+
+    #[test]
+    fn resolve_default_placeholder_exact_match() {
+        let tag_map: HashMap<String, Vec<String>> = vec![(
+            "Auto-pvd".to_string(),
+            vec!["Auto-pvd-pvd0".to_string(), "Auto-pvd-pvd1".to_string()],
+        )]
+        .into_iter()
+        .collect();
+        let ppg: ProxyProviderGroups = vec![(
+            "pvd".to_string(),
+            vec![
+                ("pvd0".to_string(), "https://e.com/1.json".to_string()),
+                ("pvd1".to_string(), "https://e.com/2.json".to_string()),
+            ]
+            .into_iter()
+            .collect(),
+        )]
+        .into_iter()
+        .collect();
+
+        let result = resolve_default_placeholder(
+            "${PPG.pvd.pvd0}", &tag_map, &ppg,
+        );
+        let tag = result.unwrap();
+        assert!(tag.starts_with("Auto-pvd"));
+    }
+
+    #[test]
+    fn resolve_default_placeholder_fallback() {
+        let tag_map: HashMap<String, Vec<String>> = HashMap::new();
+        let ppg: ProxyProviderGroups = HashMap::new();
+
+        let result = resolve_default_placeholder(
+            "${PPG.pvd.pvd0}", &tag_map, &ppg,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn resolve_default_placeholder_invalid_format() {
+        let tag_map: HashMap<String, Vec<String>> = HashMap::new();
+        let ppg: ProxyProviderGroups = HashMap::new();
+
+        let result = resolve_default_placeholder(
+            "plain-string", &tag_map, &ppg,
+        );
+        assert!(result.is_err());
+    }
+}

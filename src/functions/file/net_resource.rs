@@ -374,4 +374,52 @@ mod tests {
         let resources = extract_singbox_net_resources(&json);
         assert!(resources.is_empty());
     }
+
+    fn load_singbox_profile(name: &str) -> serde_json::Value {
+        let path = format!(
+            "{}/tests/profiles/sing-box/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            name
+        );
+        let data = std::fs::read_to_string(path).unwrap();
+        serde_json::from_str(&data).unwrap()
+    }
+
+    #[test]
+    fn singbox_profile_minimal_has_no_resources() {
+        let json = load_singbox_profile("minimal.json");
+        let resources = extract_singbox_net_resources(&json);
+        assert!(resources.is_empty());
+    }
+
+    #[test]
+    fn singbox_profile_with_providers_finds_outbounds() {
+        let json = load_singbox_profile("with_providers.json");
+        let resources = extract_singbox_net_resources(&json);
+        assert_eq!(resources.len(), 4);
+        let pp_count = resources
+            .iter()
+            .filter(|r| r.section == ResourceSection::ProxyProvider)
+            .count();
+        assert_eq!(pp_count, 2);
+        let rp_count = resources
+            .iter()
+            .filter(|r| r.section == ResourceSection::RuleProvider)
+            .count();
+        assert_eq!(rp_count, 2);
+    }
+
+    #[test]
+    fn singbox_profile_full_finds_rulesets() {
+        let json = load_singbox_profile("full.json");
+        let resources = extract_singbox_net_resources(&json);
+        let rp: Vec<_> = resources
+            .iter()
+            .filter(|r| r.section == ResourceSection::RuleProvider)
+            .collect();
+        assert_eq!(rp.len(), 3);
+        assert!(rp.iter().any(|r| r.name == "geosite-geolocation-cn"));
+        assert!(rp.iter().any(|r| r.name == "geosite-geolocation-!cn"));
+        assert!(rp.iter().any(|r| r.name == "category-ads-all"));
+    }
 }

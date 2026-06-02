@@ -1,0 +1,47 @@
+{
+  "outbounds": [
+    {
+      "tag": "hk-node",
+      "type": "vless",
+      "outbound": {
+        "url": "https://example.com/hk.json",
+        "path": "./outbounds/hk.json"
+      }
+    },
+    {
+      "tag": "jp-node",
+      "type": "vmess",
+      "outbound": {
+        "url": "https://example.com/jp.json",
+        "path": "./outbounds/jp.json"
+      }
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": {
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "geoip-cn",
+        "format": "binary",
+        "url": "https://example.com/geoip.db",
+        "path": "./rules/geoip.db"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-cn",
+        "format": "binary",
+        "url": "https://example.com/geosite.db",
+        "path": "./rules/geosite.db"
+      },
+      {
+        "type": "local",
+        "tag": "my-local-rules",
+        "path": "./rules/local.json"
+      }
+    ]
+  }
+}

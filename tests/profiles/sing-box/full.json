@@ -1,0 +1,127 @@
+{
+  "log": { "level": "info", "timestamp": true },
+  "dns": {
+    "servers": [
+      { "tag": "dns-remote", "address": "tls://1.1.1.1", "detour": "Entry" },
+      { "tag": "dns-local", "address": "223.5.5.5", "detour": "direct" }
+    ],
+    "rules": [
+      { "rule_set": ["geosite-geolocation-cn"], "server": "dns-local" },
+      { "rule_set": ["geosite-geolocation-!cn"], "server": "dns-remote" }
+    ]
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "address": ["172.18.0.1/30"],
+      "auto_route": true,
+      "strict_route": true
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 2080
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "Entry",
+      "outbounds": ["Auto-pvd", "Select-pvd", "direct"],
+      "default": "Auto-pvd"
+    },
+    {
+      "type": "urltest",
+      "tag": "Auto-pvd",
+      "outbounds": ["hk-01", "jp-01", "us-01"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "5m",
+      "tolerance": 50
+    },
+    {
+      "type": "selector",
+      "tag": "Select-pvd",
+      "outbounds": ["hk-01", "jp-01", "us-01"],
+      "default": "hk-01"
+    },
+    {
+      "type": "shadowsocks",
+      "tag": "hk-01",
+      "server": "hk.example.com",
+      "server_port": 443,
+      "method": "aes-256-gcm",
+      "password": "pwd-hk-01"
+    },
+    {
+      "type": "vmess",
+      "tag": "jp-01",
+      "server": "jp.example.com",
+      "server_port": 8443,
+      "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "security": "auto",
+      "transport": { "type": "ws", "path": "/ws" }
+    },
+    {
+      "type": "vmess",
+      "tag": "us-01",
+      "server": "us.example.com",
+      "server_port": 443,
+      "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "security": "auto"
+    },
+    { "type": "direct", "tag": "direct" },
+    { "type": "block", "tag": "block" },
+    { "type": "dns", "tag": "dns-out" }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "rules": [
+      { "action": "sniff" },
+      { "protocol": "dns", "action": "hijack-dns" },
+      { "clash_mode": "Direct", "outbound": "direct" },
+      { "clash_mode": "Proxy", "outbound": "Entry" },
+      { "rule_set": ["geosite-geolocation-!cn"], "outbound": "Entry" },
+      { "rule_set": ["geosite-geolocation-cn"], "outbound": "direct" },
+      { "ip_is_private": true, "outbound": "direct" },
+      { "rule_set": ["category-ads-all"], "action": "reject" }
+    ],
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "geosite-geolocation-cn",
+        "format": "binary",
+        "url": "https://example.com/geosite-cn.srs",
+        "path": "./rule-providers/geosite-cn.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "geosite-geolocation-!cn",
+        "format": "binary",
+        "url": "https://example.com/geosite-!cn.srs",
+        "path": "./rule-providers/geosite-!cn.srs"
+      },
+      {
+        "type": "remote",
+        "tag": "category-ads-all",
+        "format": "binary",
+        "url": "https://example.com/category-ads-all.srs",
+        "path": "./rule-providers/ads.srs"
+      },
+      {
+        "type": "local",
+        "tag": "private-rules",
+        "path": "./rule-providers/private.json"
+      }
+    ]
+  },
+  "experimental": {
+    "cache_file": { "enabled": true },
+    "clash_api": {
+      "default_mode": "Rule",
+      "external_controller": "127.0.0.1:9090",
+      "external_ui": "dashboard",
+      "secret": ""
+    }
+  }
+}
