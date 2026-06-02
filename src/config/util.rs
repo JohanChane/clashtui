@@ -43,7 +43,6 @@ pub(super) fn load_home_dir() -> Result<std::path::PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    
 
     #[cfg(target_os = "macos")]
     #[test]

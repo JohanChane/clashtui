@@ -580,10 +580,7 @@ open_dir_cmd: ""
     #[test]
     fn config_fixture_mihomo_full() {
         let cfg = load_config_fixture("mihomo/full.yaml");
-        assert_eq!(
-            cfg.mihomo.core.config_dir,
-            "/opt/clashtui/mihomo/config"
-        );
+        assert_eq!(cfg.mihomo.core.config_dir, "/opt/clashtui/mihomo/config");
         assert_eq!(cfg.mihomo.core.bin_path, "/opt/clashtui/mihomo/mihomo");
         assert_eq!(
             cfg.mihomo.core.config_path,
@@ -649,14 +646,8 @@ open_dir_cmd: ""
     #[test]
     fn config_fixture_singbox_full() {
         let cfg = load_config_fixture("sing-box/full.yaml");
-        assert_eq!(
-            cfg.singbox.core.config_dir,
-            "/opt/clashtui/sing-box/config"
-        );
-        assert_eq!(
-            cfg.singbox.core.bin_path,
-            "/opt/clashtui/sing-box/sing-box"
-        );
+        assert_eq!(cfg.singbox.core.config_dir, "/opt/clashtui/sing-box/config");
+        assert_eq!(cfg.singbox.core.bin_path, "/opt/clashtui/sing-box/sing-box");
         assert_eq!(
             cfg.singbox.core.config_path,
             "/opt/clashtui/sing-box/config/config.json"

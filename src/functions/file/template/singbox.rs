@@ -232,7 +232,6 @@ pub fn expand_singbox_template(
     mut provider_proxies: HashMap<String, Vec<JsonValue>>,
     groups: &ProxyProviderGroups,
 ) -> anyhow::Result<JsonValue> {
-
     // Filter out group-type entries (selector, urltest, etc.) —
     // only keep actual proxy nodes
     for proxies in provider_proxies.values_mut() {
@@ -479,9 +478,7 @@ mod tests {
         );
         providers.insert(
             "pvd1".to_string(),
-            vec![
-                json!({"tag": "node3", "type": "trojan", "server": "s3.com", "server_port": 443}),
-            ],
+            vec![json!({"tag": "node3", "type": "trojan", "server": "s3.com", "server_port": 443})],
         );
         let result = dedup_singbox_proxy_tags(providers);
         assert_eq!(result["pvd0"].len(), 2);
@@ -495,15 +492,11 @@ mod tests {
         let mut providers = HashMap::new();
         providers.insert(
             "pvd0".to_string(),
-            vec![
-                json!({"tag": "shared", "type": "ss", "server": "a.com", "server_port": 443}),
-            ],
+            vec![json!({"tag": "shared", "type": "ss", "server": "a.com", "server_port": 443})],
         );
         providers.insert(
             "pvd1".to_string(),
-            vec![
-                json!({"tag": "shared", "type": "vmess", "server": "b.com", "server_port": 8443}),
-            ],
+            vec![json!({"tag": "shared", "type": "vmess", "server": "b.com", "server_port": 8443})],
         );
         let result = dedup_singbox_proxy_tags(providers);
         let pvd0_tag = result["pvd0"][0]["tag"].as_str().unwrap();
@@ -518,9 +511,7 @@ mod tests {
         let mut providers = HashMap::new();
         providers.insert(
             "pvd0".to_string(),
-            vec![
-                json!({"type": "ss", "server": "a.com", "server_port": 443}),
-            ],
+            vec![json!({"type": "ss", "server": "a.com", "server_port": 443})],
         );
         let result = dedup_singbox_proxy_tags(providers);
         assert_eq!(result["pvd0"].len(), 1);
@@ -547,9 +538,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let result = resolve_default_placeholder(
-            "${PPG.pvd.pvd0}", &tag_map, &ppg,
-        );
+        let result = resolve_default_placeholder("${PPG.pvd.pvd0}", &tag_map, &ppg);
         let tag = result.unwrap();
         assert!(tag.starts_with("Auto-pvd"));
     }
@@ -559,9 +548,7 @@ mod tests {
         let tag_map: HashMap<String, Vec<String>> = HashMap::new();
         let ppg: ProxyProviderGroups = HashMap::new();
 
-        let result = resolve_default_placeholder(
-            "${PPG.pvd.pvd0}", &tag_map, &ppg,
-        );
+        let result = resolve_default_placeholder("${PPG.pvd.pvd0}", &tag_map, &ppg);
         assert!(result.is_err());
     }
 
@@ -570,18 +557,12 @@ mod tests {
         let tag_map: HashMap<String, Vec<String>> = HashMap::new();
         let ppg: ProxyProviderGroups = HashMap::new();
 
-        let result = resolve_default_placeholder(
-            "plain-string", &tag_map, &ppg,
-        );
+        let result = resolve_default_placeholder("plain-string", &tag_map, &ppg);
         assert!(result.is_err());
     }
 
     fn load_json_fixture(path: &str) -> JsonValue {
-        let full = format!(
-            "{}/{}",
-            env!("CARGO_MANIFEST_DIR"),
-            path
-        );
+        let full = format!("{}/{}", env!("CARGO_MANIFEST_DIR"), path);
         let data = std::fs::read_to_string(full).unwrap();
         serde_json::from_str(&data).unwrap()
     }
@@ -589,14 +570,19 @@ mod tests {
     fn make_groups() -> ProxyProviderGroups {
         let mut groups = ProxyProviderGroups::new();
         let mut pvd = std::collections::BTreeMap::new();
-        pvd.insert("hajimi".to_string(), "https://e.com/hajimi.json".to_string());
+        pvd.insert(
+            "hajimi".to_string(),
+            "https://e.com/hajimi.json".to_string(),
+        );
         pvd.insert("manbo".to_string(), "https://e.com/manbo.json".to_string());
         groups.insert("pvd".to_string(), pvd);
         groups
     }
 
-    fn make_provider_proxies() -> (HashMap<String, Vec<JsonValue>>, HashMap<String, Vec<JsonValue>>)
-    {
+    fn make_provider_proxies() -> (
+        HashMap<String, Vec<JsonValue>>,
+        HashMap<String, Vec<JsonValue>>,
+    ) {
         let hajimi = load_json_fixture("tests/proxy-providers/sing-box/hk.json");
         let manbo = load_json_fixture("tests/proxy-providers/sing-box/jp.json");
 
@@ -627,10 +613,7 @@ mod tests {
             .find(|ob| ob["tag"] == "Auto-hajimi")
             .expect("Auto-hajimi missing");
         assert_eq!(auto_hajimi["type"], "urltest");
-        assert_eq!(
-            auto_hajimi["outbounds"].as_array().unwrap().len(),
-            3
-        );
+        assert_eq!(auto_hajimi["outbounds"].as_array().unwrap().len(), 3);
 
         let auto_manbo = outbounds
             .iter()

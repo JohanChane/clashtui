@@ -481,7 +481,6 @@ mod tests {
 
     #[test]
     fn resolve_group_for_sort_returns_parent_for_child() {
-        
         let (mut content, mut state) = load_fixture();
 
         // Expand the first folder to reveal its children

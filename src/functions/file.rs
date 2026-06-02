@@ -17,4 +17,3 @@ pub(crate) static TEMPLATE_PATH: LazyLock<PathBuf> =
         crate::config::CoreType::Mihomo => crate::config::template_path(),
         crate::config::CoreType::Singbox => crate::config::singbox_template_path(),
     });
-

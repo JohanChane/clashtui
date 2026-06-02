@@ -672,6 +672,9 @@ mod tests {
             .filter(|n| n.parent.as_deref() == Some("At-manbo"))
             .map(|n| n.name.as_str())
             .collect();
-        assert!(!at_manbo_children.is_empty(), "At-manbo should have children after expand");
+        assert!(
+            !at_manbo_children.is_empty(),
+            "At-manbo should have children after expand"
+        );
     }
 }

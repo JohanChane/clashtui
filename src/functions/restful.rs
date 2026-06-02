@@ -356,7 +356,6 @@ pub mod connection {
 }
 
 pub mod api_log {
-    
 
     pub struct LogEntry {
         pub type_: String,
