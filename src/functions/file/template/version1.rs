@@ -272,7 +272,7 @@ mod tests {
     fn testdata_path(name: &str) -> std::path::PathBuf {
         let manifest_dir = std::env!("CARGO_MANIFEST_DIR");
         std::path::PathBuf::from(manifest_dir)
-            .join("src/functions/file/template/testdata")
+            .join("tests/templates/mihomo")
             .join(name)
     }
 

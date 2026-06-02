@@ -400,7 +400,7 @@ mod tests {
     fn load_fixture() -> (Proxies, ListState) {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/src/tui/tab/proxies/tests/fixtures/proxies.json"
+            "/tests/apidata/mihomo/proxies.json"
         );
         let data = std::fs::read_to_string(path).unwrap();
         let response: ProxiesResponse = serde_json::from_str(&data).unwrap();

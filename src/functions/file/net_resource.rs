@@ -171,7 +171,7 @@ mod tests {
     fn load_test_yaml() -> serde_yml::Mapping {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/src/functions/file/testdata/net_resource_test.yaml"
+            "/tests/profiles/mihomo/net_resource_test.yaml"
         );
         serde_yml::from_reader(File::open(path).unwrap()).unwrap()
     }

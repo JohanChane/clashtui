@@ -340,7 +340,7 @@ mod tests {
     fn load_fixture() -> IndexMap<String, Proxy> {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/src/tui/tab/proxies/tests/fixtures/proxies.json"
+            "/tests/apidata/mihomo/proxies.json"
         );
         let data = std::fs::read_to_string(path).expect("Failed to read fixture");
         let response: ProxiesResponse =
