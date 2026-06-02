@@ -1,0 +1,20 @@
+mihomo:
+  core:
+    config_dir: /opt/mihomo
+    bin_path: /opt/mihomo/mihomo
+    config_path: /opt/mihomo/config.yaml
+  core_service:
+    service_name: mihomo_svc
+    is_user: true
+singbox:
+  core:
+    config_dir: /opt/sing-box
+    bin_path: /opt/sing-box/sing-box
+    config_path: /opt/sing-box/config.json
+  core_service:
+    service_name: singbox_svc
+    is_user: true
+timeout:
+extra:
+  edit_cmd:
+  open_dir_cmd:

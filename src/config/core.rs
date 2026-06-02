@@ -562,4 +562,131 @@ open_dir_cmd: ""
             vec!["--user", "clashtui_test", "restart"]
         );
     }
+
+    fn fixture_path(name: &str) -> String {
+        format!(
+            "{}/tests/clashtui_configs/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            name
+        )
+    }
+
+    fn load_config_fixture(name: &str) -> ConfigFile {
+        let path = fixture_path(name);
+        let yaml = std::fs::read_to_string(&path).unwrap();
+        serde_yml::from_str(&yaml).unwrap()
+    }
+
+    #[test]
+    fn config_fixture_mihomo_full() {
+        let cfg = load_config_fixture("mihomo/full.yaml");
+        assert_eq!(
+            cfg.mihomo.core.config_dir,
+            "/opt/clashtui/mihomo/config"
+        );
+        assert_eq!(cfg.mihomo.core.bin_path, "/opt/clashtui/mihomo/mihomo");
+        assert_eq!(
+            cfg.mihomo.core.config_path,
+            "/opt/clashtui/mihomo/config/config.yaml"
+        );
+        assert_eq!(cfg.mihomo.core_service.service_name, "clashtui_mihomo");
+        assert!(!cfg.mihomo.core_service.is_user);
+        assert_eq!(
+            cfg.mihomo.core_service.service_controller.as_deref(),
+            Some("systemd")
+        );
+        assert_eq!(cfg.timeout, Some(5));
+        assert_eq!(cfg.extra.edit_cmd.as_deref(), Some(r#"vim "%s""#));
+        assert_eq!(cfg.extra.open_dir_cmd.as_deref(), Some(r#"yazi "%s""#));
+    }
+
+    #[test]
+    fn config_fixture_mihomo_full_roundtrip() {
+        let cfg = load_config_fixture("mihomo/full.yaml");
+        let serialized = serde_yml::to_string(&cfg).unwrap();
+        let deser: ConfigFile = serde_yml::from_str(&serialized).unwrap();
+        assert_eq!(deser.mihomo.core.config_dir, cfg.mihomo.core.config_dir);
+        assert_eq!(deser.mihomo.core.bin_path, cfg.mihomo.core.bin_path);
+        assert_eq!(deser.singbox.core.bin_path, cfg.singbox.core.bin_path);
+        assert_eq!(deser.timeout, cfg.timeout);
+        assert_eq!(deser.extra.edit_cmd, cfg.extra.edit_cmd);
+        assert_eq!(
+            deser.mihomo.core_service.service_controller,
+            cfg.mihomo.core_service.service_controller
+        );
+    }
+
+    #[test]
+    fn config_fixture_empty_sections_defaults() {
+        let cfg = load_config_fixture("mihomo/empty_sections.yaml");
+        assert_eq!(cfg.mihomo.core.config_dir, "");
+        assert_eq!(cfg.mihomo.core.bin_path, "");
+        assert_eq!(cfg.mihomo.core.config_path, "");
+        assert_eq!(cfg.mihomo.core_service.service_name, "");
+        assert!(!cfg.mihomo.core_service.is_user);
+        assert_eq!(cfg.mihomo.core_service.service_controller, None);
+        assert_eq!(cfg.singbox.core.config_dir, "");
+        assert_eq!(cfg.singbox.core.bin_path, "");
+        assert_eq!(cfg.singbox.core.config_path, "");
+        assert_eq!(cfg.singbox.core_service.service_name, "");
+        assert!(!cfg.singbox.core_service.is_user);
+        assert_eq!(cfg.timeout, None);
+        assert_eq!(cfg.extra.edit_cmd, None);
+        assert_eq!(cfg.extra.open_dir_cmd, None);
+    }
+
+    #[test]
+    fn config_fixture_null_optionals() {
+        let cfg = load_config_fixture("mihomo/null_optionals.yaml");
+        assert_eq!(cfg.mihomo.core.config_dir, "/opt/mihomo");
+        assert_eq!(cfg.mihomo.core_service.service_name, "mihomo_svc");
+        assert!(cfg.mihomo.core_service.is_user);
+        assert_eq!(cfg.timeout, None);
+        assert_eq!(cfg.extra.edit_cmd, None);
+        assert_eq!(cfg.extra.open_dir_cmd, None);
+    }
+
+    #[test]
+    fn config_fixture_singbox_full() {
+        let cfg = load_config_fixture("sing-box/full.yaml");
+        assert_eq!(
+            cfg.singbox.core.config_dir,
+            "/opt/clashtui/sing-box/config"
+        );
+        assert_eq!(
+            cfg.singbox.core.bin_path,
+            "/opt/clashtui/sing-box/sing-box"
+        );
+        assert_eq!(
+            cfg.singbox.core.config_path,
+            "/opt/clashtui/sing-box/config/config.json"
+        );
+        assert_eq!(cfg.singbox.core_service.service_name, "clashtui_singbox");
+        assert!(!cfg.singbox.core_service.is_user);
+        assert_eq!(
+            cfg.singbox.core_service.service_controller.as_deref(),
+            Some("openrc")
+        );
+        assert_eq!(cfg.timeout, Some(30));
+        assert_eq!(cfg.extra.edit_cmd.as_deref(), Some(r#"nvim "%s""#));
+        assert_eq!(cfg.extra.open_dir_cmd.as_deref(), Some(r#"lf "%s""#));
+    }
+
+    #[test]
+    fn config_fixture_singbox_minimal_empty_strings() {
+        let cfg = load_config_fixture("sing-box/minimal.yaml");
+        assert_eq!(cfg.mihomo.core.config_dir, "");
+        assert_eq!(cfg.mihomo.core.bin_path, "");
+        assert_eq!(cfg.mihomo.core.config_path, "");
+        assert_eq!(cfg.mihomo.core_service.service_name, "");
+        assert!(!cfg.mihomo.core_service.is_user);
+        assert_eq!(cfg.singbox.core.config_dir, "");
+        assert_eq!(cfg.singbox.core.bin_path, "");
+        assert_eq!(cfg.singbox.core.config_path, "");
+        assert_eq!(cfg.singbox.core_service.service_name, "");
+        assert!(!cfg.singbox.core_service.is_user);
+        assert_eq!(cfg.timeout, None);
+        assert_eq!(cfg.extra.edit_cmd, None);
+        assert_eq!(cfg.extra.open_dir_cmd, None);
+    }
 }

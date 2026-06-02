@@ -1,0 +1,16 @@
+mihomo:
+  core:
+    config_dir: ""
+    bin_path: ""
+    config_path: ""
+  core_service:
+    service_name: ""
+    is_user: false
+singbox:
+  core:
+    config_dir: ""
+    bin_path: ""
+    config_path: ""
+  core_service:
+    service_name: ""
+    is_user: false
