@@ -42,6 +42,19 @@ github_api_curl() {
   fi
 }
 
+safe_link() {
+  local src="$1"
+  local dst="$2"
+  if [ ! -e "$src" ]; then
+    log_error "safe_link: source '$src' does not exist"
+    return 1
+  fi
+  if [ -L "$dst" ]; then
+    $SUDO rm -f "$dst"
+  fi
+  $SUDO ln -s "$src" "$dst"
+}
+
 backup_dir() {
   [ -d "$1" ] || return 0
   local i=1
@@ -1008,10 +1021,10 @@ prompt_templates_and_rules() {
 install_mihomo() {
   if command_exists mihomo; then
     $SUDO mkdir -p "$INSTALL_DIR_MIHOMO"
-    $SUDO ln -sf "$(which mihomo)" "$INSTALL_DIR_MIHOMO/mihomo"
+    safe_link "$(which mihomo)" "$INSTALL_DIR_MIHOMO/mihomo"
   elif command_exists clash-meta; then
     $SUDO mkdir -p "$INSTALL_DIR_MIHOMO"
-    $SUDO ln -sf "$(which clash-meta)" "$INSTALL_DIR_MIHOMO/mihomo"
+    safe_link "$(which clash-meta)" "$INSTALL_DIR_MIHOMO/mihomo"
   else
     download_mihomo
   fi
@@ -1036,7 +1049,7 @@ install_mihomo() {
 install_singbox() {
   if command_exists sing-box; then
     $SUDO mkdir -p "$INSTALL_DIR_SINGBOX"
-    $SUDO ln -sf "$(which sing-box)" "$INSTALL_DIR_SINGBOX/sing-box"
+    safe_link "$(which sing-box)" "$INSTALL_DIR_SINGBOX/sing-box"
     if ! $IS_USER && ! $IS_MACOS; then
       $SUDO ln -sf "$INSTALL_DIR_SINGBOX/sing-box" /usr/bin/sing-box
     fi
@@ -1064,7 +1077,7 @@ install_clashtui() {
   local core_type="$1"
   if command_exists clashtui; then
     $SUDO mkdir -p "$INSTALL_BIN"
-    $SUDO ln -sf "$(which clashtui)" "$CLASHTUI_BIN"
+    safe_link "$(which clashtui)" "$CLASHTUI_BIN"
   else
     download_clashtui
   fi
