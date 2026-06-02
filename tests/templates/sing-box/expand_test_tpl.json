@@ -1,0 +1,57 @@
+{
+  "log": { "level": "info", "timestamp": true },
+  "dns": {
+    "servers": [
+      { "tag": "dns-remote", "address": "tls://1.1.1.1", "detour": "Entry" },
+      { "tag": "dns-local", "address": "223.5.5.5", "detour": "direct" }
+    ],
+    "rules": [
+      { "rule_set": ["geosite-cn"], "server": "dns-local" },
+      { "rule_set": ["geosite-!cn"], "server": "dns-remote" }
+    ]
+  },
+  "inbounds": [
+    { "type": "mixed", "tag": "mixed-in", "listen": "127.0.0.1", "listen_port": 2080 }
+  ],
+  "outbounds": [
+    {
+      "type": "selector",
+      "tag": "Entry",
+      "outbounds": ["${PGG.Auto}", "${PGG.Select}", "direct"],
+      "default": "${PGG.Auto}"
+    },
+    {
+      "type": "urltest",
+      "tag": "Auto",
+      "expand_group_with": ["${PPG.pvd}"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "5m",
+      "tolerance": 50
+    },
+    {
+      "type": "selector",
+      "tag": "Select",
+      "expand_group_with": ["${PPG.pvd}"],
+      "default": "${PPG.pvd.hajimi}"
+    },
+    { "type": "direct", "tag": "direct" },
+    { "type": "block", "tag": "block" },
+    { "type": "dns", "tag": "dns-out" }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "rules": [
+      { "action": "sniff" },
+      { "protocol": "dns", "action": "hijack-dns" },
+      { "rule_set": ["geosite-!cn"], "outbound": "Entry" },
+      { "rule_set": ["geosite-cn"], "outbound": "direct" },
+      { "ip_is_private": true, "outbound": "direct" }
+    ]
+  },
+  "experimental": {
+    "clash_api": {
+      "default_mode": "Rule",
+      "external_controller": "127.0.0.1:9090"
+    }
+  }
+}

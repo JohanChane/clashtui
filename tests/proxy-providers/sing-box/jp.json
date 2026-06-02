@@ -1,0 +1,30 @@
+[
+  {
+    "type": "vmess",
+    "tag": "jp-01",
+    "server": "jp1.example.com",
+    "server_port": 8080,
+    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "security": "auto"
+  },
+  {
+    "type": "vmess",
+    "tag": "jp-02",
+    "server": "jp2.example.com",
+    "server_port": 443,
+    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "security": "auto",
+    "transport": { "type": "grpc", "service_name": "proxy" }
+  },
+  {
+    "type": "trojan",
+    "tag": "jp-03",
+    "server": "jp3.example.com",
+    "server_port": 443,
+    "password": "pwd-jp-03",
+    "tls": {
+      "enabled": true,
+      "server_name": "jp3.example.com"
+    }
+  }
+]

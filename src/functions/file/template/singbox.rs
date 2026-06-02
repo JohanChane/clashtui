@@ -145,7 +145,7 @@ fn resolve_default_placeholder(
 /// translated to sing-box native `route` rules/rule_set.
 pub async fn gen_template_singbox(
     tpl: &JsonValue,
-    _template_name: &str,
+    template_name: &str,
     groups: &ProxyProviderGroups,
     with_proxy: bool,
     force_refresh: bool,
@@ -222,8 +222,14 @@ pub async fn gen_template_singbox(
         );
     }
 
-    // Apply Set-based cross-provider tag deduplication
-    provider_proxies = dedup_singbox_proxy_tags(provider_proxies);
+    expand_singbox_template(tpl, provider_proxies, groups)
+}
+
+pub fn expand_singbox_template(
+    tpl: &JsonValue,
+    mut provider_proxies: HashMap<String, Vec<JsonValue>>,
+    groups: &ProxyProviderGroups,
+) -> anyhow::Result<JsonValue> {
 
     // Filter out group-type entries (selector, urltest, etc.) —
     // only keep actual proxy nodes
@@ -565,6 +571,182 @@ mod tests {
         let result = resolve_default_placeholder(
             "plain-string", &tag_map, &ppg,
         );
+        assert!(result.is_err());
+    }
+
+    fn load_json_fixture(path: &str) -> JsonValue {
+        let full = format!(
+            "{}/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            path
+        );
+        let data = std::fs::read_to_string(full).unwrap();
+        serde_json::from_str(&data).unwrap()
+    }
+
+    fn make_groups() -> ProxyProviderGroups {
+        let mut groups = ProxyProviderGroups::new();
+        let mut pvd = std::collections::BTreeMap::new();
+        pvd.insert("hajimi".to_string(), "https://e.com/hajimi.json".to_string());
+        pvd.insert("manbo".to_string(), "https://e.com/manbo.json".to_string());
+        groups.insert("pvd".to_string(), pvd);
+        groups
+    }
+
+    fn make_provider_proxies() -> (HashMap<String, Vec<JsonValue>>, HashMap<String, Vec<JsonValue>>)
+    {
+        let hajimi = load_json_fixture("tests/proxy-providers/sing-box/hk.json");
+        let manbo = load_json_fixture("tests/proxy-providers/sing-box/jp.json");
+
+        let hajimi_arr: Vec<JsonValue> = hajimi.as_array().unwrap().clone();
+        let manbo_arr: Vec<JsonValue> = manbo.as_array().unwrap().clone();
+
+        let mut provider_proxies = HashMap::new();
+        provider_proxies.insert("hajimi".to_string(), hajimi_arr.clone());
+        provider_proxies.insert("manbo".to_string(), manbo_arr.clone());
+
+        let mut expected = HashMap::new();
+        expected.insert("hajimi".to_string(), hajimi_arr);
+        expected.insert("manbo".to_string(), manbo_arr);
+        (provider_proxies, expected)
+    }
+
+    #[test]
+    fn expand_template_produces_expanded_groups() {
+        let tpl = load_json_fixture("tests/templates/sing-box/expand_test_tpl.json");
+        let groups = make_groups();
+        let (provider_proxies, _) = make_provider_proxies();
+
+        let result = expand_singbox_template(&tpl, provider_proxies, &groups).unwrap();
+        let outbounds = result["outbounds"].as_array().unwrap();
+
+        let auto_hajimi = outbounds
+            .iter()
+            .find(|ob| ob["tag"] == "Auto-hajimi")
+            .expect("Auto-hajimi missing");
+        assert_eq!(auto_hajimi["type"], "urltest");
+        assert_eq!(
+            auto_hajimi["outbounds"].as_array().unwrap().len(),
+            3
+        );
+
+        let auto_manbo = outbounds
+            .iter()
+            .find(|ob| ob["tag"] == "Auto-manbo")
+            .expect("Auto-manbo missing");
+        assert_eq!(auto_manbo["type"], "urltest");
+
+        let select_hajimi = outbounds
+            .iter()
+            .find(|ob| ob["tag"] == "Select-hajimi")
+            .expect("Select-hajimi missing");
+        assert_eq!(select_hajimi["type"], "selector");
+
+        let select_manbo = outbounds
+            .iter()
+            .find(|ob| ob["tag"] == "Select-manbo")
+            .expect("Select-manbo missing");
+        assert_eq!(select_manbo["type"], "selector");
+    }
+
+    #[test]
+    fn expand_template_resolves_pgg_placeholder() {
+        let tpl = load_json_fixture("tests/templates/sing-box/expand_test_tpl.json");
+        let groups = make_groups();
+        let (provider_proxies, _) = make_provider_proxies();
+
+        let result = expand_singbox_template(&tpl, provider_proxies, &groups).unwrap();
+        let outbounds = result["outbounds"].as_array().unwrap();
+
+        let entry = outbounds.iter().find(|ob| ob["tag"] == "Entry").unwrap();
+        let entry_outbounds: Vec<String> = entry["outbounds"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap().to_string())
+            .collect();
+
+        assert!(entry_outbounds.contains(&"Auto-hajimi".to_string()));
+        assert!(entry_outbounds.contains(&"Auto-manbo".to_string()));
+        assert!(entry_outbounds.contains(&"Select-hajimi".to_string()));
+        assert!(entry_outbounds.contains(&"Select-manbo".to_string()));
+        assert!(entry_outbounds.contains(&"direct".to_string()));
+    }
+
+    #[test]
+    fn expand_template_resolves_default_placeholder() {
+        let tpl = load_json_fixture("tests/templates/sing-box/expand_test_tpl.json");
+        let groups = make_groups();
+        let (provider_proxies, _) = make_provider_proxies();
+
+        let result = expand_singbox_template(&tpl, provider_proxies, &groups).unwrap();
+        let outbounds = result["outbounds"].as_array().unwrap();
+
+        let entry = outbounds.iter().find(|ob| ob["tag"] == "Entry").unwrap();
+        let default = entry["default"].as_str().unwrap();
+        assert!(default.starts_with("Auto"));
+
+        let select_hajimi = outbounds
+            .iter()
+            .find(|ob| ob["tag"] == "Select-hajimi")
+            .unwrap();
+        let sel_default = select_hajimi["default"].as_str().unwrap();
+        assert_eq!(sel_default, "${PPG.pvd.hajimi}");
+    }
+
+    #[test]
+    fn expand_template_appends_proxy_nodes() {
+        let tpl = load_json_fixture("tests/templates/sing-box/expand_test_tpl.json");
+        let groups = make_groups();
+        let (provider_proxies, _) = make_provider_proxies();
+
+        let result = expand_singbox_template(&tpl, provider_proxies, &groups).unwrap();
+        let outbounds = result["outbounds"].as_array().unwrap();
+
+        let tags: Vec<&str> = outbounds
+            .iter()
+            .filter_map(|ob| ob.get("tag").and_then(|t| t.as_str()))
+            .collect();
+        assert!(tags.contains(&"hk-01"));
+        assert!(tags.contains(&"hk-02"));
+        assert!(tags.contains(&"hk-03"));
+        assert!(tags.contains(&"jp-01"));
+        assert!(tags.contains(&"jp-02"));
+        assert!(tags.contains(&"jp-03"));
+    }
+
+    #[test]
+    fn expand_template_injects_clashtui_metadata() {
+        let tpl = load_json_fixture("tests/templates/sing-box/expand_test_tpl.json");
+        let groups = make_groups();
+        let (provider_proxies, _) = make_provider_proxies();
+
+        let result = expand_singbox_template(&tpl, provider_proxies, &groups).unwrap();
+        assert!(result.get("clashtui").is_some());
+        let ppg = &result["clashtui"]["proxy_provider_groups"];
+        assert!(ppg.get("pvd").is_some());
+    }
+
+    #[test]
+    fn expand_template_preserves_non_outbound_sections() {
+        let tpl = load_json_fixture("tests/templates/sing-box/expand_test_tpl.json");
+        let groups = make_groups();
+        let (provider_proxies, _) = make_provider_proxies();
+
+        let result = expand_singbox_template(&tpl, provider_proxies, &groups).unwrap();
+        assert_eq!(result["log"]["level"], "info");
+        assert!(result["dns"]["servers"].as_array().is_some());
+        assert!(result["inbounds"].as_array().is_some());
+        assert!(result["route"]["rules"].as_array().is_some());
+    }
+
+    #[test]
+    fn expand_template_fails_with_empty_providers() {
+        let tpl = load_json_fixture("tests/templates/sing-box/expand_test_tpl.json");
+        let groups = make_groups();
+        let provider_proxies = HashMap::new();
+
+        let result = expand_singbox_template(&tpl, provider_proxies, &groups);
         assert!(result.is_err());
     }
 }

@@ -1,0 +1,13 @@
+[
+  {
+    "type": "hysteria2",
+    "tag": "sg-hy2",
+    "server": "sg.example.com",
+    "server_port": 443,
+    "password": "pwd-sg-hy2",
+    "tls": {
+      "enabled": true,
+      "server_name": "sg.example.com"
+    }
+  }
+]

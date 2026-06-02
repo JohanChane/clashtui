@@ -1,0 +1,27 @@
+[
+  {
+    "type": "shadowsocks",
+    "tag": "hk-01",
+    "server": "hk1.example.com",
+    "server_port": 443,
+    "method": "aes-256-gcm",
+    "password": "pwd-hk-01"
+  },
+  {
+    "type": "shadowsocks",
+    "tag": "hk-02",
+    "server": "hk2.example.com",
+    "server_port": 8388,
+    "method": "chacha20-ietf-poly1305",
+    "password": "pwd-hk-02"
+  },
+  {
+    "type": "vmess",
+    "tag": "hk-03",
+    "server": "hk3.example.com",
+    "server_port": 8443,
+    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "security": "auto",
+    "transport": { "type": "ws", "path": "/ws" }
+  }
+]

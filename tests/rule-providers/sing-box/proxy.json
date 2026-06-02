@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "rules": [
+    { "domain_suffix": [".google.com", ".youtube.com", ".github.com"] },
+    { "domain_keyword": ["google"] }
+  ]
+}

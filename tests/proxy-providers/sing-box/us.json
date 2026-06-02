@@ -1,0 +1,22 @@
+[
+  {
+    "type": "shadowsocks",
+    "tag": "us-01",
+    "server": "us1.example.com",
+    "server_port": 443,
+    "method": "aes-128-gcm",
+    "password": "pwd-us-01"
+  },
+  {
+    "type": "vless",
+    "tag": "us-02",
+    "server": "us2.example.com",
+    "server_port": 443,
+    "uuid": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+    "flow": "xtls-rprx-vision",
+    "tls": {
+      "enabled": true,
+      "server_name": "us2.example.com"
+    }
+  }
+]

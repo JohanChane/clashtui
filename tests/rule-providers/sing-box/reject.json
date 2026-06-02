@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "rules": [
+    { "domain_suffix": [".ads.example.com", ".tracker.example.com"] },
+    { "domain_keyword": ["analytics", "advert"] },
+    { "ip_cidr": ["10.0.0.0/8", "127.0.0.0/8"] }
+  ]
+}
