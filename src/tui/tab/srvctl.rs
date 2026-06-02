@@ -45,24 +45,6 @@ impl TryFrom<&crate::tui::Key> for SrvCtlKey {
     }
 }
 
-macro_rules! tri {
-    ($e:expr) => {
-        match $e {
-            Ok(v) => v,
-            Err(e) => {
-                crate::tui::widget::popmsg::Confirm::err(e);
-                return do_nothing();
-            }
-        }
-    };
-    ($e:expr, or_cancel) => {
-        match $e {
-            Ok(v) => v,
-            Err(_) => return do_nothing(),
-        }
-    };
-}
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SrvCtlOp {
     Stop,
@@ -93,6 +75,7 @@ impl SrvCtlOp {
         }
     }
     fn all() -> Vec<Self> {
+        #[cfg_attr(not(windows), allow(unused_mut))]
         let mut ops = vec![Self::Stop, Self::Restart, Self::SwitchCore, Self::StopAll];
         #[cfg(windows)]
         {
@@ -145,7 +128,7 @@ impl SrvCtlContent {
                     crate::functions::command::nssm_status(&service_name)
                 }
                 crate::config::ServiceController::OpenRc => {
-                    let mut args = vec![service_name.as_str(), "status"];
+                    let args = vec![service_name.as_str(), "status"];
                     let bin = controller.bin_name();
                     let output = std::process::Command::new(bin).args(&args).output();
                     match output {
@@ -178,62 +161,6 @@ impl SrvCtlContent {
             wrapper(move |c: &mut SrvCtlContent| match target {
                 CoreType::Mihomo => c.mihomo_status = status,
                 CoreType::Singbox => c.singbox_status = status,
-            })
-        }
-        .spawn_at(task_set);
-    }
-    fn spawn_current_status_check(&self, task_set: &mut FutureSet<Self>) {
-        let service_name = self.service_name.clone();
-        let is_user = self.is_user;
-        let csc = match crate::config::CONFIG.core_type() {
-            CoreType::Mihomo => crate::config::CONFIG.cfg_file.mihomo.core_service.clone(),
-            CoreType::Singbox => crate::config::CONFIG.cfg_file.singbox.core_service.clone(),
-        };
-        let controller = crate::config::ServiceController::from_config(&csc);
-        async move {
-            let status = match controller {
-                crate::config::ServiceController::Launchd => launchd_status(&service_name, is_user),
-                #[cfg(windows)]
-                crate::config::ServiceController::Nssm => {
-                    crate::functions::command::nssm_status(&service_name)
-                }
-                crate::config::ServiceController::OpenRc => {
-                    let mut args = vec![service_name.as_str(), "status"];
-                    let bin = controller.bin_name();
-                    let output = std::process::Command::new(bin).args(&args).output();
-                    match output {
-                        Ok(o) => {
-                            let stdout = String::from_utf8_lossy(&o.stdout);
-                            if stdout.contains("started") {
-                                "active".to_owned()
-                            } else if stdout.contains("stopped") {
-                                "inactive".to_owned()
-                            } else {
-                                stdout.trim().to_owned()
-                            }
-                        }
-                        Err(_) => "?".to_owned(),
-                    }
-                }
-                _ => {
-                    let mut args = vec!["is-active"];
-                    if is_user {
-                        args.push("--user");
-                    }
-                    args.push(&service_name);
-                    let output = std::process::Command::new("systemctl").args(&args).output();
-                    match output {
-                        Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_owned(),
-                        Err(_) => "?".to_owned(),
-                    }
-                }
-            };
-            wrapper(move |c: &mut SrvCtlContent| {
-                c.status = status.clone();
-                match crate::config::CONFIG.core_type() {
-                    CoreType::Mihomo => c.mihomo_status = status,
-                    CoreType::Singbox => c.singbox_status = status,
-                }
             })
         }
         .spawn_at(task_set);
@@ -627,6 +554,7 @@ impl TabContent for SrvCtlContent {
             .border_style(section.border)
             .title(title_line)
             .title_bottom({
+                #[cfg_attr(not(windows), allow(unused_mut))]
                 let mut spans = vec![
                     ratatui::text::Span::styled(
                         format!(" {} ", current_core_label),

@@ -256,12 +256,6 @@ impl ProfileManager {
                 update_with_proxy: data.update_with_proxy,
             })
     }
-    /// return all profile names from both sections
-    pub fn all(&self) -> Vec<String> {
-        let mut keys: Vec<String> = self.mihomo.profiles.keys().cloned().collect();
-        keys.extend(self.singbox.profiles.keys().cloned());
-        keys
-    }
     /// return profile names for the active core only
     pub fn all_for_core(&self) -> Vec<String> {
         match self.core_type {

@@ -32,6 +32,7 @@ fn flatten_yaml_merge_key(map: &mut serde_yml::Mapping) {
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[allow(dead_code)]
 struct PGitem {
     name: String,
     #[serde(rename = "use")]

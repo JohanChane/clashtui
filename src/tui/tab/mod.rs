@@ -1,5 +1,5 @@
 mod dev {
-    pub use crate::tui::Key as TuiKey;
+    
     pub use crate::tui::widget::dualtab::*;
     pub use crate::tui::widget::tab::*;
     pub use crossterm::event::KeyCode;
@@ -54,6 +54,7 @@ pub(crate) mod agent {
 
     static AGENT: OnceLock<Agent> = OnceLock::new();
 
+    #[allow(dead_code)]
     fn key_from_str(s: &str) -> crate::tui::Key {
         use std::str::FromStr;
         crate::tui::Key::from_str(s).expect("invalid key string in mod_agent!")
@@ -166,6 +167,7 @@ pub(crate) mod agent {
     }
 }
 
+#[allow(unused_imports)]
 pub use agent::{agent, all_shortcuts};
 pub use agent::{init as agent_init, init_descs, init_chords};
     };

@@ -27,6 +27,7 @@ pub struct NetResource {
 pub struct NetResourceUpdate {
     pub name: String,
     pub url: String,
+    #[allow(dead_code)]
     pub path: String,
     pub section: ResourceSection,
     pub ok: bool,

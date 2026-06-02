@@ -43,6 +43,7 @@ pub struct ProxiesResponse {
 #[derive(Debug, Deserialize, Default, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct Proxy {
+    #[allow(dead_code)]
     pub name: String,
     #[serde(rename = "type")]
     pub proxy_type: String,
@@ -56,10 +57,12 @@ pub struct Proxy {
     pub all: Option<Vec<String>>,
     #[serde(default)]
     pub history: Vec<DelayRecord>,
+    #[allow(dead_code)]
     #[serde(default)]
     pub extra: IndexMap<String, DelayInfo>,
     #[serde(default)]
     pub test_url: Option<String>,
+    #[allow(dead_code)]
     #[serde(default)]
     pub provider_name: Option<String>,
     #[serde(default)]
@@ -92,7 +95,9 @@ impl<'de> Deserialize<'de> for DelayRecord {
 
 #[derive(Debug, Clone)]
 pub struct DelayInfo {
+    #[allow(dead_code)]
     pub alive: bool,
+    #[allow(dead_code)]
     pub history: Vec<DelayRecord>,
 }
 
@@ -113,15 +118,6 @@ impl<'de> Deserialize<'de> for DelayInfo {
 
 pub fn fetch_proxies() -> Result<ProxiesResponse> {
     request(Method::Get, "/proxies", None).and_then(|r| r.json())
-}
-
-pub fn get_proxy(name: &str) -> Result<Proxy> {
-    request(
-        Method::Get,
-        &format!("/proxies/{}", encode_path(name)),
-        None,
-    )
-    .and_then(|r| r.json())
 }
 
 pub fn select_proxy(group: &str, node: &str) -> Result<()> {

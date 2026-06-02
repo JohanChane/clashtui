@@ -18,4 +18,3 @@ pub(crate) static TEMPLATE_PATH: LazyLock<PathBuf> =
         crate::config::CoreType::Singbox => crate::config::singbox_template_path(),
     });
 
-const MAX_SUPPORTED_TEMPLATE_VERSION: u64 = 1;

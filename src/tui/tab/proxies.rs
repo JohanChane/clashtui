@@ -196,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn chord_handler_Sn_dispatches_global_sort_by_name() {
+    fn chord_handler_sn_dispatches_global_sort_by_name() {
         let s = mk_key(KeyCode::Char('S'));
         let n = mk_key(KeyCode::Char('n'));
         let shortcuts = make_shortcuts();
@@ -295,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn single_key_G_in_agent() {
+    fn single_key_g_in_agent() {
         let kev = mk_key(KeyCode::Char('G'));
         let key = Key::try_from(&kev);
         assert!(matches!(key, Ok(Key::GoBottom)), "G should map to GoBottom");
@@ -373,7 +373,7 @@ mod tests {
     }
 
     #[test]
-    fn S_initiates_chord_mode() {
+    fn uppercase_s_initiates_chord_mode() {
         let s_upper = mk_key(KeyCode::Char('S'));
         let shortcuts = make_shortcuts();
         let mut ch = ChordHandler::default();
@@ -392,7 +392,7 @@ mod tests {
     }
 
     #[test]
-    fn Sd_dispatches_global_sort_by_delay() {
+    fn sd_dispatches_global_sort_by_delay() {
         let s_upper = mk_key(KeyCode::Char('S'));
         let d = mk_key(KeyCode::Char('d'));
         let shortcuts = make_shortcuts();
@@ -409,7 +409,7 @@ mod tests {
     }
 
     #[test]
-    fn Sr_dispatches_global_reset_sort() {
+    fn sr_dispatches_global_reset_sort() {
         let s_upper = mk_key(KeyCode::Char('S'));
         let r = mk_key(KeyCode::Char('r'));
         let shortcuts = make_shortcuts();
@@ -495,7 +495,7 @@ mod tests {
     }
 
     #[test]
-    fn F_maps_to_fzf_find_in_agent() {
+    fn f_maps_to_fzf_find_in_agent() {
         let kev = mk_key(KeyCode::Char('F'));
         let key = Key::try_from(&kev);
         assert!(matches!(key, Ok(Key::FzfFind)), "F should map to FzfFind");

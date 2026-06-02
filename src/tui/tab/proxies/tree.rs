@@ -226,17 +226,6 @@ impl ProxyTree {
         }
     }
 
-    pub fn collapse_at(
-        &mut self,
-        name: &str,
-        proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,
-    ) {
-        if let Some(idx) = self.find_folder_index(name) {
-            self.nodes[idx].expanded = false;
-            self.rebuild_from_proxies(proxies);
-        }
-    }
-
     pub fn collapse_all(
         &mut self,
         proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,

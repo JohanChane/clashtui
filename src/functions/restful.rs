@@ -14,7 +14,6 @@ const DEFAULT_TIMEOUT: u64 = 5;
 mod headers {
     pub const USER_AGENT: &str = "user-agent";
     pub const AUTHORIZATION: &str = "authorization";
-    pub const DEFAULT_USER_AGENT: &str = "github.com/JohanChane/clashtui";
 }
 
 type Result<T, E = minreq::Error> = core::result::Result<T, E>;
@@ -39,17 +38,6 @@ pub mod control {
     /// for mihomo, it's like `{"meta": true, "version": "v1.1.1"}`
     pub fn version() -> Result<String> {
         request(Method::Get, "/version", None).and_then(|r| r.as_str().map(|s| s.to_owned()))
-    }
-
-    /// Try GET `https://www.gstatic.com/generate_204`
-    ///
-    /// return nothing on success
-    pub fn check_connectivity() -> Result<()> {
-        minreq::get("https://www.gstatic.com/generate_204")
-            .with_proxy(minreq::Proxy::new(&CONFIG.proxy_addr)?)
-            .with_timeout(timeout!())
-            .send_lazy()
-            .map(|_| ())
     }
 }
 
@@ -288,10 +276,12 @@ pub mod connection {
         pub metadata: ConnMetaData,
         pub upload: u64,
         pub download: u64,
+        #[allow(dead_code)]
         pub start: String,
         pub chains: Vec<String>,
         #[serde(default)]
         pub rule: Option<String>,
+        #[allow(dead_code)]
         #[serde(default, rename = "rulePayload")]
         pub rule_payload: Option<String>,
     }
@@ -302,15 +292,19 @@ pub mod connection {
     pub struct ConnMetaData {
         pub network: String,
         #[serde(rename = "type", default)]
+        #[allow(dead_code)]
         pub ctype: String,
         pub host: String,
         #[serde(default)]
+        #[allow(dead_code)]
         pub process: String,
         #[serde(default)]
         pub process_path: String,
 
         #[serde(rename = "sourceIP")]
+        #[allow(dead_code)]
         pub source_ip: String,
+        #[allow(dead_code)]
         pub source_port: String,
         #[serde(default)]
         pub remote_destination: String,
@@ -318,6 +312,7 @@ pub mod connection {
         pub destination_port: String,
         #[serde(default, rename = "destinationIP")]
         pub destination_ip: Option<String>,
+        #[allow(dead_code)]
         #[serde(default, rename = "sniffHost")]
         pub sniff_host: Option<String>,
     }
@@ -359,7 +354,7 @@ pub mod connection {
 }
 
 pub mod api_log {
-    use super::*;
+    
 
     pub struct LogEntry {
         pub type_: String,
@@ -439,17 +434,6 @@ pub mod api_log {
                 },
             )
             .collect()
-    }
-
-    pub fn get_logs(level: Option<&str>) -> Result<Vec<LogEntry>> {
-        let url = match level {
-            Some(l) if !l.is_empty() && l != "unknown" => format!("/logs?level={l}"),
-            _ => "/logs".to_owned(),
-        };
-        request(Method::Get, &url, None).and_then(|r| {
-            let body = r.as_str()?;
-            Ok(parse_log_entries(body))
-        })
     }
 }
 

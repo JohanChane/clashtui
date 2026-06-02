@@ -12,6 +12,6 @@ mod dev {
 
 pub mod prelude {
     pub use super::input::Input;
-    pub use super::input::InputMasked;
+    
     // pub use super::prompt::Prompt;
 }

@@ -22,6 +22,7 @@ impl Profile {
 
 #[derive(Clone)]
 pub struct LocalProfile {
+    #[allow(dead_code)]
     pub name: String,
     pub dtype: ProfileType,
     pub path: PathBuf,

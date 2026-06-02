@@ -75,7 +75,7 @@ impl Config {
     fn load() -> Result<Self> {
         let mut cfg_file = ConfigFile::from_file()?;
         let basic_info = BasicInfo::from_file()?;
-        let mut data: ProfileManager = ProfileManager::from_file()?;
+        let data: ProfileManager = ProfileManager::from_file()?;
         // Flush pending legacy Template migrations: write proxy_provider_groups from
         // old database entries into the corresponding template files.
         {
@@ -313,9 +313,6 @@ fn singbox_dir() -> PathBuf {
 pub fn config_dir_path() -> PathBuf {
     DATA_DIR.get().unwrap().clone()
 }
-pub fn config_root_path() -> PathBuf {
-    CONFIG_ROOT.get().unwrap().clone()
-}
 pub fn core_data_dir(core_type: CoreType) -> PathBuf {
     match core_type {
         CoreType::Mihomo => mihomo_dir(),
@@ -333,9 +330,6 @@ pub fn profile_yamls_path() -> PathBuf {
 }
 pub fn profile_jsons_path() -> PathBuf {
     singbox_dir().join(defs::PROFILE_JSONS_DIR)
-}
-pub fn provider_cache_path() -> PathBuf {
-    mihomo_dir().join(defs::PROVIDER_CACHE_DIR)
 }
 pub fn singbox_proxy_providers_path() -> PathBuf {
     singbox_dir().join(defs::PROXY_PROVIDERS_DIR)

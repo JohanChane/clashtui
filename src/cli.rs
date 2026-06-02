@@ -3,7 +3,6 @@ mod utils;
 mod widgets;
 
 pub use handler::handle_cli;
-pub use widgets::{Confirm, Select};
 
 #[derive(clap::Parser)]
 #[cfg_attr(debug_assertions, derive(Debug))]
@@ -99,7 +98,7 @@ pub(crate) enum ArgCommand {
 }
 
 #[derive(Debug, clap::Subcommand)]
-enum Target {
+pub(crate) enum Target {
     /// check for ClashTUI
     Clashtui,
     /// check for Mihomo
@@ -108,7 +107,7 @@ enum Target {
 
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
-enum ModeCommand {
+pub(crate) enum ModeCommand {
     /// rule
     Rule,
     /// direct
@@ -119,7 +118,7 @@ enum ModeCommand {
 
 #[derive(Clone, clap::ValueEnum)]
 #[cfg_attr(debug_assertions, derive(Debug))]
-enum ProfileTypeFilter {
+pub(crate) enum ProfileTypeFilter {
     /// file-based profiles
     File,
     /// URL-based profiles
@@ -147,7 +146,7 @@ impl ProfileTypeFilter {
 
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
-enum ProfileCommand {
+pub(crate) enum ProfileCommand {
     /// update the selected profile or all
     Update {
         /// update all profiles,
@@ -187,7 +186,7 @@ enum ProfileCommand {
 
 #[derive(clap::Subcommand)]
 #[cfg_attr(debug_assertions, derive(Debug))]
-enum ServiceCommand {
+pub(crate) enum ServiceCommand {
     /// start/restart service, can be soft
     Restart {
         /// restart by send POST request to mihomo

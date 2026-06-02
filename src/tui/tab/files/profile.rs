@@ -717,14 +717,12 @@ mod actions {
         let (new_names, new_atime) = get_profiles_with_readable_atime();
         wrapper(move |(content, _): &mut C| {
             let mut msgs = Vec::with_capacity(results.len());
-            let mut has_net_updates = false;
             for (name, result) in results {
                 content.updating.remove(&name);
                 match result {
                     Ok(upd) => {
                         let mut msg = format!("Updated: {}", upd.name);
                         if !upd.net_updates.is_empty() {
-                            has_net_updates = true;
                             msg.push('\n');
                             msg.push_str(
                                 &crate::functions::file::net_resource::format_net_updates(

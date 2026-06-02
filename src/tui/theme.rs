@@ -41,7 +41,7 @@ impl From<StyleDef> for Style {
 
 #[derive(serde::Deserialize, Default, Debug, Clone)]
 #[serde(default)]
-struct SectionPaletteDef {
+pub(crate) struct SectionPaletteDef {
     pub border: Option<StyleDef>,
     pub highlight: Option<StyleDef>,
     pub text: Option<StyleDef>,
@@ -53,14 +53,14 @@ struct SectionPaletteDef {
 
 #[derive(serde::Deserialize, Default, Debug, Clone)]
 #[serde(default)]
-struct TabbarDef {
+pub(crate) struct TabbarDef {
     pub text: StyleDef,
     pub highlight: StyleDef,
 }
 
 #[derive(serde::Deserialize, Default, Debug, Clone)]
 #[serde(default)]
-struct PopupDef {
+pub(crate) struct PopupDef {
     pub border: StyleDef,
     pub text: StyleDef,
 }
@@ -87,7 +87,6 @@ pub(crate) struct ComputedSectionTheme {
     pub highlight: Style,
     pub text: Style,
     pub muted: Style,
-    pub title: Style,
     pub extra: HashMap<String, Style>,
 }
 
@@ -104,7 +103,6 @@ impl ComputedSectionTheme {
             highlight: resolve(&palette.highlight, &default.highlight),
             text: resolve(&palette.text, &default.text),
             muted: resolve(&palette.muted, &default.muted),
-            title: resolve(&palette.title, &default.title),
             extra: {
                 let mut merged = HashMap::new();
                 for (k, v) in &default.extra {

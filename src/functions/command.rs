@@ -314,18 +314,16 @@ pub fn start_core_service(password: Option<&str>, core_type: CoreType) -> Result
     svc_operation("start", password, Some(core_type))
 }
 
-pub fn restart_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
-    svc_operation("restart", password, Some(core_type))
-}
-
 pub fn reload_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
     svc_operation("reload", password, Some(core_type))
 }
 
+#[cfg(windows)]
 pub fn install_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
     svc_operation("install", password, Some(core_type))
 }
 
+#[cfg(windows)]
 pub fn uninstall_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
     svc_operation("remove", password, Some(core_type))
 }

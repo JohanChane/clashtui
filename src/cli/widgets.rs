@@ -1,42 +1,6 @@
 use std::fmt::Display;
 use std::io::Write;
 
-#[derive(Default)]
-pub struct Confirm {
-    prompts: Vec<String>,
-}
-impl Confirm {
-    pub fn append_prompt<S: ToString>(mut self, prompt: S) -> Self {
-        self.prompts.push(prompt.to_string());
-        self
-    }
-    pub fn interact(self) -> std::io::Result<bool> {
-        let Self { mut prompts } = self;
-        debug_assert!(
-            !prompts.is_empty(),
-            "Empty prompt for Confirm, why it's here?"
-        );
-        let mut out = std::io::stderr().lock();
-        let prompt = prompts.pop().unwrap();
-        for p in prompts {
-            writeln!(out, "{}", p)?;
-        }
-        loop {
-            write!(out, "{prompt} [y/n]: ")?;
-            let mut buf = String::new();
-            std::io::stdin().read_line(&mut buf)?;
-            return match buf.chars().nth(0) {
-                Some('y') | Some('Y') => Ok(true),
-                Some('n') | Some('N') => Ok(false),
-                _ => {
-                    eprintln!("Not a valid input");
-                    continue;
-                }
-            };
-        }
-    }
-}
-
 pub struct Select<It> {
     start_prompts: Vec<String>,
     end_prompt: Option<String>,

@@ -145,7 +145,7 @@ fn resolve_default_placeholder(
 /// translated to sing-box native `route` rules/rule_set.
 pub async fn gen_template_singbox(
     tpl: &JsonValue,
-    template_name: &str,
+    _template_name: &str,
     groups: &ProxyProviderGroups,
     with_proxy: bool,
     force_refresh: bool,

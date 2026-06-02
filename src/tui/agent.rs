@@ -214,16 +214,6 @@ fn merge_mappings(base: &mut serde_yml::Mapping, override_map: &mut serde_yml::M
     }
 }
 
-pub fn get(value: &mut serde_yml::Mapping, idx: &str) -> Result<serde_yml::Mapping> {
-    let Some(maybe_map) = value.remove(idx) else {
-        anyhow::bail!("Does not contain `{idx}` section")
-    };
-    let serde_yml::Value::Mapping(map) = maybe_map else {
-        anyhow::bail!("Section `{idx}` is not mapping")
-    };
-    Ok(map)
-}
-
 pub fn check_duplicate_keys(section: &str, map: &serde_yml::Mapping) {
     use std::collections::HashSet;
     let mut seen = HashSet::new();
@@ -293,7 +283,7 @@ mihomo:
       super_: false
     : MoveUp
 "#;
-    let mut value: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
+    let value: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
 
     // Simulate mihomo being the active core
     let mut common = value.clone();
@@ -326,7 +316,7 @@ connections:
     super_: false
   : MoveDown
 "#;
-    let mut value: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
+    let value: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
     // Top-level directly has "connections" - no "keymap" wrapper needed
     assert!(value.contains_key("connections"));
     assert!(!value.contains_key("keymap"));

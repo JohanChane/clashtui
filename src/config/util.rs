@@ -5,14 +5,12 @@ pub mod defs {
     pub const DATA_FILE: &str = "clashtui.db";
     pub const CORE_OVERRIDE_FILE: &str = "core_override_config.yaml";
     pub const CORE_OVERRIDE_SINGBOX_FILE: &str = "core_override_config.json";
-    pub const LOG_FILE: &str = "clashtui.log";
     #[cfg(feature = "customized-theme")]
     pub const THEME_FILE: &str = "theme.yaml";
     pub const PROFILE_YAMLS_DIR: &str = "profiles";
     pub const PROFILE_JSONS_DIR: &str = "profiles";
     pub const TEMPLATE_DIR: &str = "templates";
     pub const KEYMAP_FILE: &str = "keymap.yaml";
-    pub const PROVIDER_CACHE_DIR: &str = "providers";
     pub const PROXY_PROVIDERS_DIR: &str = "proxy-providers";
 }
 
@@ -45,7 +43,7 @@ pub(super) fn load_home_dir() -> Result<std::path::PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     #[cfg(target_os = "macos")]
     #[test]

@@ -1,6 +1,5 @@
 use std::sync::atomic::AtomicBool;
 
-use utils::*;
 
 mod agent;
 mod app;

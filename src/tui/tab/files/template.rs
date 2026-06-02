@@ -393,7 +393,7 @@ mod actions {
         do_nothing()
     }
 
-    async fn preview(name: String) -> CB {
+    async fn preview(_name: String) -> CB {
         todo!()
     }
 

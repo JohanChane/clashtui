@@ -3,16 +3,6 @@ use nix::unistd::{Gid, Group};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::PathBuf;
 
-pub fn correct_cap_for_tun() -> Result<String> {
-    let binary_path = &crate::config::CONFIG.cfg_file.mihomo.core.bin_path;
-
-    exec("chmod", vec!["+x", binary_path])?;
-    run_as_su_by_sudo(
-        "setcap",
-        &["'cap_net_admin,cap_net_bind_service=+ep'", binary_path],
-    )
-}
-
 pub fn find_files_not_group_writable(dir: &Path) -> Vec<PathBuf> {
     let mut result = Vec::new();
 
@@ -137,22 +127,6 @@ pub fn repair_file_permissions(dir: &Path, group_name: &str) -> Result<String> {
 //         .map(|staus| staus.success())
 //         .map_err(|e| e.into())
 // }
-
-/// here we call `crate::tui::hold` to get back to normal screen,
-/// leaving stdio to `sudo`, where user can enter their passwords
-/// without worries
-fn run_as_su_by_sudo(pgm: &str, args: &[&str]) -> Result<String> {
-    crate::tui::hold(true)?;
-
-    let opt = std::process::Command::new("sudo")
-        // .arg("-S")
-        .arg(pgm)
-        .args(args)
-        .output()?;
-
-    crate::tui::hold(false)?;
-    Ok(stringify_output(opt))
-}
 
 // fn run_as_su_by_pkexec(pgm: &str, args: &[&str]) -> Result<String> {
 //     let mut path = std::env::var("PATH").unwrap_or_default();

@@ -1,5 +1,5 @@
 use super::{
-    MAX_SUPPORTED_TEMPLATE_VERSION, PROFILE_JSONS_PATH, PROFILE_YAMLS_PATH, TEMPLATE_PATH,
+    PROFILE_JSONS_PATH, PROFILE_YAMLS_PATH, TEMPLATE_PATH,
 };
 use crate::config::database::{ProfileType, ProxyProviderGroups};
 use anyhow::{Context as _, bail};
@@ -342,36 +342,6 @@ pub fn check_template_ppg_availability(
     Ok(())
 }
 
-pub fn create_template(path: String) -> anyhow::Result<Option<String>> {
-    let path = std::path::PathBuf::from(path);
-    let file = std::fs::File::open(&path)?;
-    let map: serde_yml::Mapping = serde_yml::from_reader(file)?;
-    // remove extension if exists
-    // file is opened, so file_name should exist
-    let name = path.with_extension("").file_name().unwrap().to_owned();
-    match map
-        .get("clashtui_template_version")
-        .and_then(|v| v.as_u64())
-    {
-        None => {
-            std::fs::copy(&path, TEMPLATE_PATH.join(name))?;
-            Ok(None)
-        }
-        Some(ver) if ver <= MAX_SUPPORTED_TEMPLATE_VERSION => {
-            std::fs::copy(&path, TEMPLATE_PATH.join(&name))?;
-            Ok(Some(format!(
-                "Name:{} Added\nClashtui Template Version {}",
-                // path from a String, should be UTF-8
-                name.to_str().unwrap(),
-                ver
-            )))
-        }
-        Some(_) => anyhow::bail!(
-            "Version higher than {} is not support",
-            MAX_SUPPORTED_TEMPLATE_VERSION
-        ),
-    }
-}
 pub fn apply_template(template_name: &str, profile_name: &str) -> anyhow::Result<()> {
     let groups = read_template_ppg(template_name)?;
     let path = TEMPLATE_PATH.join(template_name);

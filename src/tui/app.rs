@@ -306,7 +306,7 @@ impl App {
 
     fn render_which(&self, f: &mut ratatui::Frame) {
         use ratatui::layout::{Alignment, Constraint, Layout, Rect};
-        use ratatui::style::{Style, Stylize};
+        use ratatui::style::{Style};
         use ratatui::text::{Line, Span};
         use ratatui::widgets::{Block, Clear, Paragraph};
         use widget::chord::key_event_to_str;
@@ -373,7 +373,7 @@ impl App {
 
     fn render_global_which(&self, f: &mut ratatui::Frame) {
         use ratatui::layout::{Alignment, Constraint, Layout, Rect};
-        use ratatui::style::{Style, Stylize};
+        use ratatui::style::{Style};
         use ratatui::text::{Line, Span};
         use ratatui::widgets::{Block, Clear, Paragraph};
         use widget::chord::key_event_to_str;
