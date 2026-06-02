@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::io::Write;
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub struct Select<It> {
     start_prompts: Vec<String>,
     end_prompt: Option<String>,
@@ -19,6 +20,7 @@ impl<It: Display> Default for Select<It> {
 ///
 /// The `Select` struct provides methods for appending items to the list, setting prompts, and
 /// interacting with the user to select an item from the list.
+#[cfg_attr(not(test), allow(dead_code))]
 impl<It: Display> Select<It> {
     pub fn append_items<I: Iterator<Item = It>>(mut self, items: I) -> Self {
         self.items.extend(items);

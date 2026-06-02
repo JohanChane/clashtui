@@ -30,6 +30,7 @@ fn save_cached_proxies(url: &str, proxies: &[JsonValue]) {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn interval_to_duration(seconds: u64) -> String {
     if seconds >= 3600 && seconds % 3600 == 0 {
         format!("{}h", seconds / 3600)
@@ -75,6 +76,7 @@ fn download_subscription(url: &str, with_proxy: bool) -> anyhow::Result<Vec<Json
 }
 
 /// Deduplicate proxy tags across proxy-providers for sing-box.
+#[cfg_attr(not(test), allow(dead_code))]
 fn dedup_singbox_proxy_tags(
     providers: std::collections::HashMap<String, Vec<JsonValue>>,
 ) -> std::collections::HashMap<String, Vec<JsonValue>> {

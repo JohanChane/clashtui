@@ -477,6 +477,7 @@ fn test_no_duplicate_keys_in_default_agents() {
     }
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 #[derive(serde::Deserialize, Debug, PartialEq)]
 enum TestAction {
     MoveDown,

@@ -48,6 +48,7 @@ pub struct Proxy {
     #[serde(rename = "type")]
     pub proxy_type: String,
     #[serde(default)]
+    #[cfg_attr(not(test), allow(dead_code))]
     pub alive: bool,
     #[serde(default)]
     pub hidden: bool,

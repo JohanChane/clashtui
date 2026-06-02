@@ -290,6 +290,7 @@ pub mod connection {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub struct ConnMetaData {
+        #[cfg_attr(not(test), allow(dead_code))]
         pub network: String,
         #[serde(rename = "type", default)]
         #[allow(dead_code)]
@@ -299,6 +300,7 @@ pub mod connection {
         #[allow(dead_code)]
         pub process: String,
         #[serde(default)]
+        #[cfg_attr(not(test), allow(dead_code))]
         pub process_path: String,
 
         #[serde(rename = "sourceIP")]
@@ -405,6 +407,7 @@ pub mod api_log {
         (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn parse_log_entries(body: &str) -> Vec<LogEntry> {
         body.lines()
             .filter(|line| !line.is_empty())
