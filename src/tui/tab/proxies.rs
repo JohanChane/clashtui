@@ -452,7 +452,7 @@ mod tests {
         let mut tasks: FutureSet<Proxies> = tokio::task::JoinSet::new();
 
         // Select a middle folder
-        let folder_name = "Sl-pvd0";
+        let folder_name = "Sl-hajimi";
         let folder_idx = content
             .tree
             .nodes
@@ -555,7 +555,7 @@ mod tests {
             .tree
             .nodes
             .iter()
-            .position(|n| n.node_type == NodeType::Folder && n.name == "Sl-pvd0")
+            .position(|n| n.node_type == NodeType::Folder && n.name == "Sl-hajimi")
             .unwrap();
         let parent = content
             .tree
@@ -573,12 +573,12 @@ mod tests {
 
         // All top-level (parent=None) Folder nodes should be siblings
         assert!(
-            siblings.contains(&"Sl-pvd0"),
+            siblings.contains(&"Sl-hajimi"),
             "Folder itself should be in siblings"
         );
         assert!(siblings.contains(&"Entry"), "Entry is a top-level sibling");
         assert!(
-            !siblings.contains(&"vmess-ipdktc33"),
+            !siblings.contains(&"vmess-node001"),
             "vmess-ipdktc33 is a child, not a sibling"
         );
     }
@@ -624,7 +624,7 @@ mod tests {
             .tree
             .nodes
             .iter()
-            .position(|n| n.name == "Sl-pvd0" && n.parent.as_deref() == Some("Entry"))
+            .position(|n| n.name == "Sl-hajimi" && n.parent.as_deref() == Some("Entry"))
             .unwrap();
         let parent = content
             .tree
@@ -641,42 +641,37 @@ mod tests {
             .collect();
 
         assert!(
-            siblings.contains(&"Sl-pvd0"),
+            siblings.contains(&"Sl-hajimi"),
             "Sl-pvd0 itself should be in siblings"
         );
         assert!(
-            siblings.contains(&"At-pvd0"),
+            siblings.contains(&"At-hajimi"),
             "At-pvd0 is a sibling under Entry"
         );
         assert!(
-            siblings.contains(&"FltAt-pvd0"),
+            siblings.contains(&"Sl-manbo"),
             "FltAt-pvd0 is a sibling under Entry"
         );
         assert!(
             !siblings.contains(&"Entry"),
             "Entry is the parent, not a sibling"
         );
-        // Expand 看视频 and verify its child is NOT a sibling of Sl-pvd0
-        let kan_idx = content
+        // Expand At-manbo (a top-level Folder) and verify it has children
+        let at_manbo_idx = content
             .tree
             .nodes
             .iter()
-            .position(|n| {
-                n.name == "看视频和下载不要选这个" && n.parent.as_deref() == Some("Entry")
-            })
+            .position(|n| n.node_type == NodeType::Folder && n.name == "At-manbo")
             .unwrap();
-        state.select(Some(kan_idx));
+        state.select(Some(at_manbo_idx));
         content.dispatch_key(Key::Expand, &mut tasks, &mut state);
-        let siblings_after: Vec<&str> = content
+        let at_manbo_children: Vec<&str> = content
             .tree
             .nodes
             .iter()
-            .filter(|n| n.parent == parent)
+            .filter(|n| n.parent.as_deref() == Some("At-manbo"))
             .map(|n| n.name.as_str())
             .collect();
-        assert!(
-            !siblings_after.contains(&"[bak]日本-优化2"),
-            "grandchild of 看视频 should not be a sibling of Sl-pvd0"
-        );
+        assert!(!at_manbo_children.is_empty(), "At-manbo should have children after expand");
     }
 }

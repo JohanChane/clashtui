@@ -1,0 +1,76 @@
+{
+  "port": 0,
+  "socks-port": 0,
+  "redir-port": 0,
+  "tproxy-port": 0,
+  "mixed-port": 7890,
+  "tun": {
+    "enable": true,
+    "device": "Meta",
+    "stack": "Mixed",
+    "dns-hijack": [
+      "any:53",
+      "tcp://any:53"
+    ],
+    "auto-route": true,
+    "auto-detect-interface": true,
+    "gso-max-size": 65536,
+    "inet4-address": [
+      "192.0.2.1/30"
+    ],
+    "auto-redirect": true,
+    "file-descriptor": 0,
+    "recvmsgx": true
+  },
+  "tuic-server": {
+    "enable": false,
+    "listen": "",
+    "certificate": "",
+    "private-key": "",
+    "ech-key": "",
+    "mux-option": {
+      "brutal": {
+        "enabled": false
+      }
+    }
+  },
+  "ss-node001": "",
+  "vmess-node001": "",
+  "authentication": null,
+  "skip-auth-prefixes": null,
+  "lan-allowed-ips": [
+    "192.0.2.1/0",
+    "::/0"
+  ],
+  "lan-disallowed-ips": null,
+  "allow-lan": false,
+  "bind-address": "*",
+  "inbound-tfo": false,
+  "inbound-mptcp": false,
+  "mode": "rule",
+  "unified-delay": true,
+  "log-level": "silent",
+  "ipv6": false,
+  "interface-name": "",
+  "routing-mark": 0,
+  "geox-url": {
+    "geo-ip": "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat",
+    "mmdb": "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb",
+    "asn": "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/GeoLite2-ASN.mmdb",
+    "geo-site": "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat"
+  },
+  "geo-auto-update": true,
+  "geo-update-interval": 7,
+  "geodata-mode": false,
+  "geodata-loader": "memconservative",
+  "geosite-matcher": "succinct",
+  "tcp-concurrent": true,
+  "find-process-mode": "strict",
+  "sniffing": true,
+  "global-client-fingerprint": "",
+  "global-ua": "clash.meta/1.19.25",
+  "etag-support": true,
+  "keep-alive-idle": 0,
+  "keep-alive-interval": 0,
+  "disable-keep-alive": false
+}

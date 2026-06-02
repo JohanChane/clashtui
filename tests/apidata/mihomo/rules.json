@@ -1,0 +1,284 @@
+{
+  "rules": [
+    {
+      "index": 0,
+      "type": "GeoIP",
+      "payload": "lan",
+      "proxy": "DIRECT",
+      "size": 0,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 24,
+        "missAt": "2026-06-02T22:03:57.96561018+08:00"
+      }
+    },
+    {
+      "index": 1,
+      "type": "GeoSite",
+      "payload": "github",
+      "proxy": "Entry",
+      "size": 61,
+      "extra": {
+        "disabled": false,
+        "hitCount": 1,
+        "hitAt": "2026-06-02T22:01:40.171581401+08:00",
+        "missCount": 23,
+        "missAt": "2026-06-02T22:03:57.965621645+08:00"
+      }
+    },
+    {
+      "index": 2,
+      "type": "GeoSite",
+      "payload": "twitter",
+      "proxy": "Entry",
+      "size": 24,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 23,
+        "missAt": "2026-06-02T22:03:57.965625664+08:00"
+      }
+    },
+    {
+      "index": 3,
+      "type": "GeoSite",
+      "payload": "youtube",
+      "proxy": "Entry",
+      "size": 178,
+      "extra": {
+        "disabled": false,
+        "hitCount": 4,
+        "hitAt": "2026-06-02T22:03:57.965630636+08:00",
+        "missCount": 19,
+        "missAt": "2026-06-02T22:03:29.029074709+08:00"
+      }
+    },
+    {
+      "index": 4,
+      "type": "GeoSite",
+      "payload": "google",
+      "proxy": "Entry",
+      "size": 1082,
+      "extra": {
+        "disabled": false,
+        "hitCount": 3,
+        "hitAt": "2026-06-02T22:02:47.682424269+08:00",
+        "missCount": 16,
+        "missAt": "2026-06-02T22:03:29.029076978+08:00"
+      }
+    },
+    {
+      "index": 5,
+      "type": "GeoSite",
+      "payload": "telegram",
+      "proxy": "Entry",
+      "size": 20,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 16,
+        "missAt": "2026-06-02T22:03:29.029077805+08:00"
+      }
+    },
+    {
+      "index": 6,
+      "type": "GeoSite",
+      "payload": "netflix",
+      "proxy": "Entry",
+      "size": 28,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 16,
+        "missAt": "2026-06-02T22:03:29.029078935+08:00"
+      }
+    },
+    {
+      "index": 7,
+      "type": "GeoSite",
+      "payload": "bilibili",
+      "proxy": "Entry-RuleMode",
+      "size": 50,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 16,
+        "missAt": "2026-06-02T22:03:29.02908005+08:00"
+      }
+    },
+    {
+      "index": 8,
+      "type": "GeoSite",
+      "payload": "bahamut",
+      "proxy": "Entry",
+      "size": 5,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 16,
+        "missAt": "2026-06-02T22:03:29.029080471+08:00"
+      }
+    },
+    {
+      "index": 9,
+      "type": "GeoSite",
+      "payload": "spotify",
+      "proxy": "Entry",
+      "size": 26,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 16,
+        "missAt": "2026-06-02T22:03:29.029081204+08:00"
+      }
+    },
+    {
+      "index": 10,
+      "type": "GeoSite",
+      "payload": "steam@cn",
+      "proxy": "Entry-RuleMode",
+      "size": 17,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 16,
+        "missAt": "2026-06-02T22:03:29.029082911+08:00"
+      }
+    },
+    {
+      "index": 11,
+      "type": "GeoSite",
+      "payload": "category-games@cn",
+      "proxy": "Entry-RuleMode",
+      "size": 49,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 16,
+        "missAt": "2026-06-02T22:03:29.029084316+08:00"
+      }
+    },
+    {
+      "index": 12,
+      "type": "GeoSite",
+      "payload": "CN",
+      "proxy": "Entry-RuleMode",
+      "size": 113055,
+      "extra": {
+        "disabled": false,
+        "hitCount": 1,
+        "hitAt": "2026-06-02T22:03:29.029089078+08:00",
+        "missCount": 15,
+        "missAt": "2026-06-02T22:03:14.783161602+08:00"
+      }
+    },
+    {
+      "index": 13,
+      "type": "GeoSite",
+      "payload": "geolocation-!cn",
+      "proxy": "Entry",
+      "size": 26475,
+      "extra": {
+        "disabled": false,
+        "hitCount": 6,
+        "hitAt": "2026-06-02T22:02:55.11944265+08:00",
+        "missCount": 9,
+        "missAt": "2026-06-02T22:03:14.783814325+08:00"
+      }
+    },
+    {
+      "index": 14,
+      "type": "GeoIP",
+      "payload": "google",
+      "proxy": "Entry",
+      "size": 0,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 9,
+        "missAt": "2026-06-02T22:03:14.783925991+08:00"
+      }
+    },
+    {
+      "index": 15,
+      "type": "GeoIP",
+      "payload": "netflix",
+      "proxy": "Entry",
+      "size": 0,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 9,
+        "missAt": "2026-06-02T22:03:14.783927172+08:00"
+      }
+    },
+    {
+      "index": 16,
+      "type": "GeoIP",
+      "payload": "telegram",
+      "proxy": "Entry",
+      "size": 0,
+      "extra": {
+        "disabled": false,
+        "hitCount": 4,
+        "hitAt": "2026-06-02T22:01:20.001304354+08:00",
+        "missCount": 5,
+        "missAt": "2026-06-02T22:03:14.78392778+08:00"
+      }
+    },
+    {
+      "index": 17,
+      "type": "GeoIP",
+      "payload": "twitter",
+      "proxy": "Entry",
+      "size": 0,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 5,
+        "missAt": "2026-06-02T22:03:14.783928197+08:00"
+      }
+    },
+    {
+      "index": 18,
+      "type": "GeoIP",
+      "payload": "cn",
+      "proxy": "Entry-RuleMode",
+      "size": 0,
+      "extra": {
+        "disabled": false,
+        "hitCount": 0,
+        "hitAt": "1970-01-01T08:00:00+08:00",
+        "missCount": 5,
+        "missAt": "2026-06-02T22:03:14.783928874+08:00"
+      }
+    },
+    {
+      "index": 19,
+      "type": "Match",
+      "payload": "",
+      "proxy": "Entry-LastMatch",
+      "size": -1,
+      "extra": {
+        "disabled": false,
+        "hitCount": 5,
+        "hitAt": "2026-06-02T22:03:14.783929793+08:00",
+        "missCount": 0,
+        "missAt": "1970-01-01T08:00:00+08:00"
+      }
+    }
+  ]
+}

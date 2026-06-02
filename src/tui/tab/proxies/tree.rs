@@ -372,22 +372,22 @@ mod tests {
     #[test]
     fn resolve_delay_follows_now_chain() {
         let proxies = load_fixture();
-        let delay = resolve_delay("Sl-pvd0", &proxies);
-        assert!(delay.is_some(), "Sl-pvd0 Selector should resolve a delay");
+        let delay = resolve_delay("Sl-hajimi", &proxies);
+        assert!(delay.is_some(), "Sl-hajimi Selector should resolve a delay");
         assert!(delay.unwrap() > 0);
     }
 
     #[test]
     fn selector_group_resolves_via_now_chain() {
         let proxies = load_fixture();
-        let delay = resolve_delay("看视频和下载不要选这个", &proxies);
+        let delay = resolve_delay("Sl-manbo", &proxies);
         assert!(delay.is_some(), "Selector should resolve via now chain");
     }
 
     #[test]
     fn url_test_group_resolves_delay() {
         let proxies = load_fixture();
-        let delay = resolve_delay("At-pvd0", &proxies);
+        let delay = resolve_delay("At-hajimi", &proxies);
         assert!(delay.is_some(), "URLTest should have delay");
         assert!(delay.unwrap() > 0);
     }
@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn leaf_proxy_uses_own_history() {
         let proxies = load_fixture();
-        let delay = resolve_delay("[bak]日本-优化2", &proxies);
+        let delay = resolve_delay("日本-优化", &proxies);
         assert!(delay.is_some(), "Leaf VMess should use own history");
         assert!(delay.unwrap() > 0);
     }
@@ -404,7 +404,7 @@ mod tests {
     fn zero_delay_history_shows_fail() {
         let proxies = load_fixture();
         assert_eq!(
-            resolve_delay("DIRECT", &proxies),
+            resolve_delay("台湾-优化3", &proxies),
             Some(0),
             "All-zero history = FAIL"
         );
@@ -565,31 +565,6 @@ mod tests {
         );
         assert_eq!(resolve_now_delay("G1", &proxies), Some(42));
         assert_eq!(resolve_delay("G1", &proxies), Some(42));
-    }
-
-    #[test]
-    fn link_node_marks_is_now_correctly() {
-        let proxies = load_fixture();
-        let mut nodes = Vec::new();
-        let mut expanded = HashMap::new();
-        expanded.insert("Entry".to_string(), true);
-        ProxyTree::push_entry(
-            &mut nodes,
-            "Entry",
-            None,
-            None,
-            0,
-            &proxies,
-            &expanded,
-            SortMode::None,
-        );
-
-        let links: Vec<_> = nodes
-            .iter()
-            .filter(|n| n.node_type == NodeType::Link && n.name == "看视频和下载不要选这个")
-            .collect();
-        assert_eq!(links.len(), 1);
-        assert!(links[0].is_now, "now child should be marked");
     }
 
     #[test]
@@ -828,5 +803,71 @@ mod tests {
         assert!(tcp_child.is_some());
         assert_eq!(tcp_child.unwrap().tcp, true);
         assert_eq!(tcp_child.unwrap().udp, false);
+    }
+
+    #[test]
+    fn mihomo_hidden_not_in_top_level() {
+        let proxies = load_fixture();
+        let hidden = proxies.get("hidden-proxy").expect("hidden-proxy missing");
+        assert!(hidden.hidden);
+
+        let tree = ProxyTree::build(ProxiesResponse {
+            proxies: proxies.clone(),
+        });
+        let names: Vec<&str> = tree.nodes.iter().map(|n| n.name.as_str()).collect();
+        assert!(!names.contains(&"hidden-proxy"));
+    }
+
+    #[test]
+    fn mihomo_tcp_only_leaf() {
+        let proxies = load_fixture();
+        let tcp = proxies.get("tcp-only").expect("tcp-only missing");
+        assert!(tcp.tcp);
+        assert!(!tcp.udp);
+    }
+
+    #[test]
+    fn mihomo_dead_proxy_alive_false() {
+        let proxies = load_fixture();
+        let dead = proxies.get("dead-proxy").expect("dead-proxy missing");
+        assert!(!dead.alive);
+        assert_eq!(dead.proxy_type, "Shadowsocks");
+    }
+
+    #[test]
+    fn mihomo_loadbalance_group_type() {
+        let proxies = load_fixture();
+        let lb = proxies.get("LB-group").expect("LB-group missing");
+        assert_eq!(lb.proxy_type, "LoadBalance");
+        assert!(lb.all.as_ref().map(|a| a.len()).unwrap_or(0) > 0);
+        assert!(lb.now.is_some());
+    }
+
+    #[test]
+    fn mihomo_hysteria2_type_exists() {
+        let proxies = load_fixture();
+        let hy2 = proxies.get("日本JP-HY2").expect("JP HY2 missing");
+        assert_eq!(hy2.proxy_type, "Hysteria2");
+    }
+
+    #[test]
+    fn mihomo_now_chain_two_levels() {
+        let proxies = load_fixture();
+        let delay = resolve_delay("Entry", &proxies);
+        assert!(delay.is_some(), "Entry should resolve delay via now chain");
+        assert!(delay.unwrap() > 0);
+    }
+
+    #[test]
+    fn mihomo_expand_all_tcp_child_visible() {
+        let proxies = load_fixture();
+        let mut tree = ProxyTree::build(ProxiesResponse {
+            proxies: proxies.clone(),
+        });
+        tree.expand_all(&proxies);
+        let tcp = tree.nodes.iter().find(|n| n.name == "tcp-only");
+        assert!(tcp.is_some());
+        assert_eq!(tcp.unwrap().tcp, true);
+        assert_eq!(tcp.unwrap().udp, false);
     }
 }

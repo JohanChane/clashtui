@@ -1,147 +1,195 @@
 {
   "proxies": {
-    "At-pvd0": {
+    "At-hajimi": {
       "alive": true,
       "all": [
-        "vmess-ipdktc33"
+        "vmess-node001",
+        "tcp-only"
       ],
-      "extra": {
-        "https://www.gstatic.com/generate_204": {
-          "alive": true,
-          "history": [
-            {
-              "time": "2026-05-05T23:53:29.533568136+08:00",
-              "delay": 173
-            },
-            {
-              "time": "2026-05-05T23:53:48.61683137+08:00",
-              "delay": 172
-            },
-            {
-              "time": "2026-05-06T00:04:50.521387658+08:00",
-              "delay": 185
-            }
-          ]
-        }
-      },
+      "dialer-proxy": "",
+      "expectedStatus": "*",
+      "extra": {},
+      "fixed": "",
       "hidden": false,
-      "history": [
-        {
-          "time": "2026-05-05T23:53:29.533568136+08:00",
-          "delay": 173
-        },
-        {
-          "time": "2026-05-05T23:53:48.61683137+08:00",
-          "delay": 172
-        },
-        {
-          "time": "2026-05-06T00:04:50.521387658+08:00",
-          "delay": 185
-        }
-      ],
-      "name": "At-pvd0",
-      "now": "vmess-ipdktc33",
+      "history": [],
+      "icon": "",
+      "interface": "",
+      "mptcp": false,
+      "name": "At-hajimi",
+      "now": "vmess-node001",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "testUrl": "https://www.gstatic.com/generate_204",
+      "tfo": false,
       "type": "URLTest",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
+    },
+    "At-manbo": {
+      "alive": true,
+      "all": [
+        "剩余流量：106.2 GB",
+        "套餐到期：长期有效",
+        "过滤掉11条线路",
+        "日本-优化",
+        "日本-优化2",
+        "日本-优化3",
+        "日本JP-HY2",
+        "新加坡SG-HY2",
+        "新加坡-优化-Gemini-GPT",
+        "新加坡-优化2-Gemini-GPT",
+        "新加坡-优化3-Gemini",
+        "香港HK-HY2",
+        "香港-优化-Gemini",
+        "香港-优化2-Gemini",
+        "香港-优化3-Gemini",
+        "香港WAP-优化-Gemini",
+        "香港WAP-优化2-Gemini",
+        "香港WAP-优化3-Gemini",
+        "韩国KR-HY2",
+        "印度-优化",
+        "台湾-优化",
+        "台湾-优化2-GPT",
+        "台湾-优化3",
+        "美国LA-优化-GPT",
+        "美国LA-优化2-GPT",
+        "美国LA-优化3-GPT",
+        "加拿大-优化",
+        "加拿大-优化2",
+        "加拿大-优化3",
+        "德国DE-HY2",
+        "德国-优化",
+        "德国-优化2",
+        "英国-优化-GPT",
+        "英国-优化2",
+        "英国-优化3",
+        "dead-proxy"
+      ],
+      "dialer-proxy": "",
+      "expectedStatus": "*",
+      "extra": {},
+      "fixed": "",
+      "hidden": false,
+      "history": [],
+      "icon": "",
+      "interface": "",
+      "mptcp": false,
+      "name": "At-manbo",
+      "now": "香港HK-HY2",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "testUrl": "https://www.gstatic.com/generate_204",
+      "tfo": false,
+      "type": "URLTest",
+      "udp": true,
+      "uot": false,
+      "xudp": false
     },
     "COMPATIBLE": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {},
       "history": [],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
       "name": "COMPATIBLE",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Compatible",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
     "DIRECT": {
-      "alive": false,
-      "extra": {
-        "https://www.gstatic.com/generate_204": {
-          "alive": false,
-          "history": [
-            {
-              "time": "2026-05-05T23:53:42.574779514+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-05T23:53:47.575233284+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-05T23:53:52.575450895+08:00",
-              "delay": 0
-            }
-          ]
-        }
-      },
-      "history": [
-        {
-          "time": "2026-05-05T23:53:42.574779514+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-05T23:53:47.575233284+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-05T23:53:52.575450895+08:00",
-          "delay": 0
-        }
-      ],
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {},
+      "history": [],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
       "name": "DIRECT",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Direct",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
     "Entry": {
       "alive": true,
       "all": [
-        "At-pvd0",
-        "FltAt-pvd0",
-        "Sl-pvd0",
-        "看视频和下载不要选这个",
-        "vmess-ipdktc33"
+        "At-hajimi",
+        "At-manbo",
+        "Sl-hajimi",
+        "Sl-manbo",
+        "vmess-node001",
+        "剩余流量：106.2 GB",
+        "套餐到期：长期有效",
+        "过滤掉11条线路",
+        "日本-优化",
+        "日本-优化2",
+        "日本-优化3",
+        "日本JP-HY2",
+        "新加坡SG-HY2",
+        "新加坡-优化-Gemini-GPT",
+        "新加坡-优化2-Gemini-GPT",
+        "新加坡-优化3-Gemini",
+        "香港HK-HY2",
+        "香港-优化-Gemini",
+        "香港-优化2-Gemini",
+        "香港-优化3-Gemini",
+        "香港WAP-优化-Gemini",
+        "香港WAP-优化2-Gemini",
+        "香港WAP-优化3-Gemini",
+        "韩国KR-HY2",
+        "印度-优化",
+        "台湾-优化",
+        "台湾-优化2-GPT",
+        "台湾-优化3",
+        "美国LA-优化-GPT",
+        "美国LA-优化2-GPT",
+        "美国LA-优化3-GPT",
+        "加拿大-优化",
+        "加拿大-优化2",
+        "加拿大-优化3",
+        "德国DE-HY2",
+        "德国-优化",
+        "德国-优化2",
+        "英国-优化-GPT",
+        "英国-优化2",
+        "英国-优化3",
+        "hidden-proxy",
+        "tcp-only",
+        "LB-group",
+        "dead-proxy"
       ],
-      "extra": {
-        "https://www.gstatic.com/generate_204": {
-          "alive": true,
-          "history": [
-            {
-              "time": "2026-05-05T23:53:40.433126871+08:00",
-              "delay": 173
-            },
-            {
-              "time": "2026-05-05T23:53:43.640763911+08:00",
-              "delay": 177
-            },
-            {
-              "time": "2026-05-05T23:53:48.852851706+08:00",
-              "delay": 176
-            }
-          ]
-        }
-      },
+      "dialer-proxy": "",
+      "extra": {},
       "hidden": false,
-      "history": [
-        {
-          "time": "2026-05-05T23:53:40.433126871+08:00",
-          "delay": 173
-        },
-        {
-          "time": "2026-05-05T23:53:43.640763911+08:00",
-          "delay": 177
-        },
-        {
-          "time": "2026-05-05T23:53:48.852851706+08:00",
-          "delay": 176
-        }
-      ],
+      "history": [],
+      "icon": "",
+      "interface": "",
+      "mptcp": false,
       "name": "Entry",
-      "now": "看视频和下载不要选这个",
+      "now": "vmess-node001",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "testUrl": "",
+      "tfo": false,
       "type": "Selector",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
     "Entry-LastMatch": {
       "alive": true,
@@ -149,120 +197,49 @@
         "Entry",
         "DIRECT"
       ],
-      "extra": {
-        "https://www.gstatic.com/generate_204": {
-          "alive": true,
-          "history": [
-            {
-              "time": "2026-05-05T23:45:53.597444795+08:00",
-              "delay": 177
-            },
-            {
-              "time": "2026-05-05T23:53:48.704058448+08:00",
-              "delay": 189
-            }
-          ]
-        }
-      },
+      "dialer-proxy": "",
+      "extra": {},
       "hidden": false,
-      "history": [
-        {
-          "time": "2026-05-05T23:45:53.597444795+08:00",
-          "delay": 177
-        },
-        {
-          "time": "2026-05-05T23:53:48.704058448+08:00",
-          "delay": 189
-        }
-      ],
+      "history": [],
+      "icon": "",
+      "interface": "",
+      "mptcp": false,
       "name": "Entry-LastMatch",
       "now": "Entry",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "testUrl": "",
+      "tfo": false,
       "type": "Selector",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
     "Entry-RuleMode": {
-      "alive": false,
+      "alive": true,
       "all": [
         "DIRECT",
         "Entry"
       ],
-      "extra": {
-        "https://www.gstatic.com/generate_204": {
-          "alive": false,
-          "history": [
-            {
-              "time": "2026-05-05T23:45:57.326759741+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-05T23:53:52.575487495+08:00",
-              "delay": 0
-            }
-          ]
-        }
-      },
+      "dialer-proxy": "",
+      "extra": {},
       "hidden": false,
-      "history": [
-        {
-          "time": "2026-05-05T23:45:57.326759741+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-05T23:53:52.575487495+08:00",
-          "delay": 0
-        }
-      ],
+      "history": [],
+      "icon": "",
+      "interface": "",
+      "mptcp": false,
       "name": "Entry-RuleMode",
       "now": "DIRECT",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "testUrl": "",
+      "tfo": false,
       "type": "Selector",
       "udp": true,
-        "tcp": true
-    },
-    "FltAt-pvd0": {
-      "alive": true,
-      "all": [
-        "vmess-ipdktc33"
-      ],
-      "extra": {
-        "https://www.gstatic.com/generate_204": {
-          "alive": true,
-          "history": [
-            {
-              "time": "2026-05-05T23:53:29.61028546+08:00",
-              "delay": 184
-            },
-            {
-              "time": "2026-05-05T23:53:48.680732062+08:00",
-              "delay": 184
-            },
-            {
-              "time": "2026-05-06T00:04:49.917845521+08:00",
-              "delay": 171
-            }
-          ]
-        }
-      },
-      "hidden": false,
-      "history": [
-        {
-          "time": "2026-05-05T23:53:29.61028546+08:00",
-          "delay": 184
-        },
-        {
-          "time": "2026-05-05T23:53:48.680732062+08:00",
-          "delay": 184
-        },
-        {
-          "time": "2026-05-06T00:04:49.917845521+08:00",
-          "delay": 171
-        }
-      ],
-      "name": "FltAt-pvd0",
-      "now": "vmess-ipdktc33",
-      "type": "URLTest",
-      "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
     "GLOBAL": {
       "alive": true,
@@ -270,222 +247,276 @@
         "DIRECT",
         "REJECT",
         "Entry",
-        "Sl-pvd0",
-        "FltAt-pvd0",
-        "At-pvd0",
-        "看视频和下载不要选这个",
+        "Sl-hajimi",
+        "Sl-manbo",
+        "At-hajimi",
+        "At-manbo",
         "Entry-RuleMode",
         "Entry-LastMatch"
       ],
+      "dialer-proxy": "",
       "extra": {},
       "hidden": false,
       "history": [],
+      "icon": "",
+      "interface": "",
+      "mptcp": false,
       "name": "GLOBAL",
-      "now": "Sl-pvd0",
+      "now": "DIRECT",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "testUrl": "",
+      "tfo": false,
       "type": "Selector",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
     "PASS": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {},
       "history": [],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
       "name": "PASS",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Pass",
       "udp": true,
-      "tcp": false
+      "uot": false,
+      "xudp": false
     },
     "REJECT": {
-      "alive": false,
-      "extra": {
-        "https://www.gstatic.com/generate_204": {
-          "alive": false,
-          "history": [
-            {
-              "time": "2026-05-05T23:45:52.327415468+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-05T23:53:47.576216486+08:00",
-              "delay": 0
-            }
-          ]
-        }
-      },
-      "history": [
-        {
-          "time": "2026-05-05T23:45:52.327415468+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-05T23:53:47.576216486+08:00",
-          "delay": 0
-        }
-      ],
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {},
+      "history": [],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
       "name": "REJECT",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Reject",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
     "REJECT-DROP": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {},
       "history": [],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
       "name": "REJECT-DROP",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "RejectDrop",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
-    "Sl-pvd0": {
+    "Sl-hajimi": {
       "alive": true,
       "all": [
-        "vmess-ipdktc33"
+        "vmess-node001"
       ],
-      "extra": {
-        "https://www.gstatic.com/generate_204": {
-          "alive": true,
-          "history": [
-            {
-              "time": "2026-05-05T23:53:29.82599479+08:00",
-              "delay": 188
-            },
-            {
-              "time": "2026-05-05T23:53:49.056100319+08:00",
-              "delay": 614
-            },
-            {
-              "time": "2026-05-06T00:04:49.808218751+08:00",
-              "delay": 185
-            }
-          ]
-        }
-      },
+      "dialer-proxy": "",
+      "extra": {},
       "hidden": false,
-      "history": [
-        {
-          "time": "2026-05-05T23:53:29.82599479+08:00",
-          "delay": 188
-        },
-        {
-          "time": "2026-05-05T23:53:49.056100319+08:00",
-          "delay": 614
-        },
-        {
-          "time": "2026-05-06T00:04:49.808218751+08:00",
-          "delay": 185
-        }
-      ],
-      "name": "Sl-pvd0",
-      "now": "vmess-ipdktc33",
+      "history": [],
+      "icon": "",
+      "interface": "",
+      "mptcp": false,
+      "name": "Sl-hajimi",
+      "now": "vmess-node001",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "testUrl": "",
+      "tfo": false,
       "type": "Selector",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
-    "[bak]剩余流量：116.36 GB": {
+    "Sl-manbo": {
       "alive": true,
+      "all": [
+        "剩余流量：106.2 GB",
+        "套餐到期：长期有效",
+        "过滤掉11条线路",
+        "日本-优化",
+        "日本-优化2",
+        "日本-优化3",
+        "日本JP-HY2",
+        "新加坡SG-HY2",
+        "新加坡-优化-Gemini-GPT",
+        "新加坡-优化2-Gemini-GPT",
+        "新加坡-优化3-Gemini",
+        "香港HK-HY2",
+        "香港-优化-Gemini",
+        "香港-优化2-Gemini",
+        "香港-优化3-Gemini",
+        "香港WAP-优化-Gemini",
+        "香港WAP-优化2-Gemini",
+        "香港WAP-优化3-Gemini",
+        "韩国KR-HY2",
+        "印度-优化",
+        "台湾-优化",
+        "台湾-优化2-GPT",
+        "台湾-优化3",
+        "美国LA-优化-GPT",
+        "美国LA-优化2-GPT",
+        "美国LA-优化3-GPT",
+        "加拿大-优化",
+        "加拿大-优化2",
+        "加拿大-优化3",
+        "德国DE-HY2",
+        "德国-优化",
+        "德国-优化2",
+        "英国-优化-GPT",
+        "英国-优化2",
+        "英国-优化3"
+      ],
+      "dialer-proxy": "",
       "extra": {},
+      "hidden": false,
       "history": [],
-      "name": "[bak]剩余流量：116.36 GB",
-      "type": "Vmess",
+      "icon": "",
+      "interface": "",
+      "mptcp": false,
+      "name": "Sl-manbo",
+      "now": "剩余流量：106.2 GB",
+      "provider-name": "",
+      "routing-mark": 0,
+      "smux": false,
+      "testUrl": "",
+      "tfo": false,
+      "type": "Selector",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
-    "[bak]加拿大-优化": {
+    "vmess-node001": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-05T23:53:35.655115938+08:00",
-              "delay": 323
-            },
-            {
-              "time": "2026-05-06T01:27:37.906400007+08:00",
-              "delay": 341
-            },
-            {
-              "time": "2026-05-06T01:28:28.911855031+08:00",
-              "delay": 347
+              "time": "2026-06-02T22:01:15.62187352+08:00",
+              "delay": 272
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-05T23:53:35.655115938+08:00",
-          "delay": 323
-        },
-        {
-          "time": "2026-05-06T01:27:37.906400007+08:00",
-          "delay": 341
-        },
-        {
-          "time": "2026-05-06T01:28:28.911855031+08:00",
-          "delay": 347
+          "time": "2026-06-02T22:01:15.62187352+08:00",
+          "delay": 272
         }
       ],
-      "name": "[bak]加拿大-优化",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "vmess-node001",
+      "provider-name": "hajimi",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]加拿大-优化2": {
+    "剩余流量：106.2 GB": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T01:27:31.840235299+08:00",
-              "delay": 306
-            },
-            {
-              "time": "2026-05-06T01:27:37.67647969+08:00",
-              "delay": 306
-            },
-            {
-              "time": "2026-05-06T01:28:28.652607465+08:00",
-              "delay": 311
+              "time": "2026-06-02T22:01:13.359011752+08:00",
+              "delay": 166
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-06T01:27:31.840235299+08:00",
-          "delay": 306
-        },
-        {
-          "time": "2026-05-06T01:27:37.67647969+08:00",
-          "delay": 306
-        },
-        {
-          "time": "2026-05-06T01:28:28.652607465+08:00",
-          "delay": 311
+          "time": "2026-06-02T22:01:13.359011752+08:00",
+          "delay": 166
         }
       ],
-      "name": "[bak]加拿大-优化2",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "剩余流量：106.2 GB",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]加拿大-优化3": {
+    "加拿大-优化": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T00:37:38.916472653+08:00",
-              "delay": 308
-            },
+              "time": "2026-06-02T22:01:16.408178888+08:00",
+              "delay": 335
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:16.408178888+08:00",
+          "delay": 335
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "加拿大-优化",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "加拿大-优化2": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
             {
-              "time": "2026-05-06T01:27:37.642459898+08:00",
-              "delay": 302
-            },
-            {
-              "time": "2026-05-06T01:28:28.641624744+08:00",
+              "time": "2026-06-02T22:01:16.37314946+08:00",
               "delay": 303
             }
           ]
@@ -493,435 +524,758 @@
       },
       "history": [
         {
-          "time": "2026-05-06T00:37:38.916472653+08:00",
-          "delay": 308
-        },
-        {
-          "time": "2026-05-06T01:27:37.642459898+08:00",
-          "delay": 302
-        },
-        {
-          "time": "2026-05-06T01:28:28.641624744+08:00",
+          "time": "2026-06-02T22:01:16.37314946+08:00",
           "delay": 303
         }
       ],
-      "name": "[bak]加拿大-优化3",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "加拿大-优化2",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]印度-优化": {
+    "加拿大-优化3": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T00:57:21.594035517+08:00",
+              "time": "2026-06-02T22:01:17.537226378+08:00",
+              "delay": 305
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:17.537226378+08:00",
+          "delay": 305
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "加拿大-优化3",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "印度-优化": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:14.639130096+08:00",
               "delay": 125
-            },
-            {
-              "time": "2026-05-06T01:27:36.740004783+08:00",
-              "delay": 116
-            },
-            {
-              "time": "2026-05-06T01:28:27.694538378+08:00",
-              "delay": 116
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-06T00:57:21.594035517+08:00",
+          "time": "2026-06-02T22:01:14.639130096+08:00",
           "delay": 125
-        },
-        {
-          "time": "2026-05-06T01:27:36.740004783+08:00",
-          "delay": 116
-        },
-        {
-          "time": "2026-05-06T01:28:27.694538378+08:00",
-          "delay": 116
         }
       ],
-      "name": "[bak]印度-优化",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "印度-优化",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]台湾-优化": {
+    "台湾-优化": {
       "alive": true,
-      "extra": {},
-      "history": [],
-      "name": "[bak]台湾-优化",
-      "type": "Vmess",
-      "udp": true,
-        "tcp": true
-    },
-    "[bak]台湾-优化2-GPT": {
-      "alive": true,
-      "extra": {},
-      "history": [],
-      "name": "[bak]台湾-优化2-GPT",
-      "type": "Vmess",
-      "udp": true,
-        "tcp": true
-    },
-    "[bak]台湾-优化3": {
-      "alive": true,
-      "extra": {},
-      "history": [],
-      "name": "[bak]台湾-优化3",
-      "type": "Vmess",
-      "udp": true,
-        "tcp": true
-    },
-    "[bak]套餐到期：长期有效": {
-      "alive": true,
-      "extra": {},
-      "history": [],
-      "name": "[bak]套餐到期：长期有效",
-      "type": "Vmess",
-      "udp": true,
-        "tcp": true
-    },
-    "[bak]德国-优化": {
-      "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-05T23:53:35.606316473+08:00",
-              "delay": 234
-            },
-            {
-              "time": "2026-05-06T01:27:37.393409154+08:00",
-              "delay": 215
-            },
-            {
-              "time": "2026-05-06T01:28:28.357791251+08:00",
-              "delay": 212
+              "time": "2026-06-02T22:01:16.726575198+08:00",
+              "delay": 151
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-05T23:53:35.606316473+08:00",
-          "delay": 234
-        },
-        {
-          "time": "2026-05-06T01:27:37.393409154+08:00",
-          "delay": 215
-        },
-        {
-          "time": "2026-05-06T01:28:28.357791251+08:00",
-          "delay": 212
+          "time": "2026-06-02T22:01:16.726575198+08:00",
+          "delay": 151
         }
       ],
-      "name": "[bak]德国-优化",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "台湾-优化",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]德国-优化2": {
+    "台湾-优化2-GPT": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T00:38:23.200201133+08:00",
-              "delay": 227
-            },
-            {
-              "time": "2026-05-06T01:27:37.500909137+08:00",
-              "delay": 237
-            },
-            {
-              "time": "2026-05-06T01:28:28.389096+08:00",
-              "delay": 228
+              "time": "2026-06-02T22:01:16.735816969+08:00",
+              "delay": 119
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-06T00:38:23.200201133+08:00",
-          "delay": 227
-        },
-        {
-          "time": "2026-05-06T01:27:37.500909137+08:00",
-          "delay": 237
-        },
-        {
-          "time": "2026-05-06T01:28:28.389096+08:00",
-          "delay": 228
+          "time": "2026-06-02T22:01:16.735816969+08:00",
+          "delay": 119
         }
       ],
-      "name": "[bak]德国-优化2",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "台湾-优化2-GPT",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]新加坡-优化-Gemini-GPT": {
+    "台湾-优化3": {
+      "alive": false,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": false,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:19.072811993+08:00",
+              "delay": 0
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:19.072811993+08:00",
+          "delay": 0
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "台湾-优化3",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "套餐到期：长期有效": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T00:38:08.673434109+08:00",
+              "time": "2026-06-02T22:01:13.249131274+08:00",
+              "delay": 141
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:13.249131274+08:00",
+          "delay": 141
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "套餐到期：长期有效",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "德国-优化": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:18.040400791+08:00",
+              "delay": 240
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:18.040400791+08:00",
+          "delay": 240
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "德国-优化",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "德国-优化2": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:18.738027917+08:00",
+              "delay": 216
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:18.738027917+08:00",
+          "delay": 216
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "德国-优化2",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "德国DE-HY2": {
+      "alive": false,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": false,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:21.06816023+08:00",
+              "delay": 0
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:21.06816023+08:00",
+          "delay": 0
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "德国DE-HY2",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Hysteria2",
+      "udp": true,
+      "uot": false,
+      "xudp": false
+    },
+    "新加坡-优化-Gemini-GPT": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:13.692920541+08:00",
               "delay": 67
-            },
-            {
-              "time": "2026-05-06T01:27:41.113858588+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-06T01:28:30.265836792+08:00",
-              "delay": 65
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-06T00:38:08.673434109+08:00",
+          "time": "2026-06-02T22:01:13.692920541+08:00",
           "delay": 67
-        },
-        {
-          "time": "2026-05-06T01:27:41.113858588+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-06T01:28:30.265836792+08:00",
-          "delay": 65
         }
       ],
-      "name": "[bak]新加坡-优化-Gemini-GPT",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "新加坡-优化-Gemini-GPT",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]新加坡-优化2-Gemini-GPT": {
+    "新加坡-优化2-Gemini-GPT": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T01:23:45.590733646+08:00",
+              "time": "2026-06-02T22:01:13.987+08:00",
               "delay": 60
-            },
-            {
-              "time": "2026-05-06T01:27:41.113855263+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-06T01:28:30.262072481+08:00",
-              "delay": 62
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-06T01:23:45.590733646+08:00",
+          "time": "2026-06-02T22:01:13.987+08:00",
           "delay": 60
-        },
-        {
-          "time": "2026-05-06T01:27:41.113855263+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-06T01:28:30.262072481+08:00",
-          "delay": 62
         }
       ],
-      "name": "[bak]新加坡-优化2-Gemini-GPT",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "新加坡-优化2-Gemini-GPT",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]新加坡-优化3-Gemini": {
+    "新加坡-优化3-Gemini": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-05T23:53:34.583598787+08:00",
-              "delay": 62
-            },
-            {
-              "time": "2026-05-06T01:27:41.113922592+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-06T01:28:30.256328801+08:00",
-              "delay": 59
+              "time": "2026-06-02T22:01:13.674601189+08:00",
+              "delay": 60
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-05T23:53:34.583598787+08:00",
-          "delay": 62
-        },
-        {
-          "time": "2026-05-06T01:27:41.113922592+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-06T01:28:30.256328801+08:00",
-          "delay": 59
+          "time": "2026-06-02T22:01:13.674601189+08:00",
+          "delay": 60
         }
       ],
-      "name": "[bak]新加坡-优化3-Gemini",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "新加坡-优化3-Gemini",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]日本-优化": {
+    "新加坡SG-HY2": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T01:23:37.320581671+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-06T01:27:41.113965076+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-06T01:28:29.182361273+08:00",
-              "delay": 253
+              "time": "2026-06-02T22:01:12.874413016+08:00",
+              "delay": 56
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-06T01:23:37.320581671+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-06T01:27:41.113965076+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-06T01:28:29.182361273+08:00",
-          "delay": 253
+          "time": "2026-06-02T22:01:12.874413016+08:00",
+          "delay": 56
         }
       ],
-      "name": "[bak]日本-优化",
-      "type": "Vmess",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "新加坡SG-HY2",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Hysteria2",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
-    "[bak]日本-优化2": {
+    "日本-优化": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T01:23:40.133313559+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-06T01:27:41.113840125+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-06T01:28:29.87025137+08:00",
-              "delay": 291
+              "time": "2026-06-02T22:01:13.350065477+08:00",
+              "delay": 169
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-06T01:23:40.133313559+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-06T01:27:41.113840125+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-06T01:28:29.87025137+08:00",
-          "delay": 291
+          "time": "2026-06-02T22:01:13.350065477+08:00",
+          "delay": 169
         }
       ],
-      "name": "[bak]日本-优化2",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "日本-优化",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]日本-优化3": {
+    "日本-优化2": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T00:37:35.130051524+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-06T01:27:41.113833277+08:00",
-              "delay": 5000
-            },
-            {
-              "time": "2026-05-06T01:28:31.809529389+08:00",
-              "delay": 277
+              "time": "2026-06-02T22:01:13.498979026+08:00",
+              "delay": 182
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-06T00:37:35.130051524+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-06T01:27:41.113833277+08:00",
-          "delay": 5000
-        },
-        {
-          "time": "2026-05-06T01:28:31.809529389+08:00",
-          "delay": 277
+          "time": "2026-06-02T22:01:13.498979026+08:00",
+          "delay": 182
         }
       ],
-      "name": "[bak]日本-优化3",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "日本-优化2",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]美国LA-优化-GPT": {
+    "日本-优化3": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T00:37:52.274983145+08:00",
-              "delay": 221
-            },
+              "time": "2026-06-02T22:01:14.479698377+08:00",
+              "delay": 186
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:14.479698377+08:00",
+          "delay": 186
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "日本-优化3",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "日本JP-HY2": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
             {
-              "time": "2026-05-06T01:27:38.071083405+08:00",
-              "delay": 208
-            },
+              "time": "2026-06-02T22:01:12.976185659+08:00",
+              "delay": 74
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:12.976185659+08:00",
+          "delay": 74
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "日本JP-HY2",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Hysteria2",
+      "udp": true,
+      "uot": false,
+      "xudp": false
+    },
+    "美国LA-优化-GPT": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
             {
-              "time": "2026-05-06T01:28:29.272577382+08:00",
+              "time": "2026-06-02T22:01:18.696365833+08:00",
+              "delay": 414
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:18.696365833+08:00",
+          "delay": 414
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "美国LA-优化-GPT",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "美国LA-优化2-GPT": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:16.06752302+08:00",
+              "delay": 243
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:16.06752302+08:00",
+          "delay": 243
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "美国LA-优化2-GPT",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "美国LA-优化3-GPT": {
+      "alive": false,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": false,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:19.609259757+08:00",
+              "delay": 0
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:19.609259757+08:00",
+          "delay": 0
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "美国LA-优化3-GPT",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "英国-优化-GPT": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:18.939953958+08:00",
+              "delay": 199
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:18.939953958+08:00",
+          "delay": 199
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "英国-优化-GPT",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "英国-优化2": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:18.197914124+08:00",
+              "delay": 243
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:18.197914124+08:00",
+          "delay": 243
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "英国-优化2",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "英国-优化3": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:18.456635239+08:00",
               "delay": 222
             }
           ]
@@ -929,419 +1283,372 @@
       },
       "history": [
         {
-          "time": "2026-05-06T00:37:52.274983145+08:00",
-          "delay": 221
-        },
-        {
-          "time": "2026-05-06T01:27:38.071083405+08:00",
-          "delay": 208
-        },
-        {
-          "time": "2026-05-06T01:28:29.272577382+08:00",
+          "time": "2026-06-02T22:01:18.456635239+08:00",
           "delay": 222
         }
       ],
-      "name": "[bak]美国LA-优化-GPT",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "英国-优化3",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]美国LA-优化2-GPT": {
+    "过滤掉11条线路": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T00:37:47.329651807+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-06T01:27:38.180128253+08:00",
-              "delay": 246
-            },
-            {
-              "time": "2026-05-06T01:28:29.338122517+08:00",
-              "delay": 250
+              "time": "2026-06-02T22:01:13.280392785+08:00",
+              "delay": 149
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-06T00:37:47.329651807+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-06T01:27:38.180128253+08:00",
-          "delay": 246
-        },
-        {
-          "time": "2026-05-06T01:28:29.338122517+08:00",
-          "delay": 250
+          "time": "2026-06-02T22:01:13.280392785+08:00",
+          "delay": 149
         }
       ],
-      "name": "[bak]美国LA-优化2-GPT",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "过滤掉11条线路",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]美国LA-优化3-GPT": {
+    "韩国KR-HY2": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-05T23:53:35.71022127+08:00",
-              "delay": 447
-            },
-            {
-              "time": "2026-05-06T01:27:38.184133517+08:00",
-              "delay": 245
-            },
-            {
-              "time": "2026-05-06T01:28:29.301682512+08:00",
-              "delay": 238
+              "time": "2026-06-02T22:01:14.072309607+08:00",
+              "delay": 76
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-05T23:53:35.71022127+08:00",
-          "delay": 447
-        },
-        {
-          "time": "2026-05-06T01:27:38.184133517+08:00",
-          "delay": 245
-        },
-        {
-          "time": "2026-05-06T01:28:29.301682512+08:00",
-          "delay": 238
+          "time": "2026-06-02T22:01:14.072309607+08:00",
+          "delay": 76
         }
       ],
-      "name": "[bak]美国LA-优化3-GPT",
-      "type": "Vmess",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "韩国KR-HY2",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Hysteria2",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
-    "[bak]英国-优化-GPT": {
+    "香港-优化-Gemini": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-05T23:53:35.231172157+08:00",
-              "delay": 215
-            },
-            {
-              "time": "2026-05-06T01:27:37.79442701+08:00",
-              "delay": 303
-            },
-            {
-              "time": "2026-05-06T01:28:28.324249606+08:00",
-              "delay": 200
+              "time": "2026-06-02T22:01:14.278983663+08:00",
+              "delay": 262
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-05T23:53:35.231172157+08:00",
-          "delay": 215
-        },
-        {
-          "time": "2026-05-06T01:27:37.79442701+08:00",
-          "delay": 303
-        },
-        {
-          "time": "2026-05-06T01:28:28.324249606+08:00",
-          "delay": 200
+          "time": "2026-06-02T22:01:14.278983663+08:00",
+          "delay": 262
         }
       ],
-      "name": "[bak]英国-优化-GPT",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "香港-优化-Gemini",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]英国-优化2": {
+    "香港-优化2-Gemini": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-05T23:53:35.27309013+08:00",
-              "delay": 230
-            },
-            {
-              "time": "2026-05-06T01:27:37.481678558+08:00",
-              "delay": 233
-            },
-            {
-              "time": "2026-05-06T01:28:28.479983975+08:00",
-              "delay": 250
+              "time": "2026-06-02T22:01:17.048488738+08:00",
+              "delay": 294
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-05T23:53:35.27309013+08:00",
-          "delay": 230
-        },
-        {
-          "time": "2026-05-06T01:27:37.481678558+08:00",
-          "delay": 233
-        },
-        {
-          "time": "2026-05-06T01:28:28.479983975+08:00",
-          "delay": 250
+          "time": "2026-06-02T22:01:17.048488738+08:00",
+          "delay": 294
         }
       ],
-      "name": "[bak]英国-优化2",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "香港-优化2-Gemini",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]英国-优化3": {
+    "香港-优化3-Gemini": {
       "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-05T23:53:37.573233967+08:00",
-              "delay": 236
-            },
-            {
-              "time": "2026-05-06T01:27:37.42492247+08:00",
-              "delay": 221
-            },
-            {
-              "time": "2026-05-06T01:28:28.42492483+08:00",
-              "delay": 230
+              "time": "2026-06-02T22:01:14.608166638+08:00",
+              "delay": 298
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-05T23:53:37.573233967+08:00",
-          "delay": 236
-        },
-        {
-          "time": "2026-05-06T01:27:37.42492247+08:00",
-          "delay": 221
-        },
-        {
-          "time": "2026-05-06T01:28:28.42492483+08:00",
-          "delay": 230
+          "time": "2026-06-02T22:01:14.608166638+08:00",
+          "delay": 298
         }
       ],
-      "name": "[bak]英国-优化3",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "香港-优化3-Gemini",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
       "type": "Vmess",
       "udp": true,
-        "tcp": true
+      "uot": true,
+      "xudp": false
     },
-    "[bak]过滤掉15条线路": {
-      "alive": false,
-      "extra": {
-        "https://www.gstatic.com/generate_204": {
-          "alive": false,
-          "history": [
-            {
-              "time": "2026-05-06T01:04:44.171491315+08:00",
-              "delay": 81
-            },
-            {
-              "time": "2026-05-06T01:27:41.113856581+08:00",
-              "delay": 0
-            },
-            {
-              "time": "2026-05-06T01:28:32.073866068+08:00",
-              "delay": 0
-            }
-          ]
-        }
-      },
-      "history": [
-        {
-          "time": "2026-05-06T01:04:44.171491315+08:00",
-          "delay": 81
-        },
-        {
-          "time": "2026-05-06T01:27:41.113856581+08:00",
-          "delay": 0
-        },
-        {
-          "time": "2026-05-06T01:28:32.073866068+08:00",
-          "delay": 0
-        }
-      ],
-      "name": "[bak]过滤掉15条线路",
-      "type": "Vmess",
-      "udp": true,
-        "tcp": true
-    },
-    "[bak]香港-优化-Gemini": {
+    "香港HK-HY2": {
       "alive": true,
-      "extra": {},
-      "history": [],
-      "name": "[bak]香港-优化-Gemini",
-      "type": "Vmess",
-      "udp": true,
-        "tcp": true
-    },
-    "[bak]香港-优化2-Gemini": {
-      "alive": true,
-      "extra": {},
-      "history": [],
-      "name": "[bak]香港-优化2-Gemini",
-      "type": "Vmess",
-      "udp": true,
-        "tcp": true
-    },
-    "[bak]香港-优化3-Gemini": {
-      "alive": true,
-      "extra": {},
-      "history": [],
-      "name": "[bak]香港-优化3-Gemini",
-      "type": "Vmess",
-      "udp": true,
-        "tcp": true
-    },
-    "[bak]香港WAP-优化-Gemini": {
-      "alive": true,
-      "extra": {},
-      "history": [],
-      "name": "[bak]香港WAP-优化-Gemini",
-      "type": "Vmess",
-      "udp": true,
-        "tcp": true
-    },
-    "[bak]香港WAP-优化2-Gemini": {
-      "alive": true,
-      "extra": {},
-      "history": [],
-      "name": "[bak]香港WAP-优化2-Gemini",
-      "type": "Vmess",
-      "udp": true,
-        "tcp": true
-    },
-    "[bak]香港WAP-优化3-Gemini": {
-      "alive": true,
-      "extra": {},
-      "history": [],
-      "name": "[bak]香港WAP-优化3-Gemini",
-      "type": "Vmess",
-      "udp": true,
-        "tcp": true
-    },
-    "vmess-ipdktc33": {
-      "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
           "alive": true,
           "history": [
             {
-              "time": "2026-05-06T01:39:40.597433066+08:00",
-              "delay": 611
-            },
-            {
-              "time": "2026-05-06T01:44:39.172679084+08:00",
-              "delay": 176
-            },
-            {
-              "time": "2026-05-06T01:49:42.208013365+08:00",
-              "delay": 214
+              "time": "2026-06-02T22:01:13.158196689+08:00",
+              "delay": 20
             }
           ]
         }
       },
       "history": [
         {
-          "time": "2026-05-06T01:39:40.597433066+08:00",
-          "delay": 611
-        },
-        {
-          "time": "2026-05-06T01:44:39.172679084+08:00",
-          "delay": 176
-        },
-        {
-          "time": "2026-05-06T01:49:42.208013365+08:00",
-          "delay": 214
+          "time": "2026-06-02T22:01:13.158196689+08:00",
+          "delay": 20
         }
       ],
-      "name": "vmess-ipdktc33",
-      "type": "Vmess",
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "香港HK-HY2",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Hysteria2",
       "udp": true,
-        "tcp": true
+      "uot": false,
+      "xudp": false
     },
-    "看视频和下载不要选这个": {
-      "alive": false,
-      "all": [
-        "[bak]过滤掉15条线路",
-        "[bak]日本-优化",
-        "[bak]日本-优化2",
-        "[bak]日本-优化3",
-        "[bak]新加坡-优化-Gemini-GPT",
-        "[bak]新加坡-优化2-Gemini-GPT",
-        "[bak]新加坡-优化3-Gemini",
-        "[bak]印度-优化",
-        "[bak]美国LA-优化-GPT",
-        "[bak]美国LA-优化2-GPT",
-        "[bak]美国LA-优化3-GPT",
-        "[bak]加拿大-优化",
-        "[bak]加拿大-优化2",
-        "[bak]加拿大-优化3",
-        "[bak]德国-优化",
-        "[bak]德国-优化2",
-        "[bak]英国-优化-GPT",
-        "[bak]英国-优化2",
-        "[bak]英国-优化3"
-      ],
+    "香港WAP-优化-Gemini": {
+      "alive": true,
+      "dialer-proxy": "",
       "extra": {
         "https://www.gstatic.com/generate_204": {
-          "alive": false,
+          "alive": true,
           "history": [
             {
-              "time": "2026-05-05T23:53:50.367544369+08:00",
-              "delay": 288
-            },
-            {
-              "time": "2026-05-06T00:04:49.983786521+08:00",
-              "delay": 213
-            },
-            {
-              "time": "2026-05-06T00:38:08.450349862+08:00",
-              "delay": 0
+              "time": "2026-06-02T22:01:13.721041288+08:00",
+              "delay": 70
             }
           ]
         }
       },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:13.721041288+08:00",
+          "delay": 70
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "香港WAP-优化-Gemini",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "香港WAP-优化2-Gemini": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:14.831706895+08:00",
+              "delay": 87
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:14.831706895+08:00",
+          "delay": 87
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "香港WAP-优化2-Gemini",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "香港WAP-优化3-Gemini": {
+      "alive": true,
+      "dialer-proxy": "",
+      "extra": {
+        "https://www.gstatic.com/generate_204": {
+          "alive": true,
+          "history": [
+            {
+              "time": "2026-06-02T22:01:14.994968843+08:00",
+              "delay": 94
+            }
+          ]
+        }
+      },
+      "history": [
+        {
+          "time": "2026-06-02T22:01:14.994968843+08:00",
+          "delay": 94
+        }
+      ],
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "interface": "",
+      "mptcp": false,
+      "name": "香港WAP-优化3-Gemini",
+      "provider-name": "manbo",
+      "routing-mark": 0,
+      "smux": false,
+      "tfo": false,
+      "type": "Vmess",
+      "udp": true,
+      "uot": true,
+      "xudp": false
+    },
+    "hidden-proxy": {
+      "alive": true,
+      "all": null,
+      "hidden": true,
+      "history": [
+        {
+          "time": "2026-06-02T21:00:00+08:00",
+          "delay": 50
+        }
+      ],
+      "name": "hidden-proxy",
+      "now": null,
+      "type": "Vmess",
+      "udp": true
+    },
+    "tcp-only": {
+      "alive": true,
+      "all": null,
       "hidden": false,
       "history": [
         {
-          "time": "2026-05-05T23:53:50.367544369+08:00",
-          "delay": 288
-        },
-        {
-          "time": "2026-05-06T00:04:49.983786521+08:00",
-          "delay": 213
-        },
-        {
-          "time": "2026-05-06T00:38:08.450349862+08:00",
-          "delay": 0
+          "time": "2026-06-02T21:00:00+08:00",
+          "delay": 30
         }
       ],
-      "name": "看视频和下载不要选这个",
-      "now": "[bak]日本-优化2",
-      "type": "Selector",
-      "udp": true,
-        "tcp": true
+      "name": "tcp-only",
+      "now": null,
+      "tcp": true,
+      "type": "Vmess",
+      "udp": false
+    },
+    "LB-group": {
+      "alive": true,
+      "all": [
+        "tcp-only",
+        "vmess-node001"
+      ],
+      "hidden": false,
+      "history": [],
+      "name": "LB-group",
+      "now": "tcp-only",
+      "type": "LoadBalance",
+      "udp": true
+    },
+    "dead-proxy": {
+      "alive": false,
+      "all": null,
+      "hidden": false,
+      "history": [],
+      "name": "dead-proxy",
+      "type": "Shadowsocks",
+      "udp": false
     }
   }
 }

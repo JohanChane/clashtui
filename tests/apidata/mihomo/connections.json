@@ -1,0 +1,476 @@
+{
+  "downloadTotal": 19094999,
+  "uploadTotal": 9731330,
+  "connections": [
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "network": "tcp",
+        "type": "Redir",
+        "sourceIP": "192.0.2.1",
+        "destinationIP": "",
+        "sourceGeoIP": null,
+        "destinationGeoIP": null,
+        "sourceIPASN": "",
+        "destinationIPASN": "",
+        "sourcePort": "55376",
+        "destinationPort": "443",
+        "inboundIP": "192.0.2.1",
+        "inboundPort": "32925",
+        "inboundName": "DEFAULT-TUN",
+        "inboundUser": "",
+        "host": "sub.example.net",
+        "dnsMode": "fake-ip",
+        "uid": 0,
+        "process": "",
+        "processPath": "",
+        "specialProxy": "",
+        "specialRules": "",
+        "remoteDestination": "192.0.2.1",
+        "dscp": 0,
+        "sniffHost": ""
+      },
+      "upload": 3354,
+      "download": 1242,
+      "start": "2026-06-02T22:02:44.47100151+08:00",
+      "chains": [
+        "vmess-node001",
+        "Entry"
+      ],
+      "providerChains": [
+        "hajimi",
+        ""
+      ],
+      "rule": "GeoSite",
+      "rulePayload": "geolocation-!cn"
+    },
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "network": "udp",
+        "type": "Tun",
+        "sourceIP": "192.0.2.1",
+        "destinationIP": "192.0.2.1",
+        "sourceGeoIP": null,
+        "destinationGeoIP": null,
+        "sourceIPASN": "",
+        "destinationIPASN": "",
+        "sourcePort": "36238",
+        "destinationPort": "443",
+        "inboundIP": "",
+        "inboundPort": "0",
+        "inboundName": "DEFAULT-TUN",
+        "inboundUser": "",
+        "host": "sub.example.net",
+        "dnsMode": "normal",
+        "uid": 0,
+        "process": "",
+        "processPath": "",
+        "specialProxy": "",
+        "specialRules": "",
+        "remoteDestination": "sub.example.net",
+        "dscp": 0,
+        "sniffHost": "sub.example.net"
+      },
+      "upload": 17528,
+      "download": 0,
+      "start": "2026-06-02T22:03:59.065102464+08:00",
+      "chains": [
+        "vmess-node001",
+        "Entry"
+      ],
+      "providerChains": [
+        "hajimi",
+        ""
+      ],
+      "rule": "GeoSite",
+      "rulePayload": "youtube"
+    },
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "network": "tcp",
+        "type": "Redir",
+        "sourceIP": "192.0.2.1",
+        "destinationIP": "",
+        "sourceGeoIP": null,
+        "destinationGeoIP": null,
+        "sourceIPASN": "",
+        "destinationIPASN": "",
+        "sourcePort": "55370",
+        "destinationPort": "443",
+        "inboundIP": "192.0.2.1",
+        "inboundPort": "32925",
+        "inboundName": "DEFAULT-TUN",
+        "inboundUser": "",
+        "host": "sub.example.net",
+        "dnsMode": "fake-ip",
+        "uid": 0,
+        "process": "",
+        "processPath": "",
+        "specialProxy": "",
+        "specialRules": "",
+        "remoteDestination": "192.0.2.1",
+        "dscp": 0,
+        "sniffHost": ""
+      },
+      "upload": 2788,
+      "download": 939,
+      "start": "2026-06-02T22:02:39.879092914+08:00",
+      "chains": [
+        "vmess-node001",
+        "Entry"
+      ],
+      "providerChains": [
+        "hajimi",
+        ""
+      ],
+      "rule": "GeoSite",
+      "rulePayload": "geolocation-!cn"
+    },
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "network": "tcp",
+        "type": "Redir",
+        "sourceIP": "192.0.2.1",
+        "destinationIP": "192.0.2.1",
+        "sourceGeoIP": null,
+        "destinationGeoIP": [
+          "us"
+        ],
+        "sourceIPASN": "",
+        "destinationIPASN": "",
+        "sourcePort": "49566",
+        "destinationPort": "443",
+        "inboundIP": "192.0.2.1",
+        "inboundPort": "32925",
+        "inboundName": "DEFAULT-TUN",
+        "inboundUser": "",
+        "host": "sub.example.net",
+        "dnsMode": "fake-ip",
+        "uid": 0,
+        "process": "",
+        "processPath": "",
+        "specialProxy": "",
+        "specialRules": "",
+        "remoteDestination": "192.0.2.1",
+        "dscp": 0,
+        "sniffHost": ""
+      },
+      "upload": 2273,
+      "download": 5087,
+      "start": "2026-06-02T22:03:12.81550697+08:00",
+      "chains": [
+        "vmess-node001",
+        "Entry",
+        "Entry-LastMatch"
+      ],
+      "providerChains": [
+        "hajimi",
+        "",
+        ""
+      ],
+      "rule": "Match",
+      "rulePayload": ""
+    },
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "network": "tcp",
+        "type": "Redir",
+        "sourceIP": "192.0.2.1",
+        "destinationIP": "",
+        "sourceGeoIP": null,
+        "destinationGeoIP": null,
+        "sourceIPASN": "",
+        "destinationIPASN": "",
+        "sourcePort": "54508",
+        "destinationPort": "443",
+        "inboundIP": "192.0.2.1",
+        "inboundPort": "32925",
+        "inboundName": "DEFAULT-TUN",
+        "inboundUser": "",
+        "host": "sub.example.net",
+        "dnsMode": "fake-ip",
+        "uid": 0,
+        "process": "",
+        "processPath": "",
+        "specialProxy": "",
+        "specialRules": "",
+        "remoteDestination": "192.0.2.1",
+        "dscp": 0,
+        "sniffHost": ""
+      },
+      "upload": 5169,
+      "download": 4223,
+      "start": "2026-06-02T22:03:56.541907643+08:00",
+      "chains": [
+        "vmess-node001",
+        "Entry"
+      ],
+      "providerChains": [
+        "hajimi",
+        ""
+      ],
+      "rule": "GeoSite",
+      "rulePayload": "youtube"
+    },
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "network": "tcp",
+        "type": "Redir",
+        "sourceIP": "192.0.2.1",
+        "destinationIP": "",
+        "sourceGeoIP": null,
+        "destinationGeoIP": null,
+        "sourceIPASN": "",
+        "destinationIPASN": "",
+        "sourcePort": "38850",
+        "destinationPort": "443",
+        "inboundIP": "192.0.2.1",
+        "inboundPort": "32925",
+        "inboundName": "DEFAULT-TUN",
+        "inboundUser": "",
+        "host": "sub.example.net",
+        "dnsMode": "fake-ip",
+        "uid": 0,
+        "process": "",
+        "processPath": "",
+        "specialProxy": "",
+        "specialRules": "",
+        "remoteDestination": "192.0.2.1",
+        "dscp": 0,
+        "sniffHost": ""
+      },
+      "upload": 2814,
+      "download": 2075,
+      "start": "2026-06-02T22:02:47.387286196+08:00",
+      "chains": [
+        "vmess-node001",
+        "Entry"
+      ],
+      "providerChains": [
+        "hajimi",
+        ""
+      ],
+      "rule": "GeoSite",
+      "rulePayload": "google"
+    },
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "network": "tcp",
+        "type": "Redir",
+        "sourceIP": "192.0.2.1",
+        "destinationIP": "",
+        "sourceGeoIP": null,
+        "destinationGeoIP": null,
+        "sourceIPASN": "",
+        "destinationIPASN": "",
+        "sourcePort": "36018",
+        "destinationPort": "443",
+        "inboundIP": "192.0.2.1",
+        "inboundPort": "32925",
+        "inboundName": "DEFAULT-TUN",
+        "inboundUser": "",
+        "host": "sub.example.net",
+        "dnsMode": "fake-ip",
+        "uid": 0,
+        "process": "",
+        "processPath": "",
+        "specialProxy": "",
+        "specialRules": "",
+        "remoteDestination": "192.0.2.1",
+        "dscp": 0,
+        "sniffHost": ""
+      },
+      "upload": 2691,
+      "download": 1986,
+      "start": "2026-06-02T22:03:47.640498637+08:00",
+      "chains": [
+        "vmess-node001",
+        "Entry"
+      ],
+      "providerChains": [
+        "hajimi",
+        ""
+      ],
+      "rule": "GeoSite",
+      "rulePayload": "youtube"
+    },
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "network": "tcp",
+        "type": "Redir",
+        "sourceIP": "192.0.2.1",
+        "destinationIP": "",
+        "sourceGeoIP": null,
+        "destinationGeoIP": null,
+        "sourceIPASN": "",
+        "destinationIPASN": "",
+        "sourcePort": "38852",
+        "destinationPort": "443",
+        "inboundIP": "192.0.2.1",
+        "inboundPort": "32925",
+        "inboundName": "DEFAULT-TUN",
+        "inboundUser": "",
+        "host": "sub.example.net",
+        "dnsMode": "fake-ip",
+        "uid": 0,
+        "process": "",
+        "processPath": "",
+        "specialProxy": "",
+        "specialRules": "",
+        "remoteDestination": "192.0.2.1",
+        "dscp": 0,
+        "sniffHost": ""
+      },
+      "upload": 4219,
+      "download": 3557,
+      "start": "2026-06-02T22:02:49.718511727+08:00",
+      "chains": [
+        "vmess-node001",
+        "Entry"
+      ],
+      "providerChains": [
+        "hajimi",
+        ""
+      ],
+      "rule": "GeoSite",
+      "rulePayload": "google"
+    },
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "network": "tcp",
+        "type": "Redir",
+        "sourceIP": "192.0.2.1",
+        "destinationIP": "192.0.2.1",
+        "sourceGeoIP": null,
+        "destinationGeoIP": [
+          "telegram",
+          "sg"
+        ],
+        "sourceIPASN": "",
+        "destinationIPASN": "",
+        "sourcePort": "53252",
+        "destinationPort": "443",
+        "inboundIP": "192.0.2.1",
+        "inboundPort": "32925",
+        "inboundName": "DEFAULT-TUN",
+        "inboundUser": "",
+        "host": "",
+        "dnsMode": "normal",
+        "uid": 0,
+        "process": "",
+        "processPath": "",
+        "specialProxy": "",
+        "specialRules": "",
+        "remoteDestination": "192.0.2.1",
+        "dscp": 0,
+        "sniffHost": ""
+      },
+      "upload": 5402,
+      "download": 43385,
+      "start": "2026-06-02T22:01:20.806166165+08:00",
+      "chains": [
+        "vmess-node001",
+        "Entry"
+      ],
+      "providerChains": [
+        "hajimi",
+        ""
+      ],
+      "rule": "GeoIP",
+      "rulePayload": "telegram"
+    },
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "network": "tcp",
+        "type": "Redir",
+        "sourceIP": "192.0.2.1",
+        "destinationIP": "",
+        "sourceGeoIP": null,
+        "destinationGeoIP": null,
+        "sourceIPASN": "",
+        "destinationIPASN": "",
+        "sourcePort": "49612",
+        "destinationPort": "443",
+        "inboundIP": "192.0.2.1",
+        "inboundPort": "32925",
+        "inboundName": "DEFAULT-TUN",
+        "inboundUser": "",
+        "host": "sub.example.net",
+        "dnsMode": "fake-ip",
+        "uid": 0,
+        "process": "",
+        "processPath": "",
+        "specialProxy": "",
+        "specialRules": "",
+        "remoteDestination": "192.0.2.1",
+        "dscp": 0,
+        "sniffHost": ""
+      },
+      "upload": 9371949,
+      "download": 1366251,
+      "start": "2026-06-02T22:03:29.062787038+08:00",
+      "chains": [
+        "DIRECT",
+        "Entry-RuleMode"
+      ],
+      "providerChains": [
+        "",
+        ""
+      ],
+      "rule": "GeoSite",
+      "rulePayload": "CN"
+    },
+    {
+      "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "metadata": {
+        "network": "tcp",
+        "type": "Redir",
+        "sourceIP": "192.0.2.1",
+        "destinationIP": "",
+        "sourceGeoIP": null,
+        "destinationGeoIP": null,
+        "sourceIPASN": "",
+        "destinationIPASN": "",
+        "sourcePort": "55546",
+        "destinationPort": "443",
+        "inboundIP": "192.0.2.1",
+        "inboundPort": "32925",
+        "inboundName": "DEFAULT-TUN",
+        "inboundUser": "",
+        "host": "firefox.settings.services.mozilla.com",
+        "dnsMode": "fake-ip",
+        "uid": 0,
+        "process": "",
+        "processPath": "",
+        "specialProxy": "",
+        "specialRules": "",
+        "remoteDestination": "192.0.2.1",
+        "dscp": 0,
+        "sniffHost": ""
+      },
+      "upload": 827,
+      "download": 4185,
+      "start": "2026-06-02T22:02:46.130779063+08:00",
+      "chains": [
+        "vmess-node001",
+        "Entry"
+      ],
+      "providerChains": [
+        "hajimi",
+        ""
+      ],
+      "rule": "GeoSite",
+      "rulePayload": "geolocation-!cn"
+    }
+  ],
+  "memory": 121946112
+}

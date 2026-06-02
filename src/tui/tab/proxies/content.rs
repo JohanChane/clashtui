@@ -423,11 +423,11 @@ mod tests {
             .tree
             .nodes
             .iter()
-            .position(|n| n.node_type == NodeType::Folder && n.name == "Sl-pvd0")
+            .position(|n| n.node_type == NodeType::Folder && n.name == "Sl-hajimi")
             .unwrap();
         state.select(Some(folder_idx));
         let key = content.selection_key(&state).unwrap();
-        assert_eq!(key.0, "Sl-pvd0");
+        assert_eq!(key.0, "Sl-hajimi");
         assert_eq!(key.2, NodeType::Folder);
     }
 
@@ -446,7 +446,7 @@ mod tests {
             .tree
             .nodes
             .iter()
-            .position(|n| n.node_type == NodeType::Folder && n.name == "Sl-pvd0")
+            .position(|n| n.node_type == NodeType::Folder && n.name == "Sl-hajimi")
             .unwrap();
         let node = content.tree.node_at(folder_idx).unwrap();
         let key = (
@@ -502,7 +502,7 @@ mod tests {
             .tree
             .nodes
             .iter()
-            .position(|n| n.name == "Sl-pvd0" && n.parent.as_deref() == Some("Entry"))
+            .position(|n| n.name == "Sl-hajimi" && n.parent.as_deref() == Some("Entry"))
             .expect("Sl-pvd0 should exist as child of Entry after expand");
         let group = content.resolve_group_for_sort(child_idx).unwrap();
         assert_eq!(group, "Entry");
