@@ -3,6 +3,7 @@ use nix::unistd::{Gid, Group};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::PathBuf;
 
+#[allow(dead_code)]
 pub fn correct_cap_for_tun() -> Result<String> {
     // macOS TUN works via utun devices; no setcap needed.
     // The core binary just needs to run as root for TUN access.
