@@ -28,6 +28,7 @@ pub fn exec_sudo(args: Vec<&str>, password: &str) -> Result<String> {
     let output = child.wait_with_output()?;
     Ok(stringify_output(output))
 }
+#[cfg(unix)]
 pub fn sudo_needs_password() -> bool {
     !std::process::Command::new("sudo")
         .args(["-n", "true"])

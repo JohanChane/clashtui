@@ -118,11 +118,13 @@ impl Input {
 }
 
 #[derive(Default)]
+#[cfg(unix)]
 pub struct InputMasked {
     buffer: String,
     cursor: usize,
 }
 
+#[cfg(unix)]
 impl Msg for InputMasked {
     type Result = String;
 
@@ -176,6 +178,7 @@ impl Msg for InputMasked {
     }
 }
 
+#[cfg(unix)]
 impl InputMasked {
     pub fn new() -> Self {
         Default::default()
@@ -289,6 +292,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn masked_cjk_insert_between_chars() {
         let mut inp = InputMasked {
             buffer: "你好".into(),
@@ -300,6 +304,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(unix)]
     fn masked_move_cursor_right_with_cjk() {
         let mut inp = InputMasked {
             buffer: "你好".into(),

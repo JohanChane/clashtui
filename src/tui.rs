@@ -13,9 +13,11 @@ mod widget;
 
 pub use app::App;
 pub use key::Key;
+#[cfg(unix)]
 pub use term::hold;
 pub(crate) use theme::Theme;
 
+#[cfg(unix)]
 pub async fn prompt_sudo_password() -> Option<String> {
     match popmsg::input::InputMasked::new()
         .with_title("Sudo Password".to_owned())

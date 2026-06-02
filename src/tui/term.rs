@@ -54,6 +54,7 @@ pub fn teardown() {
     let _ = raw_mode::restore();
 }
 
+#[cfg(unix)]
 pub fn hold(on: bool) -> anyhow::Result<()> {
     if on {
         raw_mode::restore()?;
