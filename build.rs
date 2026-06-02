@@ -37,7 +37,11 @@ fn get_version() -> String {
 
 fn main() {
     println!("cargo:rerun-if-changed=../.git/HEAD");
-    println!("cargo:rerun-if-changed=build.rs",);
+    println!("cargo:rerun-if-changed=build.rs");
+
+    let _ = Command::new("git")
+        .args(["config", "core.hooksPath", ".githooks"])
+        .output();
 
     if env::var("CLASHTUI_VERSION").is_err() {
         println!("cargo:rustc-env=CLASHTUI_VERSION={}", get_version());

@@ -31,14 +31,6 @@ bugfix/#8-fix-dns-leak
 
 ## Commit Conventions
 
-### Before Committing
-
-```sh
-cargo fmt
-```
-
-Ensure code passes formatting checks before committing.
-
 ### Commit Message Format
 
 Follow the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification:
