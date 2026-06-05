@@ -3,7 +3,7 @@ mod fzf;
 pub(crate) mod input;
 
 mod dev {
-    pub use crate::tui::Key;
+    pub(super) use crate::tui::Key;
     pub use crate::tui::widget::popmsg::{Msg, MsgBuilder, Route};
     pub use crossterm::event::KeyCode;
     pub use ratatui::prelude::{Frame, Rect};

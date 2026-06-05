@@ -1,261 +1,133 @@
-use std::{
-    fmt::{Display, Write},
-    str::FromStr,
-};
+use crossterm::event::KeyEvent;
+pub type Key = KeyEvent;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Key {
-    pub code: KeyCode,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub shift: bool,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub ctrl: bool,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub alt: bool,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub super_: bool,
-}
-
-fn is_false(b: &bool) -> bool {
-    !*b
-}
-
-impl Key {
-    pub fn plain(&self) -> Option<char> {
-        match self.code {
-            KeyCode::Char(c) if !self.ctrl && !self.alt && !self.super_ => Some(c),
-            _ => None,
-        }
-    }
-}
-
-impl Default for Key {
-    fn default() -> Self {
-        Self {
-            code: KeyCode::Null,
-            shift: false,
-            ctrl: false,
-            alt: false,
-            super_: false,
-        }
-    }
-}
-
-impl From<KeyEvent> for Key {
-    fn from(value: KeyEvent) -> Self {
-        let shift = match (value.code, value.modifiers) {
-            (KeyCode::Char(c), _m) => c.is_ascii_uppercase(),
-            (KeyCode::BackTab, _) => false,
-            (_, m) => m.contains(KeyModifiers::SHIFT),
-        };
-
-        Self {
-            code: value.code,
-            shift,
-            ctrl: value.modifiers.contains(KeyModifiers::CONTROL),
-            alt: value.modifiers.contains(KeyModifiers::ALT),
-            super_: value.modifiers.contains(KeyModifiers::SUPER),
-        }
-    }
-}
-
-impl FromStr for Key {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        use anyhow::bail;
-
-        if s.is_empty() {
-            bail!("empty key");
-        }
-
-        let mut key = Self::default();
-        if !s.starts_with('<') || !s.ends_with('>') {
-            key.code = KeyCode::Char(s.chars().next().unwrap());
-            key.shift = matches!(key.code, KeyCode::Char(c) if c.is_ascii_uppercase());
-            return Ok(key);
-        }
-
-        let mut it = s[1..s.len() - 1].split_inclusive('-').peekable();
-        while let Some(next) = it.next() {
-            match next.to_ascii_lowercase().as_str() {
-                "s-" => key.shift = true,
-                "c-" => key.ctrl = true,
-                "a-" => key.alt = true,
-                "d-" => key.super_ = true,
-
-                "space" => key.code = KeyCode::Char(' '),
-                "backspace" => key.code = KeyCode::Backspace,
-                "enter" => key.code = KeyCode::Enter,
-                "left" => key.code = KeyCode::Left,
-                "right" => key.code = KeyCode::Right,
-                "up" => key.code = KeyCode::Up,
-                "down" => key.code = KeyCode::Down,
-                "home" => key.code = KeyCode::Home,
-                "end" => key.code = KeyCode::End,
-                "pageup" => key.code = KeyCode::PageUp,
-                "pagedown" => key.code = KeyCode::PageDown,
-                "tab" => key.code = KeyCode::Tab,
-                "backtab" => key.code = KeyCode::BackTab,
-                "delete" => key.code = KeyCode::Delete,
-                "insert" => key.code = KeyCode::Insert,
-                "esc" => key.code = KeyCode::Esc,
-
-                _ => match next {
-                    s if it.peek().is_none() => {
-                        let c = s.chars().next().unwrap();
-                        key.shift |= c.is_ascii_uppercase();
-                        key.code =
-                            KeyCode::Char(if key.shift { c.to_ascii_uppercase() } else { c });
-                    }
-                    s => bail!("unknown key: {s}"),
-                },
-            }
-        }
-
-        if key.code == KeyCode::Null {
-            bail!("empty key");
-        }
-        Ok(key)
-    }
-}
-
-impl Display for Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(c) = self.plain() {
-            return if c == ' ' {
-                write!(f, "<Space>")
-            } else {
-                f.write_char(c)
-            };
-        }
-
-        write!(f, "<")?;
-        if self.super_ {
-            write!(f, "D-")?;
-        }
-        if self.ctrl {
-            write!(f, "C-")?;
-        }
-        if self.alt {
-            write!(f, "A-")?;
-        }
-        if self.shift && !matches!(self.code, KeyCode::Char(_)) {
-            write!(f, "S-")?;
-        }
-
-        let code = match self.code {
-            KeyCode::Backspace => "Backspace",
-            KeyCode::Enter => "Enter",
-            KeyCode::Left => "Left",
-            KeyCode::Right => "Right",
-            KeyCode::Up => "Up",
-            KeyCode::Down => "Down",
-            KeyCode::Home => "Home",
-            KeyCode::End => "End",
-            KeyCode::PageUp => "PageUp",
-            KeyCode::PageDown => "PageDown",
-            KeyCode::Tab => "Tab",
-            KeyCode::BackTab => "BackTab",
-            KeyCode::Delete => "Delete",
-            KeyCode::Insert => "Insert",
-            KeyCode::Esc => "Esc",
-
-            KeyCode::Char(' ') => "Space",
-            KeyCode::Char(c) => {
-                f.write_char(c)?;
-                ""
-            }
-            _ => "Unknown",
-        };
-
-        write!(f, "{code}>")
-    }
-}
-
-#[cfg(test)]
-mod tests {
+/// Build KeyMap
+///
+/// - load keymapping from file or something via `init`
+/// - get keymapping via `get`
+///
+/// File Format:
+///
+/// `Act1: [Key1, Key2, ...]`
+macro_rules! key_map {
+    ($actid:ident, [$(($key:expr, $action:expr, $desc:literal),)*]) => {
+pub mod km {
     use super::*;
+    use anyhow::Context;
+    use std::collections::{HashMap, HashSet};
+    use std::sync::OnceLock;
+    use crate::tui::key::Key as _Key;
 
-    fn key_event(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
-        KeyEvent::new(code, modifiers)
+    pub type KeyMap = HashMap<_Key, $actid>;
+    type FileMap = HashMap<$actid, Vec<_Key>>;
+
+    static MAPPING: OnceLock<KeyMap> = OnceLock::new();
+
+    pub fn init(map: serde_yml::Value) -> anyhow::Result<bool> {
+        let map = serde_yml::from_value(map).context("Failed to load keymap")?;
+        let is_duplicated = check_duplicate(&map);
+        if MAPPING.set(map_from_file(map)).is_err() {
+            anyhow::bail!("")
+        }
+        Ok(is_duplicated)
     }
 
-    #[test]
-    fn plain_char_no_modifiers() {
-        let k = Key::from(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
-        assert_eq!(k.code, KeyCode::Char('a'));
-        assert!(!k.shift);
-        assert!(!k.ctrl);
-        assert!(!k.alt);
-        assert!(!k.super_);
+    pub fn get() -> &'static KeyMap {
+        MAPPING.get().expect("try get keymap without init")
     }
 
-    #[test]
-    fn uppercase_char_infers_shift() {
-        let k = Key::from(key_event(KeyCode::Char('A'), KeyModifiers::NONE));
-        assert_eq!(k.code, KeyCode::Char('A'));
-        assert!(k.shift);
+    pub fn default() -> FileMap {
+        let mut map = FileMap::new();
+        $(
+            map.entry($action).or_default().push($key.into());
+        )*
+        map
     }
 
-    #[test]
-    fn uppercase_char_with_shift_modifier() {
-        let k = Key::from(key_event(KeyCode::Char('A'), KeyModifiers::SHIFT));
-        assert_eq!(k.code, KeyCode::Char('A'));
-        assert!(k.shift);
+    fn check_duplicate(map: &FileMap) -> bool {
+        let it = map.values();
+        let excepted = it.len();
+        let got = it
+            .scan(HashSet::new(), |set, val| set.insert(val).then_some(()))
+            .count();
+        excepted == got
     }
 
-    #[test]
-    fn ctrl_key() {
-        let k = Key::from(key_event(KeyCode::Char('w'), KeyModifiers::CONTROL));
-        assert_eq!(k.code, KeyCode::Char('w'));
-        assert!(k.ctrl);
-        assert!(!k.shift);
+    fn map_from_file(map: FileMap) -> KeyMap {
+        map.into_iter()
+            .flat_map(|(act, keys)| keys.into_iter().map(move |key| (key, act)))
+            .collect()
     }
 
-    #[test]
-    fn non_alpha_shift_stripped_windows_style() {
-        let k = Key::from(key_event(KeyCode::Char('~'), KeyModifiers::SHIFT));
-        assert_eq!(k.code, KeyCode::Char('~'));
-        assert!(!k.shift, "shift should be stripped for non-alpha char");
-    }
+    impl TryFrom<&_Key> for $actid {
+        type Error = ();
 
-    #[test]
-    fn non_alpha_shift_stripped_unix_style() {
-        let k = Key::from(key_event(KeyCode::Char('~'), KeyModifiers::NONE));
-        assert_eq!(k.code, KeyCode::Char('~'));
-        assert!(!k.shift);
+        fn try_from(ev: &_Key) -> Result<Self, Self::Error> {
+            let km = km::get();
+            return km.get(ev).map(|act| *act).ok_or(());
+        }
     }
+}};
+}
 
-    #[test]
-    fn shift_digit_normalized() {
-        let k_win = Key::from(key_event(KeyCode::Char('!'), KeyModifiers::SHIFT));
-        let k_unix = Key::from(key_event(KeyCode::Char('!'), KeyModifiers::NONE));
-        assert_eq!(k_win, k_unix);
-        assert_eq!(k_win.code, KeyCode::Char('!'));
-        assert!(!k_win.shift);
-    }
+pub fn load() -> anyhow::Result<()> {
+    let path = crate::config::keymap_path();
 
-    #[test]
-    fn lowercase_alpha_stays_unshifted() {
-        let k = Key::from(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
-        assert_eq!(k.code, KeyCode::Char('a'));
-        assert!(!k.shift);
-    }
+    let mut value: serde_yml::Mapping = match std::fs::File::open(&path) {
+        Ok(file) => serde_yml::from_reader(file)?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_yml::Mapping::new(),
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "failed to open keymap file at {}: {e}",
+                path.display()
+            ));
+        }
+    };
 
-    #[test]
-    fn backtab_shift_is_false() {
-        let k = Key::from(key_event(KeyCode::BackTab, KeyModifiers::SHIFT));
-        assert_eq!(k.code, KeyCode::BackTab);
-        assert!(!k.shift);
+    macro_rules! quick_load {
+        ($rec:expr, $id:ident) => {
+            if $id::km::init(value.remove(stringify!($id)).unwrap())? {
+                $rec.push(stringify!($id))
+            }
+        };
+        ($rec:expr, $($id:ident),+ $(,)?) => {
+            $(quick_load!($rec, $id);)+
+        };
     }
+    use super::{app, tab::*};
 
-    #[test]
-    fn non_char_key_with_shift() {
-        let k = Key::from(key_event(KeyCode::Up, KeyModifiers::SHIFT));
-        assert_eq!(k.code, KeyCode::Up);
-        assert!(k.shift);
+    let mut has_duplicate = vec![];
+    quick_load!(
+        has_duplicate,
+        app,
+        connections,
+        proxies,
+        srvctl,
+        settings,
+        logs
+    );
+    files::km_init(&mut has_duplicate, value.remove("files").unwrap())?;
+
+    Ok(())
+}
+
+pub fn init() -> anyhow::Result<()> {
+    macro_rules! quick_default {
+        ($map:expr, $id:ident) => {
+            $map.insert(stringify!($id).into(), serde_yml::to_value($id::km::default())?);
+        };
+        ($map:expr, $($id:ident),+ $(,)?) => {
+            $(quick_default!($map, $id);)+
+        };
     }
+    use super::{app, tab::*};
+
+    let mut map = serde_yml::Mapping::new();
+    quick_default!(map, app, connections, proxies, srvctl, settings, logs);
+    map.insert("files".into(), files::km_default()?);
+
+    let path = crate::config::keymap_path();
+    let file = std::fs::File::create(path)?;
+    serde_yml::to_writer(file, &map)?;
+    Ok(())
 }

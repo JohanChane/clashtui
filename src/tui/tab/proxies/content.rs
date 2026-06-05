@@ -309,10 +309,6 @@ impl BasicTabContent for Proxies {
 
     const TITLE: &str = "Proxies";
 
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        super::agent::all_shortcuts()
-    }
-
     fn after_sync(&self, task_set: &mut FutureSet<Self>) {
         if self.paused {
             return;

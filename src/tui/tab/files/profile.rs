@@ -74,81 +74,77 @@ fn traffic_percentage(used: u64, total: u64) -> f64 {
     }
 }
 
-mod_agent!(
+key_map!(
     Key,
     [
-        ([KeyCode::Left], Key::Switch, "Switch pane"),
-        ([KeyCode::Right], Key::Switch, "Switch pane"),
-        ([KeyCode::Char('h')], Key::Switch, "Switch pane"),
-        ([KeyCode::Char('l')], Key::Switch, "Switch pane"),
-        ([KeyCode::Down], Key::MoveDown, "Move down"),
-        ([KeyCode::Up], Key::MoveUp, "Move up"),
-        ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
-        ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
-        ([KeyCode::Enter], Key::Select, "Select"),
+        (KeyCode::Left, Key::Switch, "Switch pane"),
+        (KeyCode::Right, Key::Switch, "Switch pane"),
+        (KeyCode::Char('h'), Key::Switch, "Switch pane"),
+        (KeyCode::Char('l'), Key::Switch, "Switch pane"),
+        (KeyCode::Down, Key::MoveDown, "Move down"),
+        (KeyCode::Up, Key::MoveUp, "Move up"),
+        (KeyCode::Char('j'), Key::MoveDown, "Move down"),
+        (KeyCode::Char('k'), Key::MoveUp, "Move up"),
+        (KeyCode::Enter, Key::Select, "Select"),
         (
-            [KeyCode::Char('i')],
+            KeyCode::Char('i'),
             Key::Action(Action::Add),
             "Import (URL or file)"
         ),
         (
-            [KeyCode::Char('d'), KeyCode::Char('d')],
+            KeyCode::Char('D'),
             Key::Action(Action::Delete),
             "Delete profile"
         ),
-        ([KeyCode::Char('e')], Key::Action(Action::Edit), "Edit"),
+        (KeyCode::Char('e'), Key::Action(Action::Edit), "Edit"),
+        (KeyCode::Char('p'), Key::Action(Action::Preview), "Preview"),
+        (KeyCode::Char('u'), Key::Action(Action::Update), "Update"),
         (
-            [KeyCode::Char('p')],
-            Key::Action(Action::Preview),
-            "Preview"
-        ),
-        ([KeyCode::Char('u')], Key::Action(Action::Update), "Update"),
-        (
-            [KeyCode::Char('/')],
+            KeyCode::Char('/'),
             Key::Action(Action::Search),
             "Search/Filter"
         ),
-        ([KeyCode::Char('t')], Key::Action(Action::Test), "Test"),
+        (KeyCode::Char('t'), Key::Action(Action::Test), "Test"),
         (
-            [KeyCode::Char('c')],
+            KeyCode::Char('c'),
             Key::Action(Action::Check),
             "Check config"
         ),
+        // (
+        //     [KeyCode::Char('C'), KeyCode::Char('u')],
+        //     Key::Action(Action::CopyUrl),
+        //     "Copy URL"
+        // ),
         (
-            [KeyCode::Char('C'), KeyCode::Char('u')],
-            Key::Action(Action::CopyUrl),
-            "Copy URL"
-        ),
-        (
-            [KeyCode::Char('f')],
+            KeyCode::Char('f'),
             Key::Action(Action::FzfFind),
             "Find profile"
         ),
-        (
-            [KeyCode::Char('g'), KeyCode::Char('g')],
-            Key::Action(Action::GoTop),
-            "Go to top"
-        ),
-        (
-            [KeyCode::Char('G')],
-            Key::Action(Action::GoEnd),
-            "Go to end"
-        ),
-        (
-            key("P"),
-            Key::Action(Action::ToggleNoPp),
-            "Toggle no proxy-provider"
-        ),
-        (
-            key("O"),
-            Key::Action(Action::ToggleUpdateWithProxy),
-            "Toggle update with proxy"
-        ),
-        (key("n"), Key::Action(Action::Traffic), "Show traffic"),
+        // (
+        //     [KeyCode::Char('g'), KeyCode::Char('g')],
+        //     Key::Action(Action::GoTop),
+        //     "Go to top"
+        // ),
+        // (
+        //     [KeyCode::Char('G')],
+        //     Key::Action(Action::GoEnd),
+        //     "Go to end"
+        // ),
+        // (
+        //     key("P"),
+        //     Key::Action(Action::ToggleNoPp),
+        //     "Toggle no proxy-provider"
+        // ),
+        // (
+        //     key("O"),
+        //     Key::Action(Action::ToggleUpdateWithProxy),
+        //     "Toggle update with proxy"
+        // ),
+        // (key("n"), Key::Action(Action::Traffic), "Show traffic"),
     ]
 );
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum Key {
     Switch,
     MoveUp,
@@ -158,111 +154,7 @@ pub enum Key {
     Action(Action),
 }
 
-impl serde::Serialize for Key {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Key::Switch => serializer.serialize_str("Switch"),
-            Key::MoveUp => serializer.serialize_str("MoveUp"),
-            Key::MoveDown => serializer.serialize_str("MoveDown"),
-            Key::Select => serializer.serialize_str("Select"),
-            Key::Action(action) => {
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry("Action", action)?;
-                map.end()
-            }
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for Key {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de::{self, Visitor};
-        use std::fmt;
-
-        struct KeyVisitor;
-
-        impl<'de> Visitor<'de> for KeyVisitor {
-            type Value = Key;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a string (unit variant) or mapping (Action: <name>)")
-            }
-
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Key, E> {
-                match v {
-                    "Switch" => Ok(Key::Switch),
-                    "MoveUp" => Ok(Key::MoveUp),
-                    "MoveDown" => Ok(Key::MoveDown),
-                    "Select" => Ok(Key::Select),
-                    s => Err(de::Error::unknown_variant(
-                        s,
-                        &["Switch", "MoveUp", "MoveDown", "Select", "Action: ..."],
-                    )),
-                }
-            }
-
-            fn visit_map<M: de::MapAccess<'de>>(self, mut map: M) -> Result<Key, M::Error> {
-                let k: String = map
-                    .next_key()?
-                    .ok_or_else(|| de::Error::missing_field("variant"))?;
-                if k == "Action" {
-                    let v: String = map.next_value()?;
-                    match v.as_str() {
-                        "Add" => Ok(Key::Action(Action::Add)),
-                        "ImportFile" => Ok(Key::Action(Action::ImportFile)),
-                        "Delete" => Ok(Key::Action(Action::Delete)),
-                        "Edit" => Ok(Key::Action(Action::Edit)),
-                        "Preview" => Ok(Key::Action(Action::Preview)),
-                        "Update" => Ok(Key::Action(Action::Update)),
-                        "UpdateAll" => Ok(Key::Action(Action::UpdateAll)),
-                        "Search" => Ok(Key::Action(Action::Search)),
-                        "Test" => Ok(Key::Action(Action::Test)),
-                        "Check" => Ok(Key::Action(Action::Check)),
-                        "CopyUrl" => Ok(Key::Action(Action::CopyUrl)),
-                        "FzfFind" => Ok(Key::Action(Action::FzfFind)),
-                        "GoTop" => Ok(Key::Action(Action::GoTop)),
-                        "GoEnd" => Ok(Key::Action(Action::GoEnd)),
-                        "ToggleNoPp" => Ok(Key::Action(Action::ToggleNoPp)),
-                        "ToggleUpdateWithProxy" => Ok(Key::Action(Action::ToggleUpdateWithProxy)),
-                        "Traffic" => Ok(Key::Action(Action::Traffic)),
-                        s => Err(de::Error::unknown_variant(
-                            s,
-                            &[
-                                "Add",
-                                "ImportFile",
-                                "Delete",
-                                "Edit",
-                                "Preview",
-                                "Update",
-                                "UpdateAll",
-                                "Search",
-                                "Test",
-                                "Check",
-                                "CopyUrl",
-                                "FzfFind",
-                                "GoTop",
-                                "GoEnd",
-                                "ToggleNoPp",
-                                "ToggleUpdateWithProxy",
-                                "Traffic",
-                            ],
-                        )),
-                    }
-                } else {
-                    Err(de::Error::unknown_field(&k, &["Action"]))
-                }
-            }
-        }
-
-        deserializer.deserialize_any(KeyVisitor)
-    }
-}
-
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub enum Action {
     Add,
     ImportFile,
@@ -283,28 +175,6 @@ pub enum Action {
     Traffic,
 }
 
-impl TryFrom<&crate::tui::Key> for Key {
-    type Error = ();
-
-    fn try_from(value: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(value).copied().ok_or(());
-        }
-
-        Ok(match value.code {
-            KeyCode::Right | KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('l') => {
-                Self::Switch
-            }
-            KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
-            KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
-            KeyCode::Enter => Self::Select,
-
-            _ => return Err(()),
-        })
-    }
-}
-
 #[derive(Default)]
 pub struct Profile {
     items: Vec<String>,
@@ -319,10 +189,6 @@ impl BasicTabContent for Profile {
     type State = ListState;
 
     const TITLE: &str = "Profile";
-
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
-    }
 }
 
 impl DualTabContent for Profile {

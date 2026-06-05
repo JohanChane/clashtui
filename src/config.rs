@@ -290,6 +290,7 @@ pub fn init_config() -> Result<()> {
     )?;
     ConfigFile::default().to_file()?;
     ProfileManager::default().to_file()?;
+    crate::tui::keymap_init()?;
 
     fs::create_dir(mihomo.join(defs::TEMPLATE_DIR))?;
     fs::create_dir(mihomo.join(defs::PROFILE_YAMLS_DIR))?;

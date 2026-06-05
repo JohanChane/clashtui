@@ -51,8 +51,6 @@ where
     state: (C1::State, C2::State),
     tasks: FutureSet<(C1, C2)>,
     is_focus_on_c1: bool,
-    c1_shortcuts: Vec<(KeyCombo, &'static str)>,
-    c2_shortcuts: Vec<(KeyCombo, &'static str)>,
 }
 
 impl<C1, C2> Default for DualTab<C1, C2>
@@ -68,76 +66,15 @@ where
         let mut tasks = Default::default();
         content.0.init(&mut tasks, &mut state.0);
         content.1.init(&mut tasks, &mut state.1);
-        let c1_shortcuts: Vec<(KeyCombo, &'static str)> = C1::all_shortcuts()
-            .iter()
-            .map(|(combo, _, desc)| (combo.clone(), *desc))
-            .collect();
-        let c2_shortcuts: Vec<(KeyCombo, &'static str)> = C2::all_shortcuts()
-            .iter()
-            .map(|(combo, _, desc)| (combo.clone(), *desc))
-            .collect();
         Self {
             content,
             state,
             tasks,
             is_focus_on_c1: true,
-            c1_shortcuts,
-            c2_shortcuts,
         }
     }
 }
 
-impl<C1, C2> DualTab<C1, C2>
-where
-    C1: DualTabContent<Mate = C2>,
-    C2: DualTabContentMate<Mate = C1>,
-{
-    pub fn shortcuts(&self) -> &[(KeyCombo, &'static str)] {
-        if self.is_focus_on_c1 {
-            &self.c1_shortcuts
-        } else {
-            &self.c2_shortcuts
-        }
-    }
-
-    pub fn dispatch_shortcut(&mut self, seq: &[Key]) {
-        log::debug!(
-            "dispatch_shortcut: seq={seq:?} focus_c1={}",
-            self.is_focus_on_c1
-        );
-        if self.is_focus_on_c1 {
-            for (s, key, desc) in C1::all_shortcuts() {
-                if &**s == seq {
-                    log::debug!("dispatch_shortcut: matched C1 '{desc}'");
-                    if DualTabContent::handle_key_event(
-                        &mut self.content.0,
-                        *key,
-                        &mut self.tasks,
-                        &mut self.state.0,
-                    ) {
-                        self.is_focus_on_c1 = false;
-                    }
-                    return;
-                }
-            }
-        } else {
-            for (s, key, desc) in C2::all_shortcuts() {
-                if &**s == seq {
-                    log::debug!("dispatch_shortcut: matched C2 '{desc}'");
-                    if DualTabContentMate::handle_key_event(
-                        &mut self.content.1,
-                        *key,
-                        &mut self.tasks,
-                        &mut self.state.1,
-                    ) {
-                        self.is_focus_on_c1 = true;
-                    }
-                    return;
-                }
-            }
-        }
-    }
-}
 
 impl<C1, C2> TuiWidget for DualTab<C1, C2>
 where

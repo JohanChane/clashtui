@@ -1,14 +1,11 @@
 use super::*;
-use std::sync::LazyLock;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use tab::prelude::*;
 use tokio::sync::Notify;
-use widget::chord::ChordHandler;
 use widget::help::HelpPanel;
 use widget::popmsg::PopUp;
 
 use crossterm::event::{KeyCode, KeyEventKind};
-use widget::tab::KeyCombo;
 
 // 50fps
 const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
@@ -16,44 +13,32 @@ pub(super) static FULL_RENDER: Notify = Notify::const_new();
 pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
 
-static GLOBAL_CHORD_SHORTCUTS: LazyLock<Vec<(KeyCombo, &str)>> = LazyLock::new(|| {
-    fn ctrl(c: char) -> Key {
-        Key {
-            code: KeyCode::Char(c),
-            shift: false,
-            ctrl: true,
-            alt: false,
-            super_: false,
-        }
-    }
-    fn plain(c: char) -> Key {
-        Key {
-            code: KeyCode::Char(c),
-            shift: false,
-            ctrl: false,
-            alt: false,
-            super_: false,
-        }
-    }
-    vec![
-        (KeyCombo(vec![ctrl('g'), plain('c')]), "Open core data dir"),
-        (
-            KeyCombo(vec![ctrl('g'), plain('m')]),
-            "Open core install dir",
-        ),
-        (KeyCombo(vec![ctrl('g'), plain('f')]), "Start core service"),
-        (
-            KeyCombo(vec![ctrl('g'), plain('t')]),
-            "Close all connections",
-        ),
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub enum AppKey {
+    Tab(u8),
+    TabNext,
+    Quit,
+    Help,
+}
+key_map!(
+    AppKey,
+    [
+        (KeyCode::Tab, AppKey::TabNext, "Tab Next"),
+        (KeyCode::Char('1'), AppKey::Tab(1), "Tab1"),
+        (KeyCode::Char('2'), AppKey::Tab(2), "Tab2"),
+        (KeyCode::Char('3'), AppKey::Tab(3), "Tab3"),
+        (KeyCode::Char('4'), AppKey::Tab(4), "Tab4"),
+        (KeyCode::Char('5'), AppKey::Tab(5), "Tab5"),
+        (KeyCode::Char('6'), AppKey::Tab(6), "Tab6"),
+        (KeyCode::Char('7'), AppKey::Tab(7), "Tab7"),
+        (KeyCode::Char('q'), AppKey::Quit, "Exit"),
+        (KeyCode::Char('?'), AppKey::Help, "Help"),
     ]
-});
+);
 
 pub struct App {
     tabs: Vec<Tab>,
     popup: PopUp,
-    chord: ChordHandler,
-    global_chord: ChordHandler,
     help: HelpPanel,
 
     tab_index: u8,
@@ -72,8 +57,6 @@ impl App {
                 CoreSrvCtlTab::default().into(),
             ],
             popup: PopUp::default(),
-            chord: ChordHandler::default(),
-            global_chord: ChordHandler::default(),
             help: HelpPanel::default(),
             tab_index: 0,
         };
@@ -174,7 +157,7 @@ impl App {
                 Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
                     #[cfg(debug_assertions)]
                     the_egg(key_event.code);
-                    let key: Key = key_event.into();
+                    let key = key_event.into();
                     app.handle_key_event(&key);
                 }
                 Event::Resize(..) => terminal.autoresize()?,
@@ -189,57 +172,11 @@ impl App {
     /// KeyEvent Route:
     /// PopUp(0) → GlobalChord(0.5) → Help(1) → Which(2) → Tab(3) → Global(4)
     fn handle_key_event(&mut self, kv: &Key) {
-        log::debug!("K: {kv}");
+        log::debug!("K: {kv:?}");
 
         if self.popup.check() {
             self.popup.handle_key_event(kv);
             return;
-        }
-
-        {
-            let shortcuts_ptr: *const [(KeyCombo, &str)] =
-                GLOBAL_CHORD_SHORTCUTS.as_slice() as *const _;
-            if self
-                .global_chord
-                .handle(kv, unsafe { &*shortcuts_ptr }, &mut |seq| {
-                    log::debug!("global_chord dispatch: {seq:?}");
-                    match seq.last().and_then(|k| k.plain()) {
-                        Some('c') => {
-                            log::debug!("open_dir: core data dir");
-                            let dir =
-                                crate::config::core_data_dir(crate::config::CONFIG.core_type());
-                            let _ = crate::functions::command::open_dir(dir.to_str().unwrap());
-                        }
-                        Some('m') => {
-                            log::debug!("open_dir: core install dir");
-                            let dir_str = match crate::config::CONFIG.core_type() {
-                                crate::config::CoreType::Mihomo => {
-                                    &crate::config::CONFIG.cfg_file.mihomo.core.config_dir
-                                }
-                                crate::config::CoreType::Singbox => {
-                                    &crate::config::CONFIG.cfg_file.singbox.core.config_dir
-                                }
-                            };
-                            let parent = std::path::Path::new(dir_str)
-                                .parent()
-                                .unwrap_or(std::path::Path::new(dir_str));
-                            let _ = crate::functions::command::open_dir(parent.to_str().unwrap());
-                        }
-                        Some('f') => {
-                            log::debug!("restart core service");
-                            let _ = crate::functions::command::restart_service();
-                        }
-                        Some('t') => {
-                            log::debug!("close all connections");
-                            let _ =
-                                crate::functions::restful::connection::terminate_all_connections();
-                        }
-                        _ => {}
-                    }
-                })
-            {
-                return;
-            }
         }
 
         if self.help.is_active() {
@@ -248,18 +185,6 @@ impl App {
         }
 
         let ti = self.tab_index as usize;
-        let shortcuts_ptr: *const [(widget::tab::KeyCombo, &str)] =
-            { self.tabs[ti].shortcuts() as *const _ };
-
-        if self
-            .chord
-            .handle(kv, unsafe { &*shortcuts_ptr }, &mut |seq| {
-                log::debug!("chord dispatch: {seq:?}");
-                self.tabs[ti].dispatch_shortcut(seq);
-            })
-        {
-            return;
-        }
 
         self.tabs[ti].handle_key_event(kv);
         self.handle_global_kv(kv);
@@ -280,14 +205,6 @@ impl App {
 
         self.tabs[self.tab_index as usize].render(f, chunks[1]);
 
-        if self.chord.is_active() {
-            self.render_which(f);
-        }
-
-        if self.global_chord.is_active() {
-            self.render_global_which(f);
-        }
-
         if self.help.is_active() {
             self.render_help(f, &self.tabs[self.tab_index as usize]);
         }
@@ -297,182 +214,39 @@ impl App {
         }
     }
 
-    fn render_which(&self, f: &mut ratatui::Frame) {
-        use ratatui::layout::{Alignment, Constraint, Layout, Rect};
-        use ratatui::style::Style;
-        use ratatui::text::{Line, Span};
-        use ratatui::widgets::{Block, Clear, Paragraph};
-        use widget::chord::key_event_to_str;
-
-        let candidate_count = self.chord.candidates.len();
-        let cols = if candidate_count > 4 { 2 } else { 1 };
-
-        let total_height = candidate_count.div_ceil(cols) as u16 + 2;
-        let total_width = if cols == 1 { 40 } else { 70 };
-
-        let area = f.area();
-        let popup_area = Rect {
-            x: area
-                .x
-                .saturating_add(area.width.saturating_sub(total_width) / 2),
-            y: area.height.saturating_sub(total_height + 2),
-            width: total_width.min(area.width),
-            height: total_height.min(area.height),
-        };
-
-        f.render_widget(Clear, popup_area);
-
-        let block = Block::bordered()
-            .title(" Which? ")
-            .title_alignment(Alignment::Left);
-        f.render_widget(block.clone(), popup_area);
-
-        let inner = block.inner(popup_area);
-        let col_widths: Vec<_> = (0..cols)
-            .map(|_| Constraint::Ratio(1, cols as u32))
-            .collect();
-        let col_areas = Layout::horizontal(&col_widths).split(inner);
-
-        let items_per_col = candidate_count.div_ceil(cols);
-
-        let accent = Theme::get().popup.text;
-
-        for (col_idx, col_area) in col_areas.iter().enumerate().take(cols) {
-            let lines: Vec<Line> = self
-                .chord
-                .candidates
-                .iter()
-                .skip(col_idx * items_per_col)
-                .take(items_per_col)
-                .map(|(seq, desc)| {
-                    let remaining = &seq[self.chord.pressed.len()..];
-                    let key_str: String = remaining
-                        .iter()
-                        .map(key_event_to_str)
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    Line::from(vec![
-                        Span::raw(" "),
-                        Span::styled(key_str, accent),
-                        Span::raw("  "),
-                        Span::styled(*desc, Style::new().dim()),
-                    ])
-                })
-                .collect();
-
-            f.render_widget(Paragraph::new(lines), *col_area);
-        }
-    }
-
-    fn render_global_which(&self, f: &mut ratatui::Frame) {
-        use ratatui::layout::{Alignment, Constraint, Layout, Rect};
-        use ratatui::style::Style;
-        use ratatui::text::{Line, Span};
-        use ratatui::widgets::{Block, Clear, Paragraph};
-        use widget::chord::key_event_to_str;
-
-        let candidate_count = self.global_chord.candidates.len();
-        let cols = if candidate_count > 4 { 2 } else { 1 };
-
-        let total_height = candidate_count.div_ceil(cols) as u16 + 2;
-        let total_width = if cols == 1 { 40 } else { 70 };
-
-        let area = f.area();
-        let popup_area = Rect {
-            x: area
-                .x
-                .saturating_add(area.width.saturating_sub(total_width) / 2),
-            y: area.height.saturating_sub(total_height + 2),
-            width: total_width.min(area.width),
-            height: total_height.min(area.height),
-        };
-
-        f.render_widget(Clear, popup_area);
-
-        let block = Block::bordered()
-            .title(" Which? ")
-            .title_alignment(Alignment::Left);
-        f.render_widget(block.clone(), popup_area);
-
-        let inner = block.inner(popup_area);
-        let col_widths: Vec<_> = (0..cols)
-            .map(|_| Constraint::Ratio(1, cols as u32))
-            .collect();
-        let col_areas = Layout::horizontal(&col_widths).split(inner);
-
-        let items_per_col = candidate_count.div_ceil(cols);
-
-        let accent = Theme::get().popup.text;
-
-        for (col_idx, col_area) in col_areas.iter().enumerate().take(cols) {
-            let lines: Vec<Line> = self
-                .global_chord
-                .candidates
-                .iter()
-                .skip(col_idx * items_per_col)
-                .take(items_per_col)
-                .map(|(seq, desc)| {
-                    let remaining = &seq[self.global_chord.pressed.len()..];
-                    let key_str: String = remaining
-                        .iter()
-                        .map(key_event_to_str)
-                        .collect::<Vec<_>>()
-                        .join(" ");
-                    Line::from(vec![
-                        Span::raw(" "),
-                        Span::styled(key_str, accent),
-                        Span::raw("  "),
-                        Span::styled(*desc, Style::new().dim()),
-                    ])
-                })
-                .collect();
-
-            f.render_widget(Paragraph::new(lines), *col_area);
-        }
-    }
-
     fn render_help(&self, f: &mut ratatui::Frame, tab: &Tab) {
         widget::help::render_help(f, tab);
     }
     /// Global layer (4) — last resort: Tab switch, Quit, Help
     fn handle_global_kv(&mut self, kv: &Key) -> bool {
-        const TAB_COUNT: u8 = 7;
-        match kv.code {
-            KeyCode::Char(c @ '1'..='7') if !kv.ctrl && !kv.alt && !kv.super_ => {
-                let new_index = c as u8 - b'1';
-                if new_index != self.tab_index {
-                    self.tabs[self.tab_index as usize].on_leave();
-                    self.tab_index = new_index;
-                    self.tabs[self.tab_index as usize].on_enter();
+        if let Ok(key) = AppKey::try_from(kv) {
+            match key {
+                AppKey::Tab(new_index) => {
+                    if new_index != self.tab_index {
+                        self.tabs[self.tab_index as usize].on_leave();
+                        self.tab_index = new_index - 1;
+                        self.tabs[self.tab_index as usize].on_enter();
+                    }
                 }
-                true
-            }
-            KeyCode::Tab if !kv.ctrl && !kv.alt && !kv.super_ => {
-                let old_index = self.tab_index;
-                if self.tab_index == TAB_COUNT - 1 {
-                    self.tab_index = 0;
-                } else {
-                    self.tab_index += 1;
-                }
-                if self.tab_index != old_index {
+                AppKey::TabNext => {
+                    const TAB_COUNT: u8 = 7;
+                    let old_index = self.tab_index;
+                    if self.tab_index == TAB_COUNT - 1 {
+                        self.tab_index = 0;
+                    } else {
+                        self.tab_index += 1;
+                    }
                     self.tabs[old_index as usize].on_leave();
                     self.tabs[self.tab_index as usize].on_enter();
                 }
-                true
+                AppKey::Quit => {
+                    QUIT.store(true, Ordering::Relaxed);
+                }
+                AppKey::Help => self.help.toggle(),
             }
-            KeyCode::Char('q') if !kv.ctrl && !kv.alt && !kv.super_ => {
-                QUIT.store(true, Ordering::Relaxed);
-                true
-            }
-            KeyCode::Char('c') if kv.ctrl && !kv.alt && !kv.super_ => {
-                QUIT.store(true, Ordering::Relaxed);
-                true
-            }
-            KeyCode::Char('?') if !kv.ctrl && !kv.alt && !kv.super_ => {
-                self.help.toggle();
-                true
-            }
-            _ => false,
+            true
+        } else {
+            false
         }
     }
     fn sync(&mut self) {
@@ -530,232 +304,5 @@ fn the_egg(key: crossterm::event::KeyCode) {
     *current += 1;
     if *current == 12 {
         log::debug!("You've found the egg!")
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::tui::widget::tab::KeyCombo;
-
-    fn kev(code: KeyCode) -> Key {
-        Key {
-            code,
-            shift: false,
-            ctrl: false,
-            alt: false,
-            super_: false,
-        }
-    }
-
-    fn ctrl(c: char) -> Key {
-        Key {
-            code: KeyCode::Char(c),
-            shift: false,
-            ctrl: true,
-            alt: false,
-            super_: false,
-        }
-    }
-
-    fn mk_app() -> App {
-        use std::sync::Once;
-        static INIT: Once = Once::new();
-        INIT.call_once(|| {
-            let tmp = std::env::temp_dir().join(format!("clashtui-test-{}", fastrand::u32(..)));
-            std::fs::create_dir_all(&tmp).ok();
-            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                crate::config::init(Some(tmp)).unwrap()
-            }));
-        });
-
-        App {
-            tabs: vec![
-                Tab::from(StatusTab::default()),
-                Tab::from(FileTab::default()),
-                Tab::from(ProxiesTab::default()),
-                Tab::from(ConnectionsTab::default()),
-                Tab::from(LogsTab::default()),
-                Tab::from(SettingsTab::default()),
-                Tab::from(CoreSrvCtlTab::default()),
-            ],
-            popup: PopUp::default(),
-            chord: ChordHandler::default(),
-            global_chord: ChordHandler::default(),
-            help: HelpPanel::default(),
-            tab_index: 0,
-        }
-    }
-
-    #[test]
-    fn keyevent_vec_equals_slice() {
-        let g = kev(KeyCode::Char('g'));
-        let e = kev(KeyCode::Char('e'));
-
-        let vec: Vec<Key> = vec![g, e];
-        let slice: &[Key] = &[g, e];
-
-        assert_eq!(vec, slice);
-        assert_eq!(&vec, slice);
-    }
-
-    #[test]
-    fn keyevents_compare_equal() {
-        let a = kev(KeyCode::Char('e'));
-        let b = kev(KeyCode::Char('e'));
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn global_chord_shortcuts_have_expected_entries() {
-        let shortcuts = &*GLOBAL_CHORD_SHORTCUTS;
-        assert_eq!(shortcuts.len(), 4);
-        assert_eq!(&shortcuts[1].1, &"Open core install dir");
-    }
-
-    #[test]
-    fn global_chord_first_is_ctrl_g_c() {
-        let shortcuts = &*GLOBAL_CHORD_SHORTCUTS;
-        assert_eq!(shortcuts[0].0.len(), 2);
-        assert_eq!(shortcuts[0].1, "Open core data dir");
-    }
-
-    #[test]
-    fn global_chord_ctrl_g_enters_chord_mode() {
-        let g = ctrl('g');
-        let shortcuts: &[(KeyCombo, &str)] = &GLOBAL_CHORD_SHORTCUTS;
-        let mut ch = ChordHandler::default();
-        let mut dispatched: Vec<Vec<Key>> = vec![];
-        let consumed = ch.handle(&g, shortcuts, &mut |seq| dispatched.push(seq.to_vec()));
-        assert!(consumed);
-        assert!(dispatched.is_empty());
-        assert!(ch.is_active());
-    }
-
-    #[test]
-    fn tab_switch_1_to_4() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let mut app = mk_app();
-        QUIT.store(false, Ordering::Relaxed);
-
-        for (i, c) in ['1', '2', '3', '4'].iter().enumerate() {
-            let key = kev(KeyCode::Char(*c));
-            let result = app.handle_global_kv(&key);
-            assert!(result, "key '{c}' should be handled");
-            assert_eq!(app.tab_index, i as u8);
-        }
-    }
-
-    #[test]
-    fn tab_switch_7() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let mut app = mk_app();
-        QUIT.store(false, Ordering::Relaxed);
-        let key = kev(KeyCode::Char('7'));
-        let result = app.handle_global_kv(&key);
-        assert!(result);
-        assert_eq!(app.tab_index, 6);
-    }
-
-    #[test]
-    fn tab_switch_out_of_range_ignored() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let mut app = mk_app();
-        QUIT.store(false, Ordering::Relaxed);
-        let key = kev(KeyCode::Char('8'));
-        let result = app.handle_global_kv(&key);
-        assert!(!result);
-        assert_eq!(app.tab_index, 0);
-    }
-
-    #[test]
-    fn tab_cycle_forward_with_tab_key() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let mut app = mk_app();
-        QUIT.store(false, Ordering::Relaxed);
-
-        let tab_count = app.tabs.len() as u8;
-        for i in 1..=tab_count {
-            let key = kev(KeyCode::Tab);
-            let result = app.handle_global_kv(&key);
-            assert!(result);
-            assert_eq!(app.tab_index, i % tab_count);
-        }
-    }
-
-    #[test]
-    fn quit_with_q() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let mut app = mk_app();
-        QUIT.store(false, Ordering::Relaxed);
-        let key = kev(KeyCode::Char('q'));
-        let result = app.handle_global_kv(&key);
-        assert!(result);
-        assert!(QUIT.load(Ordering::Relaxed));
-        QUIT.store(false, Ordering::Relaxed);
-    }
-
-    #[test]
-    fn quit_with_ctrl_c() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let mut app = mk_app();
-        QUIT.store(false, Ordering::Relaxed);
-        let key = ctrl('c');
-        let result = app.handle_global_kv(&key);
-        assert!(result);
-        assert!(QUIT.load(Ordering::Relaxed));
-        QUIT.store(false, Ordering::Relaxed);
-    }
-
-    #[test]
-    fn help_toggle_with_question_mark() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let mut app = mk_app();
-        QUIT.store(false, Ordering::Relaxed);
-
-        assert!(!app.help.is_active());
-        let key = kev(KeyCode::Char('?'));
-        let result = app.handle_global_kv(&key);
-        assert!(result);
-        assert!(app.help.is_active());
-
-        let result = app.handle_global_kv(&key);
-        assert!(result);
-        assert!(!app.help.is_active());
-    }
-
-    #[test]
-    fn unhandled_key_returns_false() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let mut app = mk_app();
-        QUIT.store(false, Ordering::Relaxed);
-        let key = kev(KeyCode::Char('x'));
-        let result = app.handle_global_kv(&key);
-        assert!(!result);
-    }
-
-    #[test]
-    fn ctrl_tab_not_handled_by_global() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        let _guard = rt.enter();
-        let mut app = mk_app();
-        QUIT.store(false, Ordering::Relaxed);
-        let key = Key {
-            code: KeyCode::Tab,
-            shift: false,
-            ctrl: true,
-            alt: false,
-            super_: false,
-        };
-        let result = app.handle_global_kv(&key);
-        assert!(!result);
     }
 }

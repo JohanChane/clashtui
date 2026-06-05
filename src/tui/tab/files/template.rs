@@ -4,58 +4,54 @@ use crate::functions::file::template::*;
 use ratatui::style::Style;
 use std::cell::Cell;
 
-mod_agent!(
+key_map!(
     Key,
     [
-        ([KeyCode::Left], Key::Switch, "Switch pane"),
-        ([KeyCode::Right], Key::Switch, "Switch pane"),
-        ([KeyCode::Char('h')], Key::Switch, "Switch pane"),
-        ([KeyCode::Char('l')], Key::Switch, "Switch pane"),
-        ([KeyCode::Down], Key::MoveDown, "Move down"),
-        ([KeyCode::Up], Key::MoveUp, "Move up"),
-        ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
-        ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
+        (KeyCode::Left, Key::Switch, "Switch pane"),
+        (KeyCode::Right, Key::Switch, "Switch pane"),
+        (KeyCode::Char('h'), Key::Switch, "Switch pane"),
+        (KeyCode::Char('l'), Key::Switch, "Switch pane"),
+        (KeyCode::Down, Key::MoveDown, "Move down"),
+        (KeyCode::Up, Key::MoveUp, "Move up"),
+        (KeyCode::Char('j'), Key::MoveDown, "Move down"),
+        (KeyCode::Char('k'), Key::MoveUp, "Move up"),
         (
-            [KeyCode::Char('d'), KeyCode::Char('d')],
+            KeyCode::Char('D'),
             Key::Action(Action::Delete),
             "Delete template"
         ),
-        ([KeyCode::Char('e')], Key::Action(Action::Edit), "Edit"),
+        (KeyCode::Char('e'), Key::Action(Action::Edit), "Edit"),
         (
-            [KeyCode::Char('E')],
+            KeyCode::Char('E'),
             Key::Action(Action::EditProviders),
             "Edit proxy providers"
         ),
+        (KeyCode::Char('p'), Key::Action(Action::Preview), "Preview"),
+        (KeyCode::Enter, Key::Action(Action::Generate), "Generate"),
         (
-            [KeyCode::Char('p')],
-            Key::Action(Action::Preview),
-            "Preview"
-        ),
-        ([KeyCode::Enter], Key::Action(Action::Generate), "Generate"),
-        (
-            [KeyCode::Char('f')],
+            KeyCode::Char('f'),
             Key::Action(Action::FzfFind),
             "Find template"
         ),
+        // (
+        //     [KeyCode::Char('g'), KeyCode::Char('g')],
+        //     Key::Action(Action::GoTop),
+        //     "Go to top"
+        // ),
+        // (
+        //     [KeyCode::Char('G')],
+        //     Key::Action(Action::GoEnd),
+        //     "Go to end"
+        // ),
         (
-            [KeyCode::Char('g'), KeyCode::Char('g')],
-            Key::Action(Action::GoTop),
-            "Go to top"
-        ),
-        (
-            [KeyCode::Char('G')],
-            Key::Action(Action::GoEnd),
-            "Go to end"
-        ),
-        (
-            [KeyCode::Char('/')],
+            KeyCode::Char('/'),
             Key::Action(Action::Search),
             "Search/Filter"
         ),
     ]
 );
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Debug)]
 pub enum Key {
     Switch,
     MoveUp,
@@ -65,95 +61,7 @@ pub enum Key {
     Action(Action),
 }
 
-impl serde::Serialize for Key {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Key::Switch => serializer.serialize_str("Switch"),
-            Key::MoveUp => serializer.serialize_str("MoveUp"),
-            Key::MoveDown => serializer.serialize_str("MoveDown"),
-            Key::Select => serializer.serialize_str("Select"),
-            Key::Action(action) => {
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry("Action", action)?;
-                map.end()
-            }
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for Key {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de::{self, Visitor};
-        use std::fmt;
-
-        struct KeyVisitor;
-
-        impl<'de> Visitor<'de> for KeyVisitor {
-            type Value = Key;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a string (unit variant) or mapping (Action: <name>)")
-            }
-
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Key, E> {
-                match v {
-                    "Switch" => Ok(Key::Switch),
-                    "MoveUp" => Ok(Key::MoveUp),
-                    "MoveDown" => Ok(Key::MoveDown),
-                    "Select" => Ok(Key::Select),
-                    s => Err(de::Error::unknown_variant(
-                        s,
-                        &["Switch", "MoveUp", "MoveDown", "Select", "Action: ..."],
-                    )),
-                }
-            }
-
-            fn visit_map<M: de::MapAccess<'de>>(self, mut map: M) -> Result<Key, M::Error> {
-                let k: String = map
-                    .next_key()?
-                    .ok_or_else(|| de::Error::missing_field("variant"))?;
-                if k == "Action" {
-                    let v: String = map.next_value()?;
-                    match v.as_str() {
-                        "Generate" => Ok(Key::Action(Action::Generate)),
-                        "Delete" => Ok(Key::Action(Action::Delete)),
-                        "Edit" => Ok(Key::Action(Action::Edit)),
-                        "EditProviders" => Ok(Key::Action(Action::EditProviders)),
-                        "Preview" => Ok(Key::Action(Action::Preview)),
-                        "Search" => Ok(Key::Action(Action::Search)),
-                        "FzfFind" => Ok(Key::Action(Action::FzfFind)),
-                        "GoTop" => Ok(Key::Action(Action::GoTop)),
-                        "GoEnd" => Ok(Key::Action(Action::GoEnd)),
-                        s => Err(de::Error::unknown_variant(
-                            s,
-                            &[
-                                "Generate",
-                                "Delete",
-                                "Edit",
-                                "EditProviders",
-                                "Preview",
-                                "Search",
-                                "FzfFind",
-                                "GoTop",
-                                "GoEnd",
-                            ],
-                        )),
-                    }
-                } else {
-                    Err(de::Error::unknown_field(&k, &["Action"]))
-                }
-            }
-        }
-
-        deserializer.deserialize_any(KeyVisitor)
-    }
-}
-
-#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Debug)]
 pub enum Action {
     Generate,
     Delete,
@@ -164,28 +72,6 @@ pub enum Action {
     FzfFind,
     GoTop,
     GoEnd,
-}
-
-impl TryFrom<&crate::tui::Key> for Key {
-    type Error = ();
-
-    fn try_from(value: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(value).copied().ok_or(());
-        }
-
-        Ok(match value.code {
-            KeyCode::Enter => Self::Select,
-            KeyCode::Right | KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('l') => {
-                Self::Switch
-            }
-            KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
-            KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
-
-            _ => return Err(()),
-        })
-    }
 }
 
 #[derive(Default)]
@@ -200,10 +86,6 @@ impl BasicTabContent for Template {
     type State = ListState;
 
     const TITLE: &str = "Template";
-
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
-    }
 }
 
 impl DualTabContentMate for Template {
