@@ -1,4 +1,4 @@
-pub mod chord;
+// pub mod chord;
 pub mod dualtab;
 pub mod help;
 pub mod popmsg;

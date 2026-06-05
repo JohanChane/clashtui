@@ -5,7 +5,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
 use std::rc::Rc;
 
-use super::chord::key_event_to_str;
+// use super::chord::key_event_to_str;
 use super::tab::KeyCombo;
 use crate::tui::theme::Theme;
 
@@ -31,7 +31,8 @@ impl HelpPanel {
 const HELP_WIDTH: u16 = 60;
 
 pub fn render_help(f: &mut ratatui::Frame, tab: &impl TuiTab) {
-    let shortcuts = tab.shortcuts();
+    todo!();
+    let shortcuts = &[];
     let tab_title = tab.title();
 
     let global_shortcuts: Rc<[(KeyCombo, &str)]> = Rc::new([
@@ -166,7 +167,7 @@ fn render_shortcut_section(
                 } else {
                     combo
                         .iter()
-                        .map(key_event_to_str)
+                        .map(|k| format!("{k:?}"))
                         .collect::<Vec<_>>()
                         .join(" ")
                 };

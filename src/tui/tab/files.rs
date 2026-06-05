@@ -5,6 +5,33 @@ use ratatui::{
 
 use super::dev::*;
 
+pub fn km_init(rec: &mut Vec<&str>, map: serde_yml::Value) -> anyhow::Result<()> {
+    if let serde_yml::Value::Mapping(mut map) = map {
+        if profile::km::init(map.remove("profile").unwrap())? {
+            rec.push("profile");
+        }
+        if template::km::init(map.remove("template").unwrap())? {
+            rec.push("template");
+        }
+    } else {
+        todo!()
+    }
+    Ok(())
+}
+
+pub fn km_default() -> serde_yml::Result<serde_yml::Value> {
+    let mut map = serde_yml::Mapping::new();
+    map.insert(
+        "profile".into(),
+        serde_yml::to_value(profile::km::default())?,
+    );
+    map.insert(
+        "template".into(),
+        serde_yml::to_value(template::km::default())?,
+    );
+    Ok(map.into())
+}
+
 /// The Only reason why I use two functions to `sync` is that
 /// I except modifying Self (what we do in `wrapper`) is
 /// fast and infallable
@@ -43,47 +70,3 @@ newtype_tab!(
     FileTab(DualTab<profile::Profile, template::Template>),
     "File"
 );
-
-pub fn agent_init(mut keymap: serde_yml::Mapping) -> anyhow::Result<()> {
-    if let Some(val) = keymap.remove("profile") {
-        match val {
-            serde_yml::Value::Mapping(map) => {
-                crate::tui::agent::check_duplicate_keys("file/profile", &map);
-                let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
-                profile::agent_init(keys);
-                profile::init_descs(descs);
-            }
-            serde_yml::Value::Sequence(seq) => {
-                let entries: Vec<crate::tui::agent::Entry> =
-                    serde_yml::from_value(serde_yml::Value::Sequence(seq))?;
-                crate::tui::agent::check_duplicate_keys_list("file/profile", &entries);
-                let (keys, descs, chords) = crate::tui::agent::extract_keymap_list(entries)?;
-                profile::agent_init(keys);
-                profile::init_descs(descs);
-                profile::init_chords(chords);
-            }
-            _ => anyhow::bail!("file/profile is neither Mapping nor Sequence"),
-        }
-    }
-    if let Some(val) = keymap.remove("template") {
-        match val {
-            serde_yml::Value::Mapping(map) => {
-                crate::tui::agent::check_duplicate_keys("file/template", &map);
-                let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
-                template::agent_init(keys);
-                template::init_descs(descs);
-            }
-            serde_yml::Value::Sequence(seq) => {
-                let entries: Vec<crate::tui::agent::Entry> =
-                    serde_yml::from_value(serde_yml::Value::Sequence(seq))?;
-                crate::tui::agent::check_duplicate_keys_list("file/template", &entries);
-                let (keys, descs, chords) = crate::tui::agent::extract_keymap_list(entries)?;
-                template::agent_init(keys);
-                template::init_descs(descs);
-                template::init_chords(chords);
-            }
-            _ => anyhow::bail!("file/template is neither Mapping nor Sequence"),
-        }
-    }
-    Ok(())
-}

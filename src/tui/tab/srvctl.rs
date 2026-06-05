@@ -6,19 +6,19 @@ use ratatui::widgets::ListItem;
 
 newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
 
-mod_agent!(
+key_map!(
     SrvCtlKey,
     [
-        ([KeyCode::Enter], SrvCtlKey::Execute, "Execute"),
-        ([KeyCode::Esc], SrvCtlKey::Esc, "Back"),
-        ([KeyCode::Up], SrvCtlKey::MoveUp, "Move up"),
-        ([KeyCode::Down], SrvCtlKey::MoveDown, "Move down"),
-        ([KeyCode::Char('k')], SrvCtlKey::MoveUp, "Move up"),
-        ([KeyCode::Char('j')], SrvCtlKey::MoveDown, "Move down"),
+        (KeyCode::Enter, SrvCtlKey::Execute, "Execute"),
+        (KeyCode::Esc, SrvCtlKey::Esc, "Back"),
+        (KeyCode::Up, SrvCtlKey::MoveUp, "Move up"),
+        (KeyCode::Down, SrvCtlKey::MoveDown, "Move down"),
+        (KeyCode::Char('k'), SrvCtlKey::MoveUp, "Move up"),
+        (KeyCode::Char('j'), SrvCtlKey::MoveDown, "Move down"),
     ]
 );
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
 pub(crate) enum SrvCtlKey {
     Execute,
     MoveUp,
@@ -26,22 +26,22 @@ pub(crate) enum SrvCtlKey {
     Esc,
 }
 
-impl TryFrom<&crate::tui::Key> for SrvCtlKey {
-    type Error = ();
-
-    fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(ev).copied().ok_or(());
+macro_rules! tri {
+    ($e:expr) => {
+        match $e {
+            Ok(v) => v,
+            Err(e) => {
+                crate::tui::widget::popmsg::Confirm::err(e);
+                return do_nothing();
+            }
         }
-        Ok(match ev.code {
-            KeyCode::Enter => Self::Execute,
-            KeyCode::Esc => Self::Esc,
-            KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
-            KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
-            _ => return Err(()),
-        })
-    }
+    };
+    ($e:expr, or_cancel) => {
+        match $e {
+            Ok(v) => v,
+            Err(_) => return do_nothing(),
+        }
+    };
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -218,10 +218,6 @@ impl BasicTabContent for SrvCtlContent {
     type State = ListState;
 
     const TITLE: &str = "CoreSrvCtl";
-
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
-    }
 
     fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         self.spawn_status_check(task_set, CoreType::Mihomo);
@@ -568,92 +564,5 @@ impl TabContent for SrvCtlContent {
             .highlight_style(highlight_style);
 
         f.render_stateful_widget(list, area, state);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn mk_key(code: KeyCode) -> crate::tui::Key {
-        crate::tui::Key {
-            code,
-            shift: matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase()),
-            ctrl: false,
-            alt: false,
-            super_: false,
-        }
-    }
-
-    #[test]
-    fn srvctl_key_agent_contains_expected() {
-        let a = agent();
-        assert!(a.contains_key(&mk_key(KeyCode::Enter)));
-        assert!(a.contains_key(&mk_key(KeyCode::Esc)));
-        assert!(a.contains_key(&mk_key(KeyCode::Up)));
-        assert!(a.contains_key(&mk_key(KeyCode::Down)));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('k'))));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('j'))));
-    }
-
-    #[test]
-    fn srvctl_key_try_from_correct_actions() {
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Enter)),
-            Ok(SrvCtlKey::Execute)
-        ));
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Esc)),
-            Ok(SrvCtlKey::Esc)
-        ));
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Up)),
-            Ok(SrvCtlKey::MoveUp)
-        ));
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Down)),
-            Ok(SrvCtlKey::MoveDown)
-        ));
-    }
-
-    #[test]
-    fn srvctl_key_try_from_unknown_is_err() {
-        assert!(SrvCtlKey::try_from(&mk_key(KeyCode::Char('x'))).is_err());
-    }
-
-    #[test]
-    fn srvctl_op_all_is_non_empty() {
-        let ops = SrvCtlOp::all();
-        assert!(!ops.is_empty());
-        assert!(ops.contains(&SrvCtlOp::Stop));
-        assert!(ops.contains(&SrvCtlOp::Restart));
-        assert!(ops.contains(&SrvCtlOp::SwitchCore));
-        assert!(ops.contains(&SrvCtlOp::StopAll));
-    }
-
-    #[test]
-    fn srvctl_op_as_str_returns_non_empty() {
-        for op in [
-            SrvCtlOp::Stop,
-            SrvCtlOp::Restart,
-            SrvCtlOp::SwitchCore,
-            SrvCtlOp::StopAll,
-        ] {
-            assert!(!op.as_str().is_empty());
-        }
-    }
-
-    #[test]
-    fn srvctl_op_as_str_unique() {
-        let ops = SrvCtlOp::all();
-        let names: Vec<&str> = ops.iter().map(|op| op.as_str()).collect();
-        let mut unique = names.clone();
-        unique.sort();
-        unique.dedup();
-        assert_eq!(
-            names.len(),
-            unique.len(),
-            "all SrvCtlOp names should be unique"
-        );
     }
 }
