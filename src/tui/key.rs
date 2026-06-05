@@ -1,5 +1,38 @@
-use crossterm::event::KeyEvent;
-pub type Key = KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+pub type Key = _KeyEvent;
+
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Debug, Clone)]
+pub struct _KeyEvent {
+    /// The key itself.
+    pub code: KeyCode,
+    #[serde(
+        default = "KeyModifiers::empty",
+        skip_serializing_if = "KeyModifiers::is_empty"
+    )]
+    /// Additional key modifiers.
+    pub modifiers: KeyModifiers,
+}
+
+impl _KeyEvent {
+    pub fn from_code(code: KeyCode) -> Self {
+        Self {
+            code,
+            modifiers: KeyModifiers::empty(),
+        }
+    }
+    pub fn with_modifiers(code: KeyCode, modifiers: KeyModifiers) -> Self {
+        Self { code, modifiers }
+    }
+}
+
+impl From<KeyEvent> for _KeyEvent {
+    fn from(value: KeyEvent) -> Self {
+        Self {
+            code: value.code,
+            modifiers: value.modifiers,
+        }
+    }
+}
 
 /// Build KeyMap
 ///
@@ -39,7 +72,7 @@ pub mod km {
     pub fn default() -> FileMap {
         let mut map = FileMap::new();
         $(
-            map.entry($action).or_default().push($key.into());
+            map.entry($action).or_default().push(_Key::from_code($key));
         )*
         map
     }
@@ -127,7 +160,13 @@ pub fn init() -> anyhow::Result<()> {
     map.insert("files".into(), files::km_default()?);
 
     let path = crate::config::keymap_path();
+    // let path = "/home/jackhr/Documents/clashtui/target/clashtui/keymap.yaml";
     let file = std::fs::File::create(path)?;
     serde_yml::to_writer(file, &map)?;
     Ok(())
+}
+
+#[test]
+fn tmp() {
+    init().unwrap();
 }
