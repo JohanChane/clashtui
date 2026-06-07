@@ -776,56 +776,80 @@ user mode 的 ClashTui Core 的默认路径是 `~/.local/clashtui`。和 Linux �
 
 ### systemd vs launchd 对比
 
-| 操作          | Linux (systemd)                          | macOS (launchd)                                    |
-|---------------|------------------------------------------|----------------------------------------------------|
-| **User Mode** |                                          |                                                    |
-| unit 位置     | `~/.config/systemd/user/<name>.service`  | `~/Library/LaunchAgents/<name>.plist`              |
-| 启动服务      | `systemctl --user start <name>`          | `launchctl load <plist>` (RunAtLoad 自动启动)       |
-| 停止服务      | `systemctl --user stop <name>`           | `launchctl unload <plist>`                         |
-| 查看状态      | `systemctl --user is-active <name>`      | `launchctl print gui/$UID/<name>`                  |
-| 开机自启      | `systemctl --user enable <name>`         | `launchctl load -w <plist>` (跨重启持久化)          |
-| 登出后存活    | `loginctl enable-linger` (支持)           | 不支持 (登出即停止)                                  |
-| 崩溃重启      | `systemd service Restart=always`         | plist `KeepAlive=true`                             |
-| **System Mode** |                                        |                                                    |
-| unit 位置     | `/usr/lib/systemd/system/<name>.service` | `/Library/LaunchDaemons/<name>.plist`              |
-| 启动服务      | `sudo systemctl start <name>`            | `sudo launchctl load <plist>` (RunAtLoad 自动启动)  |
-| 停止服务      | `sudo systemctl stop <name>`             | `sudo launchctl unload <plist>`                    |
-| 查看状态      | `systemctl is-active <name>`             | `sudo launchctl print system/<name>`               |
-| 开机自启      | `sudo systemctl enable <name>`           | `sudo launchctl load -w <plist>` (跨重启持久化)     |
-| 运行身份      | 专用用户 (mihomo / sing-box)              | root (launchd system daemon)                       |
-| TUN 权限      | Linux capabilities (setcap)              | sudo / root 直接运行                                |
+<!-- systemd on Linux -->
+**Linux (systemd):**
+
+```sh
+# User mode
+systemctl --user enable  <name>   # 开机自启
+systemctl --user disable <name>   # 取消开机自启
+systemctl --user start   <name>   # 立即启动
+systemctl --user stop    <name>   # 停止
+systemctl --user status  <name>   # 查看状态
+
+# System mode (需 sudo)
+sudo systemctl enable  <name>
+sudo systemctl disable <name>
+sudo systemctl start   <name>
+sudo systemctl stop    <name>
+systemctl status       <name>
+```
+
+<!-- launchd on macOS (新用法, macOS 10.11+) -->
+**macOS (launchd 新用法):**
+
+```sh
+# User mode
+# --- 注册/注销 (bootstrap 因 RunAtLoad 会顺带启动, bootout 会顺带停止) ---
+launchctl bootstrap gui/$UID <plist> # 注册服务 → 域名, 立即启动
+launchctl bootout gui/$UID/<name>    # 停止并注销服务
+
+# --- 运行时控制 (仅对已注册在域名里的服务生效) ---
+launchctl start gui/$UID/<name>      # 启动
+launchctl stop gui/$UID/<name>       # 停止
+
+# --- 持久化 (开机自启) ---
+launchctl enable  gui/$UID/<name>    # 开机自启
+launchctl disable gui/$UID/<name>    # 取消开机自启
+
+# --- 状态 / 日志 ---
+launchctl print gui/$UID/<name>      # 查看状态
+
+# System mode (需 sudo)
+sudo launchctl bootstrap system <plist>
+sudo launchctl bootout  system/<name>
+sudo launchctl start    system/<name>
+sudo launchctl stop     system/<name>
+sudo launchctl enable   system/<name>
+sudo launchctl disable  system/<name>
+sudo launchctl print    system/<name>
+```
+
+<!-- launchctl on macOS (旧用法) -->
+**macOS (launchctl 旧用法):**
+
+```sh
+# User mode
+launchctl load   -w <plist>   # 立即启动 + 开机自启
+launchctl unload -w <plist>   # 停止 + 取消开机自启
+launchctl load   <plist>      # 立即启动 (RunAtLoad)
+launchctl unload <plist>      # 停止
+launchctl list | grep <name>  # 查看状态
+
+# System mode (需 sudo)
+sudo launchctl load   -w <plist>
+sudo launchctl unload -w <plist>
+sudo launchctl load   <plist>
+sudo launchctl unload <plist>
+sudo launchctl list | grep <name>
+```
 
 关键差异:
-- **enable/disable 概念**: systemd 的 `enable` 只设开机自启，`start` 立即启动。launchd 的 `load` 启动服务 (因 plist 中 `RunAtLoad=true`)，`load -w` 同时持久化开机自启。`unload` 停止并从 launchd 移除。`unload -w` 同时标记为禁用。
+- **enable/disable 概念**: systemd 的 `enable` 只设开机自启，`start`/`stop` 控制运行时。新 launchd 分三层: `bootstrap`/`bootout` 注册/注销服务定义 (因 RunAtLoad 顺带启停)，`start`/`stop` 纯运行时控制 (仅对已注册服务)，`enable`/`disable` 纯持久化。旧 launchd 合并为 `load -w` / `unload -w` (持久化+运行时) 和 `load` / `unload` (仅运行时)。
 - **登出行为**: launchd 的 `LaunchAgents` 在用户登出时全部停止，无法通过配置改变。`LaunchDaemons` (system mode) 在 boot 时启动，不受登入/登出影响。
 - **TUN 权限**: Linux 用 `setcap` 给二进制加 capability，以非 root 用户运行 TUN。macOS 无此机制，system mode 以 root 运行即可使用 utun 设备。
 
-所以 ClashTui services 在 macOS 下的命令如下:
-
-```sh
-# 立即启动 (system mode)
-sudo launchctl load /Library/LaunchDaemons/clashtui_mihomo.plist
-sudo launchctl load /Library/LaunchDaemons/clashtui_singbox.plist
-
-# 启动 + 开机自启
-sudo launchctl load -w /Library/LaunchDaemons/clashtui_mihomo.plist
-sudo launchctl load -w /Library/LaunchDaemons/clashtui_singbox.plist
-
-# 停止
-sudo launchctl unload /Library/LaunchDaemons/clashtui_mihomo.plist
-sudo launchctl unload /Library/LaunchDaemons/clashtui_singbox.plist
-
-# 查看状态
-sudo launchctl list | grep clashtui
-
-# User mode (无需 sudo)
-launchctl load ~/Library/LaunchAgents/clashtui_mihomo.plist
-launchctl unload ~/Library/LaunchAgents/clashtui_mihomo.plist
-launchctl load -w ~/Library/LaunchAgents/clashtui_mihomo.plist
-```
-
-> `load` 因 plist 中 `RunAtLoad=true`，加载即立即启动服务。
-> `load -w` 额外持久化开机自启，重启后自动运行。
+> **`launchctl stop` 为何不生效?** 若 plist 里 `KeepAlive=true`，`stop` 停止进程后 launchd 会立刻重启它 (`KeepAlive` 条件满足)。
 
 ### macOS 文件权限
 
