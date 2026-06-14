@@ -13,49 +13,43 @@ newtype_tab!(LogsTab(Tab<Logs>));
 key_map!(
     Key,
     [
-        (KeyCode::Up, Key::MoveUp, "Move up"),
-        (KeyCode::Down, Key::MoveDown, "Move down"),
-        (KeyCode::Char('k'), Key::MoveUp, "Move up"),
-        (KeyCode::Char('j'), Key::MoveDown, "Move down"),
+        (KeyCode::Up, Key::MoveUp),
+        (KeyCode::Down, Key::MoveDown),
+        (KeyCode::Char('k'), Key::MoveUp),
+        (KeyCode::Char('j'), Key::MoveDown),
         // ([KeyCode::Char('G')], Key::GoBottom, "Go to bottom"),
         // (
         //     [KeyCode::Char('g'), KeyCode::Char('g')],
         //     Key::GoTop,
-        //     "Go to top"
         // ),
-        (KeyCode::Char('/'), Key::Search, "Search/Filter"),
-        (KeyCode::Char('p'), Key::TogglePause, "Pause/Resume"),
-        (KeyCode::Char('f'), Key::FzfFind, "Find"),
-        (KeyCode::Char('c'), Key::Clear, "Clear logs"),
+        (KeyCode::Char('/'), Key::Search),
+        (KeyCode::Char('p'), Key::TogglePause),
+        (KeyCode::Char('f'), Key::FzfFind),
+        (KeyCode::Char('c'), Key::Clear),
         // (
         //     [KeyCode::Char('t'), KeyCode::Char('d')],
         //     Key::ToggleDebug,
-        //     "Toggle debug"
         // ),
         // (
         //     [KeyCode::Char('t'), KeyCode::Char('i')],
         //     Key::ToggleInfo,
-        //     "Toggle info"
         // ),
         // (
         //     [KeyCode::Char('t'), KeyCode::Char('w')],
         //     Key::ToggleWarning,
-        //     "Toggle warning"
         // ),
         // (
         //     [KeyCode::Char('t'), KeyCode::Char('e')],
         //     Key::ToggleError,
-        //     "Toggle error"
         // ),
         // (
         //     [KeyCode::Char('t'), KeyCode::Char('s')],
         //     Key::ToggleSilent,
-        //     "Toggle silent"
         // ),
     ]
 );
 
-#[derive_aliases::derive(..KeyWithMessage)]
+#[derive_aliases::derive(..Key)]
 pub enum Key {
     MoveUp,
     MoveDown,
@@ -70,6 +64,27 @@ pub enum Key {
     ToggleWarning,
     ToggleError,
     ToggleSilent,
+}
+
+impl AsStaticStr for Key {
+    fn as_static_str(&self) -> &'static str {
+        use crate::tui::key::consts::*;
+        match self {
+            Self::MoveUp => MOVE_UP,
+            Self::MoveDown => MOVE_DOWN,
+            Self::GoTop => GO_TOP,
+            Self::GoBottom => GO_BOTTOM,
+            Self::Search => FILTER,
+            Self::TogglePause => PAUSE,
+            Self::FzfFind => "Find",
+            Self::Clear => "Clear logs",
+            Self::ToggleDebug => "Toggle Debug",
+            Self::ToggleInfo => "Toggle Info",
+            Self::ToggleWarning => "Toggle Warning",
+            Self::ToggleError => "Toggle Error",
+            Self::ToggleSilent => "You really know what this means?",
+        }
+    }
 }
 
 const LOG_BUFFER_SIZE: usize = 300;

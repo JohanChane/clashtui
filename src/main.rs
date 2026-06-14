@@ -12,8 +12,7 @@ mod derive_alias {
                     ::serde::Serialize, ::serde::Deserialize;
         // For Copy: Copy, Clone
         Action = ..KeyBasic, ::core::marker::Copy, ::core::clone::Clone;
-        // For Help Message: strum::EnumMessage
-        KeyWithMessage = ..Action, ::strum::EnumMessage;
+        Key = ..Action;
     }
 }
 

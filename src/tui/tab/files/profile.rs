@@ -77,87 +77,91 @@ fn traffic_percentage(used: u64, total: u64) -> f64 {
 key_map!(
     Key,
     [
-        (KeyCode::Left, Key::Switch, "Switch pane"),
-        (KeyCode::Right, Key::Switch, "Switch pane"),
-        (KeyCode::Char('h'), Key::Switch, "Switch pane"),
-        (KeyCode::Char('l'), Key::Switch, "Switch pane"),
-        (KeyCode::Down, Key::MoveDown, "Move down"),
-        (KeyCode::Up, Key::MoveUp, "Move up"),
-        (KeyCode::Char('j'), Key::MoveDown, "Move down"),
-        (KeyCode::Char('k'), Key::MoveUp, "Move up"),
-        (KeyCode::Enter, Key::Select, "Select"),
-        (
-            KeyCode::Char('i'),
-            Key::Action(Action::Add),
-            "Import (URL or file)"
-        ),
-        (
-            KeyCode::Char('D'),
-            Key::Action(Action::Delete),
-            "Delete profile"
-        ),
-        (KeyCode::Char('e'), Key::Action(Action::Edit), "Edit"),
-        (KeyCode::Char('p'), Key::Action(Action::Preview), "Preview"),
-        (KeyCode::Char('u'), Key::Action(Action::Update), "Update"),
-        (
-            KeyCode::Char('/'),
-            Key::Action(Action::Search),
-            "Search/Filter"
-        ),
-        (KeyCode::Char('t'), Key::Action(Action::Test), "Test"),
-        (
-            KeyCode::Char('c'),
-            Key::Action(Action::Check),
-            "Check config"
-        ),
+        (KeyCode::Left, Key::Switch),
+        (KeyCode::Right, Key::Switch),
+        (KeyCode::Char('h'), Key::Switch),
+        (KeyCode::Char('l'), Key::Switch),
+        (KeyCode::Down, Key::MoveDown),
+        (KeyCode::Up, Key::MoveUp),
+        (KeyCode::Char('j'), Key::MoveDown),
+        (KeyCode::Char('k'), Key::MoveUp),
+        (KeyCode::Enter, Key::Select),
+        (KeyCode::Char('i'), Key::Action(Action::Add)),
+        (KeyCode::Char('D'), Key::Action(Action::Delete)),
+        (KeyCode::Char('e'), Key::Action(Action::Edit)),
+        (KeyCode::Char('p'), Key::Action(Action::Preview)),
+        (KeyCode::Char('u'), Key::Action(Action::Update)),
+        (KeyCode::Char('/'), Key::Action(Action::Search)),
+        (KeyCode::Char('t'), Key::Action(Action::Test)),
+        (KeyCode::Char('c'), Key::Action(Action::Check)),
         // (
         //     [KeyCode::Char('C'), KeyCode::Char('u')],
         //     Key::Action(Action::CopyUrl),
-        //     "Copy URL"
         // ),
-        (
-            KeyCode::Char('f'),
-            Key::Action(Action::FzfFind),
-            "Find profile"
-        ),
+        (KeyCode::Char('f'), Key::Action(Action::FzfFind)),
         // (
         //     [KeyCode::Char('g'), KeyCode::Char('g')],
         //     Key::Action(Action::GoTop),
-        //     "Go to top"
         // ),
         // (
         //     [KeyCode::Char('G')],
         //     Key::Action(Action::GoEnd),
-        //     "Go to end"
         // ),
         // (
         //     key("P"),
         //     Key::Action(Action::ToggleNoPp),
-        //     "Toggle no proxy-provider"
         // ),
         // (
         //     key("O"),
         //     Key::Action(Action::ToggleUpdateWithProxy),
-        //     "Toggle update with proxy"
         // ),
-        // (key("n"), Key::Action(Action::Traffic), "Show traffic"),
+        (KeyCode::Char('n'), Key::Action(Action::Traffic)),
     ]
 );
 
-#[derive_aliases::derive(..KeyWithMessage)]
+#[derive_aliases::derive(..Key)]
 pub enum Key {
     Switch,
     MoveUp,
     MoveDown,
     Select,
+    GoTop,
+    GoEnd,
 
     Action(Action),
+}
+
+impl AsStaticStr for Key {
+    fn as_static_str(&self) -> &'static str {
+        use crate::tui::key::consts::*;
+        match self {
+            Self::Switch => "Switch panel",
+            Self::MoveUp => MOVE_UP,
+            Self::MoveDown => MOVE_DOWN,
+            Self::Select => "Select",
+            Self::GoTop => GO_TOP,
+            Self::GoEnd => GO_BOTTOM,
+            Self::Action(Action::Add) => "Import (URL or file)",
+            Self::Action(Action::Delete) => "Delete",
+            Self::Action(Action::Edit) => "Edit",
+            Self::Action(Action::Preview) => "Preview",
+            Self::Action(Action::Update) => "Update",
+            Self::Action(Action::UpdateAll) => "Update all",
+            Self::Action(Action::Search) => FILTER,
+            Self::Action(Action::Test) => "Test",
+            Self::Action(Action::Check) => "Check config",
+            Self::Action(Action::CopyUrl) => "Copy URL",
+            Self::Action(Action::FzfFind) => "Find profile",
+            Self::Action(Action::ToggleNoPp) => "Toggle no proxy-provider",
+            Self::Action(Action::ToggleUpdateWithProxy) => "Toggle update with proxy",
+            Self::Action(Action::Traffic) => "Show traffic",
+        }
+    }
 }
 
 #[derive_aliases::derive(..Action)]
 pub enum Action {
     Add,
-    ImportFile,
     Delete,
     Edit,
     Preview,
@@ -168,8 +172,6 @@ pub enum Action {
     Check,
     CopyUrl,
     FzfFind,
-    GoTop,
-    GoEnd,
     ToggleNoPp,
     ToggleUpdateWithProxy,
     Traffic,
@@ -219,9 +221,9 @@ impl DualTabContent for Profile {
                 }
                 .spawn_at(task_set);
             }
+            Key::GoTop => state.select_first(),
+            Key::GoEnd => state.select_last(),
             Key::Action(action) => match action {
-                Action::GoTop => state.select_first(),
-                Action::GoEnd => state.select_last(),
                 Action::Traffic => {
                     let name = get_name!(self, state);
                     actions::show_traffic(name).spawn_at(task_set);
@@ -230,7 +232,7 @@ impl DualTabContent for Profile {
                     let items = self.items.clone();
                     actions::fzf_find(items).spawn_at(task_set)
                 }
-                Action::Add | Action::ImportFile => action.act(String::new()).spawn_at(task_set),
+                Action::Add => action.act(String::new()).spawn_at(task_set),
                 Action::UpdateAll => {
                     for name in &self.items {
                         self.updating.insert(name.clone());
@@ -334,7 +336,7 @@ mod actions {
         pub async fn act(self, name: String) -> CB {
             match self {
                 Self::Search => search().await,
-                Self::Add | Self::ImportFile => import().await,
+                Self::Add => import().await,
                 Self::Edit => _edit(name).await,
                 Self::Delete => delete(name).await,
                 Self::Preview => preview(name).await,
@@ -348,7 +350,6 @@ mod actions {
                     unreachable!("traffic handled in handle_key_event directly")
                 }
                 Self::FzfFind => unreachable!("FzfFind handled directly"),
-                Self::GoTop | Self::GoEnd => do_nothing(),
                 Self::UpdateAll => unreachable!("UpdateAll handled directly in handle_key_event"),
             }
         }

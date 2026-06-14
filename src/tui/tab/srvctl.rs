@@ -7,27 +7,32 @@ use ratatui::widgets::ListItem;
 newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
 
 key_map!(
-    SrvCtlKey,
+    Key,
     [
-        (KeyCode::Enter, SrvCtlKey::Execute),
-        (KeyCode::Esc, SrvCtlKey::Esc),
-        (KeyCode::Up, SrvCtlKey::MoveUp),
-        (KeyCode::Down, SrvCtlKey::MoveDown),
-        (KeyCode::Char('k'), SrvCtlKey::MoveUp),
-        (KeyCode::Char('j'), SrvCtlKey::MoveDown),
+        (KeyCode::Enter, Key::Execute),
+        (KeyCode::Up, Key::MoveUp),
+        (KeyCode::Down, Key::MoveDown),
+        (KeyCode::Char('k'), Key::MoveUp),
+        (KeyCode::Char('j'), Key::MoveDown),
     ]
 );
 
-#[derive_aliases::derive(..KeyWithMessage, strum::VariantArray)]
-pub(crate) enum SrvCtlKey {
-    #[strum(message = "Execute")]
+#[derive_aliases::derive(..Key)]
+pub(crate) enum Key {
     Execute,
-    #[strum(message = "Move up")]
     MoveUp,
-    #[strum(message = "Move down")]
     MoveDown,
-    #[strum(message = "Back")]
-    Esc,
+}
+
+impl AsStaticStr for Key {
+    fn as_static_str(&self) -> &'static str {
+        use crate::tui::key::consts::*;
+        match self {
+            Self::Execute => "Execute",
+            Self::MoveUp => MOVE_UP,
+            Self::MoveDown => MOVE_DOWN,
+        }
+    }
 }
 
 macro_rules! tri {
@@ -217,7 +222,7 @@ fn launchd_status(service_name: &str, is_user: bool) -> String {
 }
 
 impl BasicTabContent for SrvCtlContent {
-    type Key = SrvCtlKey;
+    type Key = Key;
 
     type State = ListState;
 
@@ -283,23 +288,23 @@ impl TabContent for SrvCtlContent {
 
     fn handle_key_event(
         &mut self,
-        key: SrvCtlKey,
+        key: Key,
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
     ) {
         // ---- main list routing ----
         match key {
-            SrvCtlKey::MoveUp => {
+            Key::MoveUp => {
                 let i = state.selected().unwrap_or(0);
                 state.select(Some(i.saturating_sub(1)));
             }
-            SrvCtlKey::MoveDown => {
+            Key::MoveDown => {
                 let i = state.selected().unwrap_or(0);
                 if i + 1 < self.ops.len() {
                     state.select(Some(i + 1));
                 }
             }
-            SrvCtlKey::Execute => {
+            Key::Execute => {
                 let Some(idx) = state.selected() else { return };
                 let Some(op) = self.ops.get(idx) else { return };
                 let op = *op;
@@ -490,7 +495,6 @@ impl TabContent for SrvCtlContent {
                 }
                 .spawn_at(task_set);
             }
-            _ => {}
         }
     }
 

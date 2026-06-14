@@ -7,32 +7,20 @@ use std::cell::Cell;
 key_map!(
     Key,
     [
-        (KeyCode::Left, Key::Switch, "Switch pane"),
-        (KeyCode::Right, Key::Switch, "Switch pane"),
-        (KeyCode::Char('h'), Key::Switch, "Switch pane"),
-        (KeyCode::Char('l'), Key::Switch, "Switch pane"),
-        (KeyCode::Down, Key::MoveDown, "Move down"),
-        (KeyCode::Up, Key::MoveUp, "Move up"),
-        (KeyCode::Char('j'), Key::MoveDown, "Move down"),
-        (KeyCode::Char('k'), Key::MoveUp, "Move up"),
-        (
-            KeyCode::Char('D'),
-            Key::Action(Action::Delete),
-            "Delete template"
-        ),
-        (KeyCode::Char('e'), Key::Action(Action::Edit), "Edit"),
-        (
-            KeyCode::Char('E'),
-            Key::Action(Action::EditProviders),
-            "Edit proxy providers"
-        ),
-        (KeyCode::Char('p'), Key::Action(Action::Preview), "Preview"),
-        (KeyCode::Enter, Key::Action(Action::Generate), "Generate"),
-        (
-            KeyCode::Char('f'),
-            Key::Action(Action::FzfFind),
-            "Find template"
-        ),
+        (KeyCode::Left, Key::Switch),
+        (KeyCode::Right, Key::Switch),
+        (KeyCode::Char('h'), Key::Switch),
+        (KeyCode::Char('l'), Key::Switch),
+        (KeyCode::Down, Key::MoveDown),
+        (KeyCode::Up, Key::MoveUp),
+        (KeyCode::Char('j'), Key::MoveDown),
+        (KeyCode::Char('k'), Key::MoveUp),
+        (KeyCode::Char('D'), Key::Action(Action::Delete)),
+        (KeyCode::Char('e'), Key::Action(Action::Edit)),
+        (KeyCode::Char('E'), Key::Action(Action::EditProviders)),
+        (KeyCode::Char('p'), Key::Action(Action::Preview)),
+        (KeyCode::Enter, Key::Action(Action::Generate)),
+        (KeyCode::Char('f'), Key::Action(Action::FzfFind)),
         // (
         //     [KeyCode::Char('g'), KeyCode::Char('g')],
         //     Key::Action(Action::GoTop),
@@ -43,22 +31,40 @@ key_map!(
         //     Key::Action(Action::GoEnd),
         //     "Go to end"
         // ),
-        (
-            KeyCode::Char('/'),
-            Key::Action(Action::Search),
-            "Search/Filter"
-        ),
+        (KeyCode::Char('/'), Key::Action(Action::Search)),
     ]
 );
 
-#[derive_aliases::derive(..KeyWithMessage, Debug)]
+#[derive_aliases::derive(..Key, Debug)]
 pub enum Key {
     Switch,
     MoveUp,
     MoveDown,
     Select,
+    GoTop,
+    GoEnd,
 
     Action(Action),
+}
+impl AsStaticStr for Key {
+    fn as_static_str(&self) -> &'static str {
+        use crate::tui::key::consts::*;
+        match self {
+            Self::Switch => "Switch panel",
+            Self::MoveUp => MOVE_UP,
+            Self::MoveDown => MOVE_DOWN,
+            Self::Select => "Select",
+            Self::GoTop => GO_TOP,
+            Self::GoEnd => GO_BOTTOM,
+            Self::Action(Action::Generate) => "Generate",
+            Self::Action(Action::Delete) => "Delete",
+            Self::Action(Action::Edit) => "Edit",
+            Self::Action(Action::EditProviders) => "Edit proxy providers",
+            Self::Action(Action::Preview) => "Preview",
+            Self::Action(Action::Search) => FILTER,
+            Self::Action(Action::FzfFind) => "Find template",
+        }
+    }
 }
 
 #[derive_aliases::derive(..Action, Debug)]
@@ -70,8 +76,6 @@ pub enum Action {
     Preview,
     Search,
     FzfFind,
-    GoTop,
-    GoEnd,
 }
 
 #[derive(Default)]
@@ -113,14 +117,14 @@ impl DualTabContentMate for Template {
             Key::Switch => return true,
             Key::MoveDown => state.select_next(),
             Key::MoveUp => state.select_previous(),
+            Key::GoTop => state.select_first(),
+            Key::GoEnd => state.select_last(),
 
             Key::Select => todo!(),
 
             Key::Action(action) => {
                 log::debug!("Template::Action: {action:?}");
                 match action {
-                    Action::GoTop => state.select_first(),
-                    Action::GoEnd => state.select_last(),
                     Action::FzfFind => {
                         let items = self.items.clone();
                         actions::fzf_find(items).spawn_at(task_set);
@@ -211,7 +215,6 @@ mod actions {
                 Self::Preview => preview(name).await,
                 Self::Search => search().await,
                 Self::FzfFind => unreachable!("FzfFind handled directly"),
-                Self::GoTop | Self::GoEnd => do_nothing(),
             }
         }
     }

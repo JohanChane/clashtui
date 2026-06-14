@@ -9,73 +9,62 @@ newtype_tab!(ConnectionsTab(Tab<Connections>));
 key_map!(
     Key,
     [
-        (KeyCode::Up, Key::MoveUp, "Move up"),
-        (KeyCode::Down, Key::MoveDown, "Move down"),
-        (KeyCode::Char('k'), Key::MoveUp, "Move up"),
-        (KeyCode::Char('j'), Key::MoveDown, "Move down"),
-        (KeyCode::Char('G'), Key::GoBottom, "Go to bottom"),
+        (KeyCode::Up, Key::MoveUp),
+        (KeyCode::Down, Key::MoveDown),
+        (KeyCode::Char('k'), Key::MoveUp),
+        (KeyCode::Char('j'), Key::MoveDown),
+        // (KeyCode::Char('G'), Key::GoBottom),
         // (
         //     [KeyCode::Char('g'), KeyCode::Char('g')],
         //     Key::GoTop,
-        //     "Go to top"
         // ),
         // (
         //     [KeyCode::Char('d'), KeyCode::Char('d')],
         //     Key::Terminate,
-        //     "Close"
         // ),
         // (
         //     [KeyCode::Char('a'), KeyCode::Char('c')],
         //     Key::TerminateAll,
-        //     "Close all"
         // ),
         // (
         //     [KeyCode::Char('s'), KeyCode::Char('h')],
         //     Key::SortByHost,
-        //     "Sort by Host"
         // ),
         // (
         //     [KeyCode::Char('s'), KeyCode::Char('l')],
         //     Key::SortByRule,
-        //     "Sort by Rule"
         // ),
         // (
         //     [KeyCode::Char('s'), KeyCode::Char('c')],
         //     Key::SortByChains,
-        //     "Sort by Chains"
         // ),
         // (
         //     [KeyCode::Char('s'), KeyCode::Char('n')],
         //     Key::SortByDownload,
-        //     "Sort by Download"
         // ),
         // (
         //     [KeyCode::Char('s'), KeyCode::Char('u')],
         //     Key::SortByUpload,
-        //     "Sort by Upload"
         // ),
         // (
         //     [KeyCode::Char('s'), KeyCode::Char('d')],
         //     Key::SortByDlSpeed,
-        //     "Sort by DL Speed"
         // ),
         // (
         //     [KeyCode::Char('s'), KeyCode::Char('s')],
         //     Key::SortByUlSpeed,
-        //     "Sort by UL Speed"
         // ),
         // (
         //     [KeyCode::Char('s'), KeyCode::Char('r')],
         //     Key::SortReset,
-        //     "Reset sort"
         // ),
-        (KeyCode::Char('/'), Key::Search, "Search/Filter"),
-        (KeyCode::Char('p'), Key::TogglePause, "Pause/Resume"),
-        (KeyCode::Char('f'), Key::FzfFind, "Find"),
+        (KeyCode::Char('/'), Key::Search),
+        (KeyCode::Char('p'), Key::TogglePause),
+        (KeyCode::Char('f'), Key::FzfFind),
     ]
 );
 
-#[derive_aliases::derive(..KeyWithMessage)]
+#[derive_aliases::derive(..Key)]
 pub enum Key {
     MoveUp,
     MoveDown,
@@ -94,6 +83,31 @@ pub enum Key {
     Search,
     TogglePause,
     FzfFind,
+}
+
+impl AsStaticStr for Key {
+    fn as_static_str(&self) -> &'static str {
+        use crate::tui::key::consts::*;
+        match self {
+            Self::MoveUp => MOVE_UP,
+            Self::MoveDown => MOVE_DOWN,
+            Self::GoTop => GO_TOP,
+            Self::GoBottom => GO_BOTTOM,
+            Self::Terminate => "Close",
+            Self::TerminateAll => "Close all",
+            Self::SortByHost => "Sort by Host",
+            Self::SortByRule => "Sort by Rule",
+            Self::SortByChains => "Sort by Chains",
+            Self::SortByDownload => "Sort by Download",
+            Self::SortByUpload => "Sort by Upload",
+            Self::SortByDlSpeed => "Sort by Dl Speed",
+            Self::SortByUlSpeed => "Sort by Ul Speed",
+            Self::SortReset => "Reset Sort",
+            Self::Search => FILTER,
+            Self::TogglePause => PAUSE,
+            Self::FzfFind => "Find",
+        }
+    }
 }
 
 macro_rules! tri {

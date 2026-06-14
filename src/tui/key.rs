@@ -4,6 +4,10 @@ pub type KeyDesc = Vec<(String, &'static str)>;
 pub type KeyDescRef<'a> = &'a [(String, &'a str)];
 pub type KeyMap<A> = std::collections::HashMap<Key, A>;
 
+pub trait AsStaticStr {
+    fn as_static_str(&self) -> &'static str;
+}
+
 #[derive_aliases::derive(..KeyBasic, Debug)]
 pub struct Key {
     /// The key itself.
@@ -66,18 +70,13 @@ impl From<_KeyEvent> for Key {
 ///
 /// `Act1: [Key1, Key2, ...]`
 macro_rules! key_map {
-    ($actid:ident, [$(($key:expr, $action:expr, $desc:literal),)+]) => {
-        key_map!($actid, [$(($key, $action),)*]);
-    };
-
     ($actid:ident, [$(($key:expr, $action:expr),)*]) => {
-pub mod km {
+pub(in crate::tui) mod km {
     use super::*;
     use anyhow::Context;
-    use strum::EnumMessage;
     use std::collections::{HashMap, HashSet};
     use std::sync::OnceLock;
-    use crate::tui::key::{Key as _Key, KeyDesc, KeyMap as _KeyMap};
+    use crate::tui::key::{Key as _Key, KeyDesc, KeyMap as _KeyMap, AsStaticStr};
 
     type KeyMap = _KeyMap<$actid>;
     type FileMap = HashMap<$actid, Vec<_Key>>;
@@ -108,7 +107,7 @@ pub mod km {
     pub fn get_docs() -> KeyDesc {
         get()
             .iter()
-            .map(|(key, act)| (key.to_string(), act.get_message().unwrap_or_default()))
+            .map(|(key, act)| (key.to_string(), act.as_static_str()))
             .collect()
     }
 
@@ -190,4 +189,13 @@ pub fn init() -> anyhow::Result<()> {
     let file = std::fs::File::create(path)?;
     serde_yml::to_writer(file, &map)?;
     Ok(())
+}
+
+pub mod consts {
+    pub const MOVE_UP: &'static str = "Move Up";
+    pub const MOVE_DOWN: &'static str = "Move Down";
+    pub const GO_TOP: &'static str = "Go to top";
+    pub const GO_BOTTOM: &'static str = "Go to bottom";
+    pub const FILTER: &'static str = "Search/Filter";
+    pub const PAUSE: &'static str = "Pause/Resume";
 }
