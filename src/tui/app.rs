@@ -11,23 +11,19 @@ pub(super) static FULL_RENDER: Notify = Notify::const_new();
 pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
 
-#[derive_aliases::derive(..KeyWithMessage)]
+#[derive_aliases::derive(..Key)]
 pub enum AppKey {
-    #[strum(message = "Switch tab 1-7")]
     Tab(u8),
-    #[strum(message = "Tab Next")]
     TabNext,
-    #[strum(message = "Quit")]
     Quit,
-    #[strum(message = "Help")]
     Help,
 }
-pub mod km {
+
+pub(in crate::tui) mod km {
     use super::AppKey;
-    use crate::tui::key::{Key, KeyDesc};
+    use crate::tui::key::{AsStaticStr, Key, KeyDesc};
     use crossterm::event::KeyCode;
     use std::sync::LazyLock;
-    use strum::EnumMessage;
 
     use crate::tui::key::KeyMap;
 
@@ -41,12 +37,7 @@ pub mod km {
     static KEYMAP: LazyLock<KeyMap<AppKey>> = LazyLock::new(|| {
         KeyMap::from_iter(
             (2..=7u8)
-                .map(|num| {
-                    (
-                        KeyCode::Char(char::from_digit(num.into(), 10).expect("More than 9 tabs?")),
-                        AppKey::Tab(num),
-                    )
-                })
+                .map(|num| (KeyCode::Char((b'0' + num) as char), AppKey::Tab(num)))
                 .chain(APP_KEYS)
                 .map(|(key, act)| (Key::from_code(key), act)),
         )
@@ -61,7 +52,7 @@ pub mod km {
                 AppKey::Tab(2..) => None,
                 _ => Some((key.to_string(), act)),
             })
-            .map(|(key, act)| (key, act.get_message().unwrap_or_default()))
+            .map(|(key, act)| (key, act.as_static_str()))
             .collect()
     }
 
@@ -70,6 +61,17 @@ pub mod km {
 
         fn try_from(ev: &Key) -> Result<Self, Self::Error> {
             return KEYMAP.get(ev).map(|act| *act).ok_or(());
+        }
+    }
+
+    impl AsStaticStr for AppKey {
+        fn as_static_str(&self) -> &'static str {
+            match self {
+                Self::Tab(..) => "Switch tab 1-7",
+                Self::TabNext => "Tab Next",
+                Self::Quit => "Quit",
+                Self::Help => "Help",
+            }
         }
     }
 }

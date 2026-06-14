@@ -1,6 +1,7 @@
 mod dev {
     pub use crate::tui::widget::dualtab::*;
     pub use crate::tui::widget::tab::*;
+    pub use crate::tui::key::AsStaticStr;
     pub use crossterm::event::KeyCode;
     pub use ratatui::prelude::{Frame, Rect};
     pub use ratatui::style::{Color, Stylize as _};
