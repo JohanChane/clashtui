@@ -1,12 +1,11 @@
+use crate::tui::app;
+use crate::tui::key::KeyDescRef;
 use crate::tui::tab::TuiTab;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph};
-use std::rc::Rc;
 
-// use super::chord::key_event_to_str;
-use super::tab::KeyCombo;
 use crate::tui::theme::Theme;
 
 #[derive(Default)]
@@ -31,25 +30,10 @@ impl HelpPanel {
 const HELP_WIDTH: u16 = 60;
 
 pub fn render_help(f: &mut ratatui::Frame, tab: &impl TuiTab) {
-    todo!();
-    let shortcuts = &[];
+    let shortcuts = tab.key_description();
     let tab_title = tab.title();
 
-    let global_shortcuts: Rc<[(KeyCombo, &str)]> = Rc::new([
-        (KeyCombo(vec![]), "Switch tab 1-7"),
-        (KeyCombo(vec![]), "Cycle tabs"),
-        (KeyCombo(vec![]), "Toggle help"),
-        (KeyCombo(vec![]), "Quit"),
-        (KeyCombo(vec![]), "Quit"),
-        (KeyCombo(vec![]), "Open app config dir"),
-        (KeyCombo(vec![]), "Open clash config dir"),
-        (KeyCombo(vec![]), "Start core service"),
-        (KeyCombo(vec![]), "Close all connections"),
-    ]);
-
-    let global_labels: &[&str] = &[
-        "1-7", "<Tab>", "?", "q", "C-c", "C-g c", "C-g m", "C-g f", "C-g t",
-    ];
+    let global_shortcuts = app::km::get_docs();
 
     let tab_entries = shortcuts.len();
     let global_entries = global_shortcuts.len();
@@ -99,10 +83,9 @@ pub fn render_help(f: &mut ratatui::Frame, tab: &impl TuiTab) {
         f,
         sections[0],
         &format!("Tab Shortcuts — {}", tab_title),
-        shortcuts,
+        &shortcuts,
         tab_cols,
         tab_rows as u16,
-        None,
     );
 
     let lower_inner_height = sections[1].height;
@@ -119,7 +102,6 @@ pub fn render_help(f: &mut ratatui::Frame, tab: &impl TuiTab) {
             &global_shortcuts,
             global_cols,
             global_rows as u16,
-            Some(global_labels),
         );
     }
 }
@@ -128,10 +110,9 @@ fn render_shortcut_section(
     f: &mut ratatui::Frame,
     area: Rect,
     title: &str,
-    shortcuts: &[(KeyCombo, &str)],
+    shortcuts: KeyDescRef,
     cols: usize,
     _rows: u16,
-    custom_labels: Option<&[&str]>,
 ) {
     let header = Line::raw(title).bold();
     f.render_widget(Paragraph::new(header), Rect { height: 1, ..area });
@@ -160,17 +141,7 @@ fn render_shortcut_section(
             .iter()
             .skip(col_idx * items_per_col)
             .take(items_per_col)
-            .enumerate()
-            .map(|(i, (combo, desc))| {
-                let key_str: String = if let Some(labels) = custom_labels {
-                    labels[col_idx * items_per_col + i].to_owned()
-                } else {
-                    combo
-                        .iter()
-                        .map(|k| format!("{k:?}"))
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                };
+            .map(|(key_str, desc)| {
                 Line::from(vec![
                     Span::raw(" "),
                     Span::styled(key_str, Style::new().dim()),

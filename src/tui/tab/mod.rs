@@ -1,5 +1,4 @@
 mod dev {
-    // pub use crate::tui::key::Key as TuiKey;
     pub use crate::tui::widget::dualtab::*;
     pub use crate::tui::widget::tab::*;
     pub use crossterm::event::KeyCode;
@@ -41,22 +40,14 @@ macro_rules! tri {
     };
 }
 
-
 macro_rules! newtype_tab {
     ($(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>)) => {
-        $(#[$m])*
-        #[derive(Default)]
-        pub struct $tab($ty<$inner>);
-
-        crate::new_type_impl_tuiwidget!($tab);
-
-        impl crate::tui::tab::TuiTab for $tab {
-            fn title(&self) -> &'static str {
-                $inner::TITLE
-            }
-        }
+        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, km::get_docs());
     };
-    ($(#[$m:meta])* $tab:ident($inner:ty), $title:literal) => {
+    (@no_key $(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>)) => {
+        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, vec![]);
+    };
+    ($(#[$m:meta])* $tab:ident($inner:ty), $title:expr, $key_desc:expr) => {
         $(#[$m])*
         #[derive(Default)]
         pub struct $tab($inner);
@@ -67,12 +58,17 @@ macro_rules! newtype_tab {
             fn title(&self) -> &'static str {
                 $title
             }
+
+            fn key_description(&self) -> crate::tui::key::KeyDesc {
+                $key_desc
+            }
         }
     };
 }
 
 pub trait TuiTab: super::TuiWidget {
     fn title(&self) -> &'static str;
+    fn key_description(&self) -> crate::tui::key::KeyDesc;
 }
 
 pub(crate) mod connections;
@@ -134,6 +130,12 @@ macro_rules! enum_dispatch {
         fn title(&self) -> &'static str {
             match self {
                 $(Self::$item(inner) => inner.title(),)+
+            }
+        }
+
+        fn key_description(&self) -> crate::tui::key::KeyDesc {
+            match self {
+                $(Self::$item(inner) => inner.key_description(),)+
             }
         }
     }

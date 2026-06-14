@@ -5,36 +5,74 @@ use tokio::sync::Notify;
 use widget::help::HelpPanel;
 use widget::popmsg::PopUp;
 
-use crossterm::event::{KeyCode, KeyEventKind};
-
 // 50fps
 const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
 pub(super) static FULL_RENDER: Notify = Notify::const_new();
 pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive_aliases::derive(..KeyWithMessage)]
 pub enum AppKey {
+    #[strum(message = "Switch tab 1-7")]
     Tab(u8),
+    #[strum(message = "Tab Next")]
     TabNext,
+    #[strum(message = "Quit")]
     Quit,
+    #[strum(message = "Help")]
     Help,
 }
-key_map!(
-    AppKey,
-    [
-        (KeyCode::Tab, AppKey::TabNext, "Tab Next"),
-        (KeyCode::Char('1'), AppKey::Tab(1), "Tab1"),
-        (KeyCode::Char('2'), AppKey::Tab(2), "Tab2"),
-        (KeyCode::Char('3'), AppKey::Tab(3), "Tab3"),
-        (KeyCode::Char('4'), AppKey::Tab(4), "Tab4"),
-        (KeyCode::Char('5'), AppKey::Tab(5), "Tab5"),
-        (KeyCode::Char('6'), AppKey::Tab(6), "Tab6"),
-        (KeyCode::Char('7'), AppKey::Tab(7), "Tab7"),
-        (KeyCode::Char('q'), AppKey::Quit, "Exit"),
-        (KeyCode::Char('?'), AppKey::Help, "Help"),
-    ]
-);
+pub mod km {
+    use super::AppKey;
+    use crate::tui::key::{Key, KeyDesc};
+    use crossterm::event::KeyCode;
+    use std::sync::LazyLock;
+    use strum::EnumMessage;
+
+    use crate::tui::key::KeyMap;
+
+    const APP_KEYS: [(KeyCode, AppKey); 4] = [
+        (KeyCode::Char('1'), AppKey::Tab(1)),
+        (KeyCode::Tab, AppKey::TabNext),
+        (KeyCode::Char('q'), AppKey::Quit),
+        (KeyCode::Char('?'), AppKey::Help),
+    ];
+
+    static KEYMAP: LazyLock<KeyMap<AppKey>> = LazyLock::new(|| {
+        KeyMap::from_iter(
+            (2..=7u8)
+                .map(|num| {
+                    (
+                        KeyCode::Char(char::from_digit(num.into(), 10).expect("More than 9 tabs?")),
+                        AppKey::Tab(num),
+                    )
+                })
+                .chain(APP_KEYS)
+                .map(|(key, act)| (Key::from_code(key), act)),
+        )
+    });
+
+    pub fn get_docs() -> KeyDesc {
+        KEYMAP
+            .iter()
+            // We filter Tab2,3... here
+            .filter_map(|(key, act)| match act {
+                AppKey::Tab(1) => Some(("1-7".to_string(), act)),
+                AppKey::Tab(2..) => None,
+                _ => Some((key.to_string(), act)),
+            })
+            .map(|(key, act)| (key, act.get_message().unwrap_or_default()))
+            .collect()
+    }
+
+    impl TryFrom<&Key> for AppKey {
+        type Error = ();
+
+        fn try_from(ev: &Key) -> Result<Self, Self::Error> {
+            return KEYMAP.get(ev).map(|act| *act).ok_or(());
+        }
+    }
+}
 
 pub struct App {
     tabs: Vec<Tab>,
@@ -154,7 +192,7 @@ impl App {
 
             use crossterm::event::Event;
             match ev {
-                Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
+                Event::Key(key_event) if key_event.kind.is_press() => {
                     #[cfg(debug_assertions)]
                     the_egg(key_event.code);
                     let key = key_event.into();

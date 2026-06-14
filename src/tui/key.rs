@@ -1,8 +1,11 @@
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-pub type Key = _KeyEvent;
+use crossterm::event::{KeyCode, KeyEvent as _KeyEvent, KeyModifiers};
 
-#[derive(serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Debug, Clone)]
-pub struct _KeyEvent {
+pub type KeyDesc = Vec<(String, &'static str)>;
+pub type KeyDescRef<'a> = &'a [(String, &'a str)];
+pub type KeyMap<A> = std::collections::HashMap<Key, A>;
+
+#[derive_aliases::derive(..KeyBasic, Debug)]
+pub struct Key {
     /// The key itself.
     pub code: KeyCode,
     #[serde(
@@ -13,20 +16,40 @@ pub struct _KeyEvent {
     pub modifiers: KeyModifiers,
 }
 
-impl _KeyEvent {
+impl Key {
     pub fn from_code(code: KeyCode) -> Self {
         Self {
             code,
             modifiers: KeyModifiers::empty(),
         }
     }
-    pub fn with_modifiers(code: KeyCode, modifiers: KeyModifiers) -> Self {
-        Self { code, modifiers }
+    // pub fn with_modifiers(code: KeyCode, modifiers: KeyModifiers) -> Self {
+    //     Self { code, modifiers }
+    // }
+}
+
+impl std::fmt::Display for Key {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut prefix = String::new();
+        if self.modifiers.contains(KeyModifiers::ALT) {
+            prefix.push('A');
+        }
+        if self.modifiers.contains(KeyModifiers::CONTROL) {
+            prefix.push('C');
+        }
+        if self.modifiers.contains(KeyModifiers::SHIFT) {
+            prefix.push('S');
+        }
+        if prefix.is_empty() {
+            write!(f, "{}", self.code)
+        } else {
+            write!(f, "{prefix}-{}", self.code)
+        }
     }
 }
 
-impl From<KeyEvent> for _KeyEvent {
-    fn from(value: KeyEvent) -> Self {
+impl From<_KeyEvent> for Key {
+    fn from(value: _KeyEvent) -> Self {
         Self {
             code: value.code,
             modifiers: value.modifiers,
@@ -43,30 +66,35 @@ impl From<KeyEvent> for _KeyEvent {
 ///
 /// `Act1: [Key1, Key2, ...]`
 macro_rules! key_map {
-    ($actid:ident, [$(($key:expr, $action:expr, $desc:literal),)*]) => {
+    ($actid:ident, [$(($key:expr, $action:expr, $desc:literal),)+]) => {
+        key_map!($actid, [$(($key, $action),)*]);
+    };
+
+    ($actid:ident, [$(($key:expr, $action:expr),)*]) => {
 pub mod km {
     use super::*;
     use anyhow::Context;
+    use strum::EnumMessage;
     use std::collections::{HashMap, HashSet};
     use std::sync::OnceLock;
-    use crate::tui::key::Key as _Key;
+    use crate::tui::key::{Key as _Key, KeyDesc, KeyMap as _KeyMap};
 
-    pub type KeyMap = HashMap<_Key, $actid>;
+    type KeyMap = _KeyMap<$actid>;
     type FileMap = HashMap<$actid, Vec<_Key>>;
 
-    static MAPPING: OnceLock<KeyMap> = OnceLock::new();
+    static KEYMAP: OnceLock<KeyMap> = OnceLock::new();
 
     pub fn init(map: serde_yml::Value) -> anyhow::Result<bool> {
         let map = serde_yml::from_value(map).context("Failed to load keymap")?;
         let is_duplicated = check_duplicate(&map);
-        if MAPPING.set(map_from_file(map)).is_err() {
+        if KEYMAP.set(map_from_file(map)).is_err() {
             anyhow::bail!("")
         }
         Ok(is_duplicated)
     }
 
     pub fn get() -> &'static KeyMap {
-        MAPPING.get().expect("try get keymap without init")
+        KEYMAP.get().expect("try get keymap without init")
     }
 
     pub fn default() -> FileMap {
@@ -75,6 +103,13 @@ pub mod km {
             map.entry($action).or_default().push(_Key::from_code($key));
         )*
         map
+    }
+
+    pub fn get_docs() -> KeyDesc {
+        get()
+            .iter()
+            .map(|(key, act)| (key.to_string(), act.get_message().unwrap_or_default()))
+            .collect()
     }
 
     fn check_duplicate(map: &FileMap) -> bool {
@@ -127,18 +162,10 @@ pub fn load() -> anyhow::Result<()> {
             $(quick_load!($rec, $id);)+
         };
     }
-    use super::{app, tab::*};
+    use super::tab::*;
 
     let mut has_duplicate = vec![];
-    quick_load!(
-        has_duplicate,
-        app,
-        connections,
-        proxies,
-        srvctl,
-        settings,
-        logs
-    );
+    quick_load!(has_duplicate, connections, proxies, srvctl, settings, logs);
     files::km_init(&mut has_duplicate, value.remove("files").unwrap())?;
 
     Ok(())
@@ -153,20 +180,14 @@ pub fn init() -> anyhow::Result<()> {
             $(quick_default!($map, $id);)+
         };
     }
-    use super::{app, tab::*};
+    use super::tab::*;
 
     let mut map = serde_yml::Mapping::new();
-    quick_default!(map, app, connections, proxies, srvctl, settings, logs);
+    quick_default!(map, connections, proxies, srvctl, settings, logs);
     map.insert("files".into(), files::km_default()?);
 
     let path = crate::config::keymap_path();
-    // let path = "/home/jackhr/Documents/clashtui/target/clashtui/keymap.yaml";
     let file = std::fs::File::create(path)?;
     serde_yml::to_writer(file, &map)?;
     Ok(())
-}
-
-#[test]
-fn tmp() {
-    init().unwrap();
 }

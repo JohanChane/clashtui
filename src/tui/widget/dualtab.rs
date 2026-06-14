@@ -53,6 +53,18 @@ where
     is_focus_on_c1: bool,
 }
 
+impl<C1, C2> DualTab<C1, C2>
+where
+    C1: DualTabContent<Mate = C2> + Default,
+    C1::State: Default,
+    C2: DualTabContentMate<Mate = C1> + Default,
+    C2::State: Default,
+{
+    pub fn is_foucus_on_left(&self) -> bool {
+        self.is_focus_on_c1
+    }
+}
+
 impl<C1, C2> Default for DualTab<C1, C2>
 where
     C1: DualTabContent<Mate = C2> + Default,
@@ -74,7 +86,6 @@ where
         }
     }
 }
-
 
 impl<C1, C2> TuiWidget for DualTab<C1, C2>
 where

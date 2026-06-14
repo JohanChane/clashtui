@@ -12,16 +12,6 @@
 use crate::tui::{Key, TuiWidget};
 use ratatui::prelude::{Frame, Rect};
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct KeyCombo(pub Vec<Key>);
-
-impl std::ops::Deref for KeyCombo {
-    type Target = [Key];
-    fn deref(&self) -> &[Key] {
-        &self.0
-    }
-}
-
 pub trait BasicTabContent: 'static {
     type Key: for<'a> TryFrom<&'a Key, Error = ()> + Copy;
     type State;
@@ -107,7 +97,6 @@ where
         }
     }
 }
-
 
 /// Wrap a closure to [`CallBack`], used to wrap the return function of a future
 ///

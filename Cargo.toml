@@ -66,6 +66,7 @@ tungstenite = { version = "0.29", default-features = false, features = [
     "handshake",
     "url",
 ], optional = true }
+derive_aliases = "0.4"
 simsearch = "0.4.0"
 
 [target.'cfg(unix)'.dependencies]

@@ -239,6 +239,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "crossterm 0.29.0",
+ "derive_aliases",
  "env_logger",
  "fastrand",
  "futures-lite",
@@ -422,6 +423,21 @@ checksum = "7cd812cc2bc1d69d4764bd80df88b4317eaef9e773c75226407d9bc0876b211c"
 dependencies = [
  "powerfmt",
 ]
+
+[[package]]
+name = "derive_aliases"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a42564b20fdeb062b38ad78d567d0479b2b318ff679b20895d9a1de3b6896002"
+dependencies = [
+ "derive_aliases_proc_macro",
+]
+
+[[package]]
+name = "derive_aliases_proc_macro"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e81edf3b0f0a7d68f2113aee7cedffa73d1fadea46fc85e468786a7f7aac998c"
 
 [[package]]
 name = "derive_more"
