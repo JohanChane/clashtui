@@ -3,6 +3,20 @@ mod config;
 mod functions;
 mod tui;
 
+mod derive_alias {
+    // Define the aliases
+    derive_aliases::define! {
+        // For HashMap: Hash, Eq, PartialEq
+        // For Serde: Serialize, Deserialize
+        KeyBasic = ::core::hash::Hash, ::core::cmp::PartialEq, ::core::cmp::Eq,
+                    ::serde::Serialize, ::serde::Deserialize;
+        // For Copy: Copy, Clone
+        Action = ..KeyBasic, ::core::marker::Copy, ::core::clone::Clone;
+        // For Help Message: strum::EnumMessage
+        KeyWithMessage = ..Action, ::strum::EnumMessage;
+    }
+}
+
 fn main() {
     #[cfg(target_os = "linux")]
     nix::sys::stat::umask(nix::sys::stat::Mode::from_bits_truncate(0o002));

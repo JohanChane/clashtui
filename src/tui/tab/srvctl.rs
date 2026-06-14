@@ -9,20 +9,24 @@ newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
 key_map!(
     SrvCtlKey,
     [
-        (KeyCode::Enter, SrvCtlKey::Execute, "Execute"),
-        (KeyCode::Esc, SrvCtlKey::Esc, "Back"),
-        (KeyCode::Up, SrvCtlKey::MoveUp, "Move up"),
-        (KeyCode::Down, SrvCtlKey::MoveDown, "Move down"),
-        (KeyCode::Char('k'), SrvCtlKey::MoveUp, "Move up"),
-        (KeyCode::Char('j'), SrvCtlKey::MoveDown, "Move down"),
+        (KeyCode::Enter, SrvCtlKey::Execute),
+        (KeyCode::Esc, SrvCtlKey::Esc),
+        (KeyCode::Up, SrvCtlKey::MoveUp),
+        (KeyCode::Down, SrvCtlKey::MoveDown),
+        (KeyCode::Char('k'), SrvCtlKey::MoveUp),
+        (KeyCode::Char('j'), SrvCtlKey::MoveDown),
     ]
 );
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive_aliases::derive(..KeyWithMessage, strum::VariantArray)]
 pub(crate) enum SrvCtlKey {
+    #[strum(message = "Execute")]
     Execute,
+    #[strum(message = "Move up")]
     MoveUp,
+    #[strum(message = "Move down")]
     MoveDown,
+    #[strum(message = "Back")]
     Esc,
 }
 

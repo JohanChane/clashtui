@@ -12,23 +12,26 @@ newtype_tab!(SettingsTab(Tab<SettingsContent>));
 key_map!(
     SettingsKey,
     [
-        (KeyCode::Enter, SettingsKey::Execute, "Apply"),
-        (KeyCode::Esc, SettingsKey::Esc, "Back"),
-        (KeyCode::Up, SettingsKey::MoveUp, "Move up"),
-        (KeyCode::Down, SettingsKey::MoveDown, "Move down"),
-        (KeyCode::Char('k'), SettingsKey::MoveUp, "Move up"),
-        (KeyCode::Char('j'), SettingsKey::MoveDown, "Move down"),
+        (KeyCode::Enter, SettingsKey::Execute),
+        (KeyCode::Esc, SettingsKey::Esc),
+        (KeyCode::Up, SettingsKey::MoveUp),
+        (KeyCode::Down, SettingsKey::MoveDown),
+        (KeyCode::Char('k'), SettingsKey::MoveUp),
+        (KeyCode::Char('j'), SettingsKey::MoveDown),
     ]
 );
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive_aliases::derive(..KeyWithMessage)]
 pub(crate) enum SettingsKey {
+    #[strum(message = "Apply")]
     Execute,
+    #[strum(message = "Move up")]
     MoveUp,
+    #[strum(message = "Move down")]
     MoveDown,
+    #[strum(message = "Back")]
     Esc,
 }
-
 
 use crate::config::CoreType;
 use crate::functions::restful::config_struct::{Mode, TunStack};

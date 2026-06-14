@@ -51,7 +51,7 @@ key_map!(
     ]
 );
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Debug)]
+#[derive_aliases::derive(..KeyWithMessage, Debug)]
 pub enum Key {
     Switch,
     MoveUp,
@@ -61,7 +61,7 @@ pub enum Key {
     Action(Action),
 }
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Debug)]
+#[derive_aliases::derive(..Action, Debug)]
 pub enum Action {
     Generate,
     Delete,

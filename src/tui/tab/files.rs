@@ -62,11 +62,25 @@ macro_rules! get_name {
 pub(crate) mod profile;
 pub(crate) mod template;
 
-newtype_tab!(
-    /// This can only be [DualTab], because [Template] needs to update [Profile]
-    ///
-    /// [Template]: template::Template
-    /// [Profile]: profile::Profile
-    FileTab(DualTab<profile::Profile, template::Template>),
-    "File"
-);
+/// This can only be [DualTab], because [Template] needs to update [Profile]
+///
+/// [Template]: template::Template
+/// [Profile]: profile::Profile
+#[derive(Default)]
+pub struct FileTab(DualTab<profile::Profile, template::Template>);
+
+crate::new_type_impl_tuiwidget!(FileTab);
+
+impl crate::tui::tab::TuiTab for FileTab {
+    fn title(&self) -> &'static str {
+        "File"
+    }
+
+    fn key_description(&self) -> crate::tui::key::KeyDesc {
+        if self.0.is_foucus_on_left() {
+            profile::km::get_docs()
+        } else {
+            template::km::get_docs()
+        }
+    }
+}
