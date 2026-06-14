@@ -260,9 +260,10 @@ impl App {
         if let Ok(key) = AppKey::try_from(kv) {
             match key {
                 AppKey::Tab(new_index) => {
+                    let new_index = new_index - 1;
                     if new_index != self.tab_index {
                         self.tabs[self.tab_index as usize].on_leave();
-                        self.tab_index = new_index - 1;
+                        self.tab_index = new_index;
                         self.tabs[self.tab_index as usize].on_enter();
                     }
                 }
