@@ -343,6 +343,17 @@ def check_no_bom(label: str, path: str) -> None:
         print(f"{GREEN}[OK]{NC} {label} no BOM: {path}")
 
 
+def check_mihomo_external_controller(path: str) -> None:
+    global ERROR_COUNT
+    with open(path) as f:
+        content = f.read()
+    if "external-controller: 127.0.0.1:9090" in content:
+        print(f"{GREEN}[OK]{NC} mihomo external-controller: 127.0.0.1:9090")
+    else:
+        print(f"{RED}[FAIL]{NC} mihomo config missing external-controller: 127.0.0.1:9090")
+        ERROR_COUNT += 1
+
+
 def check_clashtui_config(config_path, yaml, cfg) -> None:
     config_dir = os.path.dirname(os.path.realpath(config_path))
 
@@ -351,6 +362,8 @@ def check_clashtui_config(config_path, yaml, cfg) -> None:
         mihomo_cfg = mihomo_cfg.get("core", {})
     if isinstance(mihomo_cfg, dict) and mihomo_cfg.get("config_path"):
         check_no_bom("mihomo core config", mihomo_cfg["config_path"])
+        if os.path.isfile(mihomo_cfg["config_path"]):
+            check_mihomo_external_controller(mihomo_cfg["config_path"])
 
     def get_section(section_name: str) -> dict:
         section = cfg.get(section_name, {})

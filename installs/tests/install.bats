@@ -185,6 +185,8 @@ teardown() {
   local files=(
     "default_configs/default_keymap.yaml"
     "default_configs/default_theme.yaml"
+    "default_configs/mihomo/default_config.yaml"
+    "default_configs/mihomo/default_config_no_tun.yaml"
     "default_configs/mihomo/core_override_config.yaml"
     "default_configs/mihomo/core_override_config_no_tun.yaml"
     "default_configs/sing-box/core_override_config.json"
@@ -206,6 +208,11 @@ teardown() {
     fi
   done
   [ "$missing" -eq 0 ]
+}
+
+@test "mihomo default configs expose the 9090 external-controller" {
+  grep -q "external-controller: 127.0.0.1:9090" "$PROJECT_ROOT/contrib/default_configs/mihomo/default_config.yaml"
+  grep -q "external-controller: 127.0.0.1:9090" "$PROJECT_ROOT/contrib/default_configs/mihomo/default_config_no_tun.yaml"
 }
 
 # ---------------------------------------------------------------------------

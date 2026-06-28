@@ -779,14 +779,17 @@ create_core_configs() {
     $SUDO mkdir -p "$MIHOMO_CONFIG_DIR"
 
     local mihomo_cfg_src
+    local mihomo_default_src
     if $IS_USER; then
       mihomo_cfg_src="default_configs/mihomo/core_override_config_no_tun.yaml"
+      mihomo_default_src="default_configs/mihomo/default_config_no_tun.yaml"
     else
       mihomo_cfg_src="default_configs/mihomo/core_override_config.yaml"
+      mihomo_default_src="default_configs/mihomo/default_config.yaml"
     fi
 
     # Copy core override config via contrib helper
-    copy_contrib "$mihomo_cfg_src" "${MIHOMO_CONFIG_DIR}/config.yaml"
+    copy_contrib "$mihomo_default_src" "${MIHOMO_CONFIG_DIR}/config.yaml"
     log_info "Mihomo core config written to: ${MIHOMO_CONFIG_DIR}/config.yaml"
 
     mkdir -p "$MIHOMO_USER_CONFIG_DIR"

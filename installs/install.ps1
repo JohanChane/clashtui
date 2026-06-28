@@ -532,8 +532,9 @@ function New-CoreConfigs {
         New-Item -ItemType Directory -Path $MIHOMO_CONFIG_DIR -Force | Out-Null
 
         $cfgSrc = "default_configs/mihomo/core_override_config.yaml"
+        $defaultCfgSrc = "default_configs/mihomo/default_config.yaml"
         Backup-File (Join-Path $MIHOMO_CONFIG_DIR "config.yaml")
-        Copy-Contrib $cfgSrc (Join-Path $MIHOMO_CONFIG_DIR "config.yaml")
+        Copy-Contrib $defaultCfgSrc (Join-Path $MIHOMO_CONFIG_DIR "config.yaml")
         Write-Info "Mihomo core config written to: $MIHOMO_CONFIG_DIR/config.yaml"
 
         New-Item -ItemType Directory -Path $MIHOMO_USER_CONFIG_DIR -Force | Out-Null

@@ -1,0 +1,46 @@
+# Default standalone core configuration.
+mixed-port: 7890
+ipv6: false
+allow-lan: false
+log-level: silent
+unified-delay: true
+tcp-concurrent: true    # When domain has multiple IPs, attempt TCP handshake concurrently. One success is enough.
+
+secret: ""
+external-controller: 127.0.0.1:9090
+external-ui: uis/metacubexd
+external-ui-url: https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip
+
+#geodata-mode: true
+#geox-url:
+#  geoip: "https://mirror.ghproxy.com/https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip-lite.dat"
+#  geosite: "https://mirror.ghproxy.com/https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat"
+#  mmdb: "https://mirror.ghproxy.com/https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/country-lite.mmdb"
+#  asn: "https://mirror.ghproxy.com/https://github.com/xishang0128/geoip/releases/download/latest/GeoLite2-ASN.mmdb"
+
+geo-auto-update: true
+geo-update-interval: 7
+
+#find-process-mode: strict
+#global-client-fingerprint: chrome
+
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+dns:
+  enable: false
+
+tun:
+  enable: false
+
+proxies: []
+
+proxy-groups:
+  - name: PROXY
+    type: select
+    proxies:
+      - DIRECT
+
+rules:
+  - MATCH,PROXY
