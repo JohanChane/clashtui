@@ -154,6 +154,11 @@ launchctl load -w ~/Library/LaunchAgents/clashtui_mihomo.plist
 launchctl load -w ~/Library/LaunchAgents/clashtui_singbox.plist
 ```
 
+## FAQ
+
+- 文件权限之类的问题: 因为 clashtui 需要用到组权限, 所以请重新登录使组权限生效。
+- connection refused 的问题: 比如: mihomo, 请使用 `netstat -utapln | grep 9090` 检查 clash api 端口有没有打开。
+
 ## 文档
 
 | 文档 | 说明 |

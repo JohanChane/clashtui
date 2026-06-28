@@ -157,6 +157,11 @@ launchctl load -w ~/Library/LaunchAgents/clashtui_mihomo.plist
 launchctl load -w ~/Library/LaunchAgents/clashtui_singbox.plist
 ```
 
+## FAQ
+
+-   File permission issues: Since clashtui requires group permissions, please log in again for the group permissions to take effect.
+-   Connection refused issues (e.g., with mihomo): Please use `netstat -utapln | grep 9090` to check whether the Clash API port is open.
+
 ## Documentation
 
 | Document | Description |
