@@ -14,17 +14,16 @@ impl Proxies {
     pub fn fzf_find_with_prompt(
         &mut self,
         items: Vec<(String, usize)>,
-        prompt: &str,
+        prompt: impl Into<String> + Send + 'static,
         task_set: &mut FutureSet<Self>,
     ) {
         let names: Vec<String> = items.iter().map(|(name, _)| name.clone()).collect();
-        let prompt = prompt.to_owned();
         async move {
-            let selected = tokio::task::spawn_blocking(move || {
-                crate::tui::widget::fzffind::run_fzf(&names, &prompt)
-            })
-            .await
-            .unwrap_or(None);
+            let selected = FzfFinder::new(names)
+                .with_title(prompt.into())
+                .build_and_send()
+                .await
+                .unwrap_or_default();
             // Map fzf positional index back to tree index
             let target = selected.and_then(|pos| items.get(pos).map(|(_, idx)| *idx));
             wrapper(move |content: &mut Self| {

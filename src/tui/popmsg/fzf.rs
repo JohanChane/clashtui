@@ -10,7 +10,7 @@ pub struct FzfFinder {
 
 impl FzfFinder {
     pub fn new(items: Vec<String>) -> Self {
-        let cfg = simsearch::Options::new();
+        let cfg = simsearch::Options::new().separators(['_']);
         let mut idx = simsearch::Index::with_options(cfg);
         items
             .iter()

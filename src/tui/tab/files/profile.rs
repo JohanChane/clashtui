@@ -510,11 +510,11 @@ mod actions {
     }
 
     pub(super) async fn fzf_find(items: Vec<String>) -> CB {
-        let selected = tokio::task::spawn_blocking(move || {
-            crate::tui::widget::fzffind::run_fzf(&items, "Find Profile")
-        })
-        .await
-        .unwrap_or(None);
+        let selected = FzfFinder::new(items)
+            .with_title("Find Profile")
+            .build_and_send()
+            .await
+            .unwrap_or_default();
 
         wrapper(move |(content, _): &mut C| {
             content.jump_target.set(selected);

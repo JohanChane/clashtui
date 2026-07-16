@@ -1,6 +1,5 @@
 use super::dev::*;
 use crate::functions::restful::connection::{self, Conn};
-use crate::tui::widget::fzffind;
 use ratatui::text::Line;
 use ratatui::widgets::{Cell, Row, Table};
 use std::collections::HashMap;
@@ -829,11 +828,11 @@ mod tests {
                     .map(|r| format!("{} | {} | {}", r.host, r.rule, r.chains))
                     .collect();
                 async move {
-                    let selected = tokio::task::spawn_blocking(move || {
-                        fzffind::run_fzf(&names, "Find Connection")
-                    })
-                    .await
-                    .unwrap_or(None);
+                    let selected = FzfFinder::new(names)
+                        .with_title("Find Connection")
+                        .build_and_send()
+                        .await
+                        .unwrap_or_default();
                     wrapper(move |content: &mut Connections| {
                         content.row = selected;
                     })
