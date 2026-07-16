@@ -151,7 +151,7 @@ impl TabContent for SettingsContent {
                     })
                 }
                 Err(e) => {
-                    crate::tui::widget::popmsg::Confirm::err(e);
+                    Confirm::err(e);
                     do_nothing()
                 }
             }
@@ -203,7 +203,7 @@ impl TabContent for SettingsContent {
                                     })
                                 }
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    Confirm::err(e);
                                     do_nothing()
                                 }
                             }
@@ -254,7 +254,7 @@ impl TabContent for SettingsContent {
                                     })
                                 }
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    Confirm::err(e);
                                     do_nothing()
                                 }
                             }
@@ -302,7 +302,7 @@ impl TabContent for SettingsContent {
                                     c.allow_lan = new_val;
                                 }),
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    Confirm::err(e);
                                     wrapper(move |c: &mut SettingsContent| {
                                         c.allow_lan = !new_val;
                                     })
@@ -330,7 +330,7 @@ impl TabContent for SettingsContent {
                                     c.tun_enable = new_val;
                                 }),
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    Confirm::err(e);
                                     wrapper(move |c: &mut SettingsContent| {
                                         c.tun_enable = !new_val;
                                     })
@@ -355,7 +355,7 @@ impl TabContent for SettingsContent {
                             match result {
                                 Ok(_) => do_nothing(),
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    Confirm::err(e);
                                     do_nothing()
                                 }
                             }
@@ -375,7 +375,7 @@ impl TabContent for SettingsContent {
                             match result {
                                 Ok(_) => do_nothing(),
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    Confirm::err(e);
                                     do_nothing()
                                 }
                             }
@@ -395,7 +395,7 @@ impl TabContent for SettingsContent {
                             match result {
                                 Ok(_) => do_nothing(),
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    Confirm::err(e);
                                     do_nothing()
                                 }
                             }

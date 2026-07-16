@@ -1,3 +1,4 @@
+mod confirm;
 mod fzf;
 pub(crate) mod input;
 
@@ -11,6 +12,7 @@ mod dev {
 }
 
 pub mod prelude {
+    pub use super::confirm::Confirm;
     pub use super::fzf::FzfFinder;
     pub use super::input::Input;
 }

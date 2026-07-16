@@ -91,7 +91,7 @@ impl Proxies {
                     {
                         Ok(Ok(Ok(v))) => v,
                         Ok(Ok(Err(e))) => {
-                            crate::tui::widget::popmsg::Confirm::err(e);
+                            Confirm::err(e);
                             return wrapper(|content: &mut Self| {
                                 content.testing_since = None;
                             });

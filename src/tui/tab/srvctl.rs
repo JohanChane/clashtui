@@ -320,10 +320,10 @@ impl TabContent for SrvCtlContent {
                             match $result {
                                 Ok(out) => {
                                     if out.starts_with("Error") {
-                                        crate::tui::widget::popmsg::Confirm::err(out);
+                                        Confirm::err(out);
                                         do_nothing()
                                     } else {
-                                        crate::tui::widget::popmsg::Confirm::title("OK".to_owned())
+                                        Confirm::title("OK".to_owned())
                                             .with_prompt(out)
                                             .build_and_send();
                                         wrapper(move |c: &mut SrvCtlContent| {
@@ -337,7 +337,7 @@ impl TabContent for SrvCtlContent {
                                     }
                                 }
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    Confirm::err(e);
                                     do_nothing()
                                 }
                             }
@@ -346,16 +346,16 @@ impl TabContent for SrvCtlContent {
                             match $result {
                                 Ok(out) => {
                                     if out.starts_with("Error") {
-                                        crate::tui::widget::popmsg::Confirm::err(out);
+                                        Confirm::err(out);
                                     } else {
-                                        crate::tui::widget::popmsg::Confirm::title("OK".to_owned())
+                                        Confirm::title("OK".to_owned())
                                             .with_prompt(out)
                                             .build_and_send();
                                     }
                                     do_nothing()
                                 }
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    Confirm::err(e);
                                     do_nothing()
                                 }
                             }
@@ -437,19 +437,17 @@ impl TabContent for SrvCtlContent {
                                         };
                                     });
 
-                                    let _ = crate::tui::widget::popmsg::Confirm::dismiss_any(
-                                        "Core Switched".to_owned(),
-                                    )
-                                    .with_prompt(status_msg)
-                                    .build_and_send()
-                                    .await;
+                                    let _ = Confirm::dismiss_any("Core Switched".to_owned())
+                                        .with_prompt(status_msg)
+                                        .build_and_send()
+                                        .await;
 
                                     crate::tui::app::QUIT
                                         .store(true, std::sync::atomic::Ordering::Relaxed);
                                     update_label
                                 }
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    Confirm::err(e);
                                     do_nothing()
                                 }
                             }
@@ -490,7 +488,7 @@ impl TabContent for SrvCtlContent {
                             match result.await {
                                 Ok(new_state) => {
                                     let label = if new_state { "enabled" } else { "disabled" };
-                                    crate::tui::widget::popmsg::Confirm::title("OK".to_owned())
+                                    Confirm::title("OK".to_owned())
                                         .with_prompt(format!("System proxy {label}"))
                                         .build_and_send();
                                     wrapper(move |c: &mut SrvCtlContent| {
@@ -498,7 +496,7 @@ impl TabContent for SrvCtlContent {
                                     })
                                 }
                                 Err(e) => {
-                                    crate::tui::widget::popmsg::Confirm::err(e);
+                                    Confirm::err(e);
                                     do_nothing()
                                 }
                             }

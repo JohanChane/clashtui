@@ -1,7 +1,6 @@
 use crate::functions::command::{check_config, edit, test_config};
 use crate::functions::file::profile::{db, select, update_profile};
 use crate::functions::restful::download;
-use crate::tui::widget::popmsg::Confirm;
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, atomic::Ordering};

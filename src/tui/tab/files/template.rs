@@ -1,7 +1,6 @@
 use super::*;
 use crate::functions::command::edit;
 use crate::functions::file::template::*;
-use crate::tui::widget::popmsg::Confirm;
 use ratatui::style::Style;
 use std::cell::Cell;
 
