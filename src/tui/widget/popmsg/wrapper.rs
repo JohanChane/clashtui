@@ -35,18 +35,13 @@ impl<C: Msg> Wrapper for Instance<C> {
             .title(self.title.as_str());
 
         if let Some(prompt) = self.prompt.as_mut() {
-            use ratatui::symbols::{border, line::NORMAL};
-            use ratatui::widgets::Borders;
-            let base_block = base_block.border_set(border::Set {
-                bottom_left: NORMAL.vertical_right,
-                bottom_right: NORMAL.vertical_left,
-                ..border::PLAIN
-            });
+            use ratatui::layout::Spacing::Overlap;
+            use ratatui::symbols::merge::MergeStrategy;
             let content_block = Block::bordered()
-                .borders(Borders::ALL & !Borders::TOP)
-                .border_style(Theme::get().popup.border);
+                .border_style(Theme::get().popup.border)
+                .merge_borders(MergeStrategy::Exact);
 
-            let areas = {
+            let areas: [Rect; 2] = {
                 let (content_width, content_height) = self.content.size();
                 let (_prompt_width, prompt_height) = prompt.size();
                 let prompt_text_w = prompt
@@ -61,8 +56,12 @@ impl<C: Msg> Wrapper for Instance<C> {
                 let area = calc_area_from(w, h, f.area());
                 f.render_widget(Clear, area);
 
-                Layout::vertical([Constraint::Fill(1), Constraint::Length(1 + content_height)])
-                    .split(area)
+                Layout::vertical([
+                    Constraint::Fill(1),
+                    Constraint::Length(1 + 1 + content_height),
+                ])
+                .spacing(Overlap(1))
+                .areas(area)
             };
 
             prompt.render(f, areas[0], base_block);

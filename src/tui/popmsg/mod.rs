@@ -1,5 +1,5 @@
+mod fzf;
 pub(crate) mod input;
-// mod prompt;
 
 mod dev {
     pub use crate::tui::Key;
@@ -11,7 +11,6 @@ mod dev {
 }
 
 pub mod prelude {
+    pub use super::fzf::FzfFinder;
     pub use super::input::Input;
-
-    // pub use super::prompt::Prompt;
 }
