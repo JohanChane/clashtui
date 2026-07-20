@@ -151,13 +151,13 @@ fn handle_service(command: ServiceCommand) -> Result<()> {
                     .map_err(|e| anyhow::anyhow!("Soft restart failed: {e}"))?;
                 println!("Core restarted (soft).");
             } else {
-                let output = crate::functions::command::restart_service(None)?;
+                let output = crate::functions::command::restart_service()?;
                 println!("{output}");
             }
             Ok(())
         }
         ServiceCommand::Stop => {
-            let output = crate::functions::command::stop_service(None)?;
+            let output = crate::functions::command::stop_service()?;
             println!("{output}");
             Ok(())
         }

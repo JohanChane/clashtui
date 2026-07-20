@@ -1,9 +1,6 @@
 use super::platform::stringify_output;
 use anyhow::Result;
-use std::{
-    io::Write,
-    process::{Command, Stdio},
-};
+use std::process::{Command, Stdio};
 
 pub fn exec(pgm: &str, args: Vec<&str>) -> Result<String> {
     log::debug!("IPC: {} {:?}", pgm, args);
@@ -11,33 +8,30 @@ pub fn exec(pgm: &str, args: Vec<&str>) -> Result<String> {
     Ok(stringify_output(output))
 }
 
-pub fn exec_sudo(args: Vec<&str>, password: &str) -> Result<String> {
+pub fn exec_sudo(pgm: &str, args: Vec<&str>) -> Result<String> {
+    use crate::tui;
     log::debug!("IPC: sudo -S {:?}", args);
-    let mut cmd = Command::new("sudo");
-    cmd.arg("-S");
-    cmd.args(args);
-    cmd.stdin(Stdio::piped());
-    cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::piped());
-
-    let mut child = cmd.spawn()?;
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(password.as_bytes())?;
-        stdin.write_all(b"\n")?;
-    }
-    let output = child.wait_with_output()?;
+    tui::hold(true)?;
+    let output = Command::new("sudo")
+        .arg("-S")
+        .arg(pgm)
+        .args(args)
+        .spawn()?
+        .wait_with_output()?;
+    tui::hold(false)?;
     Ok(stringify_output(output))
 }
-#[cfg(unix)]
-pub fn sudo_needs_password() -> bool {
-    !std::process::Command::new("sudo")
-        .args(["-n", "true"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-}
+
+// #[cfg(unix)]
+// fn check_sudo_password_required() -> Result<bool> {
+//     Command::new("sudo")
+//         .args(["-n", "true"])
+//         .stdout(Stdio::null())
+//         .stderr(Stdio::null())
+//         .status()
+//         .map(|staus| staus.success())
+//         .map_err(|e| e.into())
+// }
 
 pub fn spawn(pgm: &str, args: Vec<&str>) -> Result<()> {
     log::debug!("SPW: {} {:?}", pgm, args);
