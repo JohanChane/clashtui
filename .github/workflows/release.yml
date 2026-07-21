@@ -77,15 +77,15 @@ jobs:
             extract-version: false
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: goto-bus-stop/setup-zig@v2
+      - uses: mlugg/setup-zig@v2
         if: matrix.zig-target
 
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo
           key: ci-${{ matrix.cache-suffix }}-${{ hashFiles('Cargo.lock') }}
@@ -123,7 +123,7 @@ jobs:
           if [ -f version.txt ]; then mv version.txt ./artifacts/version.txt; fi
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact-name }}
           path: artifacts
@@ -139,7 +139,7 @@ jobs:
 
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           merge-multiple: true
           path: ./artifacts

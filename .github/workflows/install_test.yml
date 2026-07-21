@@ -39,7 +39,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install bats (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
         run: sudo npm install -g bats
@@ -55,7 +55,7 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run Pester tests
         run: |
           Import-Module Pester
@@ -74,10 +74,10 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo
           key: ci-install-test-${{ matrix.os }}-${{ hashFiles('Cargo.lock') }}
@@ -200,10 +200,10 @@ jobs:
         os: [ubuntu-latest, macos-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo
           key: ci-install-test-user-${{ matrix.os }}-${{ hashFiles('Cargo.lock') }}
