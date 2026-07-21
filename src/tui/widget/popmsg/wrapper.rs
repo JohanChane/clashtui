@@ -30,13 +30,14 @@ impl<C: Msg> Wrapper for Instance<C> {
     }
 
     fn render(&mut self, f: &mut Frame) {
+        use ratatui::symbols::merge::MergeStrategy;
         let base_block = Block::bordered()
             .border_style(Theme::get().popup.border)
+            .merge_borders(MergeStrategy::Exact)
             .title(self.title.as_str());
 
         if let Some(prompt) = self.prompt.as_mut() {
             use ratatui::layout::Spacing::Overlap;
-            use ratatui::symbols::merge::MergeStrategy;
             let content_block = Block::bordered()
                 .border_style(Theme::get().popup.border)
                 .merge_borders(MergeStrategy::Exact);
