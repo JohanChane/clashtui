@@ -17,6 +17,7 @@ TARGETS = {
         "subdir": "alpine",
         "service_controller": "openrc",
         "shell": "bash",
+        "user": "johan",
     },
     "debian": {
         "image": "clashtui-debian-dev",

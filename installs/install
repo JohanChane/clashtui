@@ -34,6 +34,58 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+# --- BusyBox-aware user/group management ---
+# On BusyBox systems without shadow (Alpine), use addgroup/adduser/delgroup/deluser.
+# On systems with shadow (Debian, Alpine+shadow), use groupadd/useradd/gpasswd.
+is_busybox_user_mgmt() {
+  command -v busybox &>/dev/null && ! command -v useradd &>/dev/null
+}
+
+create_system_user() {
+  local username="$1"
+  if ! id "$username" &>/dev/null; then
+    log_info "Creating $username user and group..."
+    if is_busybox_user_mgmt; then
+      sudo addgroup -S "$username"
+      sudo adduser -S -H -D -G "$username" -s /sbin/nologin "$username"
+    else
+      sudo groupadd --system "$username"
+      sudo useradd --system --no-create-home --gid "$username" --shell /bin/false "$username"
+    fi
+  else
+    log_info "$username user already exists"
+  fi
+}
+
+add_user_to_group() {
+  local user="$1"
+  local group="$2"
+  if is_busybox_user_mgmt; then
+    sudo addgroup "$user" "$group"
+  else
+    sudo gpasswd -a "$user" "$group"
+  fi
+}
+
+del_user_from_group() {
+  local user="$1"
+  local group="$2"
+  if is_busybox_user_mgmt; then
+    sudo delgroup "$user" "$group"
+  else
+    sudo gpasswd -d "$user" "$group"
+  fi
+}
+
+delete_system_user() {
+  local username="$1"
+  if is_busybox_user_mgmt; then
+    sudo deluser "$username"
+  else
+    sudo userdel "$username"
+  fi
+}
+
 github_api_curl() {
   if [ -n "$GITHUB_TOKEN" ]; then
     curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "$@"
@@ -479,26 +531,14 @@ create_mihomo_user() {
   if $IS_USER || $IS_MACOS; then
     return 0
   fi
-  if ! id "mihomo" &>/dev/null; then
-    log_info "Creating mihomo user and group..."
-    sudo groupadd --system mihomo
-    sudo useradd --system --no-create-home --gid mihomo --shell /bin/false mihomo
-  else
-    log_info "mihomo user already exists"
-  fi
+  create_system_user mihomo
 }
 
 create_singbox_user() {
   if $IS_USER || $IS_MACOS; then
     return 0
   fi
-  if ! id "sing-box" &>/dev/null; then
-    log_info "Creating sing-box user and group..."
-    sudo groupadd --system sing-box
-    sudo useradd --system --no-create-home --gid sing-box --shell /bin/false sing-box
-  else
-    log_info "sing-box user already exists"
-  fi
+  create_system_user sing-box
 }
 
 # --- Service unit creation (systemd or launchd) ---
@@ -1037,7 +1077,7 @@ install_mihomo() {
   create_mihomo_user
 
   if [[ "$IS_USER" = "false" && "$IS_MACOS" = "false" ]]; then
-    sudo gpasswd -a "$USER" mihomo
+    add_user_to_group "$USER" mihomo
   fi
 
   create_mihomo_unit
@@ -1057,7 +1097,7 @@ install_singbox() {
   create_singbox_user
 
   if ! $IS_USER && ! $IS_MACOS; then
-    sudo gpasswd -a "$USER" sing-box
+    add_user_to_group "$USER" sing-box
   fi
 
   create_singbox_unit
@@ -1160,11 +1200,21 @@ uninstall() {
       sudo rm -rf /opt/clashtui
 
       echo "[Optional] Delete the mihomo user and group"
-      echo "  sudo gpasswd -d $USER mihomo"
-      echo "  sudo userdel mihomo"
+      if is_busybox_user_mgmt; then
+        echo "  sudo delgroup $USER mihomo"
+        echo "  sudo deluser mihomo"
+      else
+        echo "  sudo gpasswd -d $USER mihomo"
+        echo "  sudo userdel mihomo"
+      fi
       echo "[Optional] Delete the sing-box user and group"
-      echo "  sudo gpasswd -d $USER sing-box"
-      echo "  sudo userdel sing-box"
+      if is_busybox_user_mgmt; then
+        echo "  sudo delgroup $USER sing-box"
+        echo "  sudo deluser sing-box"
+      else
+        echo "  sudo gpasswd -d $USER sing-box"
+        echo "  sudo userdel sing-box"
+      fi
     fi
   fi
 

@@ -44,3 +44,18 @@ All commands accept `-t <target>` (default: `alpine`).
 ```
 
 The script can run from any directory. It locates the project root by searching upwards for `Cargo.toml`.
+
+## Building a musl binary for Alpine
+
+The release binaries on GitHub are compiled against glibc and will not run on
+Alpine (musl libc). To build an Alpine-compatible binary locally:
+
+```bash
+cargo install cargo-zigbuild
+rustup target add x86_64-unknown-linux-musl
+cargo zigbuild --target x86_64-unknown-linux-musl --release --all-features
+```
+
+The binary will be at `target/x86_64-unknown-linux-musl/release/clashtui`.
+Drop it into the container and it will run without `gcompat` or any glibc
+compatibility layer.
