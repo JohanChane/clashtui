@@ -356,86 +356,85 @@ pub mod connection {
 }
 
 pub mod api_log {
+    use super::{CONFIG, Result, config_struct::LogLevel};
+    use tokio::sync::Semaphore;
+    use tokio::sync::oneshot::{Receiver, channel};
 
-    pub struct LogEntry {
-        pub type_: String,
-        pub payload: String,
-        pub time: String,
+    #[derive(serde::Deserialize, Clone)]
+    pub struct LogMessage {
+        time: String,
+        level: LogLevel,
+        message: String,
+        fields: String,
     }
+    pub type ErrRx = Receiver<minreq::Error>;
 
-    pub(crate) fn timestamp() -> String {
-        let secs = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs() as i64;
-        let days = secs / 86400;
-        let time_of_day = secs % 86400;
-        let hh = time_of_day / 3600;
-        let mm = (time_of_day % 3600) / 60;
-        let ss = time_of_day % 60;
+    type R = circular_buffer::HeapCircularBuffer<LogMessage>;
+    type RM = std::sync::Mutex<R>;
+    type RL = std::sync::LazyLock<RM>;
 
-        let mut y: i64 = 1970;
-        let mut remaining_days = days;
-        loop {
-            let days_in_year = if is_leap(y) { 366 } else { 365 };
-            if remaining_days < days_in_year {
-                break;
-            }
-            remaining_days -= days_in_year;
-            y += 1;
-        }
-        let dims: &[i64] = if is_leap(y) {
-            &[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        } else {
-            &[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-        };
-        let mut mo = 1;
-        for dim in dims {
-            if remaining_days < *dim {
-                break;
-            }
-            remaining_days -= dim;
-            mo += 1;
-        }
-        let yy = y % 100;
-        let dd = remaining_days + 1;
-        format!("{yy:02}-{mo:02}-{dd:02} {hh:02}:{mm:02}:{ss:02}")
+    pub static LOG_POOL: RL = RL::new(|| RM::new(R::with_capacity(256)));
+    static PAUSE: Semaphore = Semaphore::const_new(1);
+
+    /// Return a guard that 'pause' the log record (by discarding all incoming logs),
+    /// drop the guard to continue recording
+    pub fn pause() -> tokio::sync::SemaphorePermit<'static> {
+        PAUSE.try_acquire().unwrap()
     }
-
-    fn is_leap(y: i64) -> bool {
-        (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
-    }
-
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub fn parse_log_entries(body: &str) -> Vec<LogEntry> {
-        body.lines()
-            .filter(|line| !line.is_empty())
-            .filter_map(
-                |line| match serde_json::from_str::<serde_json::Value>(line) {
-                    Ok(v) => {
-                        let type_ = v
-                            .get("type")
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("unknown")
-                            .to_owned();
-                        let payload = v
-                            .get("payload")
-                            .and_then(|p| p.as_str())
-                            .unwrap_or("")
-                            .to_owned();
-                        Some(LogEntry {
-                            type_,
-                            payload,
-                            time: timestamp(),
-                        })
-                    }
-                    Err(_) => {
-                        log::warn!("Failed to parse log line as JSON: {line}");
-                        None
-                    }
-                },
-            )
+    /// Return logs from old to new, with its content ranging from
+    /// `start` to `start+length` (counting from newest)
+    ///
+    /// e.g. [3,4,5] for start=3 and length=3
+    pub fn get(start: usize, length: usize) -> Vec<LogMessage> {
+        LOG_POOL
+            .lock()
+            .unwrap()
+            .iter()
+            .skip(start)
+            .take(length)
+            .rev()
+            .cloned()
             .collect()
+    }
+    /// Call this to start a background thread that collect logs
+    ///
+    /// Return a `rx` that recv the Error. If error, call this again
+    /// to restart
+    ///
+    /// Note: log level shouldn't be silent
+    pub fn subscrbe(level: LogLevel) -> Result<ErrRx> {
+        debug_assert!(
+            matches!(level, LogLevel::Silent),
+            "log level shouldn't be silent"
+        );
+        let controller = CONFIG.controller_for_core();
+        let endpoint = format!("{controller}/logs?format=structured?level={level}");
+        let mut rdr = minreq::get(endpoint).send_lazy()?;
+        let (tx, rx) = channel();
+        std::thread::spawn(move || {
+            while let Some(maybe_byte) = rdr.next() {
+                match || -> Result<LogMessage> {
+                    let (byte, size) = maybe_byte.unwrap();
+                    let bytes: Result<Vec<u8>> = std::iter::once(Ok(byte))
+                        .chain(rdr.by_ref().take(size - 1).map(|r| r.map(|(b, _)| b)))
+                        .collect();
+                    let bytes = bytes.unwrap();
+                    serde_json::from_slice(&bytes).map_err(|e| minreq::Error::SerdeJsonError(e))
+                }() {
+                    Ok(_) if PAUSE.available_permits() == 0 => {}
+                    Ok(msg) => {
+                        let mut ring = LOG_POOL.lock().unwrap();
+                        ring.push_front(msg);
+                    }
+                    Err(e) => {
+                        tx.send(e).unwrap();
+                        return;
+                    }
+                }
+            }
+        });
+
+        Ok(rx)
     }
 }
 
