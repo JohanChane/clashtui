@@ -257,7 +257,7 @@ pub trait TuiTab: super::TuiWidget {
 
 pub(crate) mod connections;
 pub(crate) mod files;
-pub(crate) mod logs;
+// pub(crate) mod logs;
 pub(crate) mod proxies;
 pub(crate) mod settings;
 pub(crate) mod srvctl;
@@ -336,7 +336,7 @@ pub mod prelude {
     pub use super::TuiTab;
     pub use super::connections::ConnectionsTab;
     pub use super::files::FileTab;
-    pub use super::logs::LogsTab;
+    // pub use super::logs::LogsTab;
     pub use super::proxies::ProxiesTab;
     pub use super::settings::SettingsTab;
     pub use super::srvctl::CoreSrvCtlTab;
@@ -379,7 +379,7 @@ pub mod prelude {
         init_section!(keymap, "proxies", proxies);
         init_section!(keymap, "srvctl", srvctl);
         init_section!(keymap, "settings", settings);
-        init_section!(keymap, "logs", logs);
+        // init_section!(keymap, "logs", logs);
 
         // FileTab has nested sections — delegate to files::agent_init
         if let Some(section_val) = crate::tui::agent::take_section(keymap, "file") {
@@ -406,7 +406,7 @@ pub mod prelude {
             SettingsTab,
             CoreSrvCtlTab,
             StatusTab,
-            LogsTab,
+            // LogsTab,
         }
     );
 }

@@ -355,6 +355,7 @@ pub mod connection {
     }
 }
 
+#[allow(unused)]
 pub mod api_log {
     use super::{CONFIG, Result, config_struct::LogLevel};
     use tokio::sync::Semaphore;
