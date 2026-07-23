@@ -388,7 +388,7 @@ impl TabContent for SettingsContent {
                                 return do_nothing();
                             }
                             let result = tokio::task::spawn_blocking(|| {
-                                crate::functions::restful::geo::upgrade_geo()
+                                crate::functions::restful::config::upgrade_geo()
                             })
                             .await
                             .unwrap();

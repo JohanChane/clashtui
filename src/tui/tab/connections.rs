@@ -447,7 +447,7 @@ impl TabContent for Connections {
                 async move {
                     let result = tokio::task::spawn_blocking(move || {
                         if use_bulk {
-                            let _ = connection::terminate_all_connections();
+                            let _ = connection::terminate_connection(None);
                         } else {
                             for id in &ids {
                                 let _ = connection::terminate_connection(Some(id.clone()));
@@ -475,23 +475,23 @@ mod tests {
             id: id.to_owned(),
             metadata: ConnMetaData {
                 network: "tcp".to_owned(),
-                ctype: "".to_owned(),
+                // ctype: "".to_owned(),
                 host: host.to_owned(),
-                process: "".to_owned(),
-                process_path: "".to_owned(),
-                source_ip: "".to_owned(),
-                source_port: "0".to_owned(),
+                // process: "".to_owned(),
+                // process_path: "".to_owned(),
+                // source_ip: "".to_owned(),
+                // source_port: "0".to_owned(),
                 remote_destination: "".to_owned(),
                 destination_port: "0".to_owned(),
                 destination_ip: None,
-                sniff_host: None,
+                // sniff_host: None,
             },
             upload: 0,
             download: 0,
-            start: "".to_owned(),
+            // start: "".to_owned(),
             chains: vec![],
             rule: None,
-            rule_payload: None,
+            // rule_payload: None,
         }
     }
 

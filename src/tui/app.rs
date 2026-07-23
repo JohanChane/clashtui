@@ -239,7 +239,7 @@ impl App {
                         Some('t') => {
                             log::debug!("close all connections");
                             let _ =
-                                crate::functions::restful::connection::terminate_all_connections();
+                                crate::functions::restful::connection::terminate_connection(None);
                         }
                         _ => {}
                     }
