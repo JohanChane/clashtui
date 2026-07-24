@@ -167,8 +167,14 @@ impl App {
                 let ev = tokio::select! {
                     Some(ev) = events.next() => ev?,
                     _ = &mut tick => continue,
-                    // if we switch between screens, we have to tell ratatui to re-render everything
-                    _ = FULL_RENDER.notified() => { terminal.clear()?; continue },
+                    // if we switch between screens
+                    _ = FULL_RENDER.notified() => {
+                        // first we hold tui for output
+                        FULL_RENDER.notified().await;
+                        // then we tell ratatui to re-render everything
+                        terminal.clear()?;
+                        continue
+                    },
                 };
                 tick.await;
                 ev
@@ -234,7 +240,7 @@ impl App {
                         }
                         Some('f') => {
                             log::debug!("restart core service");
-                            let _ = crate::functions::command::restart_service(None);
+                            let _ = crate::functions::command::restart_service();
                         }
                         Some('t') => {
                             log::debug!("close all connections");
