@@ -322,8 +322,8 @@ profiles:
 "#;
         let data: super::super::database::CoreProfileData = serde_yml::from_str(yaml).unwrap();
         assert_eq!(data.cur_profile.as_deref(), Some("my"));
-        assert_eq!(data.profiles.get("pf1").unwrap().no_pp, true);
-        assert_eq!(data.profiles.get("pf2").unwrap().no_pp, false);
+        assert!(data.profiles.get("pf1").unwrap().no_pp);
+        assert!(!data.profiles.get("pf2").unwrap().no_pp);
     }
 
     #[test]

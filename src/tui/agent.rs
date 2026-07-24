@@ -56,6 +56,7 @@ pub struct Entry {
     desc: Option<String>,
 }
 
+#[allow(clippy::type_complexity)]
 pub fn extract_keymap_list<K: serde::de::DeserializeOwned>(
     entries: Vec<Entry>,
 ) -> Result<(

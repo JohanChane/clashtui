@@ -378,10 +378,11 @@ impl TabContent for SrvCtlContent {
                             // stop all core services first
                             let stop_result = crate::functions::command::stop_all_services();
 
-                            match {
+                            let res = {
                                 crate::config::CONFIG.data.lock().unwrap().core_type = new_type;
                                 crate::config::CONFIG.save()
-                            } {
+                            };
+                            match res {
                                 Ok(()) => {
                                     // start the target core
                                     let start_result =

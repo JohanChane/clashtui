@@ -693,8 +693,7 @@ mod tests {
 
     #[test]
     fn refresh_display_rows_none_when_empty() {
-        let mut c = Connections::default();
-        c.row = Some(0);
+        let mut c = Connections { row: Some(0), ..Default::default() };
         c.refresh_display_rows();
         assert!(c.row.is_none());
     }
@@ -705,11 +704,10 @@ mod tests {
         let mut c = mk_conns(conns);
         c.row = Some(0);
         // simulate Key::MoveUp handler logic inline
-        if let Some(r) = c.row {
-            if r > 0 {
+        if let Some(r) = c.row
+            && r > 0 {
                 c.row = Some(r - 1);
             }
-        }
         assert_eq!(c.row, Some(0));
     }
 
@@ -718,11 +716,10 @@ mod tests {
         let conns = &[conn("1", "a.com"), conn("2", "b.com")];
         let mut c = mk_conns(conns);
         c.row = Some(1);
-        if let Some(r) = c.row {
-            if r + 1 < c.display_rows.len() {
+        if let Some(r) = c.row
+            && r + 1 < c.display_rows.len() {
                 c.row = Some(r + 1);
             }
-        }
         assert_eq!(c.row, Some(1));
     }
 
@@ -1059,14 +1056,15 @@ impl Connections {
             SortColumn::Download => {
                 if descending {
                     self.display_rows
-                        .sort_by(|a, b| b.download.cmp(&a.download));
+                        .sort_by_key(|a| std::cmp::Reverse(a.download));
                 } else {
                     self.display_rows.sort_by_key(|a| a.download);
                 }
             }
             SortColumn::Upload => {
                 if descending {
-                    self.display_rows.sort_by(|a, b| b.upload.cmp(&a.upload));
+                    self.display_rows
+                        .sort_by_key(|a| std::cmp::Reverse(a.upload));
                 } else {
                     self.display_rows.sort_by_key(|a| a.upload);
                 }
@@ -1074,7 +1072,7 @@ impl Connections {
             SortColumn::DlSpeed => {
                 if descending {
                     self.display_rows
-                        .sort_by(|a, b| b.dl_speed.cmp(&a.dl_speed));
+                        .sort_by_key(|a| std::cmp::Reverse(a.dl_speed));
                 } else {
                     self.display_rows.sort_by_key(|a| a.dl_speed);
                 }
@@ -1082,7 +1080,7 @@ impl Connections {
             SortColumn::UlSpeed => {
                 if descending {
                     self.display_rows
-                        .sort_by(|a, b| b.ul_speed.cmp(&a.ul_speed));
+                        .sort_by_key(|a| std::cmp::Reverse(a.ul_speed));
                 } else {
                     self.display_rows.sort_by_key(|a| a.ul_speed);
                 }

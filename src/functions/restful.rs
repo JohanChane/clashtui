@@ -91,7 +91,7 @@ pub mod config {
         )
         .and_then(|r| {
             if r.status_code >= 200 && r.status_code < 300 {
-                r.as_str().map(|s| s.to_owned()).map_err(|e| e)
+                r.as_str().map(|s| s.to_owned())
             } else {
                 let body = r.as_str().unwrap_or("(non-utf8 body)");
                 Err(minreq::Error::IoError(std::io::Error::other(format!(

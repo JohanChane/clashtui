@@ -26,5 +26,5 @@ pub fn request(
     if let Some(s) = CONFIG.secret_for_core() {
         req = req.with_header(headers::AUTHORIZATION, format!("Bearer {s}"));
     }
-    req.with_timeout(timeout!()).send().map_err(|e| e)
+    req.with_timeout(timeout!()).send()
 }

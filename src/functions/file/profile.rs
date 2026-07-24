@@ -1,3 +1,4 @@
+#[allow(clippy::module_inception)]
 mod profile;
 
 use super::PROFILE_JSONS_PATH;

@@ -108,6 +108,7 @@ impl ProxyTree {
         self.rebuild_index();
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn push_entry(
         nodes: &mut Vec<NodeItem>,
         name: &str,
@@ -591,8 +592,8 @@ mod tests {
         );
 
         assert_eq!(nodes.len(), 1);
-        assert_eq!(nodes[0].udp, true);
-        assert_eq!(nodes[0].tcp, true);
+        assert!(nodes[0].udp);
+        assert!(nodes[0].tcp);
     }
 
     #[test]
@@ -642,10 +643,10 @@ mod tests {
         );
 
         assert_eq!(nodes.len(), 2);
-        assert_eq!(nodes[0].udp, false);
-        assert_eq!(nodes[0].tcp, true);
-        assert_eq!(nodes[1].udp, false);
-        assert_eq!(nodes[1].tcp, false);
+        assert!(!nodes[0].udp);
+        assert!(nodes[0].tcp);
+        assert!(!nodes[1].udp);
+        assert!(!nodes[1].tcp);
     }
 
     #[test]
@@ -653,9 +654,9 @@ mod tests {
         let json = r#"{"proxies":{"node":{"name":"node","type":"Vmess","udp":true}}}"#;
         let response: ProxiesResponse = serde_json::from_str(json).unwrap();
         let proxy = response.proxies.get("node").unwrap();
-        assert_eq!(proxy.udp, true);
-        assert_eq!(
-            proxy.tcp, false,
+        assert!(proxy.udp);
+        assert!(
+            !proxy.tcp,
             "tcp should default to false when missing from JSON"
         );
     }
@@ -698,8 +699,8 @@ mod tests {
         );
 
         let child = nodes.iter().find(|n| n.name == "Child").unwrap();
-        assert_eq!(child.udp, true);
-        assert_eq!(child.tcp, false);
+        assert!(child.udp);
+        assert!(!child.tcp);
     }
 
     fn load_singbox_fixture() -> IndexMap<String, Proxy> {
@@ -781,8 +782,8 @@ mod tests {
         tree.expand_all(&proxies);
         let tcp_child = tree.nodes.iter().find(|n| n.name == "tcp-node");
         assert!(tcp_child.is_some());
-        assert_eq!(tcp_child.unwrap().tcp, true);
-        assert_eq!(tcp_child.unwrap().udp, false);
+        assert!(tcp_child.unwrap().tcp);
+        assert!(!tcp_child.unwrap().udp);
     }
 
     #[test]
@@ -847,7 +848,7 @@ mod tests {
         tree.expand_all(&proxies);
         let tcp = tree.nodes.iter().find(|n| n.name == "tcp-only");
         assert!(tcp.is_some());
-        assert_eq!(tcp.unwrap().tcp, true);
-        assert_eq!(tcp.unwrap().udp, false);
+        assert!(tcp.unwrap().tcp);
+        assert!(!tcp.unwrap().udp);
     }
 }

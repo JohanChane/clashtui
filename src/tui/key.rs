@@ -46,15 +46,7 @@ impl Default for Key {
 impl From<KeyEvent> for Key {
     fn from(value: KeyEvent) -> Self {
         let shift = match (value.code, value.modifiers) {
-            (KeyCode::Char(c), m) => {
-                if c.is_ascii_uppercase() {
-                    true
-                } else if !c.is_ascii_alphabetic() && m.contains(KeyModifiers::SHIFT) {
-                    false
-                } else {
-                    false
-                }
-            }
+            (KeyCode::Char(c), _m) => c.is_ascii_uppercase(),
             (KeyCode::BackTab, _) => false,
             (_, m) => m.contains(KeyModifiers::SHIFT),
         };
@@ -127,6 +119,59 @@ impl FromStr for Key {
             bail!("empty key");
         }
         Ok(key)
+    }
+}
+
+impl Display for Key {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(c) = self.plain() {
+            return if c == ' ' {
+                write!(f, "<Space>")
+            } else {
+                f.write_char(c)
+            };
+        }
+
+        write!(f, "<")?;
+        if self.super_ {
+            write!(f, "D-")?;
+        }
+        if self.ctrl {
+            write!(f, "C-")?;
+        }
+        if self.alt {
+            write!(f, "A-")?;
+        }
+        if self.shift && !matches!(self.code, KeyCode::Char(_)) {
+            write!(f, "S-")?;
+        }
+
+        let code = match self.code {
+            KeyCode::Backspace => "Backspace",
+            KeyCode::Enter => "Enter",
+            KeyCode::Left => "Left",
+            KeyCode::Right => "Right",
+            KeyCode::Up => "Up",
+            KeyCode::Down => "Down",
+            KeyCode::Home => "Home",
+            KeyCode::End => "End",
+            KeyCode::PageUp => "PageUp",
+            KeyCode::PageDown => "PageDown",
+            KeyCode::Tab => "Tab",
+            KeyCode::BackTab => "BackTab",
+            KeyCode::Delete => "Delete",
+            KeyCode::Insert => "Insert",
+            KeyCode::Esc => "Esc",
+
+            KeyCode::Char(' ') => "Space",
+            KeyCode::Char(c) => {
+                f.write_char(c)?;
+                ""
+            }
+            _ => "Unknown",
+        };
+
+        write!(f, "{code}>")
     }
 }
 
@@ -212,58 +257,5 @@ mod tests {
         let k = Key::from(key_event(KeyCode::Up, KeyModifiers::SHIFT));
         assert_eq!(k.code, KeyCode::Up);
         assert!(k.shift);
-    }
-}
-
-impl Display for Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(c) = self.plain() {
-            return if c == ' ' {
-                write!(f, "<Space>")
-            } else {
-                f.write_char(c)
-            };
-        }
-
-        write!(f, "<")?;
-        if self.super_ {
-            write!(f, "D-")?;
-        }
-        if self.ctrl {
-            write!(f, "C-")?;
-        }
-        if self.alt {
-            write!(f, "A-")?;
-        }
-        if self.shift && !matches!(self.code, KeyCode::Char(_)) {
-            write!(f, "S-")?;
-        }
-
-        let code = match self.code {
-            KeyCode::Backspace => "Backspace",
-            KeyCode::Enter => "Enter",
-            KeyCode::Left => "Left",
-            KeyCode::Right => "Right",
-            KeyCode::Up => "Up",
-            KeyCode::Down => "Down",
-            KeyCode::Home => "Home",
-            KeyCode::End => "End",
-            KeyCode::PageUp => "PageUp",
-            KeyCode::PageDown => "PageDown",
-            KeyCode::Tab => "Tab",
-            KeyCode::BackTab => "BackTab",
-            KeyCode::Delete => "Delete",
-            KeyCode::Insert => "Insert",
-            KeyCode::Esc => "Esc",
-
-            KeyCode::Char(' ') => "Space",
-            KeyCode::Char(c) => {
-                f.write_char(c)?;
-                ""
-            }
-            _ => "Unknown",
-        };
-
-        write!(f, "{code}>")
     }
 }

@@ -635,7 +635,7 @@ mod tests {
     #[test]
     fn global_chord_ctrl_g_enters_chord_mode() {
         let g = ctrl('g');
-        let shortcuts: &[(KeyCombo, &str)] = &*GLOBAL_CHORD_SHORTCUTS;
+        let shortcuts: &[(KeyCombo, &str)] = &GLOBAL_CHORD_SHORTCUTS;
         let mut ch = ChordHandler::default();
         let mut dispatched: Vec<Vec<Key>> = vec![];
         let consumed = ch.handle(&g, shortcuts, &mut |seq| dispatched.push(seq.to_vec()));

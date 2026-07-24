@@ -41,39 +41,6 @@ pub(super) fn load_home_dir() -> Result<std::path::PathBuf> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn load_home_dir_macos_uses_home_dot_config() {
-        // When not in portable mode, macOS uses $HOME/.config/clashtui
-        let exe_dir = std::env::current_exe()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .to_path_buf();
-        let portable_data = exe_dir.join("data");
-        if portable_data.exists() && portable_data.is_dir() {
-            eprintln!("skipping: portable data dir exists at {:?}", portable_data);
-            return;
-        }
-        let result = load_home_dir().unwrap();
-        assert!(
-            result.ends_with(".config/clashtui"),
-            "expected path ending with .config/clashtui, got: {result:?}"
-        );
-    }
-
-    #[test]
-    fn cfg_macos_consistent() {
-        // cfg!(target_os = "macos") should be true when compiled with --target *-apple-darwin
-        let is_macos = cfg!(target_os = "macos");
-        // This always passes — it just documents the expected platform detection
-        assert!(is_macos || !is_macos);
-    }
-}
-
 macro_rules! load_save {
     ($id:ident, $name:expr) => {
         impl $id {
@@ -109,4 +76,37 @@ macro_rules! load_save {
             }
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn load_home_dir_macos_uses_home_dot_config() {
+        // When not in portable mode, macOS uses $HOME/.config/clashtui
+        let exe_dir = std::env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        let portable_data = exe_dir.join("data");
+        if portable_data.exists() && portable_data.is_dir() {
+            eprintln!("skipping: portable data dir exists at {:?}", portable_data);
+            return;
+        }
+        let result = load_home_dir().unwrap();
+        assert!(
+            result.ends_with(".config/clashtui"),
+            "expected path ending with .config/clashtui, got: {result:?}"
+        );
+    }
+
+    #[test]
+    fn cfg_macos_consistent() {
+        // cfg!(target_os = "macos") should be true when compiled with --target *-apple-darwin
+        let is_macos = cfg!(target_os = "macos");
+        // This always passes — it just documents the expected platform detection
+        assert!(is_macos || !is_macos);
+    }
 }

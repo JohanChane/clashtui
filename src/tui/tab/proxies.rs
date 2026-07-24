@@ -173,7 +173,7 @@ mod tests {
     #[test]
     fn dispatch_shortcut_matches_chord() {
         let seq: Vec<TuiKey> = vec![mk_key(KeyCode::Char('a')), mk_key(KeyCode::Char('f'))];
-        let found = all_shortcuts().iter().any(|(combo, _, _)| &**combo == seq);
+        let found = all_shortcuts().iter().any(|(combo, _, _)| **combo == seq);
         assert!(found, "dispatch_shortcut should find (a,f) chord");
     }
 
@@ -514,8 +514,7 @@ mod tests {
         assert!(
             all_shortcuts()
                 .iter()
-                .any(|(combo, key, _)| &**combo == &[a.clone(), f.clone()]
-                    && matches!(key, Key::CollapseAll)),
+                .any(|(combo, key, _)| **combo == [a, f] && matches!(key, Key::CollapseAll)),
             "af chord should dispatch CollapseAll"
         );
 
@@ -560,8 +559,7 @@ mod tests {
         let parent = content
             .tree
             .node_at(folder_idx)
-            .map(|n| n.parent.clone())
-            .flatten();
+            .and_then(|n| n.parent.clone());
 
         let siblings: Vec<&str> = content
             .tree
@@ -629,8 +627,7 @@ mod tests {
         let parent = content
             .tree
             .node_at(child_idx)
-            .map(|n| n.parent.clone())
-            .flatten();
+            .and_then(|n| n.parent.clone());
 
         let siblings: Vec<&str> = content
             .tree

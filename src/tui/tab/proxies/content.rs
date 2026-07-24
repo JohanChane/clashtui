@@ -433,7 +433,7 @@ mod tests {
     #[test]
     fn selection_key_none_when_no_selection() {
         let (content, state) = load_fixture();
-        let mut s = state.clone();
+        let mut s = state;
         s.select(None);
         assert!(content.selection_key(&s).is_none());
     }

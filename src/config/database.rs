@@ -338,19 +338,19 @@ singbox:
             db.mihomo.profiles.get("pf1").unwrap().dtype,
             ProfileType::File
         );
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf1").unwrap().no_pp);
         assert_eq!(
             db.mihomo.profiles.get("pf2").unwrap().dtype,
             ProfileType::Url("https://raw.com".to_string())
         );
-        assert_eq!(db.mihomo.profiles.get("pf2").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf2").unwrap().no_pp);
         assert_eq!(
             db.mihomo.profiles.get("pf3").unwrap().dtype,
             ProfileType::Template {
                 template: "tpl.yaml".into(),
             }
         );
-        assert_eq!(db.mihomo.profiles.get("pf3").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf3").unwrap().no_pp);
     }
     #[test]
     fn serde_generated_migrated_to_template() {
@@ -368,7 +368,7 @@ singbox:
                 template: "my-tpl.yaml".into(),
             }
         );
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf1").unwrap().no_pp);
     }
     #[test]
     fn serde_roundtrip_file_and_url() {
@@ -396,8 +396,8 @@ singbox:
   profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
-        assert_eq!(db.mihomo.profiles.get("pf2").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf1").unwrap().no_pp);
+        assert!(!db.mihomo.profiles.get("pf2").unwrap().no_pp);
     }
     #[test]
     fn new_format_preserves_no_pp() {
@@ -410,8 +410,8 @@ singbox:
   profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, true);
-        assert_eq!(db.mihomo.profiles.get("pf2").unwrap().no_pp, false);
+        assert!(db.mihomo.profiles.get("pf1").unwrap().no_pp);
+        assert!(!db.mihomo.profiles.get("pf2").unwrap().no_pp);
     }
     #[test]
     fn new_format_missing_no_pp_defaults_false() {
@@ -423,7 +423,7 @@ singbox:
   profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf1").unwrap().no_pp);
     }
     #[test]
     fn set_no_pp_toggles_and_persists() {
@@ -458,10 +458,7 @@ singbox:
   profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(
-            db.mihomo.profiles.get("pf1").unwrap().update_with_proxy,
-            false
-        );
+        assert!(!db.mihomo.profiles.get("pf1").unwrap().update_with_proxy);
     }
 
     #[test]
