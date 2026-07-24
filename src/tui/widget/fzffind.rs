@@ -4,7 +4,7 @@ use std::sync::atomic::Ordering;
 
 pub fn run_fzf(items: &[String], prompt: &str) -> Option<usize> {
     crate::tui::EXT_PROC.store(true, Ordering::SeqCst);
-    crate::tui::suspend_terminal();
+    let _ = crate::tui::hold(true);
 
     let mut child = match Command::new("fzf")
         .args([
@@ -22,8 +22,8 @@ pub fn run_fzf(items: &[String], prompt: &str) -> Option<usize> {
     {
         Ok(c) => c,
         Err(e) => {
+            let _ = crate::tui::hold(false);
             crate::tui::widget::popmsg::Confirm::err(anyhow::anyhow!("fzf: {e}"));
-            let _ = crate::tui::resume_terminal();
             crate::tui::EXT_PROC.store(false, Ordering::SeqCst);
             return None;
         }
@@ -41,15 +41,14 @@ pub fn run_fzf(items: &[String], prompt: &str) -> Option<usize> {
     let output = match child.wait_with_output() {
         Ok(o) => o,
         Err(e) => {
+            let _ = crate::tui::hold(false);
             crate::tui::widget::popmsg::Confirm::err(anyhow::anyhow!("fzf wait: {e}"));
-            let _ = crate::tui::resume_terminal();
             crate::tui::EXT_PROC.store(false, Ordering::SeqCst);
             return None;
         }
     };
 
-    let _ = crate::tui::resume_terminal();
-    crate::tui::app::FULL_RENDER.notify_one();
+    let _ = crate::tui::hold(false);
     crate::tui::EXT_PROC.store(false, Ordering::SeqCst);
 
     if !output.status.success() {

@@ -36,11 +36,3 @@ pub fn restore() -> anyhow::Result<()> {
     term::teardown();
     Ok(())
 }
-
-pub fn suspend_terminal() {
-    term::suspend();
-}
-
-pub fn resume_terminal() -> anyhow::Result<()> {
-    term::resume()
-}
