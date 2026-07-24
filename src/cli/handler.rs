@@ -147,7 +147,7 @@ fn handle_service(command: ServiceCommand) -> Result<()> {
     match command {
         ServiceCommand::Restart { soft } => {
             if soft {
-                crate::functions::restful::control::restart(None)
+                crate::functions::restful::control::restart()
                     .map_err(|e| anyhow::anyhow!("Soft restart failed: {e}"))?;
                 println!("Core restarted (soft).");
             } else {

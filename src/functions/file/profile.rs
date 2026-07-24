@@ -474,7 +474,7 @@ pub async fn select(profile: Profile) -> anyhow::Result<()> {
     lprofile.path = out_path.clone();
     lprofile.sync_to_disk()?;
     db::set_current(profile)?;
-    crate::functions::restful::config::reload(&out_path.display().to_string())
+    crate::functions::restful::config::reload()
         .map_err(|e| anyhow::anyhow!("Config written but reload failed: {e}"))?;
     Ok(())
 }

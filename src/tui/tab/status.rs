@@ -77,7 +77,7 @@ impl BasicTabContent for Status {
                 or_set
             );
             let detected = tri!(
-                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
+                tokio::task::spawn_blocking(restful::control::detect_core_type)
                     .await
                     .unwrap(),
                 or_set
@@ -119,7 +119,7 @@ impl BasicTabContent for Status {
 
         async {
             let detected = tri!(
-                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
+                tokio::task::spawn_blocking(restful::control::detect_core_type)
                     .await
                     .unwrap(),
                 or_set

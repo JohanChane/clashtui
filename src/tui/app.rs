@@ -69,7 +69,7 @@ impl App {
                 FileTab::default().into(),
                 ProxiesTab::default().into(),
                 ConnectionsTab::default().into(),
-                LogsTab::default().into(),
+                // LogsTab::default().into(),
                 SettingsTab::default().into(),
                 CoreSrvCtlTab::default().into(),
             ],
@@ -239,7 +239,7 @@ impl App {
                         Some('t') => {
                             log::debug!("close all connections");
                             let _ =
-                                crate::functions::restful::connection::terminate_all_connections();
+                                crate::functions::restful::connection::terminate_connection(None);
                         }
                         _ => {}
                     }
@@ -582,7 +582,7 @@ mod tests {
                 Tab::from(FileTab::default()),
                 Tab::from(ProxiesTab::default()),
                 Tab::from(ConnectionsTab::default()),
-                Tab::from(LogsTab::default()),
+                // Tab::from(LogsTab::default()),
                 Tab::from(SettingsTab::default()),
                 Tab::from(CoreSrvCtlTab::default()),
             ],

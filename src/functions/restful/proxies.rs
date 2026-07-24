@@ -123,12 +123,11 @@ pub fn fetch_proxies() -> Result<ProxiesResponse> {
 
 pub fn select_proxy(group: &str, node: &str) -> Result<()> {
     let payload = serde_json::json!({ "name": node }).to_string();
-    request(
+    request_return_204(
         Method::Put,
         &format!("/proxies/{}", encode_path(group)),
         Some(payload),
     )
-    .map(|_| ())
 }
 
 pub fn test_proxy_delay(name: &str, url: Option<&str>, timeout: u64) -> Result<Option<u64>> {
@@ -159,25 +158,5 @@ pub fn test_group_delay(
         "/group/{name_enc}/delay?url={}&timeout={timeout}",
         encode_query(test_url)
     );
-    request(Method::Get, &endpoint, None).and_then(|r| {
-        let v: serde_json::Value = r.json()?;
-        let map = v
-            .as_object()
-            .map(|obj| {
-                obj.iter()
-                    .filter_map(|(k, v)| {
-                        let delay = v
-                            .as_u64()
-                            .or_else(|| v.as_str().and_then(|s| s.parse().ok()))?;
-                        if delay > 0 {
-                            Some((k.clone(), delay))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        Ok(map)
-    })
+    request(Method::Get, &endpoint, None).and_then(|r| r.json())
 }
