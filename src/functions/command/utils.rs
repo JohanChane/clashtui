@@ -23,16 +23,16 @@ pub fn exec_sudo(pgm: &str, args: Vec<&str>) -> Result<String> {
     let mut output_copy = Vec::new();
     let mut buffer = [0; 1024];
 
-    // 循环读取直到管道关闭
+    // Read in a loop until the pipe closes
     loop {
         use std::io::{Read, Write};
         let n = childstderr.read(&mut buffer)?;
         if n == 0 {
             break; // EOF
         }
-        // 保存到内存（复制一份）
+        // Save to memory (keep a copy)
         output_copy.extend_from_slice(&buffer[..n]);
-        // 写入终端
+        // Write to terminal
         stderr.write_all(&buffer[..n])?;
         stderr.flush()?;
     }
