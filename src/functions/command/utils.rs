@@ -12,12 +12,34 @@ pub fn exec_sudo(pgm: &str, args: Vec<&str>) -> Result<String> {
     use crate::tui;
     log::debug!("IPC: sudo -S {:?}", args);
     tui::hold(true)?;
-    let output = Command::new("sudo")
-        .arg("-S")
+    let mut child = Command::new("sudo")
         .arg(pgm)
         .args(args)
-        .spawn()?
-        .wait_with_output()?;
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let mut childstderr = child.stderr.take().unwrap();
+    let mut stderr = std::io::stderr();
+    let mut output_copy = Vec::new();
+    let mut buffer = [0; 1024];
+
+    // 循环读取直到管道关闭
+    loop {
+        use std::io::{Read, Write};
+        let n = childstderr.read(&mut buffer)?;
+        if n == 0 {
+            break; // EOF
+        }
+        // 保存到内存（复制一份）
+        output_copy.extend_from_slice(&buffer[..n]);
+        // 写入终端
+        stderr.write_all(&buffer[..n])?;
+        stderr.flush()?;
+    }
+    eprintln!();
+    let mut output = child.wait_with_output()?;
+    output.stderr = output_copy;
+
     tui::hold(false)?;
     Ok(stringify_output(output))
 }
