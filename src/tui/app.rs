@@ -84,7 +84,7 @@ impl App {
     }
     #[cfg(target_family = "unix")]
     fn check_startup_perms(&self) {
-        if crate::config::CONFIG.cfg_file.mihomo.core_service.is_user {
+        if !crate::config::CONFIG.cfg_file.mihomo.core_service.need_sudo {
             return;
         }
         use std::io::Write;

@@ -12,6 +12,48 @@ use std::{path::Path, process::Command};
 pub use platform::*;
 use utils::*;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Ops {
+    Stop,
+    Restart,
+    SwitchCore,
+    StopAll,
+    #[cfg(windows)]
+    Install,
+    #[cfg(windows)]
+    Uninstall,
+    #[cfg(windows)]
+    ToggleSysProxy,
+}
+
+impl Ops {
+    fn as_str(&self) -> &str {
+        match self {
+            Self::Stop => "Stop Service",
+            Self::Restart => "Start Service",
+            Self::SwitchCore => "Switch Core",
+            Self::StopAll => "Stop All Services",
+            #[cfg(windows)]
+            Self::Install => "Install Srv",
+            #[cfg(windows)]
+            Self::Uninstall => "Uninstall Srv",
+            #[cfg(windows)]
+            Self::ToggleSysProxy => "Toggle SysProxy",
+        }
+    }
+    fn all() -> Vec<Self> {
+        #[cfg_attr(not(windows), allow(unused_mut))]
+        let mut ops = vec![Self::Stop, Self::Restart, Self::SwitchCore, Self::StopAll];
+        #[cfg(windows)]
+        {
+            ops.push(Self::Install);
+            ops.push(Self::Uninstall);
+            ops.push(Self::ToggleSysProxy);
+        }
+        ops
+    }
+}
+
 pub fn test_config(profile_path: Option<&Path>, enable_geodata_mode: bool) -> String {
     let cfg = &CONFIG.cfg_file.mihomo.core;
 
@@ -102,101 +144,34 @@ pub fn check_config(profile_path: &Path) -> anyhow::Result<()> {
 
 pub fn is_core_service_running() -> Option<bool> {
     let ct = CONFIG.core_type();
-    let (service_name, is_user, csc) = match ct {
-        CoreType::Mihomo => (
-            &CONFIG.cfg_file.mihomo.core_service.service_name,
-            CONFIG.cfg_file.mihomo.core_service.is_user,
-            &CONFIG.cfg_file.mihomo.core_service,
-        ),
-        CoreType::Singbox => (
-            &CONFIG.cfg_file.singbox.core_service.service_name,
-            CONFIG.cfg_file.singbox.core_service.is_user,
-            &CONFIG.cfg_file.singbox.core_service,
-        ),
+    let scfg = match ct {
+        CoreType::Mihomo => &CONFIG.cfg_file.mihomo.core_service,
+        CoreType::Singbox => &CONFIG.cfg_file.singbox.core_service,
     };
-    let host = &ServiceController::from_config(csc);
-
-    if service_name.is_empty() {
-        return None;
-    }
-
-    #[cfg(target_os = "windows")]
-    if matches!(host, ServiceController::Nssm) {
-        let s = nssm_status(service_name);
-        return Some(s == "active");
-    }
-
-    if matches!(host, ServiceController::OpenRc) {
-        let mut args = vec![];
-        if is_user {
-            args.push("--user");
-        }
-        args.push(service_name.as_str());
-        args.push("status");
-        return std::process::Command::new(host.bin_name())
-            .args(&args)
-            .output()
-            .map(|o| Some(String::from_utf8_lossy(&o.stdout).contains("started")))
-            .unwrap_or(None);
-    }
-
-    if matches!(host, ServiceController::Systemd) {
-        let mut args = vec!["is-active"];
-        if is_user {
-            args.push("--user");
-        }
-        args.push(service_name);
-        return std::process::Command::new(host.bin_name())
-            .args(&args)
-            .output()
-            .map(|o| Some(String::from_utf8_lossy(&o.stdout).trim() == "active"))
-            .unwrap_or(None);
-    }
-
-    #[cfg(target_os = "macos")]
-    if matches!(host, ServiceController::Launchd) && is_user {
-        let uid = unsafe { libc::getuid() };
-        return std::process::Command::new("launchctl")
-            .args(["print", &format!("gui/{uid}/{service_name}")])
-            .output()
-            .map(|o| Some(String::from_utf8_lossy(&o.stdout).contains("state = running")))
-            .unwrap_or(None);
-    }
-
-    None
+    let result = exec("sh", vec!["-c", &scfg.is_active]).ok()?;
+    Some(result.starts_with("OK")) // Return Code is 0 in fact
 }
 
-fn svc_operation(op: &str, core_type: Option<CoreType>) -> Result<String> {
+fn svc_operation(op: Ops, core_type: Option<CoreType>) -> Result<String> {
     let ct = core_type.unwrap_or(CONFIG.core_type());
-
-    let (service_name, is_user, csc) = match ct {
-        CoreType::Mihomo => (
-            &CONFIG.cfg_file.mihomo.core_service.service_name,
-            CONFIG.cfg_file.mihomo.core_service.is_user,
-            &CONFIG.cfg_file.mihomo.core_service,
-        ),
-        CoreType::Singbox => (
-            &CONFIG.cfg_file.singbox.core_service.service_name,
-            CONFIG.cfg_file.singbox.core_service.is_user,
-            &CONFIG.cfg_file.singbox.core_service,
-        ),
+    let scfg = match ct {
+        CoreType::Mihomo => &CONFIG.cfg_file.mihomo.core_service,
+        CoreType::Singbox => &CONFIG.cfg_file.singbox.core_service,
     };
-    let host = &ServiceController::from_config(csc);
 
-    if matches!(host, ServiceController::Launchd) {
-        return launchd_operation(op, service_name, is_user);
-    }
-
-    #[cfg(target_os = "windows")]
-    if matches!(host, ServiceController::Nssm) {
-        return nssm_svc_operation(op, service_name, ct);
-    }
-
-    let svc_args = host.args(op, service_name, is_user);
-    if is_user {
-        exec(host.bin_name(), svc_args)
+    let args = vec![
+        "-c",
+        match op {
+            Ops::Stop => &scfg.stop,
+            Ops::Restart => &scfg.restart,
+            Ops::SwitchCore => todo!(),
+            Ops::StopAll => todo!(),
+        },
+    ];
+    if scfg.need_sudo {
+        exec_sudo("sh", args)
     } else {
-        exec_sudo(host.bin_name(), svc_args)
+        exec("sh", args)
     }
 }
 

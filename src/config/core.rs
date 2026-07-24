@@ -32,33 +32,46 @@ pub struct CoreConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default)]
-pub struct CoreServiceConfig {
-    pub service_name: String,
-    /// Controls --user flag (systemd user service) and whether sudo prefix is needed.
-    /// When false, `sudo -n true` is used to detect NOPASSWD and skip password prompt.
-    pub is_user: bool,
-    /// Init system controller override. Supported values: `"systemd"`, `"openrc"`.
-    /// When absent or unrecognized, the compile-time platform default is used.
-    /// Non-Linux platforms ignore this field.
-    pub service_controller: Option<String>,
+pub struct CoreServiceManage {
+    /// If set, clashtui will run the command below with
+    /// root privileges via `sudo` or something
+    pub need_sudo: bool,
+    /// Start the service
+    pub start: String,
+    /// Restart the service
+    pub restart: String,
+    /// Stop the service
+    pub stop: String,
+    /// Service status
+    pub status: String,
+    /// Service is active
+    pub is_active: String,
+}
+
+macro_rules! core_service {
+    (@systemd, $target:literal) => {
+        core_service!(@systemd, start, restart, stop, status, is_active, $target)
+    };
+    (@systemd, $($act:ident,)+ $target: literal) => {
+        CoreServiceManage {
+            need_sudo: true,
+            $($act: format!("systemd {} {}", stringify!($act).replace('_', "-"), $target),)+
+        }
+    };
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default)]
 pub struct MihomoSection {
-    #[serde(default)]
     pub core: CoreConfig,
-    #[serde(default)]
-    pub core_service: CoreServiceConfig,
+    pub core_service: CoreServiceManage,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
 #[serde(default)]
 pub struct SingboxSection {
-    #[serde(default)]
     pub core: CoreConfig,
-    #[serde(default)]
-    pub core_service: CoreServiceConfig,
+    pub core_service: CoreServiceManage,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -87,7 +100,7 @@ impl Default for ConfigFile {
                         bin_path: format!("{base}/mihomo/mihomo.exe"),
                         config_path: format!("{base}/mihomo/config/config.yaml"),
                     },
-                    core_service: CoreServiceConfig {
+                    core_service: CoreServiceManage {
                         service_name: "clashtui_mihomo".into(),
                         is_user: false,
                         service_controller: None,
@@ -99,7 +112,7 @@ impl Default for ConfigFile {
                         bin_path: format!("{base}/sing-box/sing-box.exe"),
                         config_path: format!("{base}/sing-box/config/config.json"),
                     },
-                    core_service: CoreServiceConfig {
+                    core_service: CoreServiceManage {
                         service_name: "clashtui_singbox".into(),
                         is_user: false,
                         service_controller: None,
@@ -117,11 +130,7 @@ impl Default for ConfigFile {
                     bin_path: "/opt/clashtui/mihomo/mihomo".into(),
                     config_path: "/opt/clashtui/mihomo/config/config.yaml".into(),
                 },
-                core_service: CoreServiceConfig {
-                    service_name: "clashtui_mihomo".into(),
-                    is_user: false,
-                    service_controller: None,
-                },
+                core_service: core_service!(@systemd, "clashtui_mihomo"),
             },
             singbox: SingboxSection {
                 core: CoreConfig {
@@ -129,11 +138,7 @@ impl Default for ConfigFile {
                     bin_path: "/opt/clashtui/sing-box/sing-box".into(),
                     config_path: "/opt/clashtui/sing-box/config/config.json".into(),
                 },
-                core_service: CoreServiceConfig {
-                    service_name: "clashtui_singbox".into(),
-                    is_user: false,
-                    service_controller: None,
-                },
+                core_service: core_service!(@systemd, "clashtui_singbox"),
             },
             timeout: Default::default(),
             extra: Default::default(),
@@ -152,66 +157,6 @@ impl Default for Extra {
         Self {
             edit_cmd: None,
             open_dir_cmd: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub enum ServiceController {
-    Systemd,
-    Nssm,
-    OpenRc,
-    Launchd,
-}
-impl Default for ServiceController {
-    fn default() -> Self {
-        if cfg!(windows) {
-            ServiceController::Nssm
-        } else if cfg!(target_os = "macos") {
-            ServiceController::Launchd
-        } else {
-            ServiceController::Systemd
-        }
-    }
-}
-impl ServiceController {
-    pub fn from_config(csc: &CoreServiceConfig) -> Self {
-        match csc.service_controller.as_deref() {
-            Some("systemd") => ServiceController::Systemd,
-            Some("openrc") if cfg!(not(windows)) && cfg!(not(target_os = "macos")) => {
-                ServiceController::OpenRc
-            }
-            Some(v) => {
-                log::warn!("Unknown service_controller '{v}', falling back to platform default");
-                Self::default()
-            }
-            None => Self::default(),
-        }
-    }
-    pub fn args<'a>(
-        &self,
-        work_type: &'a str,
-        service_name: &'a str,
-        is_user: bool,
-    ) -> Vec<&'a str> {
-        match self {
-            ServiceController::Systemd if is_user => vec!["--user", work_type, service_name],
-            ServiceController::Systemd => vec![work_type, service_name],
-            ServiceController::OpenRc if is_user => {
-                vec!["--user", service_name, work_type]
-            }
-            ServiceController::OpenRc => vec![service_name, work_type],
-            ServiceController::Nssm => vec![work_type, service_name],
-            // Launchd args are constructed inline in svc_operation
-            ServiceController::Launchd => vec![],
-        }
-    }
-    pub fn bin_name(&self) -> &'static str {
-        match self {
-            ServiceController::Systemd => "systemctl",
-            ServiceController::Nssm => "nssm",
-            ServiceController::OpenRc => "rc-service",
-            ServiceController::Launchd => "launchctl",
         }
     }
 }
@@ -445,7 +390,7 @@ open_dir_cmd: ""
     #[test]
     fn core_service_config_deser_openrc() {
         let yaml = "service_name: svc\nis_user: false\nservice_controller: openrc";
-        let csc: CoreServiceConfig = serde_yml::from_str(yaml).unwrap();
+        let csc: CoreServiceManage = serde_yml::from_str(yaml).unwrap();
         assert_eq!(csc.service_name, "svc");
         assert!(!csc.is_user);
         assert_eq!(csc.service_controller.as_deref(), Some("openrc"));
@@ -454,7 +399,7 @@ open_dir_cmd: ""
     #[test]
     fn core_service_config_deser_absent() {
         let yaml = "service_name: svc\nis_user: true";
-        let csc: CoreServiceConfig = serde_yml::from_str(yaml).unwrap();
+        let csc: CoreServiceManage = serde_yml::from_str(yaml).unwrap();
         assert_eq!(csc.service_name, "svc");
         assert!(csc.is_user);
         assert_eq!(csc.service_controller, None);
@@ -462,13 +407,13 @@ open_dir_cmd: ""
 
     #[test]
     fn core_service_config_roundtrip() {
-        let csc = CoreServiceConfig {
+        let csc = CoreServiceManage {
             service_name: "roundtrip_svc".into(),
             is_user: true,
             service_controller: Some("openrc".into()),
         };
         let yaml = serde_yml::to_string(&csc).unwrap();
-        let deser: CoreServiceConfig = serde_yml::from_str(&yaml).unwrap();
+        let deser: CoreServiceManage = serde_yml::from_str(&yaml).unwrap();
         assert_eq!(deser.service_name, csc.service_name);
         assert_eq!(deser.is_user, csc.is_user);
         assert_eq!(deser.service_controller.as_deref(), Some("openrc"));
@@ -478,7 +423,7 @@ open_dir_cmd: ""
 
     #[test]
     fn service_controller_from_config_none_is_default() {
-        let csc = CoreServiceConfig {
+        let csc = CoreServiceManage {
             service_controller: None,
             ..Default::default()
         };
@@ -490,7 +435,7 @@ open_dir_cmd: ""
 
     #[test]
     fn service_controller_from_config_systemd() {
-        let csc = CoreServiceConfig {
+        let csc = CoreServiceManage {
             service_controller: Some("systemd".into()),
             ..Default::default()
         };
@@ -503,7 +448,7 @@ open_dir_cmd: ""
     #[cfg(all(unix, not(target_os = "macos")))]
     #[test]
     fn service_controller_from_config_openrc_linux() {
-        let csc = CoreServiceConfig {
+        let csc = CoreServiceManage {
             service_controller: Some("openrc".into()),
             ..Default::default()
         };
@@ -516,7 +461,7 @@ open_dir_cmd: ""
     #[cfg(any(windows, target_os = "macos"))]
     #[test]
     fn service_controller_from_config_openrc_non_linux() {
-        let csc = CoreServiceConfig {
+        let csc = CoreServiceManage {
             service_controller: Some("openrc".into()),
             ..Default::default()
         };
@@ -528,7 +473,7 @@ open_dir_cmd: ""
 
     #[test]
     fn service_controller_from_config_unknown_fallback() {
-        let csc = CoreServiceConfig {
+        let csc = CoreServiceManage {
             service_controller: Some("runit".into()),
             ..Default::default()
         };
@@ -541,7 +486,7 @@ open_dir_cmd: ""
     #[cfg(all(unix, not(target_os = "macos")))]
     #[test]
     fn service_controller_from_config_openrc_generates_correct_commands() {
-        let csc = CoreServiceConfig {
+        let csc = CoreServiceManage {
             service_name: "clashtui_test".into(),
             is_user: false,
             service_controller: Some("openrc".into()),
