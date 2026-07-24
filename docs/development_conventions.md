@@ -88,3 +88,11 @@ Update the CHANGELOG **when releasing a new version**. Before tagging a release,
 | `Security`   | Security fixes           |
 
 Do not modify CHANGELOG in daily commits — only update it at release time. Since commit messages follow Conventional Commits, tools like [git-cliff](https://github.com/orhun/git-cliff) can auto-generate the changelog.
+
+## Git Hooks
+
+Run once after clone:
+
+```bash
+git config core.hooksPath .githooks
+```
