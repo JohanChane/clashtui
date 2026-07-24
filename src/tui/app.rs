@@ -7,7 +7,6 @@ use widget::chord::ChordHandler;
 use widget::help::HelpPanel;
 use widget::popmsg::PopUp;
 
-use Key;
 use crossterm::event::{KeyCode, KeyEventKind};
 use widget::tab::KeyCombo;
 
@@ -320,7 +319,7 @@ impl App {
         let candidate_count = self.chord.candidates.len();
         let cols = if candidate_count > 4 { 2 } else { 1 };
 
-        let total_height = ((candidate_count + cols - 1) / cols) as u16 + 2;
+        let total_height = candidate_count.div_ceil(cols) as u16 + 2;
         let total_width = if cols == 1 { 40 } else { 70 };
 
         let area = f.area();
@@ -346,7 +345,7 @@ impl App {
             .collect();
         let col_areas = Layout::horizontal(&col_widths).split(inner);
 
-        let items_per_col = (candidate_count + cols - 1) / cols;
+        let items_per_col = candidate_count.div_ceil(cols);
 
         let accent = Theme::get().popup.text;
 
@@ -361,7 +360,7 @@ impl App {
                     let remaining = &seq[self.chord.pressed.len()..];
                     let key_str: String = remaining
                         .iter()
-                        .map(|k| key_event_to_str(k))
+                        .map(key_event_to_str)
                         .collect::<Vec<_>>()
                         .join(" ");
                     Line::from(vec![
@@ -387,7 +386,7 @@ impl App {
         let candidate_count = self.global_chord.candidates.len();
         let cols = if candidate_count > 4 { 2 } else { 1 };
 
-        let total_height = ((candidate_count + cols - 1) / cols) as u16 + 2;
+        let total_height = candidate_count.div_ceil(cols) as u16 + 2;
         let total_width = if cols == 1 { 40 } else { 70 };
 
         let area = f.area();
@@ -413,7 +412,7 @@ impl App {
             .collect();
         let col_areas = Layout::horizontal(&col_widths).split(inner);
 
-        let items_per_col = (candidate_count + cols - 1) / cols;
+        let items_per_col = candidate_count.div_ceil(cols);
 
         let accent = Theme::get().popup.text;
 
@@ -428,7 +427,7 @@ impl App {
                     let remaining = &seq[self.global_chord.pressed.len()..];
                     let key_str: String = remaining
                         .iter()
-                        .map(|k| key_event_to_str(k))
+                        .map(key_event_to_str)
                         .collect::<Vec<_>>()
                         .join(" ");
                     Line::from(vec![
@@ -452,13 +451,13 @@ impl App {
         const TAB_COUNT: u8 = 7;
         match kv.code {
             KeyCode::Char(c @ '1'..='7') if !kv.ctrl && !kv.alt && !kv.super_ => {
-                let new_index = c as u8 - '1' as u8;
+                let new_index = c as u8 - b'1';
                 if new_index != self.tab_index {
                     self.tabs[self.tab_index as usize].on_leave();
                     self.tab_index = new_index;
                     self.tabs[self.tab_index as usize].on_enter();
                 }
-                return true;
+                true
             }
             KeyCode::Tab if !kv.ctrl && !kv.alt && !kv.super_ => {
                 let old_index = self.tab_index;
@@ -471,19 +470,19 @@ impl App {
                     self.tabs[old_index as usize].on_leave();
                     self.tabs[self.tab_index as usize].on_enter();
                 }
-                return true;
+                true
             }
             KeyCode::Char('q') if !kv.ctrl && !kv.alt && !kv.super_ => {
                 QUIT.store(true, Ordering::Relaxed);
-                return true;
+                true
             }
             KeyCode::Char('c') if kv.ctrl && !kv.alt && !kv.super_ => {
                 QUIT.store(true, Ordering::Relaxed);
-                return true;
+                true
             }
             KeyCode::Char('?') if !kv.ctrl && !kv.alt && !kv.super_ => {
                 self.help.toggle();
-                return true;
+                true
             }
             _ => false,
         }

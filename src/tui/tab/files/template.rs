@@ -173,7 +173,7 @@ impl TryFrom<&crate::tui::Key> for Key {
     fn try_from(value: &crate::tui::Key) -> Result<Self, Self::Error> {
         let agent = agent();
         if !agent.is_empty() {
-            return agent.get(value).map(|act| *act).ok_or(());
+            return agent.get(value).copied().ok_or(());
         }
 
         Ok(match value.code {
@@ -350,7 +350,7 @@ mod actions {
     }
 
     async fn delete(name: String) -> CB {
-        let rx = Confirm::title(format!("Delete template?"))
+        let rx = Confirm::title("Delete template?".to_string())
             .with_prompt(format!("Delete {name}?\nEnter to confirm, Esc to cancel"))
             .build_and_send();
         if rx.await.is_err() {

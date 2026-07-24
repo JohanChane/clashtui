@@ -6,21 +6,12 @@ use std::sync::RwLock;
 
 #[derive(serde::Deserialize, Debug, Clone, PartialEq)]
 #[serde(default)]
+#[derive(Default)]
 pub(crate) struct StyleDef {
     pub fg: Option<Color>,
     pub bg: Option<Color>,
     #[serde(default)]
     pub bold: bool,
-}
-
-impl Default for StyleDef {
-    fn default() -> Self {
-        Self {
-            fg: None,
-            bg: None,
-            bold: false,
-        }
-    }
 }
 
 impl From<StyleDef> for Style {

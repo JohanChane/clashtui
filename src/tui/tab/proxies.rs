@@ -108,7 +108,7 @@ impl TryFrom<&crate::tui::Key> for Key {
     fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
         let agent = agent();
         if !agent.is_empty() {
-            return agent.get(ev).map(|act| *act).ok_or(());
+            return agent.get(ev).copied().ok_or(());
         }
         Err(())
     }

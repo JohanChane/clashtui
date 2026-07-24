@@ -32,9 +32,9 @@ fn save_cached_proxies(url: &str, proxies: &[JsonValue]) {
 
 #[cfg_attr(not(test), allow(dead_code))]
 fn interval_to_duration(seconds: u64) -> String {
-    if seconds >= 3600 && seconds % 3600 == 0 {
+    if seconds >= 3600 && seconds.is_multiple_of(3600) {
         format!("{}h", seconds / 3600)
-    } else if seconds >= 60 && seconds % 60 == 0 {
+    } else if seconds >= 60 && seconds.is_multiple_of(60) {
         format!("{}m", seconds / 60)
     } else {
         format!("{}s", seconds)
@@ -87,16 +87,16 @@ fn dedup_singbox_proxy_tags(
     for (pp_name, proxies) in providers {
         let mut renamed_proxies = Vec::new();
         for mut proxy in proxies {
-            if let Some(obj) = proxy.as_object_mut() {
-                if let Some(tag) = obj.get("tag").and_then(|v| v.as_str()) {
-                    let tag_str = tag.to_string();
-                    if seen.contains(&tag_str) {
-                        let new_tag = format!("{}-{}", tag_str, pp_name);
-                        seen.insert(new_tag.clone());
-                        obj.insert("tag".to_string(), JsonValue::String(new_tag));
-                    } else {
-                        seen.insert(tag_str);
-                    }
+            if let Some(obj) = proxy.as_object_mut()
+                && let Some(tag) = obj.get("tag").and_then(|v| v.as_str())
+            {
+                let tag_str = tag.to_string();
+                if seen.contains(&tag_str) {
+                    let new_tag = format!("{}-{}", tag_str, pp_name);
+                    seen.insert(new_tag.clone());
+                    obj.insert("tag".to_string(), JsonValue::String(new_tag));
+                } else {
+                    seen.insert(tag_str);
                 }
             }
             renamed_proxies.push(proxy);
@@ -162,11 +162,9 @@ pub async fn gen_template_singbox(
             let url = url.clone();
             let pp_name = pp_name.clone();
             download_handles.push(tokio::task::spawn_blocking(move || {
-                if !force_refresh {
-                    if let Some(cached) = load_cached_proxies(&url) {
-                        log::info!("Using cached proxies for {pp_name} ({})", cached.len());
-                        return (pp_name, Ok(cached));
-                    }
+                if !force_refresh && let Some(cached) = load_cached_proxies(&url) {
+                    log::info!("Using cached proxies for {pp_name} ({})", cached.len());
+                    return (pp_name, Ok(cached));
                 }
                 match download_subscription(&url, with_proxy) {
                     Ok(proxies) => {
@@ -196,14 +194,14 @@ pub async fn gen_template_singbox(
                 let tagged: Vec<JsonValue> = proxies
                     .into_iter()
                     .map(|mut proxy| {
-                        if let Some(obj) = proxy.as_object_mut() {
-                            if !obj.contains_key("tag") {
-                                let tag = format!(
-                                    "{pp_name}-{}",
-                                    obj.get("server").and_then(|v| v.as_str()).unwrap_or("node")
-                                );
-                                obj.insert("tag".to_string(), JsonValue::String(tag));
-                            }
+                        if let Some(obj) = proxy.as_object_mut()
+                            && !obj.contains_key("tag")
+                        {
+                            let tag = format!(
+                                "{pp_name}-{}",
+                                obj.get("server").and_then(|v| v.as_str()).unwrap_or("node")
+                            );
+                            obj.insert("tag".to_string(), JsonValue::String(tag));
                         }
                         proxy
                     })
@@ -406,12 +404,12 @@ pub fn expand_singbox_template(
                 ob["outbounds"] = serde_json::json!(resolved);
             }
             // Resolve ${} placeholders in default field
-            if let Some(default_val) = ob.get("default").and_then(|v| v.as_str()) {
-                if default_val.starts_with("${") && default_val.ends_with('}') {
-                    let resolved_default =
-                        resolve_default_placeholder(default_val, &pg_names, groups)?;
-                    ob["default"] = JsonValue::String(resolved_default);
-                }
+            if let Some(default_val) = ob.get("default").and_then(|v| v.as_str())
+                && default_val.starts_with("${")
+                && default_val.ends_with('}')
+            {
+                let resolved_default = resolve_default_placeholder(default_val, &pg_names, groups)?;
+                ob["default"] = JsonValue::String(resolved_default);
             }
             new_outbounds.push(ob);
         }

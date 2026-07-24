@@ -103,7 +103,7 @@ impl TryFrom<&crate::tui::Key> for Key {
     fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
         let agent = agent();
         if !agent.is_empty() {
-            return agent.get(ev).map(|act| *act).ok_or(());
+            return agent.get(ev).copied().ok_or(());
         }
         Err(())
     }
@@ -1061,15 +1061,14 @@ impl Connections {
                     self.display_rows
                         .sort_by(|a, b| b.download.cmp(&a.download));
                 } else {
-                    self.display_rows
-                        .sort_by(|a, b| a.download.cmp(&b.download));
+                    self.display_rows.sort_by_key(|a| a.download);
                 }
             }
             SortColumn::Upload => {
                 if descending {
                     self.display_rows.sort_by(|a, b| b.upload.cmp(&a.upload));
                 } else {
-                    self.display_rows.sort_by(|a, b| a.upload.cmp(&b.upload));
+                    self.display_rows.sort_by_key(|a| a.upload);
                 }
             }
             SortColumn::DlSpeed => {
@@ -1077,8 +1076,7 @@ impl Connections {
                     self.display_rows
                         .sort_by(|a, b| b.dl_speed.cmp(&a.dl_speed));
                 } else {
-                    self.display_rows
-                        .sort_by(|a, b| a.dl_speed.cmp(&b.dl_speed));
+                    self.display_rows.sort_by_key(|a| a.dl_speed);
                 }
             }
             SortColumn::UlSpeed => {
@@ -1086,8 +1084,7 @@ impl Connections {
                     self.display_rows
                         .sort_by(|a, b| b.ul_speed.cmp(&a.ul_speed));
                 } else {
-                    self.display_rows
-                        .sort_by(|a, b| a.ul_speed.cmp(&b.ul_speed));
+                    self.display_rows.sort_by_key(|a| a.ul_speed);
                 }
             }
         }

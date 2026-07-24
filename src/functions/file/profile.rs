@@ -15,13 +15,13 @@ pub mod db {
     }
     pub fn remove(pf: Profile) -> anyhow::Result<()> {
         for path in [
-            PROFILE_JSONS_PATH.join(format!("{}.json", &pf.name)),
-            PROFILE_YAMLS_PATH.join(format!("{}.yaml", &pf.name)),
+            PROFILE_JSONS_PATH.join(format!("{}.json", pf.name)),
+            PROFILE_YAMLS_PATH.join(format!("{}.yaml", pf.name)),
         ] {
-            if let Err(e) = std::fs::remove_file(&path) {
-                if e.kind() != std::io::ErrorKind::NotFound {
-                    log::warn!("Failed to Remove profile file {}: {e}", path.display());
-                }
+            if let Err(e) = std::fs::remove_file(&path)
+                && e.kind() != std::io::ErrorKind::NotFound
+            {
+                log::warn!("Failed to Remove profile file {}: {e}", path.display());
             }
         }
         let mut pm = pm!();
@@ -151,7 +151,7 @@ pub async fn update_profile(profile: Profile, with_proxy: bool) -> anyhow::Resul
     {
         update_singbox_profile(profile.clone(), with_proxy).await
     } else {
-        let path = PROFILE_YAMLS_PATH.join(format!("{}.yaml", &profile.name));
+        let path = PROFILE_YAMLS_PATH.join(format!("{}.yaml", profile.name));
 
         if let ProfileType::Url(ref url) = profile.dtype {
             let mut response = crate::functions::restful::download::profile(url, with_proxy)?;
@@ -197,7 +197,7 @@ async fn update_singbox_profile(
     profile: Profile,
     with_proxy: bool,
 ) -> anyhow::Result<UpdateResult> {
-    let path = PROFILE_JSONS_PATH.join(format!("{}.json", &profile.name));
+    let path = PROFILE_JSONS_PATH.join(format!("{}.json", profile.name));
 
     if let ProfileType::Url(ref url) = profile.dtype {
         let mut response = crate::functions::restful::download::profile(url, with_proxy)?;
@@ -274,10 +274,10 @@ async fn update_template_profile(
                             if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
                                 return (name, url, path, false, Some(e.to_string()));
                             }
-                            if let Some(parent) = path.parent() {
-                                if let Err(e) = std::fs::create_dir_all(parent) {
-                                    return (name, url, path, false, Some(e.to_string()));
-                                }
+                            if let Some(parent) = path.parent()
+                                && let Err(e) = std::fs::create_dir_all(parent)
+                            {
+                                return (name, url, path, false, Some(e.to_string()));
                             }
                             match std::fs::write(&path, &buf) {
                                 Ok(()) => (name, url, path, true, None),
@@ -326,17 +326,17 @@ async fn update_template_profile(
         }
 
         // Also extract standalone proxy-provider URLs from the generated profile
-        let profile_path = super::PROFILE_YAMLS_PATH.join(format!("{}.yaml", &profile.name));
-        if let Ok(content) = std::fs::read_to_string(&profile_path) {
-            if let Ok(mapping) = serde_yml::from_str::<serde_yml::Mapping>(&content) {
-                for resource in mapping.extract(&[ResourceSection::ProxyProvider]) {
-                    let already_in_groups = groups
-                        .values()
-                        .flat_map(|providers| providers.values())
-                        .any(|url| url == &resource.url);
-                    if !already_in_groups {
-                        download_urls.push((resource.name, resource.url));
-                    }
+        let profile_path = super::PROFILE_YAMLS_PATH.join(format!("{}.yaml", profile.name));
+        if let Ok(content) = std::fs::read_to_string(&profile_path)
+            && let Ok(mapping) = serde_yml::from_str::<serde_yml::Mapping>(&content)
+        {
+            for resource in mapping.extract(&[ResourceSection::ProxyProvider]) {
+                let already_in_groups = groups
+                    .values()
+                    .flat_map(|providers| providers.values())
+                    .any(|url| url == &resource.url);
+                if !already_in_groups {
+                    download_urls.push((resource.name, resource.url));
                 }
             }
         }
@@ -363,10 +363,10 @@ async fn update_template_profile(
                                 Some("Invalid YAML format".to_string()),
                             );
                         }
-                        if let Some(parent) = path.parent() {
-                            if let Err(e) = std::fs::create_dir_all(parent) {
-                                return (name, url, path, false, Some(e.to_string()));
-                            }
+                        if let Some(parent) = path.parent()
+                            && let Err(e) = std::fs::create_dir_all(parent)
+                        {
+                            return (name, url, path, false, Some(e.to_string()));
                         }
                         match std::fs::write(&path, &buf) {
                             Ok(()) => (name, url, path, true, None),
@@ -474,7 +474,7 @@ pub async fn select(profile: Profile) -> anyhow::Result<()> {
     lprofile.path = out_path.clone();
     lprofile.sync_to_disk()?;
     db::set_current(profile)?;
-    crate::functions::restful::config::reload(&out_path.display().to_string())
+    crate::functions::restful::config::reload(out_path.display().to_string())
         .map_err(|e| anyhow::anyhow!("Config written but reload failed: {e}"))?;
     Ok(())
 }
@@ -506,7 +506,7 @@ fn deep_merge(base: &mut serde_json::Value, overlay: &serde_json::Value) {
 }
 
 async fn select_singbox(profile: Profile) -> anyhow::Result<()> {
-    let profile_path = super::PROFILE_JSONS_PATH.join(format!("{}.json", &profile.name));
+    let profile_path = super::PROFILE_JSONS_PATH.join(format!("{}.json", profile.name));
     anyhow::ensure!(
         profile_path.exists(),
         "Profile {} file not found: {}. Download it first.",
@@ -553,7 +553,7 @@ async fn select_singbox(profile: Profile) -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to write config to {}: {e}", out_path.display()))?;
 
     db::set_current(profile)?;
-    crate::functions::restful::config::reload(&out_path.display().to_string())
+    crate::functions::restful::config::reload(out_path.display().to_string())
         .map_err(|e| anyhow::anyhow!("Config written but reload failed: {e}"))?;
     Ok(())
 }

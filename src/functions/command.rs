@@ -56,7 +56,7 @@ pub fn check_config(profile_path: &Path) -> anyhow::Result<()> {
                 if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&content) {
                     if value
                         .as_object_mut()
-                        .map_or(false, |obj| obj.remove("clashtui").is_some())
+                        .is_some_and(|obj| obj.remove("clashtui").is_some())
                     {
                         let tmp = profile_path.with_file_name(format!(
                             "{}.raw.json",

@@ -12,8 +12,7 @@ pub fn request(
     payload: Option<String>,
 ) -> Result<minreq::Response> {
     if sub_url != "/version" && crate::config::is_core_mismatch() {
-        return Err(minreq::Error::IoError(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        return Err(minreq::Error::IoError(std::io::Error::other(
             "core mismatch",
         )));
     }
@@ -27,5 +26,5 @@ pub fn request(
     if let Some(s) = CONFIG.secret_for_core() {
         req = req.with_header(headers::AUTHORIZATION, format!("Bearer {s}"));
     }
-    req.with_timeout(timeout!()).send().map_err(|e| e.into())
+    req.with_timeout(timeout!()).send().map_err(|e| e)
 }

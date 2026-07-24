@@ -35,7 +35,7 @@ impl TryFrom<&crate::tui::Key> for SettingsKey {
     fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
         let agent = agent();
         if !agent.is_empty() {
-            return agent.get(ev).map(|k| *k).ok_or(());
+            return agent.get(ev).copied().ok_or(());
         }
         Ok(match ev.code {
             KeyCode::Enter => Self::Execute,
@@ -130,7 +130,7 @@ impl TabContent for SettingsContent {
         }
 
         async move {
-            let result = tokio::task::spawn_blocking(|| crate::functions::restful::config::fetch())
+            let result = tokio::task::spawn_blocking(crate::functions::restful::config::fetch)
                 .await
                 .unwrap();
             match result {

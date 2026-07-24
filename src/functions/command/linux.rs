@@ -12,18 +12,18 @@ pub fn find_files_not_group_writable(dir: &Path) -> Vec<PathBuf> {
             if path.is_dir() {
                 result.extend(find_files_not_group_writable(&path));
             }
-            if let Ok(metadata) = entry.metadata() {
-                if metadata.permissions().mode() & 0o0020 == 0 {
-                    result.push(path);
-                }
+            if let Ok(metadata) = entry.metadata()
+                && metadata.permissions().mode() & 0o0020 == 0
+            {
+                result.push(path);
             }
         }
     }
 
-    if let Ok(metadata) = std::fs::metadata(dir) {
-        if metadata.permissions().mode() & 0o0020 == 0 {
-            result.push(dir.to_path_buf());
-        }
+    if let Ok(metadata) = std::fs::metadata(dir)
+        && metadata.permissions().mode() & 0o0020 == 0
+    {
+        result.push(dir.to_path_buf());
     }
 
     result
@@ -38,28 +38,24 @@ pub fn find_files_not_in_group(dir: &Path, group_name: &str) -> Vec<PathBuf> {
             if path.is_dir() {
                 result.extend(find_files_not_in_group(&path, group_name));
             }
-            if let Ok(metadata) = entry.metadata() {
-                if let Some(group) = Group::from_gid(Gid::from_raw(metadata.gid()))
+            if let Ok(metadata) = entry.metadata()
+                && let Some(group) = Group::from_gid(Gid::from_raw(metadata.gid()))
                     .ok()
                     .flatten()
-                {
-                    if group.name != group_name {
-                        result.push(path);
-                    }
-                }
+                && group.name != group_name
+            {
+                result.push(path);
             }
         }
     }
 
-    if let Ok(metadata) = std::fs::metadata(dir) {
-        if let Some(group) = Group::from_gid(Gid::from_raw(metadata.gid()))
+    if let Ok(metadata) = std::fs::metadata(dir)
+        && let Some(group) = Group::from_gid(Gid::from_raw(metadata.gid()))
             .ok()
             .flatten()
-        {
-            if group.name != group_name {
-                result.push(dir.to_path_buf());
-            }
-        }
+        && group.name != group_name
+    {
+        result.push(dir.to_path_buf());
     }
 
     result

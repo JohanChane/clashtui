@@ -31,18 +31,10 @@ pub struct NodeItem {
     pub udp: bool,
 }
 
+#[derive(Default)]
 pub struct ProxyTree {
     pub nodes: Vec<NodeItem>,
     pub name_index: HashMap<String, usize>,
-}
-
-impl Default for ProxyTree {
-    fn default() -> Self {
-        Self {
-            nodes: Vec::new(),
-            name_index: HashMap::new(),
-        }
-    }
 }
 
 impl ProxyTree {
@@ -82,20 +74,20 @@ impl ProxyTree {
         let global_sort = sort_map.get("GLOBAL").copied().unwrap_or(SortMode::None);
         if global_sort == SortMode::ByName {
             top.sort();
-        } else if let Some(global) = proxies.get("GLOBAL") {
-            if let Some(ref group_all) = global.all {
-                let sort_index: Vec<&str> = group_all.iter().map(|s| s.as_str()).collect();
-                top.sort_by_key(|name| {
-                    if *name == "GLOBAL" {
-                        usize::MAX
-                    } else {
-                        sort_index
-                            .iter()
-                            .position(|&s| s == *name)
-                            .unwrap_or(usize::MAX - 1)
-                    }
-                });
-            }
+        } else if let Some(global) = proxies.get("GLOBAL")
+            && let Some(ref group_all) = global.all
+        {
+            let sort_index: Vec<&str> = group_all.iter().map(|s| s.as_str()).collect();
+            top.sort_by_key(|name| {
+                if *name == "GLOBAL" {
+                    usize::MAX
+                } else {
+                    sort_index
+                        .iter()
+                        .position(|&s| s == *name)
+                        .unwrap_or(usize::MAX - 1)
+                }
+            });
         }
 
         for name in &top {
@@ -155,51 +147,52 @@ impl ProxyTree {
             udp: proxy.udp,
         });
 
-        if has_kids && expanded {
-            if let Some(ref kids) = proxy.all {
-                let my_now = proxy.now.as_deref();
-                let ordered_kids: Vec<&String> = match sort_mode {
-                    SortMode::ByDelay => {
-                        let mut v: Vec<&String> = kids.iter().collect();
-                        v.sort_by_key(|kid| {
-                            resolve_delay(kid.as_str(), proxies)
-                                .and_then(|d| if d == 0 { None } else { Some(d) })
-                                .unwrap_or(u64::MAX)
-                        });
-                        v
-                    }
-                    SortMode::ByName => {
-                        let mut v: Vec<&String> = kids.iter().collect();
-                        v.sort();
-                        v
-                    }
-                    SortMode::None => kids.iter().collect(),
-                };
-                for kid in &ordered_kids {
-                    let is_group = proxies
-                        .get(kid.as_str())
-                        .map(|p| p.all.as_ref().map(|a| !a.is_empty()).unwrap_or(false))
-                        .unwrap_or(false);
-                    let ntype = if is_group {
-                        NodeType::Link
-                    } else {
-                        NodeType::File
-                    };
-                    let kid_proxy = proxies.get(kid.as_str());
-                    nodes.push(NodeItem {
-                        name: (*kid).clone(),
-                        depth: depth + 1,
-                        node_type: ntype,
-                        proxy_type: kid_proxy.map(|p| p.proxy_type.clone()).unwrap_or_default(),
-                        delay: resolve_delay(kid.as_str(), proxies),
-                        parent: Some(name.to_owned()),
-                        expanded: false,
-                        is_now: my_now == Some(kid.as_str()),
-                        sort_mode: SortMode::None,
-                        tcp: kid_proxy.map(|p| p.tcp).unwrap_or(false),
-                        udp: kid_proxy.map(|p| p.udp).unwrap_or(false),
+        if has_kids
+            && expanded
+            && let Some(ref kids) = proxy.all
+        {
+            let my_now = proxy.now.as_deref();
+            let ordered_kids: Vec<&String> = match sort_mode {
+                SortMode::ByDelay => {
+                    let mut v: Vec<&String> = kids.iter().collect();
+                    v.sort_by_key(|kid| {
+                        resolve_delay(kid.as_str(), proxies)
+                            .filter(|&d| d != 0)
+                            .unwrap_or(u64::MAX)
                     });
+                    v
                 }
+                SortMode::ByName => {
+                    let mut v: Vec<&String> = kids.iter().collect();
+                    v.sort();
+                    v
+                }
+                SortMode::None => kids.iter().collect(),
+            };
+            for kid in &ordered_kids {
+                let is_group = proxies
+                    .get(kid.as_str())
+                    .map(|p| p.all.as_ref().map(|a| !a.is_empty()).unwrap_or(false))
+                    .unwrap_or(false);
+                let ntype = if is_group {
+                    NodeType::Link
+                } else {
+                    NodeType::File
+                };
+                let kid_proxy = proxies.get(kid.as_str());
+                nodes.push(NodeItem {
+                    name: (*kid).clone(),
+                    depth: depth + 1,
+                    node_type: ntype,
+                    proxy_type: kid_proxy.map(|p| p.proxy_type.clone()).unwrap_or_default(),
+                    delay: resolve_delay(kid.as_str(), proxies),
+                    parent: Some(name.to_owned()),
+                    expanded: false,
+                    is_now: my_now == Some(kid.as_str()),
+                    sort_mode: SortMode::None,
+                    tcp: kid_proxy.map(|p| p.tcp).unwrap_or(false),
+                    udp: kid_proxy.map(|p| p.udp).unwrap_or(false),
+                });
             }
         }
     }
@@ -287,10 +280,8 @@ pub fn resolve_delay(
         return Some(d);
     }
     let has_kids = proxy.all.as_ref().map(|a| !a.is_empty()).unwrap_or(false);
-    if has_kids {
-        if let Some(d) = resolve_now_delay(name, proxies) {
-            return Some(d);
-        }
+    if has_kids && let Some(d) = resolve_now_delay(name, proxies) {
+        return Some(d);
     }
     if !proxy.history.is_empty() {
         return Some(0);

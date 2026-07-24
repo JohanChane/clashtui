@@ -463,10 +463,10 @@ pub async fn update_profile_without_pp(
                         continue;
                     }
                     let dest = cfg_dir.join(candidate);
-                    if let Ok(buf) = std::fs::read(&dest) {
-                        if let Ok(yaml) = serde_yml::from_slice::<serde_yml::Mapping>(&buf) {
-                            return (pp_name_clone, url, candidate.to_owned(), Ok(yaml));
-                        }
+                    if let Ok(buf) = std::fs::read(&dest)
+                        && let Ok(yaml) = serde_yml::from_slice::<serde_yml::Mapping>(&buf)
+                    {
+                        return (pp_name_clone, url, candidate.to_owned(), Ok(yaml));
                     }
                 }
                 match crate::functions::restful::download::profile(&url, with_proxy) {
@@ -562,10 +562,10 @@ pub async fn update_profile_without_pp(
             download_handles.push(tokio::task::spawn_blocking(move || {
                 if !rp_path.is_empty() {
                     let dest = cfg_dir.join(&rp_path);
-                    if let Ok(buf) = std::fs::read(&dest) {
-                        if let Ok(yaml) = serde_yml::from_slice::<serde_yml::Mapping>(&buf) {
-                            return (rp_name_clone, url, rp_path, Ok(yaml));
-                        }
+                    if let Ok(buf) = std::fs::read(&dest)
+                        && let Ok(yaml) = serde_yml::from_slice::<serde_yml::Mapping>(&buf)
+                    {
+                        return (rp_name_clone, url, rp_path, Ok(yaml));
                     }
                 }
                 match crate::functions::restful::download::profile(&url, with_proxy) {
@@ -733,10 +733,10 @@ pub async fn fetch_net_resource_statuses(
                     if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
                         return (name, url, path, section, false, Some(e.to_string()));
                     }
-                    if let Some(parent) = path.parent() {
-                        if let Err(e) = std::fs::create_dir_all(parent) {
-                            return (name, url, path, section, false, Some(e.to_string()));
-                        }
+                    if let Some(parent) = path.parent()
+                        && let Err(e) = std::fs::create_dir_all(parent)
+                    {
+                        return (name, url, path, section, false, Some(e.to_string()));
                     }
                     if serde_yml::from_slice::<serde_yml::Mapping>(&buf).is_err() {
                         return (
@@ -1138,10 +1138,10 @@ pub async fn fetch_net_resource_statuses_from_resources(
                     if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
                         return (name, url, path, section, false, Some(e.to_string()));
                     }
-                    if let Some(parent) = path.parent() {
-                        if let Err(e) = std::fs::create_dir_all(parent) {
-                            return (name, url, path, section, false, Some(e.to_string()));
-                        }
+                    if let Some(parent) = path.parent()
+                        && let Err(e) = std::fs::create_dir_all(parent)
+                    {
+                        return (name, url, path, section, false, Some(e.to_string()));
                     }
                     if serde_yml::from_slice::<serde_yml::Mapping>(&buf).is_err() {
                         return (

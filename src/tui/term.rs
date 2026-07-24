@@ -20,10 +20,11 @@ fn probe() {
         use std::io::Read;
         let mut stdin = std::io::stdin().lock();
         let mut buf = [0u8; 32];
-        if let Ok(n) = stdin.read(&mut buf) {
-            if n > 0 && buf[..n].windows(5).any(|w| w == b"\x1b[?0u") {
-                CSI_U_ENABLED.store(true, Ordering::Relaxed);
-            }
+        if let Ok(n) = stdin.read(&mut buf)
+            && n > 0
+            && buf[..n].windows(5).any(|w| w == b"\x1b[?0u")
+        {
+            CSI_U_ENABLED.store(true, Ordering::Relaxed);
         }
     }
 }

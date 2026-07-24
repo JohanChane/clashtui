@@ -39,18 +39,15 @@ impl ProfileData {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum ProfileType {
+    #[default]
     File,
     Url(String),
-    Template { template: String },
+    Template {
+        template: String,
+    },
     Singbox,
-}
-
-impl Default for ProfileType {
-    fn default() -> Self {
-        ProfileType::File
-    }
 }
 
 impl serde::Serialize for ProfileType {
@@ -112,16 +109,16 @@ impl<'de> serde::Deserialize<'de> for ProfileType {
                 template,
                 proxy_provider_groups,
             } => {
-                if let Some(groups) = proxy_provider_groups {
-                    if !groups.is_empty() {
-                        log::warn!(
-                            "Migrating legacy Template profile '{template}': proxy_provider_groups found in database, will write to template file."
-                        );
-                        PENDING_TEMPLATE_MIGRATIONS
-                            .lock()
-                            .unwrap()
-                            .push((template.clone(), groups));
-                    }
+                if let Some(groups) = proxy_provider_groups
+                    && !groups.is_empty()
+                {
+                    log::warn!(
+                        "Migrating legacy Template profile '{template}': proxy_provider_groups found in database, will write to template file."
+                    );
+                    PENDING_TEMPLATE_MIGRATIONS
+                        .lock()
+                        .unwrap()
+                        .push((template.clone(), groups));
                 }
                 ProfileType::Template { template }
             }
@@ -166,16 +163,16 @@ impl<'de> serde::Deserialize<'de> for ProfileData {
 
         if let serde_yml::Value::Mapping(map) = value {
             let dtype = map
-                .get(&serde_yml::Value::String("dtype".into()))
+                .get(serde_yml::Value::String("dtype".into()))
                 .map(|v| serde_yml::from_value(v.clone()).map_err(serde::de::Error::custom))
                 .transpose()?
                 .unwrap_or(ProfileType::File);
             let no_pp = map
-                .get(&serde_yml::Value::String("no_pp".into()))
+                .get(serde_yml::Value::String("no_pp".into()))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
             let update_with_proxy = map
-                .get(&serde_yml::Value::String("update_with_proxy".into()))
+                .get(serde_yml::Value::String("update_with_proxy".into()))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
             Ok(ProfileData {

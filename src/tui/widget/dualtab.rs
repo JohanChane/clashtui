@@ -146,26 +146,26 @@ where
 {
     fn handle_key_event(&mut self, kv: &Key) {
         if self.is_focus_on_c1 {
-            if let Ok(key) = C1::Key::try_from(kv) {
-                if DualTabContent::handle_key_event(
+            if let Ok(key) = C1::Key::try_from(kv)
+                && DualTabContent::handle_key_event(
                     &mut self.content.0,
                     key,
                     &mut self.tasks,
                     &mut self.state.0,
-                ) {
-                    self.is_focus_on_c1 = false
-                }
+                )
+            {
+                self.is_focus_on_c1 = false
             }
         } else {
-            if let Ok(key) = C2::Key::try_from(kv) {
-                if DualTabContentMate::handle_key_event(
+            if let Ok(key) = C2::Key::try_from(kv)
+                && DualTabContentMate::handle_key_event(
                     &mut self.content.1,
                     key,
                     &mut self.tasks,
                     &mut self.state.1,
-                ) {
-                    self.is_focus_on_c1 = true
-                }
+                )
+            {
+                self.is_focus_on_c1 = true
             }
         }
     }

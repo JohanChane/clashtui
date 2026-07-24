@@ -56,8 +56,8 @@ pub fn render_help(f: &mut ratatui::Frame, tab: &impl TuiTab) {
     let tab_cols = if tab_entries > 4 { 2 } else { 1 };
     let global_cols = if global_entries > 4 { 2 } else { 1 };
 
-    let tab_rows = ((tab_entries + tab_cols - 1) / tab_cols).max(1);
-    let global_rows = ((global_entries + global_cols - 1) / global_cols).max(1);
+    let tab_rows = tab_entries.div_ceil(tab_cols).max(1);
+    let global_rows = global_entries.div_ceil(global_cols).max(1);
 
     let total_height = 2 // borders
         + 1 // tab section header
@@ -152,7 +152,7 @@ fn render_shortcut_section(
         .collect();
     let col_areas = Layout::horizontal(&col_widths).split(body_area);
 
-    let items_per_col = (shortcuts.len() + cols - 1) / cols;
+    let items_per_col = shortcuts.len().div_ceil(cols);
 
     for (col_idx, col_area) in col_areas.iter().enumerate().take(cols) {
         let lines: Vec<Line> = shortcuts
@@ -166,7 +166,7 @@ fn render_shortcut_section(
                 } else {
                     combo
                         .iter()
-                        .map(|k| key_event_to_str(k))
+                        .map(key_event_to_str)
                         .collect::<Vec<_>>()
                         .join(" ")
                 };

@@ -17,7 +17,7 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
         } else if idx >= len {
             state.select(Some(len.saturating_sub(1)));
         }
-    } else if content.tree.len() > 0 {
+    } else if !content.tree.is_empty() {
         state.select(Some(0));
     }
 
@@ -86,13 +86,13 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
             NodeType::Folder => Some(node.name.as_str()),
             NodeType::Link | NodeType::File => node.parent.as_deref(),
         };
-        if let Some(gname) = group_resolved {
-            if let Some(idx) = content.tree.find_folder_index(gname) {
-                match content.tree.nodes[idx].sort_mode {
-                    SortMode::ByDelay => footer_parts.push("delay ".to_owned()),
-                    SortMode::ByName => footer_parts.push("name ".to_owned()),
-                    SortMode::None => {}
-                }
+        if let Some(gname) = group_resolved
+            && let Some(idx) = content.tree.find_folder_index(gname)
+        {
+            match content.tree.nodes[idx].sort_mode {
+                SortMode::ByDelay => footer_parts.push("delay ".to_owned()),
+                SortMode::ByName => footer_parts.push("name ".to_owned()),
+                SortMode::None => {}
             }
         }
     }
