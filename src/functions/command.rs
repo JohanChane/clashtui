@@ -12,29 +12,6 @@ use std::{path::Path, process::Command};
 pub use platform::*;
 use utils::*;
 
-#[cfg(feature = "tui")]
-pub async fn resolve_sudo_password(needs_sudo: bool) -> Result<Option<String>> {
-    if !needs_sudo {
-        return Ok(None);
-    }
-    #[cfg(windows)]
-    {
-        // Windows: each nssm operation auto-elevates via UAC
-        return Ok(None);
-    }
-    #[cfg(not(windows))]
-    {
-        if !sudo_needs_password() {
-            return Ok(None);
-        }
-        match crate::tui::prompt_sudo_password().await {
-            Some(pw) if pw.is_empty() => Ok(None),
-            Some(pw) => Ok(Some(pw)),
-            None => Err(anyhow::anyhow!("cancelled")),
-        }
-    }
-}
-
 pub fn test_config(profile_path: Option<&Path>, enable_geodata_mode: bool) -> String {
     let cfg = &CONFIG.cfg_file.mihomo.core;
 
@@ -189,7 +166,7 @@ pub fn is_core_service_running() -> Option<bool> {
     None
 }
 
-fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) -> Result<String> {
+fn svc_operation(op: &str, core_type: Option<CoreType>) -> Result<String> {
     let ct = core_type.unwrap_or(CONFIG.core_type());
 
     let (service_name, is_user, csc) = match ct {
@@ -207,7 +184,7 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
     let host = &ServiceController::from_config(csc);
 
     if matches!(host, ServiceController::Launchd) {
-        return launchd_operation(op, service_name, is_user, password);
+        return launchd_operation(op, service_name, is_user);
     }
 
     #[cfg(target_os = "windows")]
@@ -217,18 +194,9 @@ fn svc_operation(op: &str, password: Option<&str>, core_type: Option<CoreType>) 
 
     let svc_args = host.args(op, service_name, is_user);
     if is_user {
-        return exec(host.bin_name(), svc_args);
-    }
-    let mut argv = vec![host.bin_name()];
-    argv.extend(svc_args);
-
-    match password {
-        Some(pw) => exec_sudo(argv, pw),
-        None => exec("sudo", {
-            let mut a = vec!["-n"];
-            a.extend(argv);
-            a
-        }),
+        exec(host.bin_name(), svc_args)
+    } else {
+        exec_sudo(host.bin_name(), svc_args)
     }
 }
 
@@ -263,34 +231,14 @@ fn launchd_plist_path(service_name: &str, is_user: bool) -> String {
     }
 }
 
-fn launchd_operation(
-    op: &str,
-    service_name: &str,
-    is_user: bool,
-    password: Option<&str>,
-) -> Result<String> {
+fn launchd_operation(op: &str, service_name: &str, is_user: bool) -> Result<String> {
     let plist = launchd_plist_path(service_name, is_user);
 
     let do_exec = |args: Vec<&str>| -> Result<String> {
         if is_user {
             exec("launchctl", args)
         } else {
-            match password {
-                Some(pw) => {
-                    let mut argv = vec!["launchctl"];
-                    argv.extend(args);
-                    exec_sudo(argv, pw)
-                }
-                None => {
-                    let mut argv = vec!["launchctl"];
-                    argv.extend(args);
-                    exec("sudo", {
-                        let mut a = vec!["-n"];
-                        a.extend(argv);
-                        a
-                    })
-                }
-            }
+            exec_sudo("launchctl", args)
         }
     };
 
@@ -306,41 +254,37 @@ fn launchd_operation(
     }
 }
 
-pub fn stop_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
-    svc_operation("stop", password, Some(core_type))
+pub fn stop_core_service(core_type: CoreType) -> Result<String> {
+    svc_operation("stop", Some(core_type))
 }
 
-pub fn start_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
-    svc_operation("start", password, Some(core_type))
-}
-
-pub fn reload_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
-    svc_operation("reload", password, Some(core_type))
+pub fn start_core_service(core_type: CoreType) -> Result<String> {
+    svc_operation("start", Some(core_type))
 }
 
 #[cfg(windows)]
-pub fn install_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
-    svc_operation("install", password, Some(core_type))
+pub fn install_core_service(core_type: CoreType) -> Result<String> {
+    svc_operation("install", Some(core_type))
 }
 
 #[cfg(windows)]
-pub fn uninstall_core_service(password: Option<&str>, core_type: CoreType) -> Result<String> {
-    svc_operation("remove", password, Some(core_type))
+pub fn uninstall_core_service(core_type: CoreType) -> Result<String> {
+    svc_operation("remove", Some(core_type))
 }
 
-pub fn restart_service(password: Option<&str>) -> Result<String> {
-    svc_operation("restart", password, None)
+pub fn restart_service() -> Result<String> {
+    svc_operation("restart", None)
 }
 
-pub fn stop_service(password: Option<&str>) -> Result<String> {
-    svc_operation("stop", password, None)
+pub fn stop_service() -> Result<String> {
+    svc_operation("stop", None)
 }
 
-pub fn stop_all_services(password: Option<&str>) -> Result<String> {
+pub fn stop_all_services() -> Result<String> {
     let mut outputs = Vec::new();
     let core_types = [CoreType::Mihomo, CoreType::Singbox];
     for ct in &core_types {
-        match stop_core_service(password, *ct) {
+        match stop_core_service(*ct) {
             Ok(out) => outputs.push(out),
             Err(e) => {
                 log::warn!("Failed to stop {:?} service: {e}", ct);

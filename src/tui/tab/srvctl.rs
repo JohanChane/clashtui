@@ -306,15 +306,8 @@ impl TabContent for SrvCtlContent {
                 let op = *op;
 
                 let _bin_path = self.bin_path.clone();
-                let needs_sudo = !self.is_user;
 
                 async move {
-                    let password =
-                        match crate::functions::command::resolve_sudo_password(needs_sudo).await {
-                            Ok(pw) => pw,
-                            Err(_) => return do_nothing(),
-                        };
-
                     macro_rules! handle {
                         ($result:expr, $new_status:expr) => {
                             match $result {
@@ -362,19 +355,15 @@ impl TabContent for SrvCtlContent {
                         };
                     }
 
-                    let pw_ref = password.as_deref();
                     match op {
                         SrvCtlOp::Stop => {
-                            handle!(crate::functions::command::stop_service(pw_ref), "inactive")
+                            handle!(crate::functions::command::stop_service(), "inactive")
                         }
                         SrvCtlOp::Restart => {
-                            handle!(crate::functions::command::restart_service(pw_ref), "active")
+                            handle!(crate::functions::command::restart_service(), "active")
                         }
                         SrvCtlOp::StopAll => {
-                            handle!(
-                                crate::functions::command::stop_all_services(pw_ref),
-                                "inactive"
-                            )
+                            handle!(crate::functions::command::stop_all_services(), "inactive")
                         }
                         SrvCtlOp::SwitchCore => {
                             let old_type = crate::config::CONFIG.core_type();
@@ -388,7 +377,7 @@ impl TabContent for SrvCtlContent {
                             };
 
                             // stop all core services first
-                            let stop_result = crate::functions::command::stop_all_services(pw_ref);
+                            let stop_result = crate::functions::command::stop_all_services();
 
                             match (|| -> anyhow::Result<()> {
                                 crate::config::CONFIG.data.lock().unwrap().core_type = new_type;
@@ -397,9 +386,7 @@ impl TabContent for SrvCtlContent {
                                 Ok(()) => {
                                     // start the target core
                                     let start_result =
-                                        crate::functions::command::start_core_service(
-                                            pw_ref, new_type,
-                                        );
+                                        crate::functions::command::start_core_service(new_type);
 
                                     let status_msg = format!(
                                         "Core switched to {new_label}\n\n\
@@ -456,7 +443,6 @@ impl TabContent for SrvCtlContent {
                         SrvCtlOp::Install => {
                             handle!(
                                 crate::functions::command::install_core_service(
-                                    pw_ref,
                                     crate::config::CONFIG.core_type(),
                                 ),
                                 "installed"
@@ -466,7 +452,6 @@ impl TabContent for SrvCtlContent {
                         SrvCtlOp::Uninstall => {
                             handle!(
                                 crate::functions::command::uninstall_core_service(
-                                    pw_ref,
                                     crate::config::CONFIG.core_type(),
                                 ),
                                 "uninstalled"

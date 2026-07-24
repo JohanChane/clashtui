@@ -110,36 +110,8 @@ pub fn repair_file_permissions(dir: &Path, group_name: &str) -> Result<String> {
     }
 
     let script = commands.join(" && ");
-    crate::tui::hold(true)?;
-    let opt = std::process::Command::new("sudo")
-        .arg("sh")
-        .arg("-c")
-        .arg(&script)
-        .output()?;
-    crate::tui::hold(false)?;
-    Ok(stringify_output(opt))
+    exec_sudo("sh", vec!["-c", &script])
 }
-
-// fn check_sudo_password_required() -> Result<bool> {
-//     Command::new("sudo")
-//         .args(["-n", "true"])
-//         .status()
-//         .map(|staus| staus.success())
-//         .map_err(|e| e.into())
-// }
-
-// fn run_as_su_by_pkexec(pgm: &str, args: &[&str]) -> Result<String> {
-//     let mut path = std::env::var("PATH").unwrap_or_default();
-//     path.push_str(":/usr/sbin");
-
-//     let opt = Command::new("pkexec")
-//         .env("PATH", path)
-//         .arg(pgm)
-//         .args(args)
-//         .output()?;
-
-//     Ok(stringify_output(opt))
-// }
 
 pub(super) fn stringify_output(output: std::process::Output) -> String {
     let stdout_str = String::from_utf8_lossy(&output.stdout);
