@@ -297,7 +297,7 @@ impl Proxies {
                     .map(|(i, n)| (Self::fzf_display(n), i))
                     .collect();
                 if !items.is_empty() {
-                    self.fzf_find_with_prompt(items, &prompt, task_set);
+                    self.fzf_find_with_prompt(items, prompt, task_set);
                 }
             }
         }

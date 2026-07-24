@@ -404,11 +404,11 @@ impl TabContent for Logs {
                     .map(|e| format!("{} {} {}", e.time, e.type_, e.payload))
                     .collect();
                 async move {
-                    let selected = tokio::task::spawn_blocking(move || {
-                        crate::tui::widget::fzffind::run_fzf(&names, "Find Log")
-                    })
-                    .await
-                    .unwrap_or(None);
+                    let selected = FzfFinder::new(names)
+                        .with_title("Find Log")
+                        .build_and_send()
+                        .await
+                        .unwrap_or_default();
                     wrapper(move |content: &mut Logs| {
                         if let Some(idx) = selected {
                             content.scroll = idx;

@@ -8,7 +8,7 @@ use unicode_width::UnicodeWidthStr;
 
 #[derive(Default)]
 pub struct Input {
-    buffer: String,
+    pub buffer: String,
     cursor: usize,
 }
 

@@ -1,7 +1,6 @@
 use super::*;
 use crate::functions::command::edit;
 use crate::functions::file::template::*;
-use crate::tui::widget::popmsg::Confirm;
 use ratatui::style::Style;
 use std::cell::Cell;
 
@@ -412,11 +411,11 @@ mod actions {
     }
 
     pub(super) async fn fzf_find(items: Vec<String>) -> CB {
-        let selected = tokio::task::spawn_blocking(move || {
-            crate::tui::widget::fzffind::run_fzf(&items, "Find Template")
-        })
-        .await
-        .unwrap_or(None);
+        let selected = FzfFinder::new(items)
+            .with_title("Find Template")
+            .build_and_send()
+            .await
+            .unwrap_or_default();
 
         wrapper(move |(_, content): &mut C| {
             content.jump_target.set(selected);

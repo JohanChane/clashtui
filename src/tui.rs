@@ -1,5 +1,3 @@
-use std::sync::atomic::AtomicBool;
-
 mod agent;
 mod app;
 mod key;
@@ -30,8 +28,6 @@ pub async fn prompt_sudo_password() -> Option<String> {
     }
 }
 
-pub static EXT_PROC: AtomicBool = AtomicBool::new(false);
-
 trait TuiWidget {
     fn handle_key_event(&mut self, kv: &Key);
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect);
@@ -49,12 +45,4 @@ pub fn init() -> anyhow::Result<()> {
 pub fn restore() -> anyhow::Result<()> {
     term::teardown();
     Ok(())
-}
-
-pub fn suspend_terminal() {
-    term::suspend();
-}
-
-pub fn resume_terminal() -> anyhow::Result<()> {
-    term::resume()
 }

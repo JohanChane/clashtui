@@ -1,7 +1,5 @@
+use super::dev::*;
 use ratatui::{style::Stylize, text::Span, widgets::Paragraph};
-
-use super::*;
-use crossterm::event::KeyCode;
 
 /// Used to display message without reply
 pub struct Confirm {

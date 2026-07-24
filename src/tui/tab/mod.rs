@@ -18,7 +18,7 @@ macro_rules! tri {
         match $e {
             Ok(v) => v,
             Err(e) => {
-                crate::tui::widget::popmsg::Confirm::err(e);
+                Confirm::err(e);
                 return do_nothing();
             }
         }

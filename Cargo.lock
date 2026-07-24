@@ -254,6 +254,7 @@ dependencies = [
  "serde_json",
  "serde_yml",
  "signal-hook-tokio",
+ "simsearch",
  "strum 0.28.0",
  "tokio",
  "tungstenite",
@@ -1839,6 +1840,15 @@ dependencies = [
  "libc",
  "signal-hook 0.4.4",
  "tokio",
+]
+
+[[package]]
+name = "simsearch"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9100df46c8621c12a949ad4f64793600d28b56a07d60d9f5b68b876651d5c570"
+dependencies = [
+ "strsim",
 ]
 
 [[package]]

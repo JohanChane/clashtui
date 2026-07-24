@@ -1,6 +1,5 @@
 pub mod chord;
 pub mod dualtab;
-pub mod fzffind;
 pub mod help;
 pub mod popmsg;
 pub mod tab;

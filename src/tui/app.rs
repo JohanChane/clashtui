@@ -16,7 +16,6 @@ const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
 pub(super) static FULL_RENDER: Notify = Notify::const_new();
 pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
-pub(crate) static RESIZE: AtomicBool = AtomicBool::new(false);
 
 static GLOBAL_CHORD_SHORTCUTS: LazyLock<Vec<(KeyCombo, &str)>> = LazyLock::new(|| {
     fn ctrl(c: char) -> Key {
@@ -148,15 +147,6 @@ impl App {
 
         app.check_startup_perms();
         while !QUIT.load(Ordering::Relaxed) {
-            if crate::tui::EXT_PROC.load(Ordering::SeqCst) {
-                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-                continue;
-            }
-
-            if RESIZE.swap(false, Ordering::Relaxed) {
-                terminal.autoresize()?;
-            }
-
             terminal.draw(|f| app.render(f))?;
             app.sync();
 
@@ -182,9 +172,7 @@ impl App {
                     let key: Key = key_event.into();
                     app.handle_key_event(&key);
                 }
-                Event::Resize(..) => {
-                    RESIZE.store(true, Ordering::Relaxed);
-                }
+                Event::Resize(..) => terminal.autoresize()?,
                 _ => (),
             }
         }
