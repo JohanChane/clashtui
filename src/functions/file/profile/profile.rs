@@ -10,9 +10,9 @@ impl Profile {
         let path = if matches!(self.dtype, ProfileType::Singbox)
             || crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox
         {
-            PROFILE_JSONS_PATH.join(format!("{}.json", &self.name))
+            PROFILE_JSONS_PATH.join(format!("{}.json", self.name))
         } else {
-            PROFILE_YAMLS_PATH.join(format!("{}.yaml", &self.name))
+            PROFILE_YAMLS_PATH.join(format!("{}.yaml", self.name))
         };
         let mut lpf = LocalProfile::from_pf(self, path);
         lpf.sync_from_disk()?;

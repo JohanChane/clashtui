@@ -39,18 +39,15 @@ impl ProfileData {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum ProfileType {
+    #[default]
     File,
     Url(String),
-    Template { template: String },
+    Template {
+        template: String,
+    },
     Singbox,
-}
-
-impl Default for ProfileType {
-    fn default() -> Self {
-        ProfileType::File
-    }
 }
 
 impl serde::Serialize for ProfileType {
@@ -112,16 +109,16 @@ impl<'de> serde::Deserialize<'de> for ProfileType {
                 template,
                 proxy_provider_groups,
             } => {
-                if let Some(groups) = proxy_provider_groups {
-                    if !groups.is_empty() {
-                        log::warn!(
-                            "Migrating legacy Template profile '{template}': proxy_provider_groups found in database, will write to template file."
-                        );
-                        PENDING_TEMPLATE_MIGRATIONS
-                            .lock()
-                            .unwrap()
-                            .push((template.clone(), groups));
-                    }
+                if let Some(groups) = proxy_provider_groups
+                    && !groups.is_empty()
+                {
+                    log::warn!(
+                        "Migrating legacy Template profile '{template}': proxy_provider_groups found in database, will write to template file."
+                    );
+                    PENDING_TEMPLATE_MIGRATIONS
+                        .lock()
+                        .unwrap()
+                        .push((template.clone(), groups));
                 }
                 ProfileType::Template { template }
             }
@@ -166,16 +163,16 @@ impl<'de> serde::Deserialize<'de> for ProfileData {
 
         if let serde_yml::Value::Mapping(map) = value {
             let dtype = map
-                .get(&serde_yml::Value::String("dtype".into()))
+                .get(serde_yml::Value::String("dtype".into()))
                 .map(|v| serde_yml::from_value(v.clone()).map_err(serde::de::Error::custom))
                 .transpose()?
                 .unwrap_or(ProfileType::File);
             let no_pp = map
-                .get(&serde_yml::Value::String("no_pp".into()))
+                .get(serde_yml::Value::String("no_pp".into()))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
             let update_with_proxy = map
-                .get(&serde_yml::Value::String("update_with_proxy".into()))
+                .get(serde_yml::Value::String("update_with_proxy".into()))
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false);
             Ok(ProfileData {
@@ -341,19 +338,19 @@ singbox:
             db.mihomo.profiles.get("pf1").unwrap().dtype,
             ProfileType::File
         );
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf1").unwrap().no_pp);
         assert_eq!(
             db.mihomo.profiles.get("pf2").unwrap().dtype,
             ProfileType::Url("https://raw.com".to_string())
         );
-        assert_eq!(db.mihomo.profiles.get("pf2").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf2").unwrap().no_pp);
         assert_eq!(
             db.mihomo.profiles.get("pf3").unwrap().dtype,
             ProfileType::Template {
                 template: "tpl.yaml".into(),
             }
         );
-        assert_eq!(db.mihomo.profiles.get("pf3").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf3").unwrap().no_pp);
     }
     #[test]
     fn serde_generated_migrated_to_template() {
@@ -371,7 +368,7 @@ singbox:
                 template: "my-tpl.yaml".into(),
             }
         );
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf1").unwrap().no_pp);
     }
     #[test]
     fn serde_roundtrip_file_and_url() {
@@ -399,8 +396,8 @@ singbox:
   profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
-        assert_eq!(db.mihomo.profiles.get("pf2").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf1").unwrap().no_pp);
+        assert!(!db.mihomo.profiles.get("pf2").unwrap().no_pp);
     }
     #[test]
     fn new_format_preserves_no_pp() {
@@ -413,8 +410,8 @@ singbox:
   profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, true);
-        assert_eq!(db.mihomo.profiles.get("pf2").unwrap().no_pp, false);
+        assert!(db.mihomo.profiles.get("pf1").unwrap().no_pp);
+        assert!(!db.mihomo.profiles.get("pf2").unwrap().no_pp);
     }
     #[test]
     fn new_format_missing_no_pp_defaults_false() {
@@ -426,7 +423,7 @@ singbox:
   profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(db.mihomo.profiles.get("pf1").unwrap().no_pp, false);
+        assert!(!db.mihomo.profiles.get("pf1").unwrap().no_pp);
     }
     #[test]
     fn set_no_pp_toggles_and_persists() {
@@ -461,10 +458,7 @@ singbox:
   profiles: {}
 "#;
         let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(
-            db.mihomo.profiles.get("pf1").unwrap().update_with_proxy,
-            false
-        );
+        assert!(!db.mihomo.profiles.get("pf1").unwrap().update_with_proxy);
     }
 
     #[test]

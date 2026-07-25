@@ -35,7 +35,7 @@ impl TryFrom<&crate::tui::Key> for SettingsKey {
     fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
         let agent = agent();
         if !agent.is_empty() {
-            return agent.get(ev).map(|k| *k).ok_or(());
+            return agent.get(ev).copied().ok_or(());
         }
         Ok(match ev.code {
             KeyCode::Enter => Self::Execute,
@@ -130,7 +130,7 @@ impl TabContent for SettingsContent {
         }
 
         async move {
-            let result = tokio::task::spawn_blocking(|| crate::functions::restful::config::fetch())
+            let result = tokio::task::spawn_blocking(crate::functions::restful::config::fetch)
                 .await
                 .unwrap();
             match result {
@@ -496,6 +496,22 @@ impl TabContent for SettingsContent {
     }
 }
 
+fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
+    let popup_layout = Layout::vertical([
+        Constraint::Percentage((100 - percent_y) / 2),
+        Constraint::Percentage(percent_y),
+        Constraint::Percentage((100 - percent_y) / 2),
+    ])
+    .split(area);
+
+    Layout::horizontal([
+        Constraint::Percentage((100 - percent_x) / 2),
+        Constraint::Percentage(percent_x),
+        Constraint::Percentage((100 - percent_x) / 2),
+    ])
+    .split(popup_layout[1])[1]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -570,20 +586,4 @@ mod tests {
         assert!(!c.mode_selector_visible);
         assert!(!c.tun_selector_visible);
     }
-}
-
-fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
-    let popup_layout = Layout::vertical([
-        Constraint::Percentage((100 - percent_y) / 2),
-        Constraint::Percentage(percent_y),
-        Constraint::Percentage((100 - percent_y) / 2),
-    ])
-    .split(area);
-
-    Layout::horizontal([
-        Constraint::Percentage((100 - percent_x) / 2),
-        Constraint::Percentage(percent_x),
-        Constraint::Percentage((100 - percent_x) / 2),
-    ])
-    .split(popup_layout[1])[1]
 }

@@ -66,7 +66,7 @@ impl TuiWidget for PopUp {
 
     fn sync(&mut self) {
         while let Ok(content) = PAIR.1.lock().unwrap().try_recv() {
-            self.content.push(content.into());
+            self.content.push(content);
         }
     }
 }

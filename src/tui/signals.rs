@@ -26,7 +26,6 @@ impl Signals {
                             libc::kill(0, SIGTSTP);
                         }
                         _ = crate::tui::hold(false);
-                        super::app::FULL_RENDER.notify_one();
                     }
                 }
             });

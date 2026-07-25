@@ -131,16 +131,22 @@ pub(crate) enum ProfileTypeFilter {
 
 impl ProfileTypeFilter {
     fn matches(&self, dtype: &crate::config::database::ProfileType) -> bool {
-        match (self, dtype) {
-            (ProfileTypeFilter::File, crate::config::database::ProfileType::File) => true,
-            (ProfileTypeFilter::Url, crate::config::database::ProfileType::Url(_)) => true,
+        matches!(
+            (self, dtype),
             (
+                ProfileTypeFilter::File,
+                crate::config::database::ProfileType::File
+            ) | (
+                ProfileTypeFilter::Url,
+                crate::config::database::ProfileType::Url(_)
+            ) | (
                 ProfileTypeFilter::Template,
                 crate::config::database::ProfileType::Template { .. },
-            ) => true,
-            (ProfileTypeFilter::Singbox, crate::config::database::ProfileType::Singbox) => true,
-            _ => false,
-        }
+            ) | (
+                ProfileTypeFilter::Singbox,
+                crate::config::database::ProfileType::Singbox
+            )
+        )
     }
 }
 
