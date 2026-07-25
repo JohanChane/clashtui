@@ -91,13 +91,13 @@ pub mod config {
         )
         .and_then(|r| {
             if r.status_code >= 200 && r.status_code < 300 {
-                r.as_str().map(|s| s.to_owned()).map_err(|e| e.into())
+                r.as_str().map(|s| s.to_owned())
             } else {
                 let body = r.as_str().unwrap_or("(non-utf8 body)");
-                Err(minreq::Error::IoError(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("HTTP {}: {body}", r.status_code),
-                )))
+                Err(minreq::Error::IoError(std::io::Error::other(format!(
+                    "HTTP {}: {body}",
+                    r.status_code
+                ))))
             }
         })
     }
@@ -114,7 +114,7 @@ pub mod download {
     const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     fn base64_encode(input: &[u8]) -> String {
-        let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
+        let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
         for chunk in input.chunks(3) {
             let b = [
                 chunk[0],

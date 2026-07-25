@@ -56,6 +56,7 @@ pub struct Entry {
     desc: Option<String>,
 }
 
+#[allow(clippy::type_complexity)]
 pub fn extract_keymap_list<K: serde::de::DeserializeOwned>(
     entries: Vec<Entry>,
 ) -> Result<(
@@ -72,10 +73,10 @@ pub fn extract_keymap_list<K: serde::de::DeserializeOwned>(
         if entry.on.len() == 1 {
             let key = entry.on[0];
             agent.insert(key, action);
-            if let Some(desc) = entry.desc {
-                if !desc.is_empty() {
-                    descs.insert(key, desc);
-                }
+            if let Some(desc) = entry.desc
+                && !desc.is_empty()
+            {
+                descs.insert(key, desc);
             }
         } else {
             chords.push((KeyCombo(entry.on), action, entry.desc.unwrap_or_default()));
@@ -134,18 +135,18 @@ pub fn extract_keymap_with_descs<K: serde::de::DeserializeOwned>(
     for (key_val, value_val) in map {
         let key: crate::tui::Key = from_value_robust(&key_val)?;
         // Try WithDesc format: { action: K, desc: String }
-        if let serde_yml::Value::Mapping(ref m) = value_val {
-            if let Some(action_val) = m.get("action") {
-                let action: K = from_value_robust(action_val)?;
-                agent.insert(key, action);
-                if let Some(desc_val) = m.get("desc") {
-                    let desc: String = from_value_robust(desc_val).unwrap_or_default();
-                    if !desc.is_empty() {
-                        descs.insert(key, desc);
-                    }
+        if let serde_yml::Value::Mapping(ref m) = value_val
+            && let Some(action_val) = m.get("action")
+        {
+            let action: K = from_value_robust(action_val)?;
+            agent.insert(key, action);
+            if let Some(desc_val) = m.get("desc") {
+                let desc: String = from_value_robust(desc_val).unwrap_or_default();
+                if !desc.is_empty() {
+                    descs.insert(key, desc);
                 }
-                continue;
             }
+            continue;
         }
         // Simple format: scalar or Action: Edit
         let action: K = from_value_robust(&value_val)?;
@@ -204,11 +205,11 @@ fn take_mapping(value: &mut serde_yml::Mapping, key: &str) -> Option<serde_yml::
 
 fn merge_mappings(base: &mut serde_yml::Mapping, override_map: &mut serde_yml::Mapping) {
     for (key, val) in override_map.iter() {
-        if let Some(serde_yml::Value::Mapping(base_map)) = base.get_mut(key) {
-            if let serde_yml::Value::Mapping(override_inner) = val {
-                merge_mappings(base_map, &mut override_inner.clone());
-                continue;
-            }
+        if let Some(serde_yml::Value::Mapping(base_map)) = base.get_mut(key)
+            && let serde_yml::Value::Mapping(override_inner) = val
+        {
+            merge_mappings(base_map, &mut override_inner.clone());
+            continue;
         }
         base.insert(key.clone(), val.clone());
     }
@@ -218,12 +219,12 @@ pub fn check_duplicate_keys(section: &str, map: &serde_yml::Mapping) {
     use std::collections::HashSet;
     let mut seen = HashSet::new();
     for key in map.keys() {
-        if let Ok(k) = serde_yml::from_value::<crate::tui::Key>(key.clone()) {
-            if !seen.insert(k) {
-                log::warn!(
-                    "duplicate key `{k}` in [{section}] keymap — later binding overwrites earlier"
-                );
-            }
+        if let Ok(k) = serde_yml::from_value::<crate::tui::Key>(key.clone())
+            && !seen.insert(k)
+        {
+            log::warn!(
+                "duplicate key `{k}` in [{section}] keymap — later binding overwrites earlier"
+            );
         }
     }
 }

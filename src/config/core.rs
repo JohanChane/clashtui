@@ -2,16 +2,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[derive(Default)]
 pub enum CoreType {
     #[serde(rename = "mihomo")]
+    #[default]
     Mihomo,
     #[serde(rename = "singbox")]
     Singbox,
-}
-impl Default for CoreType {
-    fn default() -> Self {
-        Self::Mihomo
-    }
 }
 impl std::fmt::Display for CoreType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -143,17 +140,10 @@ impl Default for ConfigFile {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
+#[derive(Default)]
 pub struct Extra {
     pub edit_cmd: Option<String>,
     pub open_dir_cmd: Option<String>,
-}
-impl Default for Extra {
-    fn default() -> Self {
-        Self {
-            edit_cmd: None,
-            open_dir_cmd: None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
@@ -332,8 +322,8 @@ profiles:
 "#;
         let data: super::super::database::CoreProfileData = serde_yml::from_str(yaml).unwrap();
         assert_eq!(data.cur_profile.as_deref(), Some("my"));
-        assert_eq!(data.profiles.get("pf1").unwrap().no_pp, true);
-        assert_eq!(data.profiles.get("pf2").unwrap().no_pp, false);
+        assert!(data.profiles.get("pf1").unwrap().no_pp);
+        assert!(!data.profiles.get("pf2").unwrap().no_pp);
     }
 
     #[test]

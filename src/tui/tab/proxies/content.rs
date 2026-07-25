@@ -61,15 +61,14 @@ impl Proxies {
 
     pub(crate) fn restore_selection(&self, key: Option<SelectionKey>, state: &mut ListState) {
         state.select(None);
-        if let Some((name, parent, ntype)) = key {
-            if let Some(idx) = self
+        if let Some((name, parent, ntype)) = key
+            && let Some(idx) = self
                 .tree
                 .nodes
                 .iter()
                 .position(|n| n.name == name && n.parent == parent && n.node_type == ntype)
-            {
-                state.select(Some(idx));
-            }
+        {
+            state.select(Some(idx));
         }
     }
 
@@ -93,21 +92,21 @@ impl Proxies {
                 }
             }
             super::Key::GoTop => {
-                if self.tree.len() > 0 {
+                if !self.tree.is_empty() {
                     state.select(Some(0));
                 }
             }
             super::Key::GoBottom => {
-                if self.tree.len() > 0 {
+                if !self.tree.is_empty() {
                     state.select(Some(self.tree.len().saturating_sub(1)));
                 }
             }
             super::Key::Parent => {
                 let info = self.tree.node_at(current).map(|n| n.parent.clone());
-                if let Some(Some(ref parent)) = info {
-                    if let Some(idx) = self.tree.find_folder_index(parent) {
-                        state.select(Some(idx));
-                    }
+                if let Some(Some(ref parent)) = info
+                    && let Some(idx) = self.tree.find_folder_index(parent)
+                {
+                    state.select(Some(idx));
                 }
             }
             super::Key::Expand => {
@@ -157,43 +156,43 @@ impl Proxies {
             }
             super::Key::Refresh => self.refresh(task_set),
             super::Key::SortByName => {
-                if let Some(group_name) = self.resolve_group_for_sort(current) {
-                    if let Some(idx) = self.tree.find_folder_index(&group_name) {
-                        let new_mode = if self.tree.nodes[idx].sort_mode == SortMode::ByName {
-                            SortMode::None
-                        } else {
-                            SortMode::ByName
-                        };
-                        self.tree.nodes[idx].sort_mode = new_mode;
-                        let key = self.selection_key(state);
-                        self.tree.rebuild_from_proxies(&self.proxies);
-                        self.restore_selection(key, state);
-                    }
+                if let Some(group_name) = self.resolve_group_for_sort(current)
+                    && let Some(idx) = self.tree.find_folder_index(&group_name)
+                {
+                    let new_mode = if self.tree.nodes[idx].sort_mode == SortMode::ByName {
+                        SortMode::None
+                    } else {
+                        SortMode::ByName
+                    };
+                    self.tree.nodes[idx].sort_mode = new_mode;
+                    let key = self.selection_key(state);
+                    self.tree.rebuild_from_proxies(&self.proxies);
+                    self.restore_selection(key, state);
                 }
             }
             super::Key::SortByDelay => {
-                if let Some(group_name) = self.resolve_group_for_sort(current) {
-                    if let Some(idx) = self.tree.find_folder_index(&group_name) {
-                        let new_mode = if self.tree.nodes[idx].sort_mode == SortMode::ByDelay {
-                            SortMode::None
-                        } else {
-                            SortMode::ByDelay
-                        };
-                        self.tree.nodes[idx].sort_mode = new_mode;
-                        let key = self.selection_key(state);
-                        self.tree.rebuild_from_proxies(&self.proxies);
-                        self.restore_selection(key, state);
-                    }
+                if let Some(group_name) = self.resolve_group_for_sort(current)
+                    && let Some(idx) = self.tree.find_folder_index(&group_name)
+                {
+                    let new_mode = if self.tree.nodes[idx].sort_mode == SortMode::ByDelay {
+                        SortMode::None
+                    } else {
+                        SortMode::ByDelay
+                    };
+                    self.tree.nodes[idx].sort_mode = new_mode;
+                    let key = self.selection_key(state);
+                    self.tree.rebuild_from_proxies(&self.proxies);
+                    self.restore_selection(key, state);
                 }
             }
             super::Key::ResetSort => {
-                if let Some(group_name) = self.resolve_group_for_sort(current) {
-                    if let Some(idx) = self.tree.find_folder_index(&group_name) {
-                        self.tree.nodes[idx].sort_mode = SortMode::None;
-                        let key = self.selection_key(state);
-                        self.tree.rebuild_from_proxies(&self.proxies);
-                        self.restore_selection(key, state);
-                    }
+                if let Some(group_name) = self.resolve_group_for_sort(current)
+                    && let Some(idx) = self.tree.find_folder_index(&group_name)
+                {
+                    self.tree.nodes[idx].sort_mode = SortMode::None;
+                    let key = self.selection_key(state);
+                    self.tree.rebuild_from_proxies(&self.proxies);
+                    self.restore_selection(key, state);
                 }
             }
             super::Key::GlobalSortByName => {
@@ -285,7 +284,7 @@ impl Proxies {
             }
             super::Key::GroupSelect => {
                 let node = self.tree.node_at(current);
-                let parent = node.map(|n| n.parent.clone()).flatten();
+                let parent = node.and_then(|n| n.parent.clone());
                 let group_name = parent.as_deref().unwrap_or("top");
                 let prompt = format!("Select in {group_name}");
                 let items: Vec<(String, usize)> = self
@@ -382,10 +381,10 @@ impl TabContent for Proxies {
     }
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State) {
-        if let Some(idx) = self.jump_target.take() {
-            if idx < self.tree.len() {
-                state.select(Some(idx));
-            }
+        if let Some(idx) = self.jump_target.take()
+            && idx < self.tree.len()
+        {
+            state.select(Some(idx));
         }
         super::render::render(self, f, area, state);
     }
@@ -434,7 +433,7 @@ mod tests {
     #[test]
     fn selection_key_none_when_no_selection() {
         let (content, state) = load_fixture();
-        let mut s = state.clone();
+        let mut s = state;
         s.select(None);
         assert!(content.selection_key(&s).is_none());
     }

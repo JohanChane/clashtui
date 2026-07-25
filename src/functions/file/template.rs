@@ -463,10 +463,10 @@ pub async fn update_profile_without_pp(
                         continue;
                     }
                     let dest = cfg_dir.join(candidate);
-                    if let Ok(buf) = std::fs::read(&dest) {
-                        if let Ok(yaml) = serde_yml::from_slice::<serde_yml::Mapping>(&buf) {
-                            return (pp_name_clone, url, candidate.to_owned(), Ok(yaml));
-                        }
+                    if let Ok(buf) = std::fs::read(&dest)
+                        && let Ok(yaml) = serde_yml::from_slice::<serde_yml::Mapping>(&buf)
+                    {
+                        return (pp_name_clone, url, candidate.to_owned(), Ok(yaml));
                     }
                 }
                 match crate::functions::restful::download::profile(&url, with_proxy) {
@@ -562,10 +562,10 @@ pub async fn update_profile_without_pp(
             download_handles.push(tokio::task::spawn_blocking(move || {
                 if !rp_path.is_empty() {
                     let dest = cfg_dir.join(&rp_path);
-                    if let Ok(buf) = std::fs::read(&dest) {
-                        if let Ok(yaml) = serde_yml::from_slice::<serde_yml::Mapping>(&buf) {
-                            return (rp_name_clone, url, rp_path, Ok(yaml));
-                        }
+                    if let Ok(buf) = std::fs::read(&dest)
+                        && let Ok(yaml) = serde_yml::from_slice::<serde_yml::Mapping>(&buf)
+                    {
+                        return (rp_name_clone, url, rp_path, Ok(yaml));
                     }
                 }
                 match crate::functions::restful::download::profile(&url, with_proxy) {
@@ -733,10 +733,88 @@ pub async fn fetch_net_resource_statuses(
                     if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
                         return (name, url, path, section, false, Some(e.to_string()));
                     }
-                    if let Some(parent) = path.parent() {
-                        if let Err(e) = std::fs::create_dir_all(parent) {
-                            return (name, url, path, section, false, Some(e.to_string()));
-                        }
+                    if let Some(parent) = path.parent()
+                        && let Err(e) = std::fs::create_dir_all(parent)
+                    {
+                        return (name, url, path, section, false, Some(e.to_string()));
+                    }
+                    if serde_yml::from_slice::<serde_yml::Mapping>(&buf).is_err() {
+                        return (
+                            name,
+                            url,
+                            path,
+                            section,
+                            false,
+                            Some("Invalid YAML format".to_string()),
+                        );
+                    }
+                    match std::fs::write(&path, &buf) {
+                        Ok(()) => (name, url, path, section, true, None),
+                        Err(e) => (name, url, path, section, false, Some(e.to_string())),
+                    }
+                }
+                Err(e) => (name, url, path, section, false, Some(e.to_string())),
+            }
+        }));
+    }
+
+    let mut statuses = Vec::with_capacity(handles.len());
+    for handle in handles {
+        let (name, url, path, section, ok, error) = match handle.await {
+            Ok(v) => v,
+            Err(e) => {
+                statuses.push(NetResourceUpdate {
+                    name: String::new(),
+                    url: String::new(),
+                    path: String::new(),
+                    section: ResourceSection::ProxyProvider,
+                    ok: false,
+                    error: Some(e.to_string()),
+                });
+                continue;
+            }
+        };
+        statuses.push(NetResourceUpdate {
+            path: path.display().to_string(),
+            name,
+            url,
+            section,
+            ok,
+            error,
+        });
+    }
+
+    statuses
+}
+
+pub async fn fetch_net_resource_statuses_from_resources(
+    resources: &[crate::functions::file::net_resource::NetResource],
+    base_dir: &std::path::Path,
+    with_proxy: bool,
+) -> Vec<crate::functions::file::net_resource::NetResourceUpdate> {
+    use crate::functions::file::net_resource::{NetResourceUpdate, ResourceSection};
+
+    if resources.is_empty() {
+        return Vec::new();
+    }
+
+    let mut handles = Vec::with_capacity(resources.len());
+    for resource in resources.iter().cloned() {
+        let url = resource.url;
+        let name = resource.name;
+        let path = base_dir.join(&resource.path);
+        let section = resource.section;
+        handles.push(tokio::task::spawn_blocking(move || {
+            match crate::functions::restful::download::profile(&url, with_proxy) {
+                Ok(mut rdr) => {
+                    let mut buf = Vec::new();
+                    if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
+                        return (name, url, path, section, false, Some(e.to_string()));
+                    }
+                    if let Some(parent) = path.parent()
+                        && let Err(e) = std::fs::create_dir_all(parent)
+                    {
+                        return (name, url, path, section, false, Some(e.to_string()));
                     }
                     if serde_yml::from_slice::<serde_yml::Mapping>(&buf).is_err() {
                         return (
@@ -1112,82 +1190,4 @@ mod tests {
         assert_eq!(proxies, vec!["DIRECT", "HK-01", "HK-02"]);
         assert!(result_pgs[0].get("use").is_none());
     }
-}
-
-pub async fn fetch_net_resource_statuses_from_resources(
-    resources: &[crate::functions::file::net_resource::NetResource],
-    base_dir: &std::path::Path,
-    with_proxy: bool,
-) -> Vec<crate::functions::file::net_resource::NetResourceUpdate> {
-    use crate::functions::file::net_resource::{NetResourceUpdate, ResourceSection};
-
-    if resources.is_empty() {
-        return Vec::new();
-    }
-
-    let mut handles = Vec::with_capacity(resources.len());
-    for resource in resources.iter().cloned() {
-        let url = resource.url;
-        let name = resource.name;
-        let path = base_dir.join(&resource.path);
-        let section = resource.section;
-        handles.push(tokio::task::spawn_blocking(move || {
-            match crate::functions::restful::download::profile(&url, with_proxy) {
-                Ok(mut rdr) => {
-                    let mut buf = Vec::new();
-                    if let Err(e) = std::io::Read::read_to_end(&mut rdr, &mut buf) {
-                        return (name, url, path, section, false, Some(e.to_string()));
-                    }
-                    if let Some(parent) = path.parent() {
-                        if let Err(e) = std::fs::create_dir_all(parent) {
-                            return (name, url, path, section, false, Some(e.to_string()));
-                        }
-                    }
-                    if serde_yml::from_slice::<serde_yml::Mapping>(&buf).is_err() {
-                        return (
-                            name,
-                            url,
-                            path,
-                            section,
-                            false,
-                            Some("Invalid YAML format".to_string()),
-                        );
-                    }
-                    match std::fs::write(&path, &buf) {
-                        Ok(()) => (name, url, path, section, true, None),
-                        Err(e) => (name, url, path, section, false, Some(e.to_string())),
-                    }
-                }
-                Err(e) => (name, url, path, section, false, Some(e.to_string())),
-            }
-        }));
-    }
-
-    let mut statuses = Vec::with_capacity(handles.len());
-    for handle in handles {
-        let (name, url, path, section, ok, error) = match handle.await {
-            Ok(v) => v,
-            Err(e) => {
-                statuses.push(NetResourceUpdate {
-                    name: String::new(),
-                    url: String::new(),
-                    path: String::new(),
-                    section: ResourceSection::ProxyProvider,
-                    ok: false,
-                    error: Some(e.to_string()),
-                });
-                continue;
-            }
-        };
-        statuses.push(NetResourceUpdate {
-            path: path.display().to_string(),
-            name,
-            url,
-            section,
-            ok,
-            error,
-        });
-    }
-
-    statuses
 }

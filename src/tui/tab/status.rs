@@ -190,7 +190,7 @@ impl TabContent for Status {
                 ));
             }
         }
-        let matched = self.detected_core_type.map_or(true, |d| d == configured);
+        let matched = self.detected_core_type.is_none_or(|d| d == configured);
         if matched {
             if let Some(ref ver) = self.version {
                 lines.push(format!("version: {ver}"));

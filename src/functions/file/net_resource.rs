@@ -76,7 +76,7 @@ impl ExtractNetResources for serde_yml::Mapping {
                 ResourceSection::RuleProvider => "rule-providers",
             };
 
-            let section_val = match self.get(&Value::String(key.to_string())) {
+            let section_val = match self.get(Value::String(key.to_string())) {
                 Some(Value::Mapping(map)) => map,
                 _ => continue,
             };
@@ -93,7 +93,7 @@ impl ExtractNetResources for serde_yml::Mapping {
                 };
 
                 let url = match provider_map
-                    .get(&Value::String("url".to_string()))
+                    .get(Value::String("url".to_string()))
                     .and_then(|v| v.as_str())
                 {
                     Some(s) => s.to_owned(),
@@ -101,7 +101,7 @@ impl ExtractNetResources for serde_yml::Mapping {
                 };
 
                 let path = match provider_map
-                    .get(&Value::String("path".to_string()))
+                    .get(Value::String("path".to_string()))
                     .and_then(|v| v.as_str())
                 {
                     Some(s) => s.to_owned(),
@@ -130,15 +130,15 @@ pub fn extract_singbox_net_resources(content: &serde_json::Value) -> Vec<NetReso
     if let serde_json::Value::Array(outbounds) = &content["outbounds"] {
         for outbound in outbounds {
             let name = outbound["tag"].as_str().unwrap_or("unnamed");
-            if let Some(url) = outbound["outbound"]["url"].as_str() {
-                if let Some(path) = outbound["outbound"]["path"].as_str() {
-                    resources.push(NetResource {
-                        name: name.to_owned(),
-                        url: url.to_owned(),
-                        path: path.to_owned(),
-                        section: ResourceSection::ProxyProvider,
-                    });
-                }
+            if let Some(url) = outbound["outbound"]["url"].as_str()
+                && let Some(path) = outbound["outbound"]["path"].as_str()
+            {
+                resources.push(NetResource {
+                    name: name.to_owned(),
+                    url: url.to_owned(),
+                    path: path.to_owned(),
+                    section: ResourceSection::ProxyProvider,
+                });
             }
         }
     }
@@ -147,16 +147,14 @@ pub fn extract_singbox_net_resources(content: &serde_json::Value) -> Vec<NetReso
         for rule_set in rule_sets {
             let tag = rule_set["tag"].as_str().unwrap_or("unnamed");
             let is_remote = rule_set["type"].as_str() == Some("remote");
-            if is_remote {
-                if let Some(url) = rule_set["url"].as_str() {
-                    let path = rule_set["path"].as_str().unwrap_or("rules.db");
-                    resources.push(NetResource {
-                        name: tag.to_owned(),
-                        url: url.to_owned(),
-                        path: path.to_owned(),
-                        section: ResourceSection::RuleProvider,
-                    });
-                }
+            if is_remote && let Some(url) = rule_set["url"].as_str() {
+                let path = rule_set["path"].as_str().unwrap_or("rules.db");
+                resources.push(NetResource {
+                    name: tag.to_owned(),
+                    url: url.to_owned(),
+                    path: path.to_owned(),
+                    section: ResourceSection::RuleProvider,
+                });
             }
         }
     }

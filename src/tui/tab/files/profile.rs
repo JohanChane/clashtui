@@ -44,15 +44,12 @@ fn parse_traffic_info(header_value: &str) -> TrafficInfo {
 
 pub fn fetch_traffic_for_url(url: &str, with_proxy: bool) {
     let url = url.to_owned();
-    std::thread::spawn(
-        move || match download::fetch_subscription_userinfo(&url, with_proxy) {
-            Ok(Some(userinfo)) => {
-                let info = parse_traffic_info(&userinfo);
-                TRAFFIC_CACHE.lock().unwrap().insert(url, info);
-            }
-            _ => {}
-        },
-    );
+    std::thread::spawn(move || {
+        if let Ok(Some(userinfo)) = download::fetch_subscription_userinfo(&url, with_proxy) {
+            let info = parse_traffic_info(&userinfo);
+            TRAFFIC_CACHE.lock().unwrap().insert(url, info);
+        }
+    });
 }
 
 fn human_bytes(bytes: u64) -> String {
@@ -293,7 +290,7 @@ impl TryFrom<&crate::tui::Key> for Key {
     fn try_from(value: &crate::tui::Key) -> Result<Self, Self::Error> {
         let agent = agent();
         if !agent.is_empty() {
-            return agent.get(value).map(|act| *act).ok_or(());
+            return agent.get(value).copied().ok_or(());
         }
 
         Ok(match value.code {
@@ -633,7 +630,7 @@ mod actions {
     }
 
     async fn delete(name: String) -> CB {
-        let rx = Confirm::title(format!("Delete profile?"))
+        let rx = Confirm::title("Delete profile?".to_string())
             .with_prompt(format!("Delete {name}?\nEnter to confirm, Esc to cancel"))
             .build_and_send();
         if rx.await.is_err() {
@@ -675,10 +672,10 @@ mod actions {
             .map(|pf| pf.update_with_proxy)
             .unwrap_or(false);
         // Fetch traffic info before updating
-        if let Some(pf) = db::get(&name) {
-            if let crate::config::database::ProfileType::Url(ref url) = pf.dtype {
-                fetch_traffic_for_url(url, with_proxy);
-            }
+        if let Some(pf) = db::get(&name)
+            && let crate::config::database::ProfileType::Url(ref url) = pf.dtype
+        {
+            fetch_traffic_for_url(url, with_proxy);
         }
         let result = update_profile(db::get(&name).unwrap(), with_proxy).await;
 
@@ -758,30 +755,29 @@ mod actions {
         let mut lines = Vec::new();
         let mut urls_to_fetch: Vec<(String, String)> = Vec::new();
 
-        if let Some(ref p) = pf {
-            if let ProfileType::Url(ref url) = p.dtype {
-                let cached = {
-                    let cache = TRAFFIC_CACHE.lock().unwrap();
-                    cache.get(url).cloned()
-                };
-                if let Some(info) = cached {
-                    let domain =
-                        crate::functions::file::profile::extract_domain(url).unwrap_or(url);
-                    let used = info.upload + info.download;
-                    let total_str = if info.total == 0 {
-                        "unlimited".to_owned()
-                    } else {
-                        format!(
-                            "{} ({:.0}%)",
-                            human_bytes(info.total),
-                            traffic_percentage(used, info.total)
-                        )
-                    };
-                    lines.push(format!("[{name}] {domain}"));
-                    lines.push(format!("  [Used: {} / {}]", human_bytes(used), total_str));
+        if let Some(ref p) = pf
+            && let ProfileType::Url(ref url) = p.dtype
+        {
+            let cached = {
+                let cache = TRAFFIC_CACHE.lock().unwrap();
+                cache.get(url).cloned()
+            };
+            if let Some(info) = cached {
+                let domain = crate::functions::file::profile::extract_domain(url).unwrap_or(url);
+                let used = info.upload + info.download;
+                let total_str = if info.total == 0 {
+                    "unlimited".to_owned()
                 } else {
-                    urls_to_fetch.push((name.clone(), url.clone()));
-                }
+                    format!(
+                        "{} ({:.0}%)",
+                        human_bytes(info.total),
+                        traffic_percentage(used, info.total)
+                    )
+                };
+                lines.push(format!("[{name}] {domain}"));
+                lines.push(format!("  [Used: {} / {}]", human_bytes(used), total_str));
+            } else {
+                urls_to_fetch.push((name.clone(), url.clone()));
             }
         }
 
@@ -799,30 +795,28 @@ mod actions {
 
         let profile_yaml_path =
             crate::functions::file::PROFILE_YAMLS_PATH.join(format!("{name}.yaml"));
-        if let Ok(content) = std::fs::read_to_string(&profile_yaml_path) {
-            if let Ok(mapping) = serde_yml::from_str::<serde_yml::Mapping>(&content) {
-                for resource in mapping.extract(&[ResourceSection::ProxyProvider]) {
-                    if !pp_urls.iter().any(|(_, u)| u == &resource.url) {
-                        pp_urls.push((resource.name.clone(), resource.url.clone()));
-                    }
+        if let Ok(content) = std::fs::read_to_string(&profile_yaml_path)
+            && let Ok(mapping) = serde_yml::from_str::<serde_yml::Mapping>(&content)
+        {
+            for resource in mapping.extract(&[ResourceSection::ProxyProvider]) {
+                if !pp_urls.iter().any(|(_, u)| u == &resource.url) {
+                    pp_urls.push((resource.name.clone(), resource.url.clone()));
                 }
             }
         }
 
         let profile_json_path =
             crate::functions::file::PROFILE_JSONS_PATH.join(format!("{name}.json"));
-        if let Ok(content) = std::fs::read_to_string(&profile_json_path) {
-            if let Ok(mapping) = serde_json::from_str::<serde_json::Value>(&content) {
-                if let Some(pp_map) = mapping.get("proxy-providers") {
-                    if let Some(obj) = pp_map.as_object() {
-                        for (pp_name, pp_val) in obj {
-                            if let Some(pp_url) = pp_val.get("url").and_then(|v| v.as_str()) {
-                                let url = pp_url.to_string();
-                                if !pp_urls.iter().any(|(_, u)| u == &url) {
-                                    pp_urls.push((pp_name.clone(), url));
-                                }
-                            }
-                        }
+        if let Ok(content) = std::fs::read_to_string(&profile_json_path)
+            && let Ok(mapping) = serde_json::from_str::<serde_json::Value>(&content)
+            && let Some(pp_map) = mapping.get("proxy-providers")
+            && let Some(obj) = pp_map.as_object()
+        {
+            for (pp_name, pp_val) in obj {
+                if let Some(pp_url) = pp_val.get("url").and_then(|v| v.as_str()) {
+                    let url = pp_url.to_string();
+                    if !pp_urls.iter().any(|(_, u)| u == &url) {
+                        pp_urls.push((pp_name.clone(), url));
                     }
                 }
             }

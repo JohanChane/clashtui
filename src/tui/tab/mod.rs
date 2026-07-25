@@ -45,6 +45,7 @@ macro_rules! tri {
 
 macro_rules! mod_agent {
     ($ident:ident, [$($tokens:tt)*]) => {
+#[allow(clippy::vec_init_then_push)]
 pub(crate) mod agent {
     use super::*;
     use std::collections::HashMap;
@@ -267,6 +268,7 @@ macro_rules! enum_dispatch {
     ($vis:vis enum $ident:ident {
         $($item:ident,)+
     }) => {
+    #[allow(clippy::large_enum_variant, clippy::enum_variant_names)]
     $vis enum $ident {
         $($item($item),)+
     }

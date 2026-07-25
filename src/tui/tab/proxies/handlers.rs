@@ -41,7 +41,7 @@ impl Proxies {
         self.error = Some(format!("Switching to {node}..."));
         self.testing_since = Some(Instant::now());
         async move {
-            let _ = tri!(
+            tri!(
                 tokio::task::spawn_blocking(move || { proxies::select_proxy(&group, &node) })
                     .await
                     .unwrap(),
@@ -49,7 +49,7 @@ impl Proxies {
             );
             let response = match tokio::time::timeout(
                 Duration::from_secs(t_secs),
-                tokio::task::spawn_blocking(|| proxies::fetch_proxies()),
+                tokio::task::spawn_blocking(proxies::fetch_proxies),
             )
             .await
             {
@@ -106,7 +106,7 @@ impl Proxies {
                     };
                     let mut response = match tokio::time::timeout(
                         Duration::from_secs(t_secs),
-                        tokio::task::spawn_blocking(|| proxies::fetch_proxies()),
+                        tokio::task::spawn_blocking(proxies::fetch_proxies),
                     )
                     .await
                     {
@@ -120,10 +120,10 @@ impl Proxies {
                         }
                     };
                     for (child_name, d) in &delays {
-                        if *d > 0 {
-                            if let Some(proxy) = response.proxies.get_mut(child_name) {
-                                proxy.history.push(proxies::DelayRecord { delay: *d });
-                            }
+                        if *d > 0
+                            && let Some(proxy) = response.proxies.get_mut(child_name)
+                        {
+                            proxy.history.push(proxies::DelayRecord { delay: *d });
                         }
                     }
                     wrapper(move |content: &mut Self| {
@@ -165,7 +165,7 @@ impl Proxies {
                     };
                     let mut response = match tokio::time::timeout(
                         Duration::from_secs(t_secs),
-                        tokio::task::spawn_blocking(|| proxies::fetch_proxies()),
+                        tokio::task::spawn_blocking(proxies::fetch_proxies),
                     )
                     .await
                     {
@@ -178,10 +178,10 @@ impl Proxies {
                             });
                         }
                     };
-                    if let (Some(d), Some(proxy)) = (delay, response.proxies.get_mut(&name)) {
-                        if d > 0 {
-                            proxy.history.push(proxies::DelayRecord { delay: d });
-                        }
+                    if let (Some(d), Some(proxy)) = (delay, response.proxies.get_mut(&name))
+                        && d > 0
+                    {
+                        proxy.history.push(proxies::DelayRecord { delay: d });
                     }
                     wrapper(move |content: &mut Self| {
                         content.proxies = response.proxies;
@@ -226,7 +226,7 @@ impl Proxies {
                     .get(name.as_str())
                     .and_then(|p| p.test_url.clone());
                 let n = name.clone();
-                match tokio::time::timeout(
+                if let Ok(Ok(Ok(delays))) = tokio::time::timeout(
                     Duration::from_secs(t_secs),
                     tokio::task::spawn_blocking(move || {
                         proxies::test_group_delay(&n, url.as_deref(), timeout)
@@ -234,8 +234,7 @@ impl Proxies {
                 )
                 .await
                 {
-                    Ok(Ok(Ok(delays))) => all_delays.extend(delays),
-                    _ => {}
+                    all_delays.extend(delays)
                 }
             }
             for name in &files {
@@ -259,7 +258,7 @@ impl Proxies {
             }
             let mut response = match tokio::time::timeout(
                 Duration::from_secs(t_secs),
-                tokio::task::spawn_blocking(|| proxies::fetch_proxies()),
+                tokio::task::spawn_blocking(proxies::fetch_proxies),
             )
             .await
             {
@@ -272,10 +271,10 @@ impl Proxies {
                 }
             };
             for (name, d) in &all_delays {
-                if *d > 0 {
-                    if let Some(proxy) = response.proxies.get_mut(name) {
-                        proxy.history.push(proxies::DelayRecord { delay: *d });
-                    }
+                if *d > 0
+                    && let Some(proxy) = response.proxies.get_mut(name)
+                {
+                    proxy.history.push(proxies::DelayRecord { delay: *d });
                 }
             }
             wrapper(move |content: &mut Self| {
