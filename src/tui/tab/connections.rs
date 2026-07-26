@@ -444,6 +444,7 @@ impl TabContent for Connections {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 mod tests {
     use super::*;
     use crate::functions::restful::connection::{ConnMetaData, Conn};

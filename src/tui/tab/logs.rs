@@ -480,6 +480,7 @@ impl Logs {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[allow(unused_imports)]
     use crossterm::event::KeyCode;
 
     fn make_entry(type_: &str, payload: &str, time: &str) -> LogEntry {
