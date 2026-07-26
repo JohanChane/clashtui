@@ -13,6 +13,7 @@ mod widget;
 
 pub use app::App;
 pub use key::Key;
+pub(crate) use key::format_key_sequence;
 pub use term::hold;
 pub(crate) use theme::Theme;
 

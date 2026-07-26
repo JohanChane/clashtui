@@ -119,15 +119,24 @@ impl<A: Clone> Keymap<A> {
 /// Exact duplicate check: within one scope, no two bindings may have the
 /// identical `on` sequence.
 fn validate_no_exact_duplicates<A>(bindings: &[Binding<A>], scope: Scope) -> anyhow::Result<()> {
-    let mut seen = HashSet::new();
-    for b in bindings {
-        if !seen.insert(&b.on) {
+    use std::collections::HashMap;
+    let mut seen: HashMap<&Vec<Key>, (&Binding<A>, usize)> = HashMap::new();
+    for (i, b) in bindings.iter().enumerate() {
+        if let Some((first, first_idx)) = seen.get(&b.on) {
+            let seq = crate::tui::format_key_sequence(&b.on);
+            let a_desc = first.desc.as_deref().unwrap_or("<no description>");
+            let b_desc = b.desc.as_deref().unwrap_or("<no description>");
             anyhow::bail!(
-                "[{scope}] duplicate on sequence: {:?} appears more than once. \
-                 Each key sequence must be unique within a scope.",
-                b.on,
+                "[{scope}] duplicate key binding: {seq}\n  \
+                 First binding  (entry #{first_idx}): \"{a_desc}\"\n  \
+                 Second binding (entry #{i}): \"{b_desc}\"\n  \
+                 Each key sequence must be unique within a scope. \
+                 Remove or change one of the conflicting entries.",
+                first_idx = first_idx + 1,
+                i = i + 1,
             );
         }
+        seen.insert(&b.on, (b, i));
     }
     Ok(())
 }
@@ -137,13 +146,21 @@ fn validate_no_exact_duplicates<A>(bindings: &[Binding<A>], scope: Scope) -> any
 /// needs to decide "single-key vs longer chord" at runtime.
 fn validate_no_prefix_conflicts<A>(bindings: &[Binding<A>], scope: Scope) -> anyhow::Result<()> {
     for (i, a) in bindings.iter().enumerate() {
-        for b in &bindings[i + 1..] {
+        for (j, b) in bindings.iter().enumerate().skip(i + 1) {
             if a.on.starts_with(&b.on) || b.on.starts_with(&a.on) {
+                let a_seq = crate::tui::format_key_sequence(&a.on);
+                let b_seq = crate::tui::format_key_sequence(&b.on);
+                let a_desc = a.desc.as_deref().unwrap_or("<no description>");
+                let b_desc = b.desc.as_deref().unwrap_or("<no description>");
                 anyhow::bail!(
-                    "[{scope}] prefix conflict: {:?} and {:?} share a prefix. \
-                     Remove one or use non-overlapping key sequences.",
-                    a.on,
-                    b.on,
+                    "[{scope}] prefix conflict: key sequences share a common prefix\n  \
+                     Entry #{i}: {a_seq} -> \"{a_desc}\"\n  \
+                     Entry #{j}: {b_seq} -> \"{b_desc}\"\n  \
+                     A single-key binding cannot be a prefix of a chord (e.g. \"d\" \
+                     conflicts with [\"d\",\"d\"]). Remove one or use \
+                     non-overlapping key sequences.",
+                    i = i + 1,
+                    j = j + 1,
                 );
             }
         }
@@ -157,10 +174,12 @@ fn validate_no_prefix_conflicts<A>(bindings: &[Binding<A>], scope: Scope) -> any
 fn validate_max_depth<A>(bindings: &[Binding<A>], scope: Scope, max: usize) -> anyhow::Result<()> {
     for b in bindings {
         if b.on.len() > max {
+            let seq = crate::tui::format_key_sequence(&b.on);
+            let desc = b.desc.as_deref().unwrap_or("<no description>");
             anyhow::bail!(
-                "[{scope}] chord too deep: {:?} has {} keys (max {max}). \
-                 Modifiers don't count toward depth -- <C-g> is one key.",
-                b.on,
+                "[{scope}] chord too deep: {seq} -> \"{desc}\" has {} keys \
+                 (max {max}). Modifiers don't count toward depth -- \
+                 <C-g> is one key.",
                 b.on.len(),
             );
         }
@@ -407,7 +426,43 @@ mod tests {
                 "Move up",
             ),
         ];
-        assert!(validate_no_exact_duplicates(&bindings, Scope::Connections).is_err());
+        let err = validate_no_exact_duplicates(&bindings, Scope::Connections).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("[connections] duplicate key binding:"),
+            "msg: {msg}"
+        );
+        assert!(msg.contains("j"), "msg should contain the key, got: {msg}");
+        assert!(msg.contains("\"Move down\""), "msg: {msg}");
+        assert!(msg.contains("\"Move up\""), "msg: {msg}");
+        assert!(msg.contains("entry #1"), "msg: {msg}");
+        assert!(msg.contains("entry #2"), "msg: {msg}");
+    }
+
+    #[test]
+    fn validate_no_exact_duplicates_chord_shows_readable_keys() {
+        // gg duplicated — the exact bug that triggered the error-message overhaul.
+        let bindings = vec![
+            binding(
+                vec![mk_key(KeyCode::Char('g')), mk_key(KeyCode::Char('g'))],
+                TestAction::GoTop,
+                "Go to top",
+            ),
+            binding(
+                vec![mk_key(KeyCode::Char('g')), mk_key(KeyCode::Char('g'))],
+                TestAction::Quit,
+                "Go to bottom",
+            ),
+        ];
+        let err = validate_no_exact_duplicates(&bindings, Scope::Connections).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("g → g"), "expected readable chord, got: {msg}");
+        assert!(
+            !msg.contains("Key {"),
+            "should not contain Debug format, got: {msg}"
+        );
+        assert!(msg.contains("\"Go to top\""), "msg: {msg}");
+        assert!(msg.contains("\"Go to bottom\""), "msg: {msg}");
     }
 
     // -- validate_no_prefix_conflicts --
@@ -448,7 +503,16 @@ mod tests {
                 "Delete all",
             ),
         ];
-        assert!(validate_no_prefix_conflicts(&bindings, Scope::Connections).is_err());
+        let err = validate_no_prefix_conflicts(&bindings, Scope::Connections).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("[connections] prefix conflict"), "msg: {msg}");
+        assert!(msg.contains("d → d"), "expected readable chord, got: {msg}");
+        assert!(
+            !msg.contains("Key {"),
+            "should not contain Debug format, got: {msg}"
+        );
+        assert!(msg.contains("\"Delete\""), "msg: {msg}");
+        assert!(msg.contains("\"Delete all\""), "msg: {msg}");
     }
 
     #[test]
@@ -469,7 +533,11 @@ mod tests {
                 "Triple g",
             ),
         ];
-        assert!(validate_no_prefix_conflicts(&bindings, Scope::Connections).is_err());
+        let err = validate_no_prefix_conflicts(&bindings, Scope::Connections).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("[connections] prefix conflict"), "msg: {msg}");
+        assert!(msg.contains("\"Go top\""), "msg: {msg}");
+        assert!(msg.contains("\"Triple g\""), "msg: {msg}");
     }
 
     #[test]
@@ -524,7 +592,16 @@ mod tests {
             TestAction::GoTop,
             "Triple g",
         )];
-        assert!(validate_max_depth(&bindings, Scope::Connections, 2).is_err());
+        let err = validate_max_depth(&bindings, Scope::Connections, 2).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("[connections] chord too deep"), "msg: {msg}");
+        assert!(
+            msg.contains("g → g → g"),
+            "expected readable chord, got: {msg}"
+        );
+        assert!(msg.contains("\"Triple g\""), "msg: {msg}");
+        assert!(msg.contains("3 keys"), "msg: {msg}");
+        assert!(msg.contains("max 2"), "msg: {msg}");
     }
 
     // -- merge validation integration --
