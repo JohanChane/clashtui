@@ -96,7 +96,7 @@ mod tests {
             eprintln!("skipping: portable data dir exists at {:?}", portable_data);
             return;
         }
-        let result = load_home_dir().unwrap();
+        let result = super::load_home_dir().unwrap();
         assert!(
             result.ends_with(".config/clashtui"),
             "expected path ending with .config/clashtui, got: {result:?}"
