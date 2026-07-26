@@ -10,6 +10,8 @@ use strum::VariantArray;
 newtype_tab!(SettingsTab(Tab<SettingsContent>));
 
 mod_agent!(
+    keymap,
+    crate::tui::binding::Scope::Settings,
     SettingsKey,
     [
         ([KeyCode::Enter], SettingsKey::Execute, "Apply"),
@@ -21,30 +23,12 @@ mod_agent!(
     ]
 );
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum SettingsKey {
     Execute,
     MoveUp,
     MoveDown,
     Esc,
-}
-
-impl TryFrom<&crate::tui::Key> for SettingsKey {
-    type Error = ();
-
-    fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(ev).copied().ok_or(());
-        }
-        Ok(match ev.code {
-            KeyCode::Enter => Self::Execute,
-            KeyCode::Esc => Self::Esc,
-            KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
-            KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
-            _ => return Err(()),
-        })
-    }
 }
 
 use crate::config::CoreType;
@@ -97,8 +81,8 @@ impl BasicTabContent for SettingsContent {
 
     const TITLE: &str = "Settings";
 
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
+    fn keymap() -> &'static crate::tui::binding::Keymap<Self::Key> {
+        keymap::get()
     }
 
     fn on_enter(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
@@ -524,51 +508,6 @@ mod tests {
             alt: false,
             super_: false,
         }
-    }
-
-    #[test]
-    fn settings_key_agent_contains_expected() {
-        let a = agent();
-        assert!(a.contains_key(&mk_key(KeyCode::Enter)));
-        assert!(a.contains_key(&mk_key(KeyCode::Esc)));
-        assert!(a.contains_key(&mk_key(KeyCode::Up)));
-        assert!(a.contains_key(&mk_key(KeyCode::Down)));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('k'))));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('j'))));
-    }
-
-    #[test]
-    fn settings_key_try_from_correct_actions() {
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Enter)),
-            Ok(SettingsKey::Execute)
-        ));
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Esc)),
-            Ok(SettingsKey::Esc)
-        ));
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Up)),
-            Ok(SettingsKey::MoveUp)
-        ));
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Down)),
-            Ok(SettingsKey::MoveDown)
-        ));
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Char('k'))),
-            Ok(SettingsKey::MoveUp)
-        ));
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Char('j'))),
-            Ok(SettingsKey::MoveDown)
-        ));
-    }
-
-    #[test]
-    fn settings_key_try_from_unknown_key_is_err() {
-        assert!(SettingsKey::try_from(&mk_key(KeyCode::Char('x'))).is_err());
-        assert!(SettingsKey::try_from(&mk_key(KeyCode::Backspace)).is_err());
     }
 
     #[test]

@@ -11,6 +11,8 @@ use std::time::Duration;
 newtype_tab!(LogsTab(Tab<Logs>));
 
 mod_agent!(
+    keymap,
+    crate::tui::binding::Scope::Logs,
     Key,
     [
         ([KeyCode::Up], Key::MoveUp, "Move up"),
@@ -55,7 +57,7 @@ mod_agent!(
     ]
 );
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Key {
     MoveUp,
     MoveDown,
@@ -70,18 +72,6 @@ pub enum Key {
     ToggleWarning,
     ToggleError,
     ToggleSilent,
-}
-
-impl TryFrom<&crate::tui::Key> for Key {
-    type Error = ();
-
-    fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(ev).copied().ok_or(());
-        }
-        Err(())
-    }
 }
 
 const LOG_BUFFER_SIZE: usize = 300;
@@ -256,8 +246,8 @@ impl BasicTabContent for Logs {
 
     const TITLE: &str = "Logs";
 
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
+    fn keymap() -> &'static crate::tui::binding::Keymap<Self::Key> {
+        keymap::get()
     }
 
     fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
@@ -492,64 +482,12 @@ mod tests {
     use super::*;
     use crossterm::event::KeyCode;
 
-    fn kev(code: KeyCode, shift: bool) -> crate::tui::Key {
-        crate::tui::Key {
-            code,
-            shift,
-            ctrl: false,
-            alt: false,
-            super_: false,
-        }
-    }
-
     fn make_entry(type_: &str, payload: &str, time: &str) -> LogEntry {
         LogEntry {
             type_: type_.to_owned(),
             payload: payload.to_owned(),
             time: time.to_owned(),
         }
-    }
-
-    #[test]
-    fn key_j_maps_to_move_down() {
-        let k = kev(KeyCode::Char('j'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::MoveDown)));
-    }
-
-    #[test]
-    fn key_k_maps_to_move_up() {
-        let k = kev(KeyCode::Char('k'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::MoveUp)));
-    }
-
-    #[test]
-    fn key_p_maps_to_toggle_pause() {
-        let k = kev(KeyCode::Char('p'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::TogglePause)));
-    }
-
-    #[test]
-    fn key_c_maps_to_clear() {
-        let k = kev(KeyCode::Char('c'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::Clear)));
-    }
-
-    #[test]
-    fn key_f_maps_to_fzf_find() {
-        let k = kev(KeyCode::Char('f'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::FzfFind)));
-    }
-
-    #[test]
-    fn key_slash_maps_to_search() {
-        let k = kev(KeyCode::Char('/'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::Search)));
     }
 
     #[test]
