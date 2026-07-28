@@ -5,33 +5,6 @@ use ratatui::{
 
 use super::dev::*;
 
-pub fn km_init(rec: &mut Vec<&str>, map: serde_yml::Value) -> anyhow::Result<()> {
-    if let serde_yml::Value::Mapping(mut map) = map {
-        if profile::km::init(map.remove("profile").unwrap())? {
-            rec.push("profile");
-        }
-        if template::km::init(map.remove("template").unwrap())? {
-            rec.push("template");
-        }
-    } else {
-        todo!()
-    }
-    Ok(())
-}
-
-pub fn km_default() -> serde_yml::Result<serde_yml::Value> {
-    let mut map = serde_yml::Mapping::new();
-    map.insert(
-        "profile".into(),
-        serde_yml::to_value(profile::km::default())?,
-    );
-    map.insert(
-        "template".into(),
-        serde_yml::to_value(template::km::default())?,
-    );
-    Ok(map.into())
-}
-
 /// The Only reason why I use two functions to `sync` is that
 /// I except modifying Self (what we do in `wrapper`) is
 /// fast and infallable

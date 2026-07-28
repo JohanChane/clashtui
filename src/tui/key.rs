@@ -21,11 +21,32 @@ pub struct Key {
 }
 
 impl Key {
+    fn normalize(mut self) -> Self {
+        let c = match self.code {
+            KeyCode::Char(c) => c,
+            KeyCode::BackTab => {
+                return Self {
+                    code: KeyCode::Tab,
+                    modifiers: KeyModifiers::SHIFT,
+                };
+            }
+            _ => return self,
+        };
+        if c.is_ascii_uppercase() {
+            // 大写字母 → 自动加上 SHIFT modifier
+            self.modifiers.insert(KeyModifiers::SHIFT);
+        } else if self.modifiers.contains(KeyModifiers::SHIFT) {
+            // SHIFT + 小写字母 → 转为大写字母
+            self.code = KeyCode::Char(c.to_ascii_uppercase())
+        }
+        self
+    }
     pub fn from_code(code: KeyCode) -> Self {
         Self {
             code,
             modifiers: KeyModifiers::empty(),
         }
+        .normalize()
     }
     // pub fn with_modifiers(code: KeyCode, modifiers: KeyModifiers) -> Self {
     //     Self { code, modifiers }
@@ -58,12 +79,13 @@ impl From<_KeyEvent> for Key {
             code: value.code,
             modifiers: value.modifiers,
         }
+        .normalize()
     }
 }
 
 /// Build KeyMap
 ///
-/// - load keymapping from file or something via `init`
+/// - load keymapping from file or something via `set`
 /// - get keymapping via `get`
 ///
 /// File Format:
@@ -74,20 +96,18 @@ macro_rules! key_map {
 pub(in crate::tui) mod km {
     use super::*;
     use anyhow::Context;
-    use std::collections::{HashMap, HashSet};
     use std::sync::OnceLock;
-    use crate::tui::key::{Key as _Key, KeyDesc, KeyMap as _KeyMap, AsStaticStr};
+    use crate::tui::key::{Key as _Key, KeyDesc, KeyMap as _KeyMap, AsStaticStr, utils::*};
 
     type KeyMap = _KeyMap<$actid>;
-    type FileMap = HashMap<$actid, Vec<_Key>>;
 
     static KEYMAP: OnceLock<KeyMap> = OnceLock::new();
 
-    pub fn init(map: serde_yml::Value) -> anyhow::Result<bool> {
+    pub fn set(map: serde_yml::Value) -> anyhow::Result<bool> {
         let map = serde_yml::from_value(map).context("Failed to load keymap")?;
         let is_duplicated = check_duplicate(&map);
         if KEYMAP.set(map_from_file(map)).is_err() {
-            anyhow::bail!("")
+            unreachable!("keymap initiated twice");
         }
         Ok(is_duplicated)
     }
@@ -96,7 +116,7 @@ pub(in crate::tui) mod km {
         KEYMAP.get().expect("try get keymap without init")
     }
 
-    pub fn default() -> FileMap {
+    pub fn default() -> FileMap<$actid> {
         let mut map = FileMap::new();
         $(
             map.entry($action).or_default().push(_Key::from_code($key));
@@ -111,27 +131,11 @@ pub(in crate::tui) mod km {
             .collect()
     }
 
-    fn check_duplicate(map: &FileMap) -> bool {
-        let it = map.values();
-        let excepted = it.len();
-        let got = it
-            .scan(HashSet::new(), |set, val| set.insert(val).then_some(()))
-            .count();
-        excepted == got
-    }
-
-    fn map_from_file(map: FileMap) -> KeyMap {
-        map.into_iter()
-            .flat_map(|(act, keys)| keys.into_iter().map(move |key| (key, act)))
-            .collect()
-    }
-
     impl TryFrom<&_Key> for $actid {
         type Error = ();
 
         fn try_from(ev: &_Key) -> Result<Self, Self::Error> {
-            let km = km::get();
-            return km.get(ev).map(|act| *act).ok_or(());
+            return km::get().get(ev).map(|act| *act).ok_or(());
         }
     }
 }};
@@ -152,43 +156,91 @@ pub fn load() -> anyhow::Result<()> {
     };
 
     macro_rules! quick_load {
-        ($rec:expr, $id:ident) => {
-            if $id::km::init(value.remove(stringify!($id)).unwrap())? {
+        ($rec:expr, files::$id:ident $(, $($rest:tt)*)?) => {
+            if files::$id::km::set(value.remove(concat!("files/", stringify!($id))).unwrap())? {
+                $rec.push(concat!("files/", stringify!($id)))
+            }
+            quick_load!($rec $(, $($rest)*)?);
+        };
+        ($rec:expr, $id:ident $(, $($rest:tt)*)?) => {
+            if $id::km::set(value.remove(stringify!($id)).unwrap())? {
                 $rec.push(stringify!($id))
             }
+            quick_load!($rec $(, $($rest)*)?);
         };
-        ($rec:expr, $($id:ident),+ $(,)?) => {
-            $(quick_load!($rec, $id);)+
-        };
+        ($rec: expr) => {}
     }
     use super::tab::*;
 
     let mut has_duplicate = vec![];
-    quick_load!(has_duplicate, connections, proxies, srvctl, settings, logs);
-    files::km_init(&mut has_duplicate, value.remove("files").unwrap())?;
+    quick_load!(
+        has_duplicate,
+        connections,
+        proxies,
+        srvctl,
+        settings,
+        logs,
+        files::profile,
+        files::template
+    );
 
     Ok(())
 }
 
 pub fn init() -> anyhow::Result<()> {
     macro_rules! quick_default {
-        ($map:expr, $id:ident) => {
+        ($map:expr, files::$id:ident $(, $($rest:tt)*)?) => {
+            $map.insert(concat!("files/", stringify!($id)).into(), serde_yml::to_value(files::$id::km::default())?);
+            quick_default!($map $(, $($rest)*)?);
+        };
+        ($map:expr, $id:ident $(, $($rest:tt)*)?) => {
             $map.insert(stringify!($id).into(), serde_yml::to_value($id::km::default())?);
+            quick_default!($map $(, $($rest)*)?);
         };
-        ($map:expr, $($id:ident),+ $(,)?) => {
-            $(quick_default!($map, $id);)+
-        };
+        ($map: expr) => {}
     }
     use super::tab::*;
 
     let mut map = serde_yml::Mapping::new();
-    quick_default!(map, connections, proxies, srvctl, settings, logs);
-    map.insert("files".into(), files::km_default()?);
+    quick_default!(
+        map,
+        connections,
+        proxies,
+        srvctl,
+        settings,
+        logs,
+        files::profile,
+        files::template
+    );
 
     let path = crate::config::keymap_path();
     let file = std::fs::File::create(path)?;
     serde_yml::to_writer(file, &map)?;
     Ok(())
+}
+
+pub mod utils {
+    use super::{Key, KeyMap};
+    use std::collections::{HashMap, HashSet};
+
+    pub type FileMap<K> = HashMap<K, Vec<Key>>;
+
+    /// If there is duplicate (e.g. 's' => Search/Import), return true
+    pub fn check_duplicate<K>(map: &FileMap<K>) -> bool {
+        let it = map.values();
+        let expected = it.len();
+        // Any duplicate will cause got less than expected
+        let got = it
+            .scan(HashSet::new(), |set, val| set.insert(val).then_some(()))
+            .count();
+        expected != got
+    }
+
+    pub fn map_from_file<K: Copy>(map: FileMap<K>) -> KeyMap<K> {
+        map.into_iter()
+            .flat_map(|(act, keys)| keys.into_iter().map(move |key| (key, act)))
+            .collect()
+    }
 }
 
 pub mod consts {
