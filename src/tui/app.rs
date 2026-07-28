@@ -20,12 +20,38 @@ pub enum AppKey {
 }
 
 pub(in crate::tui) mod km {
+    //! We override the `set` and `get_docs` to keep
+    //! the core key bindings under control
     use super::AppKey;
     use crate::tui::key::{AsStaticStr, Key, KeyDesc};
     use crossterm::event::KeyCode;
-    use std::sync::LazyLock;
 
-    use crate::tui::key::KeyMap;
+    // There is no need to write those to file,
+    // as they are overritten when set
+    key_map!(AppKey, []);
+
+    pub use km::default;
+
+    pub fn set(mut map: serde_yml::Value) -> anyhow::Result<bool> {
+        let mmap = map.as_mapping_mut().unwrap();
+        (2..=7u8)
+            .map(|num| (KeyCode::Char((b'0' + num) as char), AppKey::Tab(num)))
+            .chain(APP_KEYS)
+            .map(|(key, act)| (act, vec![Key::from_code(key)]))
+            .try_for_each(|(key, act)| {
+                mmap.insert(serde_yml::to_value(key)?, serde_yml::to_value(act)?);
+                Ok::<_, serde_yml::Error>(())
+            })?;
+        km::set(map)
+    }
+
+    pub fn get_docs() -> KeyDesc {
+        km::get_docs()
+            .into_iter()
+            .filter(|(_, b)| *b == TAB_NUM)
+            .chain(std::iter::once(("1~7".to_string(), TAB_NUM)))
+            .collect()
+    }
 
     const APP_KEYS: [(KeyCode, AppKey); 4] = [
         (KeyCode::Char('1'), AppKey::Tab(1)),
@@ -33,41 +59,12 @@ pub(in crate::tui) mod km {
         (KeyCode::Char('q'), AppKey::Quit),
         (KeyCode::Char('?'), AppKey::Help),
     ];
-
-    static KEYMAP: LazyLock<KeyMap<AppKey>> = LazyLock::new(|| {
-        KeyMap::from_iter(
-            (2..=7u8)
-                .map(|num| (KeyCode::Char((b'0' + num) as char), AppKey::Tab(num)))
-                .chain(APP_KEYS)
-                .map(|(key, act)| (Key::from_code(key), act)),
-        )
-    });
-
-    pub fn get_docs() -> KeyDesc {
-        KEYMAP
-            .iter()
-            // We filter Tab2,3... here
-            .filter_map(|(key, act)| match act {
-                AppKey::Tab(1) => Some(("1-7".to_string(), act)),
-                AppKey::Tab(2..) => None,
-                _ => Some((key.to_string(), act)),
-            })
-            .map(|(key, act)| (key, act.as_static_str()))
-            .collect()
-    }
-
-    impl TryFrom<&Key> for AppKey {
-        type Error = ();
-
-        fn try_from(ev: &Key) -> Result<Self, Self::Error> {
-            return KEYMAP.get(ev).map(|act| *act).ok_or(());
-        }
-    }
+    const TAB_NUM: &'static str = "Switch tab 1-7";
 
     impl AsStaticStr for AppKey {
         fn as_static_str(&self) -> &'static str {
             match self {
-                Self::Tab(..) => "Switch tab 1-7",
+                Self::Tab(..) => TAB_NUM,
                 Self::TabNext => "Tab Next",
                 Self::Quit => "Quit",
                 Self::Help => "Help",
