@@ -2,10 +2,15 @@ use crossterm::event::{KeyCode, KeyEvent as _KeyEvent, KeyModifiers};
 
 pub type KeyDesc = Vec<(String, &'static str)>;
 pub type KeyDescRef<'a> = &'a [(String, &'a str)];
-pub type KeyMap<A> = std::collections::HashMap<Key, A>;
+pub type KeyMap<A> = std::collections::HashMap<Key, MaybeMap<A>>;
 
 pub trait AsStaticStr {
     fn as_static_str(&self) -> &'static str;
+}
+
+pub enum MaybeMap<A> {
+    SubMap(std::collections::HashMap<Key, A>),
+    Action(A),
 }
 
 #[derive_aliases::derive(..KeyBasic, Debug)]
@@ -97,11 +102,11 @@ pub(in crate::tui) mod km {
     use super::*;
     use anyhow::Context;
     use std::sync::OnceLock;
-    use crate::tui::key::{Key as _Key, KeyDesc, KeyMap as _KeyMap, AsStaticStr, utils::*};
+    use crate::tui::key::{Key as _Key, KeyDesc, KeyMap as _KeyMap, AsStaticStr, MaybeMap, utils::*};
 
     type KeyMap = _KeyMap<$actid>;
 
-    static KEYMAP: OnceLock<KeyMap> = OnceLock::new();
+    pub(super) static KEYMAP: OnceLock<KeyMap> = OnceLock::new();
 
     pub fn set(map: serde_yml::Value) -> anyhow::Result<bool> {
         let map = serde_yml::from_value(map).context("Failed to load keymap")?;
@@ -117,25 +122,60 @@ pub(in crate::tui) mod km {
     }
 
     pub fn default() -> FileMap<$actid> {
-        let mut map = FileMap::new();
+        // TODO: remove me when app is filled
+        #[allow(unused_mut)]
+        let mut map = FileMap {
+            common: Default::default(),
+            submap: Default::default(),
+        };
         $(
-            map.entry($action).or_default().push(_Key::from_code($key));
+            map.common.entry($action).or_default().push(_Key::from_code($key));
         )*
         map
     }
 
     pub fn get_docs() -> KeyDesc {
-        get()
-            .iter()
-            .map(|(key, act)| (key.to_string(), act.as_static_str()))
-            .collect()
+        use crate::tui::key::MaybeMap;
+        std::iter::from_fn(|| {
+            while let Some((key, maybe_submap)) = km::get().iter().next() {
+                match maybe_submap {
+                    MaybeMap::SubMap(hash_map) => {
+                        while let Some((key, act)) = hash_map.iter().next() {
+                            return Some((key.to_string(), act.as_static_str()));
+                        }
+                    }
+                    MaybeMap::Action(act) => {
+                        return Some((key.to_string(), act.as_static_str()));
+                    }
+                };
+            }
+            None
+        })
+        .collect()
     }
 
     impl TryFrom<&_Key> for $actid {
         type Error = ();
 
         fn try_from(ev: &_Key) -> Result<Self, Self::Error> {
-            return km::get().get(ev).map(|act| *act).ok_or(());
+            use std::sync::Mutex;
+
+            static SUBMAP: Mutex<Option<&'static std::collections::HashMap<_Key, $actid>>> =
+                Mutex::new(None);
+
+            let maybe_submap = &mut *SUBMAP.lock().unwrap();
+            let key = if let Some(submap) = maybe_submap.take() {
+                submap.get(ev).copied().ok_or(())?
+            } else {
+                match km::get().get(ev).ok_or(())? {
+                    MaybeMap::SubMap(hash_map) => {
+                        *maybe_submap = Some(hash_map);
+                        return Err(());
+                    }
+                    MaybeMap::Action(key) => *key,
+                }
+            };
+            return Ok(key);
         }
     }
 }};
@@ -220,25 +260,93 @@ pub fn init() -> anyhow::Result<()> {
 }
 
 pub mod utils {
-    use super::{Key, KeyMap};
+    use super::{Key, KeyMap, MaybeMap};
     use std::collections::{HashMap, HashSet};
+    use std::hash::Hash;
 
-    pub type FileMap<K> = HashMap<K, Vec<Key>>;
-
-    /// If there is duplicate (e.g. 's' => Search/Import), return true
-    pub fn check_duplicate<K>(map: &FileMap<K>) -> bool {
-        let it = map.values();
-        let expected = it.len();
-        // Any duplicate will cause got less than expected
-        let got = it
-            .scan(HashSet::new(), |set, val| set.insert(val).then_some(()))
-            .count();
-        expected != got
+    #[derive(serde::Deserialize, serde::Serialize)]
+    pub struct FileMap<A: Eq + Hash> {
+        #[serde(flatten)]
+        pub common: HashMap<A, Vec<Key>>,
+        #[serde(flatten)]
+        pub submap: HashMap<Key, HashMap<A, Vec<Key>>>,
     }
 
-    pub fn map_from_file<K: Copy>(map: FileMap<K>) -> KeyMap<K> {
-        map.into_iter()
-            .flat_map(|(act, keys)| keys.into_iter().map(move |key| (key, act)))
+    #[test]
+    fn test() {
+        #[derive(PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+        enum Action {
+            Act1,
+            Act2,
+            Act3,
+        }
+        use crossterm::event::KeyCode;
+        let mut map: FileMap<Action> = FileMap {
+            common: Default::default(),
+            submap: Default::default(),
+        };
+        map.common
+            .insert(Action::Act1, vec![Key::from_code(KeyCode::BackTab)]);
+        map.submap.insert(
+            Key::from_code(KeyCode::Down),
+            [
+                (Action::Act3, vec![Key::from_code(KeyCode::Backspace)]),
+                (Action::Act2, vec![Key::from_code(KeyCode::Delete)]),
+            ]
+            .into(),
+        );
+        map.submap.insert(
+            Key::from_code(KeyCode::Up),
+            [(Action::Act2, vec![Key::from_code(KeyCode::Char('A'))])].into(),
+        );
+        let str = serde_yml::to_string(&map).unwrap();
+        println!("{str}")
+    }
+
+    /// If there is duplicate (e.g. 's' => Search/Import), return true
+    pub fn check_duplicate<A: Eq + Hash>(map: &FileMap<A>) -> bool {
+        let mut set = HashSet::new();
+        let no_duplicate = map
+            .common
+            .values()
+            .flat_map(|keys| keys.into_iter())
+            .chain(map.submap.keys())
+            .all(|key| set.insert(key));
+        if !no_duplicate {
+            return true;
+        }
+        for submap in map.submap.values() {
+            let mut set = HashSet::new();
+            let no_duplicate = submap
+                .values()
+                .flat_map(|keys| keys.into_iter())
+                .all(|key| set.insert(key));
+            if !no_duplicate {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn map_from_file<A: Eq + Hash + Copy>(map: FileMap<A>) -> KeyMap<A> {
+        let iter = map.common.into_iter().flat_map(|(act, keys)| {
+            keys.into_iter()
+                .map(move |key| (key, MaybeMap::Action(act)))
+        });
+        map.submap
+            .into_iter()
+            .map(|(key, submap)| {
+                (
+                    key,
+                    MaybeMap::SubMap(
+                        submap
+                            .into_iter()
+                            .flat_map(|(act, keys)| keys.into_iter().map(move |key| (key, act)))
+                            .collect(),
+                    ),
+                )
+            })
+            .chain(iter)
             .collect()
     }
 }
