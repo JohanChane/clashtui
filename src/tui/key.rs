@@ -109,7 +109,7 @@ pub(in crate::tui) mod km {
     pub(super) static KEYMAP: OnceLock<KeyMap> = OnceLock::new();
 
     pub fn set(map: serde_yml::Value) -> anyhow::Result<bool> {
-        let map = serde_yml::from_value(map).context("Failed to load keymap")?;
+        let map = serde_yml::from_value(map).context("Failed to parse keymap")?;
         let is_duplicated = check_duplicate(&map);
         if KEYMAP.set(map_from_file(map)).is_err() {
             unreachable!("keymap initiated twice");
@@ -136,8 +136,9 @@ pub(in crate::tui) mod km {
 
     pub fn get_docs() -> KeyDesc {
         use crate::tui::key::MaybeMap;
+        let mut iter = km::get().iter();
         std::iter::from_fn(|| {
-            while let Some((key, maybe_submap)) = km::get().iter().next() {
+            while let Some((key, maybe_submap)) = iter.next() {
                 match maybe_submap {
                     MaybeMap::SubMap(hash_map) => {
                         while let Some((key, act)) = hash_map.iter().next() {
@@ -186,7 +187,6 @@ pub fn load() -> anyhow::Result<()> {
 
     let mut value: serde_yml::Mapping = match std::fs::File::open(&path) {
         Ok(file) => serde_yml::from_reader(file)?,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_yml::Mapping::new(),
         Err(e) => {
             return Err(anyhow::anyhow!(
                 "failed to open keymap file at {}: {e}",
@@ -197,24 +197,28 @@ pub fn load() -> anyhow::Result<()> {
 
     macro_rules! quick_load {
         ($rec:expr, files::$id:ident $(, $($rest:tt)*)?) => {
-            if files::$id::km::set(value.remove(concat!("files/", stringify!($id))).unwrap())? {
+            if files::$id::km::set(value.remove(concat!("files/", stringify!($id))).unwrap())
+                .context(concat!("failed to load files/", stringify!($id)))? {
                 $rec.push(concat!("files/", stringify!($id)))
             }
             quick_load!($rec $(, $($rest)*)?);
         };
         ($rec:expr, $id:ident $(, $($rest:tt)*)?) => {
-            if $id::km::set(value.remove(stringify!($id)).unwrap())? {
+            if $id::km::set(value.remove(stringify!($id)).unwrap())
+                .context(concat!("failed to load ", stringify!($id)))? {
                 $rec.push(stringify!($id))
             }
             quick_load!($rec $(, $($rest)*)?);
         };
         ($rec: expr) => {}
     }
-    use super::tab::*;
+    use super::{app, tab::*};
+    use anyhow::Context;
 
     let mut has_duplicate = vec![];
     quick_load!(
         has_duplicate,
+        app,
         connections,
         proxies,
         srvctl,
@@ -239,11 +243,12 @@ pub fn init() -> anyhow::Result<()> {
         };
         ($map: expr) => {}
     }
-    use super::tab::*;
+    use super::{app, tab::*};
 
     let mut map = serde_yml::Mapping::new();
     quick_default!(
         map,
+        app,
         connections,
         proxies,
         srvctl,
@@ -266,15 +271,22 @@ pub mod utils {
 
     #[derive(serde::Deserialize, serde::Serialize)]
     pub struct FileMap<A: Eq + Hash> {
-        #[serde(flatten)]
+        // #[serde(flatten)]
         pub common: HashMap<A, Vec<Key>>,
-        #[serde(flatten)]
-        pub submap: HashMap<Key, HashMap<A, Vec<Key>>>,
+        // #[serde(flatten)]
+        pub submap: HashMap<String, SubMap<A>>,
+    }
+
+    #[derive(serde::Deserialize, serde::Serialize)]
+    pub struct SubMap<A: Eq + Hash> {
+        key: Key,
+        // #[serde(flatten)]
+        inner: HashMap<A, Vec<Key>>,
     }
 
     #[test]
     fn test() {
-        #[derive(PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+        #[derive_aliases::derive(..Key)]
         enum Action {
             Act1,
             Act2,
@@ -288,19 +300,29 @@ pub mod utils {
         map.common
             .insert(Action::Act1, vec![Key::from_code(KeyCode::BackTab)]);
         map.submap.insert(
-            Key::from_code(KeyCode::Down),
-            [
-                (Action::Act3, vec![Key::from_code(KeyCode::Backspace)]),
-                (Action::Act2, vec![Key::from_code(KeyCode::Delete)]),
-            ]
-            .into(),
+            "1".to_string(),
+            SubMap {
+                key: Key::from_code(KeyCode::Down),
+                inner: [
+                    (Action::Act3, vec![Key::from_code(KeyCode::Backspace)]),
+                    (Action::Act2, vec![Key::from_code(KeyCode::Delete)]),
+                ]
+                .into(),
+            },
         );
         map.submap.insert(
-            Key::from_code(KeyCode::Up),
-            [(Action::Act2, vec![Key::from_code(KeyCode::Char('A'))])].into(),
+            "2".to_string(),
+            SubMap {
+                key: Key::from_code(KeyCode::Up),
+                inner: [(Action::Act2, vec![Key::from_code(KeyCode::Char('A'))])].into(),
+            },
         );
         let str = serde_yml::to_string(&map).unwrap();
-        println!("{str}")
+        println!("{str}");
+        let val = serde_yml::to_value(&map).unwrap();
+        println!("{val:?}");
+        let _: FileMap<Action> = serde_yml::from_str(&str).unwrap();
+        let _: FileMap<Action> = serde_yml::from_value(val).unwrap();
     }
 
     /// If there is duplicate (e.g. 's' => Search/Import), return true
@@ -310,7 +332,7 @@ pub mod utils {
             .common
             .values()
             .flat_map(|keys| keys.into_iter())
-            .chain(map.submap.keys())
+            .chain(map.submap.values().map(|submap| &submap.key))
             .all(|key| set.insert(key));
         if !no_duplicate {
             return true;
@@ -318,6 +340,7 @@ pub mod utils {
         for submap in map.submap.values() {
             let mut set = HashSet::new();
             let no_duplicate = submap
+                .inner
                 .values()
                 .flat_map(|keys| keys.into_iter())
                 .all(|key| set.insert(key));
@@ -335,11 +358,12 @@ pub mod utils {
         });
         map.submap
             .into_iter()
-            .map(|(key, submap)| {
+            .map(|(name, submap)| {
                 (
-                    key,
+                    submap.key,
                     MaybeMap::SubMap(
                         submap
+                            .inner
                             .into_iter()
                             .flat_map(|(act, keys)| keys.into_iter().map(move |key| (key, act)))
                             .collect(),

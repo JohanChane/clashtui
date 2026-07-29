@@ -33,7 +33,13 @@ pub(in crate::tui) mod km {
     pub use km::default;
 
     pub fn set(mut map: serde_yml::Value) -> anyhow::Result<bool> {
-        let mmap = map.as_mapping_mut().unwrap();
+        let mmap = map
+            .as_mapping_mut()
+            .unwrap()
+            .entry("common".into())
+            .or_insert(serde_yml::Value::Mapping(Default::default()))
+            .as_mapping_mut()
+            .unwrap();
         (2..=7u8)
             .map(|num| (KeyCode::Char((b'0' + num) as char), AppKey::Tab(num)))
             .chain(APP_KEYS)
@@ -48,7 +54,7 @@ pub(in crate::tui) mod km {
     pub fn get_docs() -> KeyDesc {
         km::get_docs()
             .into_iter()
-            .filter(|(_, b)| *b == TAB_NUM)
+            .filter(|(_, b)| *b != TAB_NUM)
             .chain(std::iter::once(("1~7".to_string(), TAB_NUM)))
             .collect()
     }
