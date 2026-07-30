@@ -323,7 +323,7 @@ impl BasicTabContent for Proxies {
         async {
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             let response = tri!(
-                tokio::task::spawn_blocking(proxies::fetch_proxies)
+                tokio::task::spawn_blocking(proxies::fetch_proxies_with_providers)
                     .await
                     .unwrap(),
                 or_set
@@ -347,7 +347,7 @@ impl BasicTabContent for Proxies {
         }
         async {
             let response = tri!(
-                tokio::task::spawn_blocking(proxies::fetch_proxies)
+                tokio::task::spawn_blocking(proxies::fetch_proxies_with_providers)
                     .await
                     .unwrap()
             );

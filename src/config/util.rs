@@ -84,6 +84,7 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn load_home_dir_macos_uses_home_dot_config() {
+        use crate::config::load_home_dir;
         // When not in portable mode, macOS uses $HOME/.config/clashtui
         let exe_dir = std::env::current_exe()
             .unwrap()
@@ -105,8 +106,8 @@ mod tests {
     #[test]
     fn cfg_macos_consistent() {
         // cfg!(target_os = "macos") should be true when compiled with --target *-apple-darwin
-        let is_macos = cfg!(target_os = "macos");
+        let _is_macos = cfg!(target_os = "macos");
+        // cfg!(target_os = "macos") should be true when compiled with *-apple-darwin
         // This always passes — it just documents the expected platform detection
-        assert!(is_macos || !is_macos);
     }
 }

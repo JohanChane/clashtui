@@ -117,8 +117,47 @@ impl<'de> Deserialize<'de> for DelayInfo {
     }
 }
 
-pub fn fetch_proxies() -> Result<ProxiesResponse> {
-    request(Method::Get, "/proxies", None).and_then(|r| r.json())
+/// Fetch /proxies and merge in proxy-provider outbounds.
+/// Proxy-provider nodes (from /providers/proxies) are NOT in /proxies,
+/// so we fetch them separately and merge.
+pub fn fetch_proxies_with_providers() -> Result<ProxiesResponse> {
+    let mut response: ProxiesResponse =
+        request(Method::Get, "/proxies", None).and_then(|r| r.json())?;
+    // Best-effort merge of provider proxies; failure is non-fatal.
+    if let Ok(pp) = fetch_providers_proxies() {
+        for (name, proxy) in pp {
+            response.proxies.entry(name).or_insert(proxy);
+        }
+    }
+    Ok(response)
+}
+
+/// Fetch proxy-provider outbounds that are not in /proxies.
+/// Returns a flat map of {name -> Proxy} for all provider proxies.
+pub fn fetch_providers_proxies() -> Result<IndexMap<String, Proxy>> {
+    let v: serde_json::Value =
+        request(Method::Get, "/providers/proxies", None).and_then(|r| r.json())?;
+    let providers = v
+        .get("providers")
+        .and_then(|p| p.as_object())
+        .cloned()
+        .unwrap_or_default();
+    let mut map: IndexMap<String, Proxy> = IndexMap::new();
+    for (_, provider) in &providers {
+        let items = provider
+            .get("proxies")
+            .and_then(|a| a.as_array())
+            .cloned()
+            .unwrap_or_default();
+        for item in items {
+            if let Ok(proxy) = serde_json::from_value::<Proxy>(item)
+                && !proxy.hidden
+            {
+                map.insert(proxy.name.clone(), proxy);
+            }
+        }
+    }
+    Ok(map)
 }
 
 pub fn select_proxy(group: &str, node: &str) -> Result<()> {

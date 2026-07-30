@@ -48,7 +48,7 @@ impl Proxies {
             );
             let response = match tokio::time::timeout(
                 Duration::from_secs(t_secs),
-                tokio::task::spawn_blocking(proxies::fetch_proxies),
+                tokio::task::spawn_blocking(proxies::fetch_proxies_with_providers),
             )
             .await
             {
@@ -105,7 +105,7 @@ impl Proxies {
                     };
                     let mut response = match tokio::time::timeout(
                         Duration::from_secs(t_secs),
-                        tokio::task::spawn_blocking(proxies::fetch_proxies),
+                        tokio::task::spawn_blocking(proxies::fetch_proxies_with_providers),
                     )
                     .await
                     {
@@ -164,7 +164,7 @@ impl Proxies {
                     };
                     let mut response = match tokio::time::timeout(
                         Duration::from_secs(t_secs),
-                        tokio::task::spawn_blocking(proxies::fetch_proxies),
+                        tokio::task::spawn_blocking(proxies::fetch_proxies_with_providers),
                     )
                     .await
                     {
@@ -233,7 +233,9 @@ impl Proxies {
                 )
                 .await
                 {
-                    all_delays.extend(delays)
+                    for (child, d) in &delays {
+                        all_delays.insert(child.clone(), *d);
+                    }
                 }
             }
             for name in &files {
@@ -257,7 +259,7 @@ impl Proxies {
             }
             let mut response = match tokio::time::timeout(
                 Duration::from_secs(t_secs),
-                tokio::task::spawn_blocking(proxies::fetch_proxies),
+                tokio::task::spawn_blocking(proxies::fetch_proxies_with_providers),
             )
             .await
             {
@@ -289,7 +291,7 @@ impl Proxies {
     pub fn refresh(&mut self, task_set: &mut FutureSet<Self>) {
         async {
             let response = tri!(
-                tokio::task::spawn_blocking(proxies::fetch_proxies)
+                tokio::task::spawn_blocking(proxies::fetch_proxies_with_providers)
                     .await
                     .unwrap(),
                 or_set
