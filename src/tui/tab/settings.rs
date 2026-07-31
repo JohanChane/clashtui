@@ -401,6 +401,11 @@ impl TabContent for SettingsContent {
         let block = Block::bordered()
             .border_style(Theme::get().section("settings").border)
             .title(Self::TITLE);
+        let block = if let Some(submap_name) = km::get_submap_name() {
+            block.title_bottom(submap_name)
+        } else {
+            block
+        };
 
         if crate::config::is_core_mismatch() {
             let widget = Paragraph::new("API data mismatch with configured core").block(block);

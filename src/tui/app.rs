@@ -260,6 +260,11 @@ fn render_tabbar(
     let block = Block::bordered()
         .title(" Clashtui ")
         .title_bottom(Line::raw(" Tab or num ").right_aligned().reversed());
+    let block = if let Some(submap_name) = km::get_submap_name() {
+        block.title_bottom(submap_name)
+    } else {
+        block
+    };
     let titles = titles
         .into_iter()
         .enumerate()
