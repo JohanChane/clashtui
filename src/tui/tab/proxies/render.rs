@@ -5,7 +5,7 @@ use crate::tui::theme::Theme;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, List, ListItem};
 
-pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListState) {
+pub(super) fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListState) {
     let theme = Theme::get();
     let section = theme.section("proxies");
 
