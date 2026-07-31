@@ -117,7 +117,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-pub enum Key {
+pub(super) enum Key {
     Switch,
     MoveUp,
     MoveDown,
@@ -157,7 +157,7 @@ impl Document for Key {
 }
 
 #[derive_aliases::derive(..Action)]
-pub enum Action {
+pub(super) enum Action {
     Add,
     Delete,
     Edit,
@@ -175,7 +175,7 @@ pub enum Action {
 }
 
 #[derive(Default)]
-pub struct Profile {
+pub(super) struct Profile {
     items: Vec<String>,
     atime: Vec<String>,
     filter: Option<String>,

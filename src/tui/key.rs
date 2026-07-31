@@ -133,13 +133,13 @@ pub mod instancing {
         } else {
             match keymap.get(ev)? {
                 MaybeMap::SubMap { name, inner } => {
-                    *submap = Some((&name, inner));
+                    *submap = Some((name, inner));
                     return None;
                 }
                 MaybeMap::Action(key) => *key,
             }
         };
-        return Some(key);
+        Some(key)
     }
 
     pub mod files {
@@ -202,7 +202,7 @@ pub mod instancing {
             let no_duplicate = map
                 .common
                 .values()
-                .flat_map(|keys| keys.into_iter())
+                .flat_map(|keys| keys.iter())
                 .chain(map.submap.values().map(|submap| &submap.key))
                 .all(|key| set.insert(key));
             if !no_duplicate {
@@ -213,7 +213,7 @@ pub mod instancing {
                 let no_duplicate = submap
                     .inner
                     .values()
-                    .flat_map(|keys| keys.into_iter())
+                    .flat_map(|keys| keys.iter())
                     .all(|key| set.insert(key));
                 if !no_duplicate {
                     return true;
@@ -280,15 +280,16 @@ macro_rules! key_map {
                 Ok(is_duplicated)
             }
 
-            pub fn get() -> &'static KeyMap {
+            pub(super) fn get() -> &'static KeyMap {
                 KEYMAP.get().expect("try get keymap without init")
             }
 
-            pub fn default() -> FileMap<$actid> {
-                $default_map
+            pub fn default() -> serde_yml::Result<serde_yml::Value> {
+                serde_yml::to_value::<FileMap<$actid>>($default_map)
             }
 
-            pub fn get_docs() -> KeyDesc {
+            // For re-export like files.rs does
+            pub(in super::super) fn get_docs() -> KeyDesc {
                 make_docs(km::get())
             }
 
@@ -299,7 +300,8 @@ macro_rules! key_map {
                 )>,
             > = std::sync::Mutex::new(None);
 
-            pub fn get_submap_name() -> Option<&'static str> {
+            // For re-export like app.rs does
+            pub(in super::super) fn get_submap_name() -> Option<&'static str> {
                 SUBMAP.lock().unwrap().map(|l| l.0)
             }
 
@@ -367,11 +369,11 @@ pub fn load() -> anyhow::Result<()> {
 pub fn init() -> anyhow::Result<()> {
     macro_rules! quick_default {
         ($map:expr, files::$id:ident $(, $($rest:tt)*)?) => {
-            $map.insert(concat!("files/", stringify!($id)).into(), serde_yml::to_value(files::$id::km::default())?);
+            $map.insert(concat!("files/", stringify!($id)).into(), files::$id::km::default()?);
             quick_default!($map $(, $($rest)*)?);
         };
         ($map:expr, $id:ident $(, $($rest:tt)*)?) => {
-            $map.insert(stringify!($id).into(), serde_yml::to_value($id::km::default())?);
+            $map.insert(stringify!($id).into(), $id::km::default()?);
             quick_default!($map $(, $($rest)*)?);
         };
         ($map: expr $(,)?) => {}
@@ -398,10 +400,10 @@ pub fn init() -> anyhow::Result<()> {
 }
 
 pub mod consts {
-    pub const MOVE_UP: &'static str = "Move Up";
-    pub const MOVE_DOWN: &'static str = "Move Down";
-    pub const GO_TOP: &'static str = "Go to top";
-    pub const GO_BOTTOM: &'static str = "Go to bottom";
-    pub const FILTER: &'static str = "Search/Filter";
-    pub const PAUSE: &'static str = "Pause/Resume";
+    pub const MOVE_UP: &str = "Move Up";
+    pub const MOVE_DOWN: &str = "Move Down";
+    pub const GO_TOP: &str = "Go to top";
+    pub const GO_BOTTOM: &str = "Go to bottom";
+    pub const FILTER: &str = "Search/Filter";
+    pub const PAUSE: &str = "Pause/Resume";
 }

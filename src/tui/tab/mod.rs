@@ -72,12 +72,12 @@ pub trait TuiTab: super::TuiWidget {
     fn key_description(&self) -> crate::tui::key::KeyDesc;
 }
 
-pub(crate) mod connections;
-pub(crate) mod files;
-pub(crate) mod logs;
-pub(crate) mod proxies;
-pub(crate) mod settings;
-pub(crate) mod srvctl;
+pub(super) mod connections;
+pub(super) mod files;
+pub(super) mod logs;
+pub(super) mod proxies;
+pub(super) mod settings;
+pub(super) mod srvctl;
 mod status;
 
 macro_rules! enum_dispatch {

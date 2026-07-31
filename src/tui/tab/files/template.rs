@@ -33,7 +33,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key, Debug)]
-pub enum Key {
+pub(super) enum Key {
     Switch,
     MoveUp,
     MoveDown,
@@ -65,7 +65,7 @@ impl Document for Key {
 }
 
 #[derive_aliases::derive(..Action, Debug)]
-pub enum Action {
+pub(super) enum Action {
     Generate,
     Delete,
     Edit,
@@ -76,7 +76,7 @@ pub enum Action {
 }
 
 #[derive(Default)]
-pub struct Template {
+pub(super) struct Template {
     items: Vec<String>,
     filter: Option<String>,
     jump_target: Cell<Option<usize>>,

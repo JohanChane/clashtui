@@ -6,7 +6,7 @@ use std::time::Instant;
 use super::tree::{NodeItem, NodeType, ProxyTree, SortMode};
 
 #[derive(Default)]
-pub struct Proxies {
+pub(super) struct Proxies {
     pub tree: ProxyTree,
     pub proxies: proxies::ProxyCatalog,
     pub error: Option<String>,
@@ -171,7 +171,7 @@ impl Proxies {
         }
     }
 
-    pub fn dispatch_key(
+    fn dispatch_key(
         &mut self,
         key: super::Key,
         task_set: &mut FutureSet<Self>,

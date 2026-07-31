@@ -38,33 +38,27 @@ key_map!(
             "Sort",
             KeyCode::Char('s'),
             [
-                (KeyCode::Char('h'), Key::SortByHost),
-                (KeyCode::Char('l'), Key::SortByRule),
-                (KeyCode::Char('c'), Key::SortByChains),
-                (KeyCode::Char('n'), Key::SortByDownload),
-                (KeyCode::Char('u'), Key::SortByUpload),
-                (KeyCode::Char('d'), Key::SortByDlSpeed),
-                (KeyCode::Char('s'), Key::SortByUlSpeed),
+                (KeyCode::Char('h'), Key::SortBy(SortColumn::Host)),
+                (KeyCode::Char('l'), Key::SortBy(SortColumn::Rule)),
+                (KeyCode::Char('c'), Key::SortBy(SortColumn::Chains)),
+                (KeyCode::Char('n'), Key::SortBy(SortColumn::Download)),
+                (KeyCode::Char('u'), Key::SortBy(SortColumn::Upload)),
+                (KeyCode::Char('d'), Key::SortBy(SortColumn::DlSpeed)),
+                (KeyCode::Char('s'), Key::SortBy(SortColumn::UlSpeed)),
                 (KeyCode::Char('r'), Key::SortReset),
             ]
         )
 );
 
 #[derive_aliases::derive(..Key)]
-pub enum Key {
+enum Key {
     MoveUp,
     MoveDown,
     GoTop,
     GoBottom,
     Terminate,
     TerminateAll,
-    SortByHost,
-    SortByRule,
-    SortByChains,
-    SortByDownload,
-    SortByUpload,
-    SortByDlSpeed,
-    SortByUlSpeed,
+    SortBy(SortColumn),
     SortReset,
     Search,
     TogglePause,
@@ -81,13 +75,15 @@ impl Document for Key {
             Self::GoBottom => GO_BOTTOM,
             Self::Terminate => "Close",
             Self::TerminateAll => "Close all",
-            Self::SortByHost => "Sort by Host",
-            Self::SortByRule => "Sort by Rule",
-            Self::SortByChains => "Sort by Chains",
-            Self::SortByDownload => "Sort by Download",
-            Self::SortByUpload => "Sort by Upload",
-            Self::SortByDlSpeed => "Sort by Dl Speed",
-            Self::SortByUlSpeed => "Sort by Ul Speed",
+            Self::SortBy(col) => match col {
+                SortColumn::Host => "Sort by Host",
+                SortColumn::Rule => "Sort by Rule",
+                SortColumn::Chains => "Sort by Chains",
+                SortColumn::Download => "Sort by Download",
+                SortColumn::Upload => "Sort by Upload",
+                SortColumn::DlSpeed => "Sort by Dl Speed",
+                SortColumn::UlSpeed => "Sort by Ul Speed",
+            },
             Self::SortReset => "Reset Sort",
             Self::Search => FILTER,
             Self::TogglePause => PAUSE,
@@ -124,7 +120,7 @@ macro_rules! tri {
     };
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive_aliases::derive(..Key)]
 enum SortColumn {
     Host,
     Rule,
@@ -450,13 +446,7 @@ impl TabContent for Connections {
                 }
                 .spawn_at(task_set);
             }
-            Key::SortByHost => self.toggle_sort(SortColumn::Host),
-            Key::SortByRule => self.toggle_sort(SortColumn::Rule),
-            Key::SortByChains => self.toggle_sort(SortColumn::Chains),
-            Key::SortByDownload => self.toggle_sort(SortColumn::Download),
-            Key::SortByUpload => self.toggle_sort(SortColumn::Upload),
-            Key::SortByDlSpeed => self.toggle_sort(SortColumn::DlSpeed),
-            Key::SortByUlSpeed => self.toggle_sort(SortColumn::UlSpeed),
+            Key::SortBy(col) => self.toggle_sort(col),
             Key::SortReset => {
                 self.sort_state = SortState::default();
                 self.apply_sort();

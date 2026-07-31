@@ -43,7 +43,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-pub enum Key {
+enum Key {
     MoveUp,
     MoveDown,
     GoTop,
