@@ -76,47 +76,44 @@ fn traffic_percentage(used: u64, total: u64) -> f64 {
 
 key_map!(
     Key,
-    [
-        (KeyCode::Left, Key::Switch),
-        (KeyCode::Right, Key::Switch),
-        (KeyCode::Char('h'), Key::Switch),
-        (KeyCode::Char('l'), Key::Switch),
-        (KeyCode::Down, Key::MoveDown),
-        (KeyCode::Up, Key::MoveUp),
-        (KeyCode::Char('j'), Key::MoveDown),
-        (KeyCode::Char('k'), Key::MoveUp),
-        (KeyCode::Enter, Key::Select),
-        (KeyCode::Char('i'), Key::Action(Action::Add)),
-        (KeyCode::Char('D'), Key::Action(Action::Delete)),
-        (KeyCode::Char('e'), Key::Action(Action::Edit)),
-        (KeyCode::Char('p'), Key::Action(Action::Preview)),
-        (KeyCode::Char('u'), Key::Action(Action::Update)),
-        (KeyCode::Char('/'), Key::Action(Action::Search)),
-        (KeyCode::Char('t'), Key::Action(Action::Test)),
-        (KeyCode::Char('c'), Key::Action(Action::Check)),
-        // (
-        //     [KeyCode::Char('C'), KeyCode::Char('u')],
-        //     Key::Action(Action::CopyUrl),
-        // ),
-        (KeyCode::Char('f'), Key::Action(Action::FzfFind)),
-        // (
-        //     [KeyCode::Char('g'), KeyCode::Char('g')],
-        //     Key::Action(Action::GoTop),
-        // ),
-        // (
-        //     [KeyCode::Char('G')],
-        //     Key::Action(Action::GoEnd),
-        // ),
-        // (
-        //     key("P"),
-        //     Key::Action(Action::ToggleNoPp),
-        // ),
-        // (
-        //     key("O"),
-        //     Key::Action(Action::ToggleUpdateWithProxy),
-        // ),
-        (KeyCode::Char('n'), Key::Action(Action::Traffic)),
-    ]
+    FileMap::new()
+        .with_common([
+            (KeyCode::Left, Key::Switch),
+            (KeyCode::Right, Key::Switch),
+            (KeyCode::Char('h'), Key::Switch),
+            (KeyCode::Char('l'), Key::Switch),
+            (KeyCode::Down, Key::MoveDown),
+            (KeyCode::Up, Key::MoveUp),
+            (KeyCode::Char('j'), Key::MoveDown),
+            (KeyCode::Char('k'), Key::MoveUp),
+            (KeyCode::Enter, Key::Select),
+            (KeyCode::Char('i'), Key::Action(Action::Add)),
+            (KeyCode::Char('D'), Key::Action(Action::Delete)),
+            (KeyCode::Char('e'), Key::Action(Action::Edit)),
+            (KeyCode::Char('p'), Key::Action(Action::Preview)),
+            (KeyCode::Char('u'), Key::Action(Action::Update)),
+            (KeyCode::Char('/'), Key::Action(Action::Search)),
+            (KeyCode::Char('t'), Key::Action(Action::Test)),
+            (KeyCode::Char('c'), Key::Action(Action::Check)),
+            (KeyCode::Char('f'), Key::Action(Action::FzfFind)),
+            (KeyCode::Char('G'), Key::GoEnd),
+            (KeyCode::Char('P'), Key::Action(Action::ToggleNoPp)),
+            (
+                KeyCode::Char('O'),
+                Key::Action(Action::ToggleUpdateWithProxy)
+            ),
+            (KeyCode::Char('n'), Key::Action(Action::Traffic)),
+        ])
+        .with_submap(
+            "Nav",
+            KeyCode::Char('g'),
+            [(KeyCode::Char('g'), Key::GoTop)]
+        ) // God knows why, but this won't serlize (while deserlizing is fine)
+          // .with_submap(
+          //     "Copy Url",
+          //     KeyCode::Char('C'),
+          //     [(KeyCode::Char('u'), Key::Action(Action::CopyUrl))]
+          // )
 );
 
 #[derive_aliases::derive(..Key)]

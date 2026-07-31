@@ -8,13 +8,13 @@ newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
 
 key_map!(
     Key,
-    [
+    FileMap::new().with_common([
         (KeyCode::Enter, Key::Execute),
         (KeyCode::Up, Key::MoveUp),
         (KeyCode::Down, Key::MoveDown),
         (KeyCode::Char('k'), Key::MoveUp),
         (KeyCode::Char('j'), Key::MoveDown),
-    ]
+    ])
 );
 
 #[derive_aliases::derive(..Key)]

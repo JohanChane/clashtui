@@ -11,14 +11,14 @@ newtype_tab!(SettingsTab(Tab<SettingsContent>));
 
 key_map!(
     Key,
-    [
+    FileMap::new().with_common([
         (KeyCode::Enter, Key::Execute),
         (KeyCode::Esc, Key::Esc),
         (KeyCode::Up, Key::MoveUp),
         (KeyCode::Down, Key::MoveDown),
         (KeyCode::Char('k'), Key::MoveUp),
         (KeyCode::Char('j'), Key::MoveDown),
-    ]
+    ])
 );
 
 #[derive_aliases::derive(..Key)]

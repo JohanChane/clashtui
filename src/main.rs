@@ -8,10 +8,10 @@ mod derive_alias {
     derive_aliases::define! {
         // For HashMap: Hash, Eq, PartialEq
         // For Serde: Serialize, Deserialize
-        KeyBasic = ::core::hash::Hash, ::core::cmp::PartialEq, ::core::cmp::Eq,
-                    ::serde::Serialize, ::serde::Deserialize;
         // For Copy: Copy, Clone
-        Action = ..KeyBasic, ::core::marker::Copy, ::core::clone::Clone;
+        Action = ::core::hash::Hash, ::core::cmp::PartialEq, ::core::cmp::Eq,
+            ::serde::Serialize, ::serde::Deserialize,
+            ::core::marker::Copy, ::core::clone::Clone;
         Key = ..Action;
     }
 }

@@ -6,33 +6,30 @@ use std::cell::Cell;
 
 key_map!(
     Key,
-    [
-        (KeyCode::Left, Key::Switch),
-        (KeyCode::Right, Key::Switch),
-        (KeyCode::Char('h'), Key::Switch),
-        (KeyCode::Char('l'), Key::Switch),
-        (KeyCode::Down, Key::MoveDown),
-        (KeyCode::Up, Key::MoveUp),
-        (KeyCode::Char('j'), Key::MoveDown),
-        (KeyCode::Char('k'), Key::MoveUp),
-        (KeyCode::Char('D'), Key::Action(Action::Delete)),
-        (KeyCode::Char('e'), Key::Action(Action::Edit)),
-        (KeyCode::Char('E'), Key::Action(Action::EditProviders)),
-        (KeyCode::Char('p'), Key::Action(Action::Preview)),
-        (KeyCode::Enter, Key::Action(Action::Generate)),
-        (KeyCode::Char('f'), Key::Action(Action::FzfFind)),
-        // (
-        //     [KeyCode::Char('g'), KeyCode::Char('g')],
-        //     Key::Action(Action::GoTop),
-        //     "Go to top"
-        // ),
-        // (
-        //     [KeyCode::Char('G')],
-        //     Key::Action(Action::GoEnd),
-        //     "Go to end"
-        // ),
-        (KeyCode::Char('/'), Key::Action(Action::Search)),
-    ]
+    FileMap::new()
+        .with_common([
+            (KeyCode::Left, Key::Switch),
+            (KeyCode::Right, Key::Switch),
+            (KeyCode::Char('h'), Key::Switch),
+            (KeyCode::Char('l'), Key::Switch),
+            (KeyCode::Down, Key::MoveDown),
+            (KeyCode::Up, Key::MoveUp),
+            (KeyCode::Char('j'), Key::MoveDown),
+            (KeyCode::Char('k'), Key::MoveUp),
+            (KeyCode::Char('D'), Key::Action(Action::Delete)),
+            (KeyCode::Char('e'), Key::Action(Action::Edit)),
+            (KeyCode::Char('E'), Key::Action(Action::EditProviders)),
+            (KeyCode::Char('p'), Key::Action(Action::Preview)),
+            (KeyCode::Enter, Key::Action(Action::Generate)),
+            (KeyCode::Char('f'), Key::Action(Action::FzfFind)),
+            (KeyCode::Char('G'), Key::GoEnd),
+            (KeyCode::Char('/'), Key::Action(Action::Search)),
+        ])
+        .with_submap(
+            "Nav",
+            KeyCode::Char('g'),
+            [(KeyCode::Char('g'), Key::GoTop)]
+        )
 );
 
 #[derive_aliases::derive(..Key, Debug)]
