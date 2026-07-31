@@ -23,7 +23,7 @@ pub(in crate::tui) mod km {
     //! We override the `set` and `get_docs` to keep
     //! the core key bindings under control
     use super::AppKey;
-    use crate::tui::key::{AsStaticStr, Key, KeyDesc};
+    use crate::tui::key::{Document, Key, KeyDesc};
     use crossterm::event::KeyCode;
 
     // There is no need to write those to file,
@@ -67,8 +67,8 @@ pub(in crate::tui) mod km {
     ];
     const TAB_NUM: &'static str = "Switch tab 1-7";
 
-    impl AsStaticStr for AppKey {
-        fn as_static_str(&self) -> &'static str {
+    impl Document for AppKey {
+        fn get_doc(&self) -> &'static str {
             match self {
                 Self::Tab(..) => TAB_NUM,
                 Self::TabNext => "Tab Next",
