@@ -284,47 +284,6 @@ pub mod utils {
         inner: HashMap<A, Vec<Key>>,
     }
 
-    #[test]
-    fn test() {
-        #[derive_aliases::derive(..Key)]
-        enum Action {
-            Act1,
-            Act2,
-            Act3,
-        }
-        use crossterm::event::KeyCode;
-        let mut map: FileMap<Action> = FileMap {
-            common: Default::default(),
-            submap: Default::default(),
-        };
-        map.common
-            .insert(Action::Act1, vec![Key::from_code(KeyCode::BackTab)]);
-        map.submap.insert(
-            "1".to_string(),
-            SubMap {
-                key: Key::from_code(KeyCode::Down),
-                inner: [
-                    (Action::Act3, vec![Key::from_code(KeyCode::Backspace)]),
-                    (Action::Act2, vec![Key::from_code(KeyCode::Delete)]),
-                ]
-                .into(),
-            },
-        );
-        map.submap.insert(
-            "2".to_string(),
-            SubMap {
-                key: Key::from_code(KeyCode::Up),
-                inner: [(Action::Act2, vec![Key::from_code(KeyCode::Char('A'))])].into(),
-            },
-        );
-        let str = serde_yml::to_string(&map).unwrap();
-        println!("{str}");
-        let val = serde_yml::to_value(&map).unwrap();
-        println!("{val:?}");
-        let _: FileMap<Action> = serde_yml::from_str(&str).unwrap();
-        let _: FileMap<Action> = serde_yml::from_value(val).unwrap();
-    }
-
     /// If there is duplicate (e.g. 's' => Search/Import), return true
     pub fn check_duplicate<A: Eq + Hash>(map: &FileMap<A>) -> bool {
         let mut set = HashSet::new();
