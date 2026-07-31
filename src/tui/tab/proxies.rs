@@ -10,61 +10,54 @@ newtype_tab!(ProxiesTab(Tab<Proxies>));
 
 key_map!(
     Key,
-    [
-        (KeyCode::Up, Key::MoveUp),
-        (KeyCode::Down, Key::MoveDown),
-        (KeyCode::Char('k'), Key::MoveUp),
-        (KeyCode::Char('j'), Key::MoveDown),
-        (KeyCode::Char('h'), Key::Parent),
-        (KeyCode::Char('l'), Key::Expand),
-        (KeyCode::Enter, Key::Select),
-        // (
-        //     [KeyCode::Char('g'), KeyCode::Char('g')],
-        //     Key::GoTop
-        // ),
-        // ([KeyCode::Char('G')], Key::GoBottom),
-        (KeyCode::Char('/'), Key::Search),
-        // (
-        //     [KeyCode::Char('s'), KeyCode::Char('n')],
-        //     Key::SortByName
-        // ),
-        // (
-        //     [KeyCode::Char('s'), KeyCode::Char('d')],
-        //     Key::SortByDelay
-        // ),
-        // (
-        //     [KeyCode::Char('s'), KeyCode::Char('r')],
-        //     Key::ResetSort
-        // ),
-        // (
-        //     [KeyCode::Char('S'), KeyCode::Char('n')],
-        //     Key::GlobalSortByName
-        // ),
-        // (
-        //     [KeyCode::Char('S'), KeyCode::Char('d')],
-        //     Key::GlobalSortByDelay
-        // ),
-        // (
-        //     [KeyCode::Char('S'), KeyCode::Char('r')],
-        //     Key::GlobalResetSort
-        // ),
-        // (
-        //     [KeyCode::Char('a'), KeyCode::Char('f')],
-        //     Key::CollapseAll
-        // ),
-        // (
-        //     [KeyCode::Char('a'), KeyCode::Char('e')],
-        //     Key::ExpandAll
-        // ),
-        (KeyCode::Char('t'), Key::TestDelay),
-        // (
-        //     [KeyCode::Char('a'), KeyCode::Char('t')],
-        //     Key::TestAllDelay
-        // ),
-        (KeyCode::Char('r'), Key::Refresh),
-        (KeyCode::Char('f'), Key::GroupSelect),
-        (KeyCode::Char('F'), Key::FzfFind),
-    ]
+    FileMap::new()
+        .with_common([
+            (KeyCode::Up, Key::MoveUp),
+            (KeyCode::Down, Key::MoveDown),
+            (KeyCode::Char('k'), Key::MoveUp),
+            (KeyCode::Char('j'), Key::MoveDown),
+            (KeyCode::Char('h'), Key::Parent),
+            (KeyCode::Char('l'), Key::Expand),
+            (KeyCode::Enter, Key::Select),
+            (KeyCode::Char('/'), Key::Search),
+            (KeyCode::Char('t'), Key::TestDelay),
+            (KeyCode::Char('r'), Key::Refresh),
+            (KeyCode::Char('f'), Key::GroupSelect),
+            (KeyCode::Char('F'), Key::FzfFind),
+            (KeyCode::Char('G'), Key::GoBottom),
+        ])
+        .with_submap(
+            "Nav",
+            KeyCode::Char('g'),
+            [(KeyCode::Char('g'), Key::GoTop)]
+        )
+        .with_submap(
+            "Sort",
+            KeyCode::Char('s'),
+            [
+                (KeyCode::Char('n'), Key::Sort(Sort::ByName)),
+                (KeyCode::Char('d'), Key::Sort(Sort::ByDelay)),
+                (KeyCode::Char('r'), Key::Sort(Sort::Reset)),
+            ]
+        )
+        .with_submap(
+            "Global Sort",
+            KeyCode::Char('S'),
+            [
+                (KeyCode::Char('n'), Key::Sort(Sort::GlobalByName)),
+                (KeyCode::Char('d'), Key::Sort(Sort::GlobalByDelay)),
+                (KeyCode::Char('r'), Key::Sort(Sort::GlobalReset)),
+            ]
+        )
+        .with_submap(
+            "All",
+            KeyCode::Char('a'),
+            [
+                (KeyCode::Char('f'), Key::CollapseAll),
+                (KeyCode::Char('e'), Key::ExpandAll),
+                (KeyCode::Char('t'), Key::TestAllDelay),
+            ]
+        )
 );
 
 #[derive_aliases::derive(..Key)]

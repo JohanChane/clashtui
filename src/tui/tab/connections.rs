@@ -8,60 +8,46 @@ newtype_tab!(ConnectionsTab(Tab<Connections>));
 
 key_map!(
     Key,
-    [
-        (KeyCode::Up, Key::MoveUp),
-        (KeyCode::Down, Key::MoveDown),
-        (KeyCode::Char('k'), Key::MoveUp),
-        (KeyCode::Char('j'), Key::MoveDown),
-        // (KeyCode::Char('G'), Key::GoBottom),
-        // (
-        //     [KeyCode::Char('g'), KeyCode::Char('g')],
-        //     Key::GoTop,
-        // ),
-        // (
-        //     [KeyCode::Char('d'), KeyCode::Char('d')],
-        //     Key::Terminate,
-        // ),
-        // (
-        //     [KeyCode::Char('a'), KeyCode::Char('c')],
-        //     Key::TerminateAll,
-        // ),
-        // (
-        //     [KeyCode::Char('s'), KeyCode::Char('h')],
-        //     Key::SortByHost,
-        // ),
-        // (
-        //     [KeyCode::Char('s'), KeyCode::Char('l')],
-        //     Key::SortByRule,
-        // ),
-        // (
-        //     [KeyCode::Char('s'), KeyCode::Char('c')],
-        //     Key::SortByChains,
-        // ),
-        // (
-        //     [KeyCode::Char('s'), KeyCode::Char('n')],
-        //     Key::SortByDownload,
-        // ),
-        // (
-        //     [KeyCode::Char('s'), KeyCode::Char('u')],
-        //     Key::SortByUpload,
-        // ),
-        // (
-        //     [KeyCode::Char('s'), KeyCode::Char('d')],
-        //     Key::SortByDlSpeed,
-        // ),
-        // (
-        //     [KeyCode::Char('s'), KeyCode::Char('s')],
-        //     Key::SortByUlSpeed,
-        // ),
-        // (
-        //     [KeyCode::Char('s'), KeyCode::Char('r')],
-        //     Key::SortReset,
-        // ),
-        (KeyCode::Char('/'), Key::Search),
-        (KeyCode::Char('p'), Key::TogglePause),
-        (KeyCode::Char('f'), Key::FzfFind),
-    ]
+    FileMap::new()
+        .with_common([
+            (KeyCode::Up, Key::MoveUp),
+            (KeyCode::Down, Key::MoveDown),
+            (KeyCode::Char('k'), Key::MoveUp),
+            (KeyCode::Char('j'), Key::MoveDown),
+            (KeyCode::Char('G'), Key::GoBottom),
+            (KeyCode::Char('/'), Key::Search),
+            (KeyCode::Char('p'), Key::TogglePause),
+            (KeyCode::Char('f'), Key::FzfFind),
+        ])
+        .with_submap(
+            "Nav",
+            KeyCode::Char('g'),
+            [(KeyCode::Char('g'), Key::GoTop)]
+        )
+        .with_submap(
+            "Terminate",
+            KeyCode::Char('d'),
+            [(KeyCode::Char('d'), Key::Terminate)]
+        )
+        .with_submap(
+            "All",
+            KeyCode::Char('a'),
+            [(KeyCode::Char('c'), Key::TerminateAll)]
+        )
+        .with_submap(
+            "Sort",
+            KeyCode::Char('s'),
+            [
+                (KeyCode::Char('h'), Key::SortByHost),
+                (KeyCode::Char('l'), Key::SortByRule),
+                (KeyCode::Char('c'), Key::SortByChains),
+                (KeyCode::Char('n'), Key::SortByDownload),
+                (KeyCode::Char('u'), Key::SortByUpload),
+                (KeyCode::Char('d'), Key::SortByDlSpeed),
+                (KeyCode::Char('s'), Key::SortByUlSpeed),
+                (KeyCode::Char('r'), Key::SortReset),
+            ]
+        )
 );
 
 #[derive_aliases::derive(..Key)]

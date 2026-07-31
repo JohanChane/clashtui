@@ -12,41 +12,34 @@ newtype_tab!(LogsTab(Tab<Logs>));
 
 key_map!(
     Key,
-    [
-        (KeyCode::Up, Key::MoveUp),
-        (KeyCode::Down, Key::MoveDown),
-        (KeyCode::Char('k'), Key::MoveUp),
-        (KeyCode::Char('j'), Key::MoveDown),
-        // ([KeyCode::Char('G')], Key::GoBottom, "Go to bottom"),
-        // (
-        //     [KeyCode::Char('g'), KeyCode::Char('g')],
-        //     Key::GoTop,
-        // ),
-        (KeyCode::Char('/'), Key::Search),
-        (KeyCode::Char('p'), Key::TogglePause),
-        (KeyCode::Char('f'), Key::FzfFind),
-        (KeyCode::Char('c'), Key::Clear),
-        // (
-        //     [KeyCode::Char('t'), KeyCode::Char('d')],
-        //     Key::ToggleDebug,
-        // ),
-        // (
-        //     [KeyCode::Char('t'), KeyCode::Char('i')],
-        //     Key::ToggleInfo,
-        // ),
-        // (
-        //     [KeyCode::Char('t'), KeyCode::Char('w')],
-        //     Key::ToggleWarning,
-        // ),
-        // (
-        //     [KeyCode::Char('t'), KeyCode::Char('e')],
-        //     Key::ToggleError,
-        // ),
-        // (
-        //     [KeyCode::Char('t'), KeyCode::Char('s')],
-        //     Key::ToggleSilent,
-        // ),
-    ]
+    FileMap::new()
+        .with_common([
+            (KeyCode::Up, Key::MoveUp),
+            (KeyCode::Down, Key::MoveDown),
+            (KeyCode::Char('k'), Key::MoveUp),
+            (KeyCode::Char('j'), Key::MoveDown),
+            (KeyCode::Char('G'), Key::GoBottom),
+            (KeyCode::Char('/'), Key::Search),
+            (KeyCode::Char('p'), Key::TogglePause),
+            (KeyCode::Char('f'), Key::FzfFind),
+            (KeyCode::Char('c'), Key::Clear),
+        ])
+        .with_submap(
+            "Nav",
+            KeyCode::Char('g'),
+            [(KeyCode::Char('g'), Key::GoTop)]
+        )
+        .with_submap(
+            "Toggle Level",
+            KeyCode::Char('t'),
+            [
+                (KeyCode::Char('d'), Key::ToggleDebug),
+                (KeyCode::Char('i'), Key::ToggleInfo),
+                (KeyCode::Char('w'), Key::ToggleWarning),
+                (KeyCode::Char('e'), Key::ToggleError),
+                (KeyCode::Char('s'), Key::ToggleSilent),
+            ]
+        )
 );
 
 #[derive_aliases::derive(..Key)]

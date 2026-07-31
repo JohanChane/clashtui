@@ -28,9 +28,9 @@ pub(in crate::tui) mod km {
 
     // There is no need to write those to file,
     // as they are overritten when set
-    key_map!(AppKey, []);
+    key_map!(AppKey, FileMap::new());
 
-    pub use km::default;
+    pub use km::{default, get_submap_name};
 
     pub fn set(mut map: serde_yml::Value) -> anyhow::Result<bool> {
         let mmap = map
