@@ -104,12 +104,19 @@ pub mod instancing {
     pub fn make_docs<A: Document>(keymap: &KeyMap<A>) -> KeyDesc {
         use crate::tui::key::MaybeMap;
         let mut iter = keymap.iter();
+        let mut inner_iter: Option<(Key, std::collections::hash_map::Iter<'_, Key, A>)> = None;
         std::iter::from_fn(|| {
-            while let Some((key, maybe_submap)) = iter.next() {
+            if let Some((key, inner_iter)) = inner_iter.as_mut()
+                && let Some((key2, act)) = inner_iter.by_ref().next()
+            {
+                return Some((format!("{key}+{key2}"), act.get_doc()));
+            }
+            for (key, maybe_submap) in iter.by_ref() {
                 match maybe_submap {
                     MaybeMap::SubMap { name: _, inner } => {
-                        while let Some((key, act)) = inner.iter().next() {
-                            return Some((key.to_string(), act.get_doc()));
+                        inner_iter = Some((*key, inner.iter()));
+                        if let Some((key2, act)) = inner_iter.as_mut().unwrap().1.by_ref().next() {
+                            return Some((format!("{key}+{key2}"), act.get_doc()));
                         }
                     }
                     MaybeMap::Action(act) => {
@@ -333,14 +340,14 @@ pub fn load() -> anyhow::Result<()> {
     macro_rules! quick_load {
         ($rec:expr, files::$id:ident $(, $($rest:tt)*)?) => {
             if files::$id::km::set(value.remove(concat!("files/", stringify!($id))).unwrap())
-                .context(concat!("failed to load files/", stringify!($id)))? {
+                .context(concat!("failed to load keymap for files/", stringify!($id)))? {
                 $rec.push(concat!("files/", stringify!($id)))
             }
             quick_load!($rec $(, $($rest)*)?);
         };
         ($rec:expr, $id:ident $(, $($rest:tt)*)?) => {
             if $id::km::set(value.remove(stringify!($id)).unwrap())
-                .context(concat!("failed to load ", stringify!($id)))? {
+                .context(concat!("failed to load keymap for ", stringify!($id)))? {
                 $rec.push(stringify!($id))
             }
             quick_load!($rec $(, $($rest)*)?);

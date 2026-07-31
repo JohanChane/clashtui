@@ -66,7 +66,7 @@ pub(in crate::tui) mod km {
         (KeyCode::Char('q'), AppKey::Quit),
         (KeyCode::Char('?'), AppKey::Help),
     ];
-    const TAB_NUM: &'static str = "Switch tab 1-7";
+    const TAB_NUM: &str = "Switch tab 1-7";
 
     impl Document for AppKey {
         fn get_doc(&self) -> &'static str {
