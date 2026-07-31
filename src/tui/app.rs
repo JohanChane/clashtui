@@ -30,7 +30,8 @@ pub(in crate::tui) mod km {
     // as they are overritten when set
     key_map!(AppKey, FileMap::new());
 
-    pub use km::{default, get_submap_name};
+    pub use km::default;
+    pub(super) use km::get_submap_name;
 
     pub fn set(mut map: serde_yml::Value) -> anyhow::Result<bool> {
         let mmap = map

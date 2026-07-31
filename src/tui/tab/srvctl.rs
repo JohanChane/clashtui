@@ -18,7 +18,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-pub(crate) enum Key {
+enum Key {
     Execute,
     MoveUp,
     MoveDown,

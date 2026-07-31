@@ -4,7 +4,7 @@ pub mod render;
 pub mod tree;
 
 use super::dev::*;
-pub use content::Proxies;
+use content::Proxies;
 
 newtype_tab!(ProxiesTab(Tab<Proxies>));
 
@@ -61,7 +61,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-pub enum Key {
+enum Key {
     MoveUp,
     MoveDown,
     Parent,
