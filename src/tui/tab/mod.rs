@@ -1,5 +1,5 @@
 mod dev {
-    pub use crate::tui::key::AsStaticStr;
+    pub use crate::tui::key::Document;
     pub use crate::tui::widget::dualtab::*;
     pub use crate::tui::widget::tab::*;
     pub use crossterm::event::KeyCode;

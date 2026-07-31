@@ -24,8 +24,8 @@ pub(crate) enum Key {
     MoveDown,
 }
 
-impl AsStaticStr for Key {
-    fn as_static_str(&self) -> &'static str {
+impl Document for Key {
+    fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
             Self::Execute => "Execute",

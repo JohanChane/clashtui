@@ -4,8 +4,8 @@ pub type KeyDesc = Vec<(String, &'static str)>;
 pub type KeyDescRef<'a> = &'a [(String, &'a str)];
 pub type KeyMap<A> = std::collections::HashMap<Key, MaybeMap<A>>;
 
-pub trait AsStaticStr {
-    fn as_static_str(&self) -> &'static str;
+pub trait Document {
+    fn get_doc(&self) -> &'static str;
 }
 
 pub enum MaybeMap<A> {
@@ -98,10 +98,10 @@ impl From<KeyCode> for Key {
 }
 
 pub mod instancing {
-    use super::{AsStaticStr, Key, KeyDesc, KeyMap, MaybeMap};
+    use super::{Document, Key, KeyDesc, KeyMap, MaybeMap};
 
     /// Generate `[(key, description 'about the key's action')]` at runtime
-    pub fn make_docs<A: AsStaticStr>(keymap: &KeyMap<A>) -> KeyDesc {
+    pub fn make_docs<A: Document>(keymap: &KeyMap<A>) -> KeyDesc {
         use crate::tui::key::MaybeMap;
         let mut iter = keymap.iter();
         std::iter::from_fn(|| {
@@ -109,11 +109,11 @@ pub mod instancing {
                 match maybe_submap {
                     MaybeMap::SubMap { name: _, inner } => {
                         while let Some((key, act)) = inner.iter().next() {
-                            return Some((key.to_string(), act.as_static_str()));
+                            return Some((key.to_string(), act.get_doc()));
                         }
                     }
                     MaybeMap::Action(act) => {
-                        return Some((key.to_string(), act.as_static_str()));
+                        return Some((key.to_string(), act.get_doc()));
                     }
                 };
             }
