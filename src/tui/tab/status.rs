@@ -179,6 +179,11 @@ impl TabContent for Status {
         let block = Block::bordered()
             .border_style(Theme::get().section("status").border)
             .title(Self::TITLE);
+        let block = if let Some(submap_name) = crate::tui::app::km::get_submap_name() {
+            block.title_bottom(submap_name)
+        } else {
+            block
+        };
         let mut lines: Vec<String> = vec![];
         let configured = CONFIG.core_type();
         if let Some(detected) = self.detected_core_type {

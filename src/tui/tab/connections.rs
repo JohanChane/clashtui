@@ -521,6 +521,11 @@ impl TabContent for Connections {
         } else {
             block.title_bottom(Line::raw(title).right_aligned().reversed())
         };
+        let block = if let Some(submap_name) = km::get_submap_name() {
+            block.title_bottom(submap_name)
+        } else {
+            block
+        };
 
         if !self.error.as_deref().unwrap_or("").is_empty() && self.display_rows.is_empty() {
             let widget =

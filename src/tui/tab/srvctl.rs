@@ -559,6 +559,11 @@ impl TabContent for SrvCtlContent {
                 ));
                 ratatui::text::Line::from(spans).right_aligned()
             });
+        let block = if let Some(submap_name) = km::get_submap_name() {
+            block.title_bottom(submap_name)
+        } else {
+            block
+        };
 
         let items: Vec<ListItem> = self
             .ops

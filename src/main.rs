@@ -50,7 +50,11 @@ fn main() {
         .target(env_logger::Target::Pipe(Box::new(log_file)))
         .init();
 
-    tui::init().unwrap();
+    if let Err(e) = tui::init() {
+        eprintln!("Failed to initiate TUI due to {e}");
+        eprintln!("Exiting");
+        return;
+    };
 
     tui::App::serve().unwrap();
 

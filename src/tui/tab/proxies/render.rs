@@ -25,6 +25,12 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
         .border_style(section.border)
         .title(Proxies::TITLE);
 
+    let block = if let Some(submap_name) = super::km::get_submap_name() {
+        block.title_bottom(submap_name)
+    } else {
+        block
+    };
+
     let spinner_str = content.testing_since.map(|since| {
         let elapsed = since.elapsed().as_millis() as usize;
         let spinner = ['|', '/', '-', '\\'];

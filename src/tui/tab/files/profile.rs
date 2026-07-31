@@ -282,6 +282,11 @@ impl DualTabContent for Profile {
         } else {
             block
         };
+        let block = if let Some(submap_name) = km::get_submap_name() {
+            block.title_bottom(submap_name)
+        } else {
+            block
+        };
 
         let current = &crate::config::CONFIG
             .data
