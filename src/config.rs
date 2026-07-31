@@ -20,9 +20,11 @@ use std::{
 use util::*;
 
 mod core;
-pub use core::{CoreType, ServiceController};
 #[macro_use]
 mod util;
+
+pub use core::{CoreType, ServiceController};
+pub use util::check_startup_perms;
 pub mod database;
 
 /// Load using [init]

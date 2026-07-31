@@ -28,6 +28,7 @@ fn main() {
         eprintln!("Failed to load Config\n{e}");
         return;
     }
+    config::check_startup_perms();
 
     // Handle CLI subcommands (profile, service, mode, update)
     if cmd.command.is_some() {

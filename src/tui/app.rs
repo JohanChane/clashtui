@@ -106,61 +106,6 @@ impl App {
         app.tabs[0].on_enter();
         app
     }
-    #[cfg(target_family = "unix")]
-    fn check_startup_perms(&self) {
-        if crate::config::CONFIG.cfg_file.mihomo.core_service.is_user {
-            return;
-        }
-        use std::io::Write;
-
-        let dirs_to_check = [
-            &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
-            &crate::config::CONFIG.cfg_file.singbox.core.config_dir,
-        ];
-
-        for dir_str in &dirs_to_check {
-            if dir_str.is_empty() {
-                continue;
-            }
-            let dir = std::path::Path::new(dir_str);
-            if !dir.exists() {
-                continue;
-            }
-            if crate::functions::command::check_file_permissions(dir) {
-                continue;
-            }
-
-            let _ = crate::tui::hold(true);
-            print!(
-                "File permissions in '{}' need repair. Fix now? [Y/n] ",
-                dir.display()
-            );
-            let _ = std::io::stdout().flush();
-            let mut input = String::new();
-            let _ = std::io::stdin().read_line(&mut input);
-            let _ = crate::tui::hold(false);
-
-            if input.trim().to_lowercase().as_str() != "y" {
-                continue;
-            }
-
-            let Some(group) = crate::functions::command::get_dir_group_name(dir) else {
-                continue;
-            };
-
-            if let Err(e) = crate::functions::command::repair_file_permissions(dir, &group) {
-                let _ = crate::tui::hold(true);
-                eprintln!("Error: {}", e);
-                use std::io::Read;
-                print!("Press Enter to continue...");
-                let _ = std::io::stdout().flush();
-                let _ = std::io::stdin().read(&mut [0u8]);
-                let _ = crate::tui::hold(false);
-            }
-        }
-    }
-    #[cfg(not(target_family = "unix"))]
-    fn check_startup_perms(&self) {}
     #[tokio::main]
     pub async fn serve() -> anyhow::Result<()> {
         signals::Signals::start()?;
@@ -170,7 +115,6 @@ impl App {
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
 
-        app.check_startup_perms();
         while !QUIT.load(Ordering::Relaxed) {
             terminal.draw(|f| app.render(f))?;
             app.sync();
