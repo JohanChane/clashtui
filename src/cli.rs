@@ -74,7 +74,6 @@ pub(crate) enum ArgCommand {
         #[command(subcommand)]
         command: ProfileCommand,
     },
-    #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
     /// service related
     Service {
         #[command(subcommand)]
@@ -125,8 +124,6 @@ pub(crate) enum ProfileTypeFilter {
     Url,
     /// template-based profiles
     Template,
-    /// sing-box profiles
-    Singbox,
 }
 
 impl ProfileTypeFilter {
@@ -142,9 +139,6 @@ impl ProfileTypeFilter {
             ) | (
                 ProfileTypeFilter::Template,
                 crate::config::database::ProfileType::Template { .. },
-            ) | (
-                ProfileTypeFilter::Singbox,
-                crate::config::database::ProfileType::Singbox
             )
         )
     }

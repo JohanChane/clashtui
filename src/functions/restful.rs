@@ -174,7 +174,7 @@ pub mod download {
         req = req.with_timeout(timeout!()).with_header(
             headers::USER_AGENT,
             CONFIG.global_ua.as_deref().unwrap_or_else(|| {
-                if CONFIG.core_type() == crate::config::CoreType::Singbox {
+                if CONFIG.core_type().is_singbox() {
                     "sing-box"
                 } else {
                     "clash.meta"
@@ -194,7 +194,7 @@ pub mod download {
             .with_header(
                 headers::USER_AGENT,
                 CONFIG.global_ua.as_deref().unwrap_or_else(|| {
-                    if CONFIG.core_type() == crate::config::CoreType::Singbox {
+                    if CONFIG.core_type().is_singbox() {
                         "sing-box"
                     } else {
                         "clash.meta"

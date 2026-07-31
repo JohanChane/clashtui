@@ -305,7 +305,7 @@ pub fn check_template_ppg_availability(
         return Ok(());
     }
 
-    let is_singbox = crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox;
+    let is_singbox = crate::config::CONFIG.core_type().is_singbox();
     let _tpl_name = std::path::Path::new(template)
         .file_stem()
         .and_then(|s| s.to_str())

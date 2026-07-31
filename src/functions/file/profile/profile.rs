@@ -7,9 +7,7 @@ impl Profile {
     pub fn load_local_profile(self) -> anyhow::Result<LocalProfile> {
         use super::super::PROFILE_JSONS_PATH;
         use super::PROFILE_YAMLS_PATH;
-        let path = if matches!(self.dtype, ProfileType::Singbox)
-            || crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox
-        {
+        let path = if crate::config::CONFIG.core_type().is_singbox() {
             PROFILE_JSONS_PATH.join(format!("{}.json", self.name))
         } else {
             PROFILE_YAMLS_PATH.join(format!("{}.yaml", self.name))
@@ -107,7 +105,7 @@ impl LocalProfile {
 impl ProfileType {
     pub fn get_domain(&self) -> Option<String> {
         match self {
-            ProfileType::File | ProfileType::Singbox | ProfileType::Template { .. } => None,
+            ProfileType::File | ProfileType::Template { .. } => None,
             ProfileType::Url(url) => extract_domain(url).map(|s| s.to_owned()),
         }
     }

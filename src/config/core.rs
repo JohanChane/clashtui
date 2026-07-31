@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[derive(Default)]
 pub enum CoreType {
@@ -9,6 +9,11 @@ pub enum CoreType {
     Mihomo,
     #[serde(rename = "singbox")]
     Singbox,
+}
+impl CoreType {
+    pub fn is_singbox(&self) -> bool {
+        matches!(self, Self::Singbox)
+    }
 }
 impl std::fmt::Display for CoreType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

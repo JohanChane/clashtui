@@ -132,7 +132,7 @@ fn import_singbox_profile(source: &std::path::Path, profile_name: &str) -> anyho
     std::fs::copy(source, &dest)?;
 
     let mut pm = pm!();
-    pm.insert(profile_name, ProfileType::Singbox);
+    pm.insert(profile_name, ProfileType::File);
     pm.to_file()?;
     Ok(pm.get(profile_name).unwrap())
 }
@@ -147,9 +147,7 @@ pub async fn update_profile(profile: Profile, with_proxy: bool) -> anyhow::Resul
 
     let result = if matches!(profile.dtype, ProfileType::Template { .. }) {
         update_template_profile(profile.clone(), with_proxy).await
-    } else if matches!(profile.dtype, ProfileType::Singbox)
-        || crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox
-    {
+    } else if crate::config::CONFIG.core_type().is_singbox() {
         update_singbox_profile(profile.clone(), with_proxy).await
     } else {
         let path = PROFILE_YAMLS_PATH.join(format!("{}.yaml", profile.name));
@@ -255,7 +253,7 @@ async fn update_template_profile(
     // Read proxy-provider URLs from the generated profile file
     let groups = super::template::read_profile_ppg(&profile.name).unwrap_or_default();
 
-    let is_singbox = crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox;
+    let is_singbox = crate::config::CONFIG.core_type().is_singbox();
     let mut statuses: Vec<NetResourceUpdate> = Vec::new();
 
     if is_singbox {
@@ -441,9 +439,7 @@ pub async fn select(profile: Profile) -> anyhow::Result<()> {
         check_template_ppg_availability(&profile)?;
     }
 
-    if matches!(profile.dtype, ProfileType::Singbox)
-        || crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox
-    {
+    if crate::config::CONFIG.core_type().is_singbox() {
         return select_singbox(profile).await;
     }
 

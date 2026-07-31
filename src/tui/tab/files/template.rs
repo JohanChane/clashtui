@@ -339,7 +339,7 @@ mod actions {
 
     async fn generate(name: String) -> CB {
         let profile_name = format!("{name}.tpl");
-        let is_singbox = crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox;
+        let is_singbox = crate::config::CONFIG.core_type().is_singbox();
         if is_singbox {
             tri!(apply_template_singbox(&name, &profile_name, false, false).await);
         } else {

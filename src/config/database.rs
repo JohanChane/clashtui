@@ -47,7 +47,6 @@ pub enum ProfileType {
     Template {
         template: String,
     },
-    Singbox,
 }
 
 impl serde::Serialize for ProfileType {
@@ -72,7 +71,6 @@ impl serde::Serialize for ProfileType {
                     &TplHelper { template },
                 )
             }
-            ProfileType::Singbox => serializer.serialize_unit_variant("ProfileType", 3, "Singbox"),
         }
     }
 }
@@ -97,8 +95,6 @@ impl<'de> serde::Deserialize<'de> for ProfileType {
             #[allow(dead_code)]
             #[serde(rename = "Generated")]
             Generated(String),
-            #[serde(rename = "Singbox")]
-            Singbox,
         }
 
         let wire = Wire::deserialize(deserializer)?;
@@ -126,7 +122,6 @@ impl<'de> serde::Deserialize<'de> for ProfileType {
                 log::warn!("Migrating deprecated ProfileType::Generated({name}) to Template.");
                 ProfileType::Template { template: name }
             }
-            Wire::Singbox => ProfileType::Singbox,
         })
     }
 }
@@ -215,19 +210,10 @@ pub struct ProfileManager {
     pub singbox: CoreProfileData,
 }
 impl ProfileManager {
-    pub fn contains_in_singbox(&self, name: &str) -> bool {
-        self.singbox.profiles.contains_key(name)
-    }
-
     pub fn insert<S: AsRef<str>>(&mut self, name: S, dtype: ProfileType) -> Option<Profile> {
         let db = &mut match dtype {
-            ProfileType::Singbox => &mut self.singbox,
-            ProfileType::Template { .. } if self.core_type == crate::config::CoreType::Singbox => {
-                &mut self.singbox
-            }
-            ProfileType::Url(_) if self.core_type == crate::config::CoreType::Singbox => {
-                &mut self.singbox
-            }
+            ProfileType::Template { .. } if self.core_type.is_singbox() => &mut self.singbox,
+            ProfileType::Url(_) if self.core_type.is_singbox() => &mut self.singbox,
             _ => &mut self.mihomo,
         };
         db.profiles

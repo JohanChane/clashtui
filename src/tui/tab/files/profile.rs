@@ -534,7 +534,7 @@ mod actions {
         );
 
         let is_url = source.starts_with("http://") || source.starts_with("https://");
-        let is_singbox = crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox;
+        let is_singbox = crate::config::CONFIG.core_type().is_singbox();
 
         if is_singbox {
             let content: serde_json::Value = if is_url {
@@ -561,7 +561,7 @@ mod actions {
                 let dtype = if is_url {
                     crate::config::database::ProfileType::Url(source.clone())
                 } else {
-                    crate::config::database::ProfileType::Singbox
+                    crate::config::database::ProfileType::File
                 };
                 pm.insert(&name, dtype);
                 tri!(pm.to_file());
@@ -597,14 +597,7 @@ mod actions {
 
     async fn toggle_no_pp(name: String) -> CB {
         {
-            let pf = tri!(db::get(&name).ok_or_else(|| anyhow::anyhow!("Profile not found")));
-            if pf.dtype == crate::config::database::ProfileType::Singbox
-                || crate::config::CONFIG
-                    .data
-                    .lock()
-                    .unwrap()
-                    .contains_in_singbox(&pf.name)
-            {
+            if crate::config::CONFIG.core_type().is_singbox() {
                 Confirm::err(anyhow::anyhow!(
                     "no_pp is not applicable for sing-box profiles (proxy-provider not supported)"
                 ));
@@ -953,16 +946,10 @@ pub(super) fn get_profiles_with_readable_atime() -> (Vec<String>, Vec<String>) {
             let name = pf.name.clone();
             let no_pp = pf.no_pp;
             let update_with_proxy = pf.update_with_proxy;
-            let is_singbox = pf.dtype == ProfileType::Singbox
-                || crate::config::CONFIG
-                    .data
-                    .lock()
-                    .unwrap()
-                    .contains_in_singbox(&pf.name);
+            let is_singbox = crate::config::CONFIG.core_type().is_singbox();
             let domain = match &pf.dtype {
                 ProfileType::File => "local import".to_owned(),
                 ProfileType::Url(url) => extract_domain(url).unwrap_or("unknown").to_owned(),
-                ProfileType::Singbox => "singbox profile".to_owned(),
                 ProfileType::Template { .. } => "template".to_owned(),
             };
             let atime = pf

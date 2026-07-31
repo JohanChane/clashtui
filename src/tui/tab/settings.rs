@@ -47,7 +47,6 @@ impl TryFrom<&crate::tui::Key> for SettingsKey {
     }
 }
 
-use crate::config::CoreType;
 use crate::functions::restful::config_struct::{Mode, TunStack};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -64,7 +63,7 @@ enum SettingsOp {
 impl SettingsOp {
     fn all() -> Vec<Self> {
         let mut ops = vec![Self::SwitchMode, Self::AllowLan];
-        if CONFIG.core_type() == CoreType::Mihomo {
+        if !CONFIG.core_type().is_singbox() {
             ops.push(Self::TunEnable);
             ops.push(Self::TunStackOp);
             ops.push(Self::FlushFakeIP);
