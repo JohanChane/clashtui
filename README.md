@@ -55,7 +55,7 @@ Windows:
 1. \[Optional\] Install mihomo and clashtui from your package repository:
 
 ```sh
-sudo pacman -S mihomo sing-box clashtui  # ArchLinux. (Note: the latest clashtui may not be uploaded yet — please build and install it manually)
+sudo pacman -S mihomo sing-box clashtui  # ArchLinux
 ```
 
 This step ensures mihomo, sing-box, and clashtui are available in your environment so the install script will skip downloading them. You can also download them manually and run `which mihomo sing-box clashtui` to verify they are correctly configured.
@@ -81,7 +81,7 @@ sudo systemctl enable clashtui_singbox.service
 1. \[Optional\] Install mihomo and clashtui from Homebrew:
 
 ```sh
-brew install mihomo sing-box clashtui  # Note: the latest clashtui may not be uploaded yet — please build and install it manually
+brew install mihomo sing-box # Note: clashtui was NOT uploaded, please install it manually
 ```
 
 2. Run the install script (same as Linux):
@@ -103,7 +103,7 @@ sudo launchctl load -w /Library/LaunchDaemons/clashtui_singbox.plist
 1. \[Optional\] Install mihomo and clashtui from Scoop:
 
 ```powershell
-scoop install mihomo sing-box clashtui  # Note: the latest clashtui may not be uploaded yet — please build and install it manually
+scoop install mihomo sing-box clashtui
 # Verify
 Get-Command mihomo sing-box clashtui
 ```
