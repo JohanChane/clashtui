@@ -55,7 +55,7 @@ Windows:
 1. \[可选\] 从仓库中安装 mihomo 和 clashtui:
 
 ```sh
-sudo pacman -S mihomo sing-box clashtui  # ArchLinux. (目前 clashtui 还没有上传最新的, 请手动编译安装 clashtui)
+sudo pacman -S mihomo sing-box clashtui  # ArchLinux
 ```
 
 这一步的目的是保证当前环境中包含 mihomo, sing-box 和 clashtui，这样安装脚本会跳过安装它们的步骤。你也可以手动下载这两个工具，然后运行 which mihomo sing-box clashtui 来检查是否已正确配置。
@@ -81,7 +81,7 @@ sudo systemctl enable clashtui_singbox.service
 1. \[可选\] 从仓库中安装 mihomo 和 clashtui:
 
 ```sh
-brew install mihomo sing-box clashtui     # 目前 clashtui 还没有上传最新的, 请手动编译安装 clashtui
+brew install mihomo sing-box # 目前 clashtui 还没有上传, 请手动安装 clashtui
 ```
 
 2. 运行安装脚本
@@ -101,7 +101,7 @@ sudo launchctl load -w /Library/LaunchDaemons/clashtui_singbox.plist
 1. \[可选\] 从仓库中安装 mihomo 和 clashtui:
 
 ```powershell
-scoop install mihomo sing-box clashtui    # 目前 clashtui 还没有上传最新的, 请手动编译安装 clashtui
+scoop install mihomo sing-box clashtui
 # 验证
 Get-Command mihomo sing-box clashtui
 ```
