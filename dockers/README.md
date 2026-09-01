@@ -1,34 +1,61 @@
 # Docker
 
-Alpine OpenRC test container management.
+Test containers for clashtui. Supports multiple Linux targets via `--target` / `-t`.
+
+## Targets
+
+| Target   | Base            | Init system | Service controller |
+|----------|-----------------|-------------|---------------------|
+| `alpine` | Alpine 3.22     | OpenRC      | `openrc`            |
+| `debian` | Debian 13 (Trixie) | systemd   | `systemd`           |
 
 ## Usage
 
-```bash
-# Build the image
-./dockers/manage.py build
+All commands accept `-t <target>` (default: `alpine`).
 
-# Run the container (detached, mounts project at /workspace/clashtui)
-./dockers/manage.py run
+```bash
+# Build images
+./dockers/manage.py -t alpine build
+./dockers/manage.py -t debian build
+
+# Run container (detached, mounts project at /home/johan/workspace/clashtui)
+./dockers/manage.py -t alpine run
+./dockers/manage.py -t debian run
 
 # Open a shell in the container
-./dockers/manage.py shell
+./dockers/manage.py -t debian shell
 
-# Run the install script inside the container (openrc mode)
-./dockers/manage.py test-install
+# Run the install script inside the container (auto-selects service controller)
+./dockers/manage.py -t alpine test-install
+./dockers/manage.py -t debian test-install
 
-# Show container status
+# Show container status (all targets)
 ./dockers/manage.py status
 
 # Show logs
-./dockers/manage.py logs         # One-shot
-./dockers/manage.py logs -f      # Follow
+./dockers/manage.py -t debian logs         # One-shot
+./dockers/manage.py -t debian logs -f      # Follow
 
 # Stop and remove the container
-./dockers/manage.py stop
+./dockers/manage.py -t debian stop
 
 # Stop container and remove image
-./dockers/manage.py clean --image
+./dockers/manage.py -t debian clean --image
 ```
 
 The script can run from any directory. It locates the project root by searching upwards for `Cargo.toml`.
+
+## Building a musl binary for Alpine
+
+The release binaries on GitHub are compiled against glibc and will not run on
+Alpine (musl libc). To build an Alpine-compatible binary locally:
+
+```bash
+cargo install cargo-zigbuild
+rustup target add x86_64-unknown-linux-musl
+cargo zigbuild --target x86_64-unknown-linux-musl --release --all-features
+```
+
+The binary will be at `target/x86_64-unknown-linux-musl/release/clashtui`.
+Drop it into the container and it will run without `gcompat` or any glibc
+compatibility layer.

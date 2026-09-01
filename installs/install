@@ -34,6 +34,58 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+# --- BusyBox-aware user/group management ---
+# On BusyBox systems without shadow (Alpine), use addgroup/adduser/delgroup/deluser.
+# On systems with shadow (Debian, Alpine+shadow), use groupadd/useradd/gpasswd.
+is_busybox_user_mgmt() {
+  command -v busybox &>/dev/null && ! command -v useradd &>/dev/null
+}
+
+create_system_user() {
+  local username="$1"
+  if ! id "$username" &>/dev/null; then
+    log_info "Creating $username user and group..."
+    if is_busybox_user_mgmt; then
+      sudo addgroup -S "$username"
+      sudo adduser -S -H -D -G "$username" -s /sbin/nologin "$username"
+    else
+      sudo groupadd --system "$username"
+      sudo useradd --system --no-create-home --gid "$username" --shell /bin/false "$username"
+    fi
+  else
+    log_info "$username user already exists"
+  fi
+}
+
+add_user_to_group() {
+  local user="$1"
+  local group="$2"
+  if is_busybox_user_mgmt; then
+    sudo addgroup "$user" "$group"
+  else
+    sudo gpasswd -a "$user" "$group"
+  fi
+}
+
+del_user_from_group() {
+  local user="$1"
+  local group="$2"
+  if is_busybox_user_mgmt; then
+    sudo delgroup "$user" "$group"
+  else
+    sudo gpasswd -d "$user" "$group"
+  fi
+}
+
+delete_system_user() {
+  local username="$1"
+  if is_busybox_user_mgmt; then
+    sudo deluser "$username"
+  else
+    sudo userdel "$username"
+  fi
+}
+
 github_api_curl() {
   if [ -n "$GITHUB_TOKEN" ]; then
     curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "$@"
@@ -167,12 +219,17 @@ resolve_paths() {
 copy_contrib() {
   local rel_path="$1"
   local dest="$2"
+  local does_use_sudo="${3:-0}"
   local src
 
   if [ "$CONTRIB_SOURCE" = "local" ]; then
     src="$CONTRIB_DIR/$rel_path"
     if [ -f "$src" ]; then
-      cp "$src" "$dest"
+      if (( does_use_sudo )); then
+          $SUDO cp "$src" "$dest"
+      else
+          cp "$src" "$dest"
+      fi
       return 0
     fi
     log_warn "Local file not found: $src, falling back to remote"
@@ -474,26 +531,14 @@ create_mihomo_user() {
   if $IS_USER || $IS_MACOS; then
     return 0
   fi
-  if ! id "mihomo" &>/dev/null; then
-    log_info "Creating mihomo user and group..."
-    sudo groupadd --system mihomo
-    sudo useradd --system --no-create-home --gid mihomo --shell /bin/false mihomo
-  else
-    log_info "mihomo user already exists"
-  fi
+  create_system_user mihomo
 }
 
 create_singbox_user() {
   if $IS_USER || $IS_MACOS; then
     return 0
   fi
-  if ! id "sing-box" &>/dev/null; then
-    log_info "Creating sing-box user and group..."
-    sudo groupadd --system sing-box
-    sudo useradd --system --no-create-home --gid sing-box --shell /bin/false sing-box
-  else
-    log_info "sing-box user already exists"
-  fi
+  create_system_user sing-box
 }
 
 # --- Service unit creation (systemd or launchd) ---
@@ -786,7 +831,7 @@ create_core_configs() {
     fi
 
     # Copy core override config via contrib helper
-    copy_contrib "$mihomo_cfg_src" "${MIHOMO_CONFIG_DIR}/config.yaml"
+    copy_contrib "$mihomo_cfg_src" "${MIHOMO_CONFIG_DIR}/config.yaml" 1
     log_info "Mihomo core config written to: ${MIHOMO_CONFIG_DIR}/config.yaml"
 
     mkdir -p "$MIHOMO_USER_CONFIG_DIR"
@@ -814,7 +859,7 @@ create_core_configs() {
       singbox_cfg_src="default_configs/sing-box/core_override_config.json"
     fi
 
-    copy_contrib "$singbox_cfg_src" "${SINGBOX_CONFIG_DIR}/config.json"
+    copy_contrib "$singbox_cfg_src" "${SINGBOX_CONFIG_DIR}/config.json" 1
     log_info "Sing-box core config written to: ${SINGBOX_CONFIG_DIR}/config.json"
 
     # Also copy to clashtui config dir for profile management
@@ -1007,8 +1052,8 @@ prompt_templates_and_rules() {
 
   if $do_rules_dat; then
     log_info "Downloading rules-dat..."
-    curl -Lo "${MIHOMO_CONFIG_DIR}/geoip.metadb" "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb"
-    curl -Lo "${MIHOMO_CONFIG_DIR}/GeoSite.dat" "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat"
+    $SUDO curl -Lo "${MIHOMO_CONFIG_DIR}/geoip.metadb" "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb"
+    $SUDO curl -Lo "${MIHOMO_CONFIG_DIR}/GeoSite.dat" "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat"
   fi
 
   if $do_singbox_tpl; then
@@ -1031,16 +1076,8 @@ install_mihomo() {
 
   create_mihomo_user
 
-  if ! $IS_USER; then
-    if $IS_MACOS; then
-      # macOS: service runs as root, admin group gets r/w access
-      $SUDO chown -R root:admin "$INSTALL_DIR_MIHOMO"
-      $SUDO chmod g+rwxs "$MIHOMO_CONFIG_DIR"
-    else
-      sudo gpasswd -a "$USER" mihomo
-      $SUDO chown -R mihomo:mihomo "$INSTALL_DIR_MIHOMO"
-      $SUDO chmod g+rwxs "$MIHOMO_CONFIG_DIR"
-    fi
+  if ! $IS_USER && ! $IS_MACOS; then
+    add_user_to_group "$USER" mihomo
   fi
 
   create_mihomo_unit
@@ -1059,15 +1096,8 @@ install_singbox() {
 
   create_singbox_user
 
-  if ! $IS_USER; then
-    if $IS_MACOS; then
-      $SUDO chown -R root:admin "$INSTALL_DIR_SINGBOX"
-      $SUDO chmod g+rwxs "$SINGBOX_CONFIG_DIR"
-    else
-      sudo gpasswd -a "$USER" sing-box
-      $SUDO chown -R sing-box:sing-box "$INSTALL_DIR_SINGBOX"
-      $SUDO chmod g+rwxs "$SINGBOX_CONFIG_DIR"
-    fi
+  if ! $IS_USER && ! $IS_MACOS; then
+    add_user_to_group "$USER" sing-box
   fi
 
   create_singbox_unit
@@ -1083,6 +1113,33 @@ install_clashtui() {
   fi
 
   create_clashtui_config "$core_type"
+}
+
+fix_core_config_dir_permission() {
+  if [[ "$CORE_TYPE" = "mihomo" || "$CORE_TYPE" = "all" ]]; then
+    if ! $IS_USER; then
+      if $IS_MACOS; then
+        # macOS: service runs as root, admin group gets r/w access
+        $SUDO chown -R root:admin "$MIHOMO_CONFIG_DIR"
+        $SUDO chmod g+rwxs "$MIHOMO_CONFIG_DIR"
+      else
+        $SUDO chown -R mihomo:mihomo "$MIHOMO_CONFIG_DIR"
+        $SUDO chmod g+rwxs "$MIHOMO_CONFIG_DIR"
+      fi
+    fi
+  fi
+
+  if [[ "$CORE_TYPE" = "singbox" || "$CORE_TYPE" = "all" ]]; then
+    if ! $IS_USER; then
+      if $IS_MACOS; then
+        $SUDO chown -R root:admin "$SINGBOX_CONFIG_DIR"
+        $SUDO chmod g+rwxs "$SINGBOX_CONFIG_DIR"
+      else
+        $SUDO chown -R sing-box:sing-box "$SINGBOX_CONFIG_DIR"
+        $SUDO chmod g+rwxs "$SINGBOX_CONFIG_DIR"
+      fi
+    fi
+  fi
 }
 
 # --- Uninstall ---
@@ -1143,11 +1200,21 @@ uninstall() {
       sudo rm -rf /opt/clashtui
 
       echo "[Optional] Delete the mihomo user and group"
-      echo "  sudo gpasswd -d $USER mihomo"
-      echo "  sudo userdel mihomo"
+      if is_busybox_user_mgmt; then
+        echo "  sudo delgroup $USER mihomo"
+        echo "  sudo deluser mihomo"
+      else
+        echo "  sudo gpasswd -d $USER mihomo"
+        echo "  sudo userdel mihomo"
+      fi
       echo "[Optional] Delete the sing-box user and group"
-      echo "  sudo gpasswd -d $USER sing-box"
-      echo "  sudo userdel sing-box"
+      if is_busybox_user_mgmt; then
+        echo "  sudo delgroup $USER sing-box"
+        echo "  sudo deluser sing-box"
+      else
+        echo "  sudo gpasswd -d $USER sing-box"
+        echo "  sudo userdel sing-box"
+      fi
     fi
   fi
 
@@ -1271,7 +1338,7 @@ main() {
   # Resolve all paths based on parsed options
   resolve_paths
 
-  log_info "Install mode: $([ "$IS_USER" = "true" ] && echo "user (~/.local/clashtui)" || echo "system ($INSTALL_DIR)")"
+  log_info "Install mode: $($IS_USER && echo "user (~/.local/clashtui)" || echo "system ($INSTALL_DIR)")"
   log_info "Core type: $CORE_TYPE"
   log_info "Repo: $REPO"
   log_info "Branch: $BRANCH"
@@ -1308,6 +1375,8 @@ main() {
 
   # Optional downloads
   prompt_templates_and_rules
+
+  fix_core_config_dir_permission
 
   log_info "Installed cores: $CORE_TYPE"
 
