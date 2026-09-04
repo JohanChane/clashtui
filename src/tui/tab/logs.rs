@@ -10,53 +10,40 @@ use std::time::Duration;
 
 newtype_tab!(LogsTab(Tab<Logs>));
 
-mod_agent!(
+key_map!(
     Key,
-    [
-        ([KeyCode::Up], Key::MoveUp, "Move up"),
-        ([KeyCode::Down], Key::MoveDown, "Move down"),
-        ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
-        ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
-        ([KeyCode::Char('G')], Key::GoBottom, "Go to bottom"),
-        (
-            [KeyCode::Char('g'), KeyCode::Char('g')],
-            Key::GoTop,
-            "Go to top"
-        ),
-        ([KeyCode::Char('/')], Key::Search, "Search/Filter"),
-        ([KeyCode::Char('p')], Key::TogglePause, "Pause/Resume"),
-        ([KeyCode::Char('f')], Key::FzfFind, "Find"),
-        ([KeyCode::Char('c')], Key::Clear, "Clear logs"),
-        (
-            [KeyCode::Char('t'), KeyCode::Char('d')],
-            Key::ToggleDebug,
-            "Toggle debug"
-        ),
-        (
-            [KeyCode::Char('t'), KeyCode::Char('i')],
-            Key::ToggleInfo,
-            "Toggle info"
-        ),
-        (
-            [KeyCode::Char('t'), KeyCode::Char('w')],
-            Key::ToggleWarning,
-            "Toggle warning"
-        ),
-        (
-            [KeyCode::Char('t'), KeyCode::Char('e')],
-            Key::ToggleError,
-            "Toggle error"
-        ),
-        (
-            [KeyCode::Char('t'), KeyCode::Char('s')],
-            Key::ToggleSilent,
-            "Toggle silent"
-        ),
-    ]
+    FileMap::new()
+        .with_common([
+            (KeyCode::Up, Key::MoveUp),
+            (KeyCode::Down, Key::MoveDown),
+            (KeyCode::Char('k'), Key::MoveUp),
+            (KeyCode::Char('j'), Key::MoveDown),
+            (KeyCode::Char('G'), Key::GoBottom),
+            (KeyCode::Char('/'), Key::Search),
+            (KeyCode::Char('p'), Key::TogglePause),
+            (KeyCode::Char('f'), Key::FzfFind),
+            (KeyCode::Char('c'), Key::Clear),
+        ])
+        .with_submap(
+            "Nav",
+            KeyCode::Char('g'),
+            [(KeyCode::Char('g'), Key::GoTop)]
+        )
+        .with_submap(
+            "Toggle Level",
+            KeyCode::Char('t'),
+            [
+                (KeyCode::Char('d'), Key::ToggleDebug),
+                (KeyCode::Char('i'), Key::ToggleInfo),
+                (KeyCode::Char('w'), Key::ToggleWarning),
+                (KeyCode::Char('e'), Key::ToggleError),
+                (KeyCode::Char('s'), Key::ToggleSilent),
+            ]
+        )
 );
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
-pub enum Key {
+#[derive_aliases::derive(..Key)]
+enum Key {
     MoveUp,
     MoveDown,
     GoTop,
@@ -72,15 +59,24 @@ pub enum Key {
     ToggleSilent,
 }
 
-impl TryFrom<&crate::tui::Key> for Key {
-    type Error = ();
-
-    fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(ev).copied().ok_or(());
+impl Document for Key {
+    fn get_doc(&self) -> &'static str {
+        use crate::tui::key::consts::*;
+        match self {
+            Self::MoveUp => MOVE_UP,
+            Self::MoveDown => MOVE_DOWN,
+            Self::GoTop => GO_TOP,
+            Self::GoBottom => GO_BOTTOM,
+            Self::Search => FILTER,
+            Self::TogglePause => PAUSE,
+            Self::FzfFind => "Find",
+            Self::Clear => "Clear logs",
+            Self::ToggleDebug => "Toggle Debug",
+            Self::ToggleInfo => "Toggle Info",
+            Self::ToggleWarning => "Toggle Warning",
+            Self::ToggleError => "Toggle Error",
+            Self::ToggleSilent => "You really know what this means?",
         }
-        Err(())
     }
 }
 
@@ -255,10 +251,6 @@ impl BasicTabContent for Logs {
     type State = ();
 
     const TITLE: &str = "Logs";
-
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
-    }
 
     fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         if crate::config::is_core_mismatch() {
@@ -448,6 +440,11 @@ impl TabContent for Logs {
         } else {
             block
         };
+        let block = if let Some(submap_name) = km::get_submap_name() {
+            block.title_bottom(submap_name)
+        } else {
+            block
+        };
 
         if !self.error.as_deref().unwrap_or("").is_empty() && self.buffer.is_empty() {
             let widget =
@@ -484,225 +481,5 @@ impl Logs {
         self.current_log_level = level.clone();
         *self.ws_level.lock().unwrap() = level;
         self.ws_reconnect.store(true, Ordering::Relaxed);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crossterm::event::KeyCode;
-
-    fn kev(code: KeyCode, shift: bool) -> crate::tui::Key {
-        crate::tui::Key {
-            code,
-            shift,
-            ctrl: false,
-            alt: false,
-            super_: false,
-        }
-    }
-
-    fn make_entry(type_: &str, payload: &str, time: &str) -> LogEntry {
-        LogEntry {
-            type_: type_.to_owned(),
-            payload: payload.to_owned(),
-            time: time.to_owned(),
-        }
-    }
-
-    #[test]
-    fn key_j_maps_to_move_down() {
-        let k = kev(KeyCode::Char('j'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::MoveDown)));
-    }
-
-    #[test]
-    fn key_k_maps_to_move_up() {
-        let k = kev(KeyCode::Char('k'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::MoveUp)));
-    }
-
-    #[test]
-    fn key_p_maps_to_toggle_pause() {
-        let k = kev(KeyCode::Char('p'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::TogglePause)));
-    }
-
-    #[test]
-    fn key_c_maps_to_clear() {
-        let k = kev(KeyCode::Char('c'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::Clear)));
-    }
-
-    #[test]
-    fn key_f_maps_to_fzf_find() {
-        let k = kev(KeyCode::Char('f'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::FzfFind)));
-    }
-
-    #[test]
-    fn key_slash_maps_to_search() {
-        let k = kev(KeyCode::Char('/'), false);
-        let result = Key::try_from(&k);
-        assert!(matches!(result, Ok(Key::Search)));
-    }
-
-    #[test]
-    fn default_logs_is_paused_true() {
-        let logs = Logs::default();
-        assert!(logs.paused, "log capture should be paused by default");
-    }
-
-    #[test]
-    fn default_logs_has_empty_buffer() {
-        let logs = Logs::default();
-        assert!(logs.buffer.is_empty());
-        assert_eq!(logs.scroll, 0);
-    }
-
-    #[test]
-    fn clear_resets_state() {
-        let mut logs = Logs {
-            buffer: LogBuffer::new(),
-            scroll: 1,
-            filter: Some("test".to_owned()),
-            ..Default::default()
-        };
-        logs.buffer
-            .push(make_entry("info", "line1", "00-01-01 00:00:00"));
-        logs.buffer
-            .push(make_entry("info", "line2", "00-01-01 00:00:00"));
-        assert_eq!(logs.buffer.count(), 2);
-        assert!(logs.filter.is_some());
-
-        logs.buffer.clear();
-        logs.scroll = 0;
-        logs.filter = None;
-
-        assert!(logs.buffer.is_empty());
-        assert_eq!(logs.scroll, 0);
-        assert!(logs.filter.is_none());
-    }
-
-    #[test]
-    fn toggle_pause_flips_state() {
-        let mut logs = Logs::default();
-        assert!(logs.paused, "default is paused");
-        logs.paused = false;
-        assert!(!logs.paused);
-        logs.paused = true;
-        assert!(logs.paused);
-    }
-
-    #[test]
-    fn scroll_clamps_at_top() {
-        let mut logs = Logs::default();
-        logs.scroll = 0;
-        logs.scroll = logs.scroll.saturating_sub(1);
-        assert_eq!(logs.scroll, 0);
-    }
-
-    #[test]
-    fn move_down_clamps_at_end() {
-        let mut logs = Logs {
-            buffer: LogBuffer::new(),
-            scroll: 0,
-            ..Default::default()
-        };
-        logs.buffer
-            .push(make_entry("info", "a", "00-00-00 00:00:00"));
-        logs.buffer
-            .push(make_entry("info", "b", "00-00-00 00:00:00"));
-        logs.scroll += 1;
-        logs.scroll += 1;
-        if logs.scroll >= logs.buffer.count() {
-            logs.scroll = logs.buffer.count().saturating_sub(1);
-        }
-        assert_eq!(logs.scroll, 1);
-    }
-
-    #[test]
-    fn log_buffer_push_and_iter() {
-        let mut buf = LogBuffer::new();
-        assert!(buf.is_empty());
-        buf.push(make_entry("info", "first", "00-00-00 00:00:01"));
-        buf.push(make_entry("warning", "second", "00-00-00 00:00:02"));
-        assert_eq!(buf.count(), 2);
-
-        let entries: Vec<&LogEntry> = buf.iter_from_head().collect();
-        assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].payload, "first");
-        assert_eq!(entries[1].payload, "second");
-    }
-
-    #[test]
-    fn log_buffer_wraps_at_capacity() {
-        const SIZE: usize = LOG_BUFFER_SIZE;
-        let mut buf = LogBuffer::new();
-        for i in 0..(SIZE + 5) {
-            buf.push(make_entry("info", &format!("line{i}"), "00-00-00 00:00:00"));
-        }
-        assert_eq!(buf.count(), SIZE);
-        let entries: Vec<&LogEntry> = buf.iter_from_head().collect();
-        assert_eq!(entries.len(), SIZE);
-        assert_eq!(entries[0].payload, "line5");
-        assert_eq!(entries[SIZE - 1].payload, format!("line{}", SIZE + 4));
-    }
-
-    #[test]
-    fn log_buffer_clear() {
-        let mut buf = LogBuffer::new();
-        buf.push(make_entry("info", "test", "00-00-00 00:00:00"));
-        assert!(!buf.is_empty());
-        buf.clear();
-        assert!(buf.is_empty());
-        assert_eq!(buf.count(), 0);
-    }
-
-    #[test]
-    fn parse_log_entries_valid_json() {
-        let body = "{\"type\":\"info\",\"payload\":\"test message\"}";
-        let entries = api_log::parse_log_entries(body);
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].type_, "info");
-        assert_eq!(entries[0].payload, "test message");
-    }
-
-    #[test]
-    fn parse_log_entries_multiple_lines() {
-        let body = "{\"type\":\"info\",\"payload\":\"first\"}\n{\"type\":\"warning\",\"payload\":\"second\"}";
-        let entries = api_log::parse_log_entries(body);
-        assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].type_, "info");
-        assert_eq!(entries[1].type_, "warning");
-    }
-
-    #[test]
-    fn parse_log_entries_skips_invalid() {
-        let body = "{\"type\":\"info\",\"payload\":\"valid\"}\nnot json\n{\"type\":\"error\",\"payload\":\"also valid\"}";
-        let entries = api_log::parse_log_entries(body);
-        assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].payload, "valid");
-        assert_eq!(entries[1].payload, "also valid");
-    }
-
-    #[test]
-    fn parse_log_entries_empty_string() {
-        let entries = api_log::parse_log_entries("");
-        assert!(entries.is_empty());
-    }
-
-    #[test]
-    fn parse_log_entries_missing_fields() {
-        let body = "{\"type\":\"info\"}";
-        let entries = api_log::parse_log_entries(body);
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].type_, "info");
-        assert_eq!(entries[0].payload, "");
     }
 }

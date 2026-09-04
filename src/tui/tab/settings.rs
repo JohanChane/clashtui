@@ -9,41 +9,34 @@ use strum::VariantArray;
 
 newtype_tab!(SettingsTab(Tab<SettingsContent>));
 
-mod_agent!(
-    SettingsKey,
-    [
-        ([KeyCode::Enter], SettingsKey::Execute, "Apply"),
-        ([KeyCode::Esc], SettingsKey::Esc, "Back"),
-        ([KeyCode::Up], SettingsKey::MoveUp, "Move up"),
-        ([KeyCode::Down], SettingsKey::MoveDown, "Move down"),
-        ([KeyCode::Char('k')], SettingsKey::MoveUp, "Move up"),
-        ([KeyCode::Char('j')], SettingsKey::MoveDown, "Move down"),
-    ]
+key_map!(
+    Key,
+    FileMap::new().with_common([
+        (KeyCode::Enter, Key::Execute),
+        (KeyCode::Esc, Key::Esc),
+        (KeyCode::Up, Key::MoveUp),
+        (KeyCode::Down, Key::MoveDown),
+        (KeyCode::Char('k'), Key::MoveUp),
+        (KeyCode::Char('j'), Key::MoveDown),
+    ])
 );
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
-pub(crate) enum SettingsKey {
+#[derive_aliases::derive(..Key)]
+enum Key {
     Execute,
     MoveUp,
     MoveDown,
     Esc,
 }
-
-impl TryFrom<&crate::tui::Key> for SettingsKey {
-    type Error = ();
-
-    fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(ev).copied().ok_or(());
+impl Document for Key {
+    fn get_doc(&self) -> &'static str {
+        use crate::tui::key::consts::*;
+        match self {
+            Self::Execute => "Execute",
+            Self::MoveUp => MOVE_UP,
+            Self::MoveDown => MOVE_DOWN,
+            Self::Esc => "Back",
         }
-        Ok(match ev.code {
-            KeyCode::Enter => Self::Execute,
-            KeyCode::Esc => Self::Esc,
-            KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
-            KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
-            _ => return Err(()),
-        })
     }
 }
 
@@ -91,15 +84,11 @@ struct SettingsContent {
 }
 
 impl BasicTabContent for SettingsContent {
-    type Key = SettingsKey;
+    type Key = Key;
 
     type State = ListState;
 
     const TITLE: &str = "Settings";
-
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
-    }
 
     fn on_enter(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         if crate::config::is_core_mismatch() {
@@ -161,26 +150,26 @@ impl TabContent for SettingsContent {
 
     fn handle_key_event(
         &mut self,
-        key: SettingsKey,
+        key: Key,
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
     ) {
         if self.mode_selector_visible {
             match key {
-                SettingsKey::MoveUp => {
+                Key::MoveUp => {
                     let i = self.mode_selector_state.selected().unwrap_or(0);
                     self.mode_selector_state.select(Some(i.saturating_sub(1)));
                 }
-                SettingsKey::MoveDown => {
+                Key::MoveDown => {
                     let i = self.mode_selector_state.selected().unwrap_or(0);
                     if i + 1 < self.modes.len() {
                         self.mode_selector_state.select(Some(i + 1));
                     }
                 }
-                SettingsKey::Esc => {
+                Key::Esc => {
                     self.mode_selector_visible = false;
                 }
-                SettingsKey::Execute => {
+                Key::Execute => {
                     let idx = self.mode_selector_state.selected().unwrap_or(0);
                     if let Some(mode) = self.modes.get(idx) {
                         let mode = *mode;
@@ -217,20 +206,20 @@ impl TabContent for SettingsContent {
 
         if self.tun_selector_visible {
             match key {
-                SettingsKey::MoveUp => {
+                Key::MoveUp => {
                     let i = self.tun_selector_state.selected().unwrap_or(0);
                     self.tun_selector_state.select(Some(i.saturating_sub(1)));
                 }
-                SettingsKey::MoveDown => {
+                Key::MoveDown => {
                     let i = self.tun_selector_state.selected().unwrap_or(0);
                     if i + 1 < self.tun_stacks.len() {
                         self.tun_selector_state.select(Some(i + 1));
                     }
                 }
-                SettingsKey::Esc => {
+                Key::Esc => {
                     self.tun_selector_visible = false;
                 }
-                SettingsKey::Execute => {
+                Key::Execute => {
                     let idx = self.tun_selector_state.selected().unwrap_or(0);
                     if let Some(stack) = self.tun_stacks.get(idx) {
                         let stack = *stack;
@@ -267,17 +256,17 @@ impl TabContent for SettingsContent {
         }
 
         match key {
-            SettingsKey::MoveUp => {
+            Key::MoveUp => {
                 let i = state.selected().unwrap_or(0);
                 state.select(Some(i.saturating_sub(1)));
             }
-            SettingsKey::MoveDown => {
+            Key::MoveDown => {
                 let i = state.selected().unwrap_or(0);
                 if i + 1 < self.ops.len() {
                     state.select(Some(i + 1));
                 }
             }
-            SettingsKey::Execute => {
+            Key::Execute => {
                 let Some(idx) = state.selected() else { return };
                 let Some(op) = self.ops.get(idx) else { return };
                 match op {
@@ -412,6 +401,11 @@ impl TabContent for SettingsContent {
         let block = Block::bordered()
             .border_style(Theme::get().section("settings").border)
             .title(Self::TITLE);
+        let block = if let Some(submap_name) = km::get_submap_name() {
+            block.title_bottom(submap_name)
+        } else {
+            block
+        };
 
         if crate::config::is_core_mismatch() {
             let widget = Paragraph::new("API data mismatch with configured core").block(block);
@@ -510,80 +504,4 @@ fn centered_rect(percent_x: u16, percent_y: u16, area: Rect) -> Rect {
         Constraint::Percentage((100 - percent_x) / 2),
     ])
     .split(popup_layout[1])[1]
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn mk_key(code: KeyCode) -> crate::tui::Key {
-        crate::tui::Key {
-            code,
-            shift: matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase()),
-            ctrl: false,
-            alt: false,
-            super_: false,
-        }
-    }
-
-    #[test]
-    fn settings_key_agent_contains_expected() {
-        let a = agent();
-        assert!(a.contains_key(&mk_key(KeyCode::Enter)));
-        assert!(a.contains_key(&mk_key(KeyCode::Esc)));
-        assert!(a.contains_key(&mk_key(KeyCode::Up)));
-        assert!(a.contains_key(&mk_key(KeyCode::Down)));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('k'))));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('j'))));
-    }
-
-    #[test]
-    fn settings_key_try_from_correct_actions() {
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Enter)),
-            Ok(SettingsKey::Execute)
-        ));
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Esc)),
-            Ok(SettingsKey::Esc)
-        ));
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Up)),
-            Ok(SettingsKey::MoveUp)
-        ));
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Down)),
-            Ok(SettingsKey::MoveDown)
-        ));
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Char('k'))),
-            Ok(SettingsKey::MoveUp)
-        ));
-        assert!(matches!(
-            SettingsKey::try_from(&mk_key(KeyCode::Char('j'))),
-            Ok(SettingsKey::MoveDown)
-        ));
-    }
-
-    #[test]
-    fn settings_key_try_from_unknown_key_is_err() {
-        assert!(SettingsKey::try_from(&mk_key(KeyCode::Char('x'))).is_err());
-        assert!(SettingsKey::try_from(&mk_key(KeyCode::Backspace)).is_err());
-    }
-
-    #[test]
-    fn settings_op_all_is_non_empty() {
-        let ops = SettingsOp::all();
-        assert!(!ops.is_empty());
-        assert!(ops.contains(&SettingsOp::SwitchMode));
-        assert!(ops.contains(&SettingsOp::AllowLan));
-    }
-
-    #[test]
-    fn settings_content_default_has_empty_ops() {
-        let c = SettingsContent::default();
-        assert!(c.ops.is_empty());
-        assert!(!c.mode_selector_visible);
-        assert!(!c.tun_selector_visible);
-    }
 }

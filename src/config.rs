@@ -20,9 +20,11 @@ use std::{
 use util::*;
 
 mod core;
-pub use core::{CoreType, ServiceController};
 #[macro_use]
 mod util;
+
+pub use core::{CoreType, ServiceController};
+pub use util::check_startup_perms;
 pub mod database;
 
 /// Load using [init]
@@ -290,6 +292,7 @@ pub fn init_config() -> Result<()> {
     )?;
     ConfigFile::default().to_file()?;
     ProfileManager::default().to_file()?;
+    crate::tui::keymap_init()?;
 
     fs::create_dir(mihomo.join(defs::TEMPLATE_DIR))?;
     fs::create_dir(mihomo.join(defs::PROFILE_YAMLS_DIR))?;
