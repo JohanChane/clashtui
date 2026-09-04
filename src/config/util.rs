@@ -95,7 +95,7 @@ mod tests {
             eprintln!("skipping: portable data dir exists at {:?}", portable_data);
             return;
         }
-        let result = load_home_dir().unwrap();
+        let result = super::load_home_dir().unwrap();
         assert!(
             result.ends_with(".config/clashtui"),
             "expected path ending with .config/clashtui, got: {result:?}"
@@ -107,6 +107,6 @@ mod tests {
         // cfg!(target_os = "macos") should be true when compiled with --target *-apple-darwin
         let is_macos = cfg!(target_os = "macos");
         // This always passes — it just documents the expected platform detection
-        assert!(is_macos || !is_macos);
+        let _ = is_macos;
     }
 }
