@@ -80,8 +80,6 @@ macro_rules! load_save {
 
 #[cfg(test)]
 mod tests {
-    use super::load_home_dir;
-
     #[cfg(target_os = "macos")]
     #[test]
     fn load_home_dir_macos_uses_home_dot_config() {
