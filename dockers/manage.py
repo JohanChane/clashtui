@@ -9,7 +9,7 @@ from pathlib import Path
 
 # ── target definitions ──────────────────────────────────────────────
 # Each target maps to: image tag, container name, Dockerfile subdir, and
-# the service controller the install script should use.
+# the service controller used by the target environment.
 TARGETS = {
     "alpine": {
         "image": "clashtui-alpine-dev",
@@ -93,8 +93,8 @@ def build(args):
     print(f"Image {image} built successfully.")
 
 
-def run_container(args):
-    """Run the container in detached mode."""
+def start_container(args):
+    """Start the container in detached mode."""
     t = _resolve_target(args.target)
     _stop_existing(t)
     extra_args = args.extra or []
@@ -222,27 +222,6 @@ def clean(args):
         run(["docker", "rmi", t["image"]], check=False)
 
 
-def test_install(args):
-    """Run install script inside the container."""
-    t = _resolve_target(args.target)
-    extra_args = args.extra or []
-    install_args = " ".join(extra_args)
-    sc = t["service_controller"]
-    cmd = [
-        "docker",
-        "exec",
-        "-it",
-        "-w",
-        "/home/johan/workspace/clashtui",
-        *_maybe_user_env(t),
-        t["container"],
-        t["shell"],
-        "-c",
-        f"installs/install --service-controller {sc} --no-prompt {install_args}",
-    ]
-    os.execvp("docker", cmd)
-
-
 # ── main ─────────────────────────────────────────────────────────────
 
 
@@ -263,8 +242,8 @@ def main():
     sub.add_parser("list-targets", help="List all available targets")
     sub.add_parser("build", help="Build the Docker image")
 
-    p_run = sub.add_parser("run", help="Run the container (detached)")
-    p_run.add_argument("extra", nargs="*", help="Extra docker run args")
+    p_start = sub.add_parser("start", help="Start the container (detached)")
+    p_start.add_argument("extra", nargs="*", help="Extra docker run args")
 
     sub.add_parser("stop", help="Stop and remove the container")
 
@@ -279,9 +258,6 @@ def main():
     p_clean = sub.add_parser("clean", help="Stop container and optionally remove image")
     p_clean.add_argument("--image", action="store_true", help="Also remove the image")
 
-    p_test = sub.add_parser("test-install", help="Run install script in container")
-    p_test.add_argument("extra", nargs="*", help="Extra args to pass to install script")
-
     args = parser.parse_args()
 
     if args.command is None:
@@ -291,13 +267,12 @@ def main():
     commands = {
         "list-targets": list_targets,
         "build": build,
-        "run": run_container,
+        "start": start_container,
         "stop": stop,
         "shell": shell,
         "status": status,
         "logs": logs,
         "clean": clean,
-        "test-install": test_install,
     }
 
     commands[args.command](args)

@@ -18,16 +18,12 @@ All commands accept `-t <target>` (default: `alpine`).
 ./dockers/manage.py -t alpine build
 ./dockers/manage.py -t debian build
 
-# Run container (detached, mounts project at /home/johan/workspace/clashtui)
-./dockers/manage.py -t alpine run
-./dockers/manage.py -t debian run
+# Start container (detached, mounts project at /home/johan/workspace/clashtui)
+./dockers/manage.py -t alpine start
+./dockers/manage.py -t debian start
 
 # Open a shell in the container
 ./dockers/manage.py -t debian shell
-
-# Run the install script inside the container (auto-selects service controller)
-./dockers/manage.py -t alpine test-install
-./dockers/manage.py -t debian test-install
 
 # Show container status (all targets)
 ./dockers/manage.py status
