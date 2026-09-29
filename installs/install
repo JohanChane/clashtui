@@ -1129,7 +1129,7 @@ fix_core_config_dir_permission() {
     fi
   fi
 
-  if [[ "$CORE_TYPE" = "singbox" || "$CORE_TYPE" = "all" ]]; then
+  if [[ "$CORE_TYPE" = "sing-box" || "$CORE_TYPE" = "all" ]]; then
     if ! $IS_USER; then
       if $IS_MACOS; then
         $SUDO chown -R root:admin "$SINGBOX_CONFIG_DIR"
