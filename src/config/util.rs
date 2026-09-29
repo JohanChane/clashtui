@@ -80,8 +80,6 @@ macro_rules! load_save {
 
 #[cfg(test)]
 mod tests {
-    use super::load_home_dir;
-
     #[cfg(target_os = "macos")]
     #[test]
     fn load_home_dir_macos_uses_home_dot_config() {
@@ -96,7 +94,7 @@ mod tests {
             eprintln!("skipping: portable data dir exists at {:?}", portable_data);
             return;
         }
-        let result = load_home_dir().unwrap();
+        let result = super::load_home_dir().unwrap();
         assert!(
             result.ends_with(".config/clashtui"),
             "expected path ending with .config/clashtui, got: {result:?}"
