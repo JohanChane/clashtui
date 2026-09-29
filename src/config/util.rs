@@ -80,6 +80,7 @@ macro_rules! load_save {
 
 #[cfg(test)]
 mod tests {
+    use super::load_home_dir;
 
     #[cfg(target_os = "macos")]
     #[test]
@@ -100,13 +101,5 @@ mod tests {
             result.ends_with(".config/clashtui"),
             "expected path ending with .config/clashtui, got: {result:?}"
         );
-    }
-
-    #[test]
-    fn cfg_macos_consistent() {
-        // cfg!(target_os = "macos") should be true when compiled with --target *-apple-darwin
-        let is_macos = cfg!(target_os = "macos");
-        // This always passes — it just documents the expected platform detection
-        assert!(is_macos || !is_macos);
     }
 }
