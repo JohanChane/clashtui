@@ -7,6 +7,8 @@ use ratatui::widgets::ListItem;
 newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
 
 mod_agent!(
+    keymap,
+    crate::tui::binding::Scope::SrvCtl,
     SrvCtlKey,
     [
         ([KeyCode::Enter], SrvCtlKey::Execute, "Execute"),
@@ -18,30 +20,12 @@ mod_agent!(
     ]
 );
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum SrvCtlKey {
     Execute,
     MoveUp,
     MoveDown,
     Esc,
-}
-
-impl TryFrom<&crate::tui::Key> for SrvCtlKey {
-    type Error = ();
-
-    fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(ev).copied().ok_or(());
-        }
-        Ok(match ev.code {
-            KeyCode::Enter => Self::Execute,
-            KeyCode::Esc => Self::Esc,
-            KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
-            KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
-            _ => return Err(()),
-        })
-    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -219,8 +203,8 @@ impl BasicTabContent for SrvCtlContent {
 
     const TITLE: &str = "CoreSrvCtl";
 
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
+    fn keymap() -> &'static crate::tui::binding::Keymap<Self::Key> {
+        keymap::get()
     }
 
     fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
@@ -526,7 +510,7 @@ impl TabContent for SrvCtlContent {
         let proxy_label = format!("  Proxy: {}", if self.proxy_enabled { "ON" } else { "OFF" });
 
         let title_line = format!(
-            "{} — {} (core: {}){}",
+            "{} -- {} (core: {}){}",
             Self::TITLE,
             self.service_name,
             self.core_label,
@@ -572,6 +556,7 @@ impl TabContent for SrvCtlContent {
 }
 
 #[cfg(test)]
+#[allow(dead_code)]
 mod tests {
     use super::*;
 
@@ -583,42 +568,6 @@ mod tests {
             alt: false,
             super_: false,
         }
-    }
-
-    #[test]
-    fn srvctl_key_agent_contains_expected() {
-        let a = agent();
-        assert!(a.contains_key(&mk_key(KeyCode::Enter)));
-        assert!(a.contains_key(&mk_key(KeyCode::Esc)));
-        assert!(a.contains_key(&mk_key(KeyCode::Up)));
-        assert!(a.contains_key(&mk_key(KeyCode::Down)));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('k'))));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('j'))));
-    }
-
-    #[test]
-    fn srvctl_key_try_from_correct_actions() {
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Enter)),
-            Ok(SrvCtlKey::Execute)
-        ));
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Esc)),
-            Ok(SrvCtlKey::Esc)
-        ));
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Up)),
-            Ok(SrvCtlKey::MoveUp)
-        ));
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Down)),
-            Ok(SrvCtlKey::MoveDown)
-        ));
-    }
-
-    #[test]
-    fn srvctl_key_try_from_unknown_is_err() {
-        assert!(SrvCtlKey::try_from(&mk_key(KeyCode::Char('x'))).is_err());
     }
 
     #[test]

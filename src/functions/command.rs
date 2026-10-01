@@ -51,7 +51,7 @@ pub fn check_config(profile_path: &Path) -> anyhow::Result<()> {
         }
         CoreType::Singbox => {
             let cfg = &CONFIG.cfg_file.singbox.core;
-            // Strip clashtui metadata before check — sing-box rejects unknown fields
+            // Strip clashtui metadata before check -- sing-box rejects unknown fields
             let check_path = if let Ok(content) = std::fs::read_to_string(profile_path) {
                 if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&content) {
                     if value
@@ -300,6 +300,7 @@ pub fn edit(path: &str) -> Result<()> {
     shell_spawn(tpl, path)
 }
 
+#[allow(dead_code)]
 pub fn open_dir(path: &str) -> Result<()> {
     let tpl = CONFIG.cfg_file.extra.open_dir_cmd.as_deref().unwrap_or("");
     log::debug!("open_dir: path={path} template={tpl}");
