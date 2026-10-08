@@ -1,261 +1,416 @@
-use std::{
-    fmt::{Display, Write},
-    str::FromStr,
-};
+use crossterm::event::{KeyCode, KeyEvent as _KeyEvent, KeyModifiers};
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+pub type KeyDesc = Vec<(String, &'static str)>;
+pub type KeyDescRef<'a> = &'a [(String, &'a str)];
+pub type KeyMap<A> = std::collections::HashMap<Key, MaybeMap<A>>;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Key {
-    pub code: KeyCode,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub shift: bool,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub ctrl: bool,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub alt: bool,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub super_: bool,
+pub trait Document {
+    fn get_doc(&self) -> &'static str;
 }
 
-fn is_false(b: &bool) -> bool {
-    !*b
+pub enum MaybeMap<A> {
+    SubMap {
+        name: String,
+        inner: std::collections::HashMap<Key, A>,
+    },
+    Action(A),
+}
+
+#[derive_aliases::derive(..Key, Debug)]
+pub struct Key {
+    /// The key itself.
+    pub code: KeyCode,
+    #[serde(
+        default = "KeyModifiers::empty",
+        skip_serializing_if = "KeyModifiers::is_empty"
+    )]
+    /// Additional key modifiers.
+    pub modifiers: KeyModifiers,
 }
 
 impl Key {
-    pub fn plain(&self) -> Option<char> {
-        match self.code {
-            KeyCode::Char(c) if !self.ctrl && !self.alt && !self.super_ => Some(c),
-            _ => None,
-        }
-    }
-}
-
-impl Default for Key {
-    fn default() -> Self {
-        Self {
-            code: KeyCode::Null,
-            shift: false,
-            ctrl: false,
-            alt: false,
-            super_: false,
-        }
-    }
-}
-
-impl From<KeyEvent> for Key {
-    fn from(value: KeyEvent) -> Self {
-        let shift = match (value.code, value.modifiers) {
-            (KeyCode::Char(c), _m) => c.is_ascii_uppercase(),
-            (KeyCode::BackTab, _) => false,
-            (_, m) => m.contains(KeyModifiers::SHIFT),
+    fn normalize(mut self) -> Self {
+        let c = match self.code {
+            KeyCode::Char(c) => c,
+            KeyCode::BackTab => {
+                return Self {
+                    code: KeyCode::Tab,
+                    modifiers: KeyModifiers::SHIFT,
+                };
+            }
+            _ => return self,
         };
+        if c.is_ascii_uppercase() {
+            // 大写字母 → 自动加上 SHIFT modifier
+            self.modifiers.insert(KeyModifiers::SHIFT);
+        } else if self.modifiers.contains(KeyModifiers::SHIFT) {
+            // SHIFT + 小写字母 → 转为大写字母
+            self.code = KeyCode::Char(c.to_ascii_uppercase())
+        }
+        self
+    }
+    pub fn from_code(code: KeyCode) -> Self {
+        Self {
+            code,
+            modifiers: KeyModifiers::empty(),
+        }
+        .normalize()
+    }
+    // pub fn with_modifiers(code: KeyCode, modifiers: KeyModifiers) -> Self {
+    //     Self { code, modifiers }
+    // }
+}
 
+impl std::fmt::Display for Key {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut prefix = String::new();
+        if self.modifiers.contains(KeyModifiers::ALT) {
+            prefix.push('A');
+        }
+        if self.modifiers.contains(KeyModifiers::CONTROL) {
+            prefix.push('C');
+        }
+        if self.modifiers.contains(KeyModifiers::SHIFT) {
+            prefix.push('S');
+        }
+        if prefix.is_empty() {
+            write!(f, "{}", self.code)
+        } else {
+            write!(f, "{prefix}-{}", self.code)
+        }
+    }
+}
+
+impl From<_KeyEvent> for Key {
+    fn from(value: _KeyEvent) -> Self {
         Self {
             code: value.code,
-            shift,
-            ctrl: value.modifiers.contains(KeyModifiers::CONTROL),
-            alt: value.modifiers.contains(KeyModifiers::ALT),
-            super_: value.modifiers.contains(KeyModifiers::SUPER),
+            modifiers: value.modifiers,
         }
+        .normalize()
     }
 }
 
-impl FromStr for Key {
-    type Err = anyhow::Error;
+impl From<KeyCode> for Key {
+    fn from(value: KeyCode) -> Self {
+        Self::from_code(value)
+    }
+}
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        use anyhow::bail;
+pub mod instancing {
+    use super::{Document, Key, KeyDesc, KeyMap, MaybeMap};
 
-        if s.is_empty() {
-            bail!("empty key");
-        }
-
-        let mut key = Self::default();
-        if !s.starts_with('<') || !s.ends_with('>') {
-            key.code = KeyCode::Char(s.chars().next().unwrap());
-            key.shift = matches!(key.code, KeyCode::Char(c) if c.is_ascii_uppercase());
-            return Ok(key);
-        }
-
-        let mut it = s[1..s.len() - 1].split_inclusive('-').peekable();
-        while let Some(next) = it.next() {
-            match next.to_ascii_lowercase().as_str() {
-                "s-" => key.shift = true,
-                "c-" => key.ctrl = true,
-                "a-" => key.alt = true,
-                "d-" => key.super_ = true,
-
-                "space" => key.code = KeyCode::Char(' '),
-                "backspace" => key.code = KeyCode::Backspace,
-                "enter" => key.code = KeyCode::Enter,
-                "left" => key.code = KeyCode::Left,
-                "right" => key.code = KeyCode::Right,
-                "up" => key.code = KeyCode::Up,
-                "down" => key.code = KeyCode::Down,
-                "home" => key.code = KeyCode::Home,
-                "end" => key.code = KeyCode::End,
-                "pageup" => key.code = KeyCode::PageUp,
-                "pagedown" => key.code = KeyCode::PageDown,
-                "tab" => key.code = KeyCode::Tab,
-                "backtab" => key.code = KeyCode::BackTab,
-                "delete" => key.code = KeyCode::Delete,
-                "insert" => key.code = KeyCode::Insert,
-                "esc" => key.code = KeyCode::Esc,
-
-                _ => match next {
-                    s if it.peek().is_none() => {
-                        let c = s.chars().next().unwrap();
-                        key.shift |= c.is_ascii_uppercase();
-                        key.code =
-                            KeyCode::Char(if key.shift { c.to_ascii_uppercase() } else { c });
+    /// Generate `[(key, description 'about the key's action')]` at runtime
+    pub fn make_docs<A: Document>(keymap: &KeyMap<A>) -> KeyDesc {
+        use crate::tui::key::MaybeMap;
+        let mut iter = keymap.iter();
+        let mut inner_iter: Option<(Key, std::collections::hash_map::Iter<'_, Key, A>)> = None;
+        std::iter::from_fn(|| {
+            if let Some((key, inner_iter)) = inner_iter.as_mut()
+                && let Some((key2, act)) = inner_iter.by_ref().next()
+            {
+                return Some((format!("{key}+{key2}"), act.get_doc()));
+            }
+            for (key, maybe_submap) in iter.by_ref() {
+                match maybe_submap {
+                    MaybeMap::SubMap { name: _, inner } => {
+                        inner_iter = Some((*key, inner.iter()));
+                        if let Some((key2, act)) = inner_iter.as_mut().unwrap().1.by_ref().next() {
+                            return Some((format!("{key}+{key2}"), act.get_doc()));
+                        }
                     }
-                    s => bail!("unknown key: {s}"),
-                },
+                    MaybeMap::Action(act) => {
+                        return Some((key.to_string(), act.get_doc()));
+                    }
+                };
             }
-        }
-
-        if key.code == KeyCode::Null {
-            bail!("empty key");
-        }
-        Ok(key)
+            None
+        })
+        .collect()
     }
-}
 
-impl Display for Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(c) = self.plain() {
-            return if c == ' ' {
-                write!(f, "<Space>")
-            } else {
-                f.write_char(c)
-            };
-        }
-
-        write!(f, "<")?;
-        if self.super_ {
-            write!(f, "D-")?;
-        }
-        if self.ctrl {
-            write!(f, "C-")?;
-        }
-        if self.alt {
-            write!(f, "A-")?;
-        }
-        if self.shift && !matches!(self.code, KeyCode::Char(_)) {
-            write!(f, "S-")?;
-        }
-
-        let code = match self.code {
-            KeyCode::Backspace => "Backspace",
-            KeyCode::Enter => "Enter",
-            KeyCode::Left => "Left",
-            KeyCode::Right => "Right",
-            KeyCode::Up => "Up",
-            KeyCode::Down => "Down",
-            KeyCode::Home => "Home",
-            KeyCode::End => "End",
-            KeyCode::PageUp => "PageUp",
-            KeyCode::PageDown => "PageDown",
-            KeyCode::Tab => "Tab",
-            KeyCode::BackTab => "BackTab",
-            KeyCode::Delete => "Delete",
-            KeyCode::Insert => "Insert",
-            KeyCode::Esc => "Esc",
-
-            KeyCode::Char(' ') => "Space",
-            KeyCode::Char(c) => {
-                f.write_char(c)?;
-                ""
+    /// Try to match an `A` by lookup in `submap` or `keymap`
+    pub fn try_from<'a, A: Eq + Copy>(
+        ev: &Key,
+        keymap: &'a KeyMap<A>,
+        submap: &mut Option<(&'a str, &'a std::collections::HashMap<Key, A>)>,
+    ) -> Option<A> {
+        let key = if let Some(submap) = submap.take() {
+            submap.1.get(ev).copied()?
+        } else {
+            match keymap.get(ev)? {
+                MaybeMap::SubMap { name, inner } => {
+                    *submap = Some((name, inner));
+                    return None;
+                }
+                MaybeMap::Action(key) => *key,
             }
-            _ => "Unknown",
         };
+        Some(key)
+    }
 
-        write!(f, "{code}>")
+    pub mod files {
+        use super::{Key, KeyMap, MaybeMap};
+        use std::collections::{HashMap, HashSet};
+        use std::hash::Hash;
+
+        #[derive(serde::Deserialize, serde::Serialize)]
+        pub struct FileMap<A: Eq + Hash> {
+            // #[serde(flatten)]
+            common: HashMap<A, Vec<Key>>,
+            // #[serde(flatten)]
+            submap: HashMap<String, SubMap<A>>,
+        }
+        impl<A: Eq + Hash> FileMap<A> {
+            pub fn new() -> Self {
+                Self {
+                    common: Default::default(),
+                    submap: Default::default(),
+                }
+            }
+            pub fn with_common(
+                mut self,
+                map: impl IntoIterator<Item = (impl Into<Key>, A)>,
+            ) -> Self {
+                map.into_iter()
+                    .for_each(|(key, act)| self.common.entry(act).or_default().push(key.into()));
+                self
+            }
+            pub fn with_submap(
+                mut self,
+                name: impl ToString,
+                key: impl Into<Key>,
+                map: impl IntoIterator<Item = (impl Into<Key>, A)>,
+            ) -> Self {
+                let inner = &mut self
+                    .submap
+                    .entry(name.to_string())
+                    .or_insert(SubMap {
+                        key: key.into(),
+                        inner: Default::default(),
+                    })
+                    .inner;
+                map.into_iter()
+                    .for_each(|(key, act)| inner.entry(act).or_default().push(key.into()));
+                self
+            }
+        }
+
+        #[derive(serde::Deserialize, serde::Serialize)]
+        pub struct SubMap<A: Eq + Hash> {
+            key: Key,
+            // #[serde(flatten)]
+            inner: HashMap<A, Vec<Key>>,
+        }
+
+        /// If there is duplicate (e.g. 's' => Search/Import), return true
+        pub fn check_duplicate<A: Eq + Hash>(map: &FileMap<A>) -> bool {
+            let mut set = HashSet::new();
+            let no_duplicate = map
+                .common
+                .values()
+                .flat_map(|keys| keys.iter())
+                .chain(map.submap.values().map(|submap| &submap.key))
+                .all(|key| set.insert(key));
+            if !no_duplicate {
+                return true;
+            }
+            for submap in map.submap.values() {
+                let mut set = HashSet::new();
+                let no_duplicate = submap
+                    .inner
+                    .values()
+                    .flat_map(|keys| keys.iter())
+                    .all(|key| set.insert(key));
+                if !no_duplicate {
+                    return true;
+                }
+            }
+            false
+        }
+
+        pub fn map_from_file<A: Eq + Hash + Copy>(map: FileMap<A>) -> KeyMap<A> {
+            let iter = map.common.into_iter().flat_map(|(act, keys)| {
+                keys.into_iter()
+                    .map(move |key| (key, MaybeMap::Action(act)))
+            });
+            map.submap
+                .into_iter()
+                .map(|(name, submap)| {
+                    (
+                        submap.key,
+                        MaybeMap::SubMap {
+                            name,
+                            inner: submap
+                                .inner
+                                .into_iter()
+                                .flat_map(|(act, keys)| keys.into_iter().map(move |key| (key, act)))
+                                .collect(),
+                        },
+                    )
+                })
+                .chain(iter)
+                .collect()
+        }
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Build KeyMap
+///
+/// - load keymapping from file or something via `set`
+/// - get keymapping via `get`
+///
+/// File Format:
+///
+/// `Act1: [Key1, Key2, ...]`
+macro_rules! key_map {
+    ($actid:ident, $default_map:expr) => {
+        pub(in crate::tui) mod km {
+            use super::*;
+            use crate::tui::key::{
+                Key as _Key, KeyDesc, KeyMap as _KeyMap,
+                instancing::{files::*, *},
+            };
+            use anyhow::Context;
+            use std::sync::OnceLock;
 
-    fn key_event(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
-        KeyEvent::new(code, modifiers)
-    }
+            type KeyMap = _KeyMap<$actid>;
 
-    #[test]
-    fn plain_char_no_modifiers() {
-        let k = Key::from(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
-        assert_eq!(k.code, KeyCode::Char('a'));
-        assert!(!k.shift);
-        assert!(!k.ctrl);
-        assert!(!k.alt);
-        assert!(!k.super_);
-    }
+            pub(super) static KEYMAP: OnceLock<KeyMap> = OnceLock::new();
 
-    #[test]
-    fn uppercase_char_infers_shift() {
-        let k = Key::from(key_event(KeyCode::Char('A'), KeyModifiers::NONE));
-        assert_eq!(k.code, KeyCode::Char('A'));
-        assert!(k.shift);
-    }
+            pub fn set(map: serde_yml::Value) -> anyhow::Result<bool> {
+                let map = serde_yml::from_value(map).context("Failed to parse keymap")?;
+                let is_duplicated = check_duplicate(&map);
+                if KEYMAP.set(map_from_file(map)).is_err() {
+                    unreachable!("keymap initiated twice");
+                }
+                Ok(is_duplicated)
+            }
 
-    #[test]
-    fn uppercase_char_with_shift_modifier() {
-        let k = Key::from(key_event(KeyCode::Char('A'), KeyModifiers::SHIFT));
-        assert_eq!(k.code, KeyCode::Char('A'));
-        assert!(k.shift);
-    }
+            pub(super) fn get() -> &'static KeyMap {
+                KEYMAP.get().expect("try get keymap without init")
+            }
 
-    #[test]
-    fn ctrl_key() {
-        let k = Key::from(key_event(KeyCode::Char('w'), KeyModifiers::CONTROL));
-        assert_eq!(k.code, KeyCode::Char('w'));
-        assert!(k.ctrl);
-        assert!(!k.shift);
-    }
+            pub fn default() -> serde_yml::Result<serde_yml::Value> {
+                serde_yml::to_value::<FileMap<$actid>>($default_map)
+            }
 
-    #[test]
-    fn non_alpha_shift_stripped_windows_style() {
-        let k = Key::from(key_event(KeyCode::Char('~'), KeyModifiers::SHIFT));
-        assert_eq!(k.code, KeyCode::Char('~'));
-        assert!(!k.shift, "shift should be stripped for non-alpha char");
-    }
+            // For re-export like files.rs does
+            pub(in super::super) fn get_docs() -> KeyDesc {
+                make_docs(km::get())
+            }
 
-    #[test]
-    fn non_alpha_shift_stripped_unix_style() {
-        let k = Key::from(key_event(KeyCode::Char('~'), KeyModifiers::NONE));
-        assert_eq!(k.code, KeyCode::Char('~'));
-        assert!(!k.shift);
-    }
+            static SUBMAP: std::sync::Mutex<
+                Option<(
+                    &'static str,
+                    &'static std::collections::HashMap<_Key, $actid>,
+                )>,
+            > = std::sync::Mutex::new(None);
 
-    #[test]
-    fn shift_digit_normalized() {
-        let k_win = Key::from(key_event(KeyCode::Char('!'), KeyModifiers::SHIFT));
-        let k_unix = Key::from(key_event(KeyCode::Char('!'), KeyModifiers::NONE));
-        assert_eq!(k_win, k_unix);
-        assert_eq!(k_win.code, KeyCode::Char('!'));
-        assert!(!k_win.shift);
-    }
+            // For re-export like app.rs does
+            pub(in super::super) fn get_submap_name() -> Option<&'static str> {
+                SUBMAP.lock().unwrap().map(|l| l.0)
+            }
 
-    #[test]
-    fn lowercase_alpha_stays_unshifted() {
-        let k = Key::from(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
-        assert_eq!(k.code, KeyCode::Char('a'));
-        assert!(!k.shift);
-    }
+            impl TryFrom<&_Key> for $actid {
+                type Error = ();
 
-    #[test]
-    fn backtab_shift_is_false() {
-        let k = Key::from(key_event(KeyCode::BackTab, KeyModifiers::SHIFT));
-        assert_eq!(k.code, KeyCode::BackTab);
-        assert!(!k.shift);
-    }
+                fn try_from(ev: &_Key) -> Result<Self, Self::Error> {
+                    let maybe_submap = &mut *SUBMAP.lock().unwrap();
+                    try_from(ev, km::get(), maybe_submap).ok_or(())
+                }
+            }
+        }
+    };
+}
 
-    #[test]
-    fn non_char_key_with_shift() {
-        let k = Key::from(key_event(KeyCode::Up, KeyModifiers::SHIFT));
-        assert_eq!(k.code, KeyCode::Up);
-        assert!(k.shift);
+pub fn load() -> anyhow::Result<()> {
+    let path = crate::config::keymap_path();
+
+    let mut value: serde_yml::Mapping = match std::fs::File::open(&path) {
+        Ok(file) => serde_yml::from_reader(file)?,
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "failed to open keymap file at {}: {e}",
+                path.display()
+            ));
+        }
+    };
+
+    macro_rules! quick_load {
+        ($rec:expr, files::$id:ident $(, $($rest:tt)*)?) => {
+            if files::$id::km::set(value.remove(concat!("files/", stringify!($id))).unwrap())
+                .context(concat!("failed to load keymap for files/", stringify!($id)))? {
+                $rec.push(concat!("files/", stringify!($id)))
+            }
+            quick_load!($rec $(, $($rest)*)?);
+        };
+        ($rec:expr, $id:ident $(, $($rest:tt)*)?) => {
+            if $id::km::set(value.remove(stringify!($id)).unwrap())
+                .context(concat!("failed to load keymap for ", stringify!($id)))? {
+                $rec.push(stringify!($id))
+            }
+            quick_load!($rec $(, $($rest)*)?);
+        };
+        ($rec: expr) => {}
     }
+    use super::{app, tab::*};
+    use anyhow::Context;
+
+    let mut has_duplicate = vec![];
+    quick_load!(
+        has_duplicate,
+        app,
+        connections,
+        proxies,
+        srvctl,
+        settings,
+        logs,
+        files::profile,
+        files::template
+    );
+
+    Ok(())
+}
+
+pub fn init() -> anyhow::Result<()> {
+    macro_rules! quick_default {
+        ($map:expr, files::$id:ident $(, $($rest:tt)*)?) => {
+            $map.insert(concat!("files/", stringify!($id)).into(), files::$id::km::default()?);
+            quick_default!($map $(, $($rest)*)?);
+        };
+        ($map:expr, $id:ident $(, $($rest:tt)*)?) => {
+            $map.insert(stringify!($id).into(), $id::km::default()?);
+            quick_default!($map $(, $($rest)*)?);
+        };
+        ($map: expr $(,)?) => {}
+    }
+    use super::{app, tab::*};
+
+    let mut map = serde_yml::Mapping::new();
+    quick_default!(
+        map,
+        app,
+        connections,
+        proxies,
+        srvctl,
+        settings,
+        logs,
+        files::profile,
+        files::template
+    );
+
+    let path = crate::config::keymap_path();
+    let file = std::fs::File::create(path)?;
+    serde_yml::to_writer(file, &map)?;
+    Ok(())
+}
+
+pub mod consts {
+    pub const MOVE_UP: &str = "Move Up";
+    pub const MOVE_DOWN: &str = "Move Down";
+    pub const GO_TOP: &str = "Go to top";
+    pub const GO_BOTTOM: &str = "Go to bottom";
+    pub const FILTER: &str = "Search/Filter";
+    pub const PAUSE: &str = "Pause/Resume";
 }
