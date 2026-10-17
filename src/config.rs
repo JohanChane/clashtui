@@ -313,6 +313,12 @@ fn singbox_dir() -> PathBuf {
 pub fn config_dir_path() -> PathBuf {
     DATA_DIR.get().unwrap().clone()
 }
+
+/// Like [`config_dir_path`], but returns `None` when the config has not been
+/// initialized yet. Safe to call from a panic hook.
+pub fn config_dir_opt() -> Option<PathBuf> {
+    DATA_DIR.get().cloned()
+}
 pub fn core_data_dir(core_type: CoreType) -> PathBuf {
     match core_type {
         CoreType::Mihomo => mihomo_dir(),

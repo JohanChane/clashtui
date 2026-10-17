@@ -38,9 +38,18 @@ fn main() {
 
     tui::init().unwrap();
 
-    tui::App::serve().unwrap();
+    // Never `unwrap` the TUI entry points below: a lost terminal (EIO) or any
+    // other I/O error must not panic the process. With `panic = "abort"` a
+    // panic here would abort and could leave the terminal unusable.
+    if let Err(e) = tui::App::serve() {
+        log::error!("TUI exited with error: {e}");
+    }
 
-    tui::restore().unwrap();
+    if let Err(e) = tui::restore() {
+        log::error!("Failed to restore terminal: {e}");
+    }
 
-    config::CONFIG.save().unwrap();
+    if let Err(e) = config::CONFIG.save() {
+        log::error!("Failed to save config: {e}");
+    }
 }

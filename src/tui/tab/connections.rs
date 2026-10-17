@@ -5,6 +5,14 @@ use ratatui::text::Line;
 use ratatui::widgets::{Cell, Row, Table};
 use std::collections::HashMap;
 
+/// Turn a background task join failure into an API error so the TUI can show
+/// it as an error state instead of panicking on `unwrap`.
+fn join_failed(e: tokio::task::JoinError) -> minreq::Error {
+    minreq::Error::IoError(std::io::Error::other(format!(
+        "background task failed: {e}"
+    )))
+}
+
 newtype_tab!(ConnectionsTab(Tab<Connections>));
 
 mod_agent!(
@@ -307,7 +315,7 @@ impl BasicTabContent for Connections {
             let info = tri!(
                 tokio::task::spawn_blocking(connection::get_connections)
                     .await
-                    .unwrap(),
+                    .unwrap_or_else(|e| Err(join_failed(e))),
                 or_set
             );
             wrapper(|content: &mut Self| {
@@ -332,7 +340,7 @@ impl BasicTabContent for Connections {
             let info = tri!(
                 tokio::task::spawn_blocking(connection::get_connections)
                     .await
-                    .unwrap(),
+                    .unwrap_or_else(|e| Err(join_failed(e))),
                 or_set
             );
             wrapper(|content: &mut Self| {
@@ -403,7 +411,7 @@ impl TabContent for Connections {
                         connection::get_connections()
                     })
                     .await
-                    .unwrap();
+                    .unwrap_or_else(|e| Err(join_failed(e)));
                     let info = tri!(result, or_cancel);
                     wrapper(move |content: &mut Connections| {
                         content.conns = info.connections.unwrap_or_default();
@@ -778,7 +786,7 @@ mod tests {
                         connection::get_connections()
                     })
                     .await
-                    .unwrap();
+                    .unwrap_or_else(|e| Err(join_failed(e)));
                     let info = tri!(result, or_cancel);
                     wrapper(move |content: &mut Connections| {
                         content.conns = info.connections.unwrap_or_default();

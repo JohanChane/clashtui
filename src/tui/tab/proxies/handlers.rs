@@ -42,9 +42,10 @@ impl Proxies {
         self.testing_since = Some(Instant::now());
         async move {
             tri!(
-                tokio::task::spawn_blocking(move || { proxies::select_proxy(&group, &node) })
-                    .await
-                    .unwrap(),
+                join_blocking(tokio::task::spawn_blocking(move || {
+                    proxies::select_proxy(&group, &node)
+                }))
+                .await,
                 or_cancel
             );
             let response = match tokio::time::timeout(
@@ -290,9 +291,7 @@ impl Proxies {
     pub fn refresh(&mut self, task_set: &mut FutureSet<Self>) {
         async {
             let response = tri!(
-                tokio::task::spawn_blocking(proxies::fetch_proxies)
-                    .await
-                    .unwrap(),
+                join_blocking(tokio::task::spawn_blocking(proxies::fetch_proxies)).await,
                 or_set
             );
             wrapper(move |content: &mut Self| {

@@ -106,11 +106,15 @@ impl App {
             }
 
             let _ = crate::tui::hold(true);
-            print!(
-                "File permissions in '{}' need repair. Fix now? [Y/n] ",
-                dir.display()
-            );
-            let _ = std::io::stdout().flush();
+            {
+                let mut out = std::io::stdout();
+                let _ = write!(
+                    out,
+                    "File permissions in '{}' need repair. Fix now? [Y/n] ",
+                    dir.display()
+                );
+                let _ = out.flush();
+            }
             let mut input = String::new();
             let _ = std::io::stdin().read_line(&mut input);
             let _ = crate::tui::hold(false);
@@ -125,10 +129,14 @@ impl App {
 
             if let Err(e) = crate::functions::command::repair_file_permissions(dir, &group) {
                 let _ = crate::tui::hold(true);
-                eprintln!("Error: {}", e);
+                {
+                    let mut err = std::io::stderr();
+                    let _ = writeln!(err, "Error: {e}");
+                    let mut out = std::io::stdout();
+                    let _ = write!(out, "Press Enter to continue...");
+                    let _ = out.flush();
+                }
                 use std::io::Read;
-                print!("Press Enter to continue...");
-                let _ = std::io::stdout().flush();
                 let _ = std::io::stdin().read(&mut [0u8]);
                 let _ = crate::tui::hold(false);
             }
@@ -142,8 +150,15 @@ impl App {
         let mut app = Self::new();
         let mut events = crossterm::event::EventStream::new();
         let mut invt = tokio::time::interval(TICK_RATE);
-        let mut terminal =
-            ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
+        // `Terminal`'s `Drop` impl calls `show_cursor()` and, when that fails,
+        // does `std::eprintln!("Failed to show the cursor: {err}")`. If the
+        // terminal is gone (EIO) that print panics, and with `panic = "abort"`
+        // it aborts the process. clashtui restores the terminal itself in
+        // `tui::restore()`, so keep the terminal alive until the process exits
+        // and never run this `Drop` impl.
+        let mut terminal = std::mem::ManuallyDrop::new(ratatui::Terminal::new(
+            ratatui::backend::CrosstermBackend::new(std::io::stdout()),
+        )?);
 
         app.check_startup_perms();
         while !QUIT.load(Ordering::Relaxed) {
