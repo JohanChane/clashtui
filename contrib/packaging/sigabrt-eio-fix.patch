@@ -1,0 +1,587 @@
+From cf5c466a118fbc47750c9e5a25321bdaab71df1a Mon Sep 17 00:00:00 2001
+From: cc <cc@localhost>
+Date: Sat, 17 Oct 2026 12:20:32 +0800
+Subject: [PATCH] fix: don't abort on lost terminal (EIO) while running TUI
+
+The panic hook restored the terminal and then called the default hook,
+which uses eprintln!. When the terminal returned EIO, that eprintln!
+panicked again and, with panic = "abort", aborted the process. The
+original panic location was lost and the only message left in the core
+was "failed printing to stderr".
+
+- set_panic_hook now appends payload + location to clashtui.log with
+  OpenOptions append + writeln! on File, ignores write errors, and never
+  calls the default hook. No print macros remain in the hook.
+- main no longer unwraps the TUI entry points (serve/restore/save); an
+  EIO is logged and the process exits cleanly.
+- Ratatui's Terminal::drop prints "Failed to show the cursor" via
+  eprintln! on error; keep the terminal alive with ManuallyDrop so that
+  path is never reached (tui::restore already restores the terminal).
+- app.rs startup prompts use write!/writeln! with ignored errors instead
+  of print!/eprintln!.
+- Replace spawn_blocking(..).await.unwrap() in the tabs with a
+  join_blocking helper that turns JoinError into a TUI error state, so an
+  unreachable core keeps retrying instead of panicking/aborting.
+
+Reproduced on the reproduced EIO setup: before, SIGABRT with the hook's
+own second panic; after, no core, exit 0, log shows only the WebSocket
+reconnect warning and "TUI exited with error: Input/output error".
+---
+ src/config.rs                   |  6 ++++
+ src/main.rs                     | 15 +++++++--
+ src/tui/app.rs                  | 35 +++++++++++++++------
+ src/tui/tab/connections.rs      | 16 +++++++---
+ src/tui/tab/logs.rs             |  4 +--
+ src/tui/tab/proxies/content.rs  | 13 +++-----
+ src/tui/tab/proxies/handlers.rs | 11 +++----
+ src/tui/tab/settings.rs         | 56 +++++++++++++++------------------
+ src/tui/tab/status.rs           | 26 +++++----------
+ src/tui/utils.rs                | 47 +++++++++++++++++++++++++--
+ src/tui/widget/tab.rs           | 46 +++++++++++++++++++++++++++
+ 11 files changed, 191 insertions(+), 84 deletions(-)
+
+diff --git a/src/config.rs b/src/config.rs
+index 169930c..97b3c75 100644
+--- a/src/config.rs
++++ b/src/config.rs
+@@ -313,6 +313,12 @@ fn singbox_dir() -> PathBuf {
+ pub fn config_dir_path() -> PathBuf {
+     DATA_DIR.get().unwrap().clone()
+ }
++
++/// Like [`config_dir_path`], but returns `None` when the config has not been
++/// initialized yet. Safe to call from a panic hook.
++pub fn config_dir_opt() -> Option<PathBuf> {
++    DATA_DIR.get().cloned()
++}
+ pub fn config_root_path() -> PathBuf {
+     CONFIG_ROOT.get().unwrap().clone()
+ }
+diff --git a/src/main.rs b/src/main.rs
+index e144e9d..f7c6c69 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -38,9 +38,18 @@ fn main() {
+ 
+     tui::init().unwrap();
+ 
+-    tui::App::serve().unwrap();
++    // Never `unwrap` the TUI entry points below: a lost terminal (EIO) or any
++    // other I/O error must not panic the process. With `panic = "abort"` a
++    // panic here would abort and could leave the terminal unusable.
++    if let Err(e) = tui::App::serve() {
++        log::error!("TUI exited with error: {e}");
++    }
+ 
+-    tui::restore().unwrap();
++    if let Err(e) = tui::restore() {
++        log::error!("Failed to restore terminal: {e}");
++    }
+ 
+-    config::CONFIG.save().unwrap();
++    if let Err(e) = config::CONFIG.save() {
++        log::error!("Failed to save config: {e}");
++    }
+ }
+diff --git a/src/tui/app.rs b/src/tui/app.rs
+index c4d8e4f..2f225e1 100644
+--- a/src/tui/app.rs
++++ b/src/tui/app.rs
+@@ -104,11 +104,15 @@ impl App {
+             }
+ 
+             let _ = crate::tui::hold(true);
+-            print!(
+-                "File permissions in '{}' need repair. Fix now? [Y/n] ",
+-                dir.display()
+-            );
+-            let _ = std::io::stdout().flush();
++            {
++                let mut out = std::io::stdout();
++                let _ = write!(
++                    out,
++                    "File permissions in '{}' need repair. Fix now? [Y/n] ",
++                    dir.display()
++                );
++                let _ = out.flush();
++            }
+             let mut input = String::new();
+             let _ = std::io::stdin().read_line(&mut input);
+             let _ = crate::tui::hold(false);
+@@ -123,10 +127,14 @@ impl App {
+ 
+             if let Err(e) = crate::functions::command::repair_file_permissions(dir, &group) {
+                 let _ = crate::tui::hold(true);
+-                eprintln!("Error: {}", e);
++                {
++                    let mut err = std::io::stderr();
++                    let _ = writeln!(err, "Error: {e}");
++                    let mut out = std::io::stdout();
++                    let _ = write!(out, "Press Enter to continue...");
++                    let _ = out.flush();
++                }
+                 use std::io::Read;
+-                print!("Press Enter to continue...");
+-                let _ = std::io::stdout().flush();
+                 let _ = std::io::stdin().read(&mut [0u8]);
+                 let _ = crate::tui::hold(false);
+             }
+@@ -140,8 +148,15 @@ impl App {
+         let mut app = Self::new();
+         let mut events = crossterm::event::EventStream::new();
+         let mut invt = tokio::time::interval(TICK_RATE);
+-        let mut terminal =
+-            ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
++        // `Terminal`'s `Drop` impl calls `show_cursor()` and, when that fails,
++        // does `std::eprintln!("Failed to show the cursor: {err}")`. If the
++        // terminal is gone (EIO) that print panics, and with `panic = "abort"`
++        // it aborts the process. clashtui restores the terminal itself in
++        // `tui::restore()`, so keep the terminal alive until the process exits
++        // and never run this `Drop` impl.
++        let mut terminal = std::mem::ManuallyDrop::new(ratatui::Terminal::new(
++            ratatui::backend::CrosstermBackend::new(std::io::stdout()),
++        )?);
+ 
+         app.check_startup_perms();
+         while !QUIT.load(Ordering::Relaxed) {
+diff --git a/src/tui/tab/connections.rs b/src/tui/tab/connections.rs
+index d3b11d3..b98ce49 100644
+--- a/src/tui/tab/connections.rs
++++ b/src/tui/tab/connections.rs
+@@ -5,6 +5,14 @@ use ratatui::text::Line;
+ use ratatui::widgets::{Cell, Row, Table};
+ use std::collections::HashMap;
+ 
++/// Turn a background task join failure into an API error so the TUI can show
++/// it as an error state instead of panicking on `unwrap`.
++fn join_failed(e: tokio::task::JoinError) -> minreq::Error {
++    minreq::Error::IoError(std::io::Error::other(format!(
++        "background task failed: {e}"
++    )))
++}
++
+ newtype_tab!(ConnectionsTab(Tab<Connections>));
+ 
+ mod_agent!(
+@@ -307,7 +315,7 @@ impl BasicTabContent for Connections {
+             let info = tri!(
+                 tokio::task::spawn_blocking(connection::get_connections)
+                     .await
+-                    .unwrap(),
++                    .unwrap_or_else(|e| Err(join_failed(e))),
+                 or_set
+             );
+             wrapper(|content: &mut Self| {
+@@ -332,7 +340,7 @@ impl BasicTabContent for Connections {
+             let info = tri!(
+                 tokio::task::spawn_blocking(connection::get_connections)
+                     .await
+-                    .unwrap(),
++                    .unwrap_or_else(|e| Err(join_failed(e))),
+                 or_set
+             );
+             wrapper(|content: &mut Self| {
+@@ -403,7 +411,7 @@ impl TabContent for Connections {
+                         connection::get_connections()
+                     })
+                     .await
+-                    .unwrap();
++                    .unwrap_or_else(|e| Err(join_failed(e)));
+                     let info = tri!(result, or_cancel);
+                     wrapper(move |content: &mut Connections| {
+                         content.conns = info.connections.unwrap_or_default();
+@@ -780,7 +788,7 @@ mod tests {
+                         connection::get_connections()
+                     })
+                     .await
+-                    .unwrap();
++                    .unwrap_or_else(|e| Err(join_failed(e)));
+                     let info = tri!(result, or_cancel);
+                     wrapper(move |content: &mut Connections| {
+                         content.conns = info.connections.unwrap_or_default();
+diff --git a/src/tui/tab/logs.rs b/src/tui/tab/logs.rs
+index 86fbfe9..c74dd05 100644
+--- a/src/tui/tab/logs.rs
++++ b/src/tui/tab/logs.rs
+@@ -270,7 +270,7 @@ impl BasicTabContent for Logs {
+         // Refresh log level from core on every re-entry
+         async {
+             let cfg = tri!(
+-                tokio::task::spawn_blocking(config::fetch).await.unwrap(),
++                join_blocking(tokio::task::spawn_blocking(config::fetch)).await,
+                 or_set
+             );
+             wrapper(move |content: &mut Self| {
+@@ -331,7 +331,7 @@ impl TabContent for Logs {
+         // Fetch initial log level
+         async {
+             let cfg = tri!(
+-                tokio::task::spawn_blocking(config::fetch).await.unwrap(),
++                join_blocking(tokio::task::spawn_blocking(config::fetch)).await,
+                 or_set
+             );
+             wrapper(move |content: &mut Self| {
+diff --git a/src/tui/tab/proxies/content.rs b/src/tui/tab/proxies/content.rs
+index 5a9d4c4..9b1961e 100644
+--- a/src/tui/tab/proxies/content.rs
++++ b/src/tui/tab/proxies/content.rs
+@@ -332,9 +332,7 @@ impl BasicTabContent for Proxies {
+         async {
+             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+             let response = tri!(
+-                tokio::task::spawn_blocking(proxies::fetch_proxies)
+-                    .await
+-                    .unwrap(),
++                join_blocking(tokio::task::spawn_blocking(proxies::fetch_proxies)).await,
+                 or_set
+             );
+             wrapper(|content: &mut Self| {
+@@ -355,11 +353,10 @@ impl BasicTabContent for Proxies {
+             return;
+         }
+         async {
+-            let response = tri!(
+-                tokio::task::spawn_blocking(proxies::fetch_proxies)
+-                    .await
+-                    .unwrap()
+-            );
++            let response = tri!(join_blocking(tokio::task::spawn_blocking(
++                proxies::fetch_proxies
++            ))
++            .await);
+             wrapper(|content: &mut Self| {
+                 content.proxies = response.proxies.clone();
+                 content.tree = ProxyTree::build(response);
+diff --git a/src/tui/tab/proxies/handlers.rs b/src/tui/tab/proxies/handlers.rs
+index 936b116..b54b45f 100644
+--- a/src/tui/tab/proxies/handlers.rs
++++ b/src/tui/tab/proxies/handlers.rs
+@@ -42,9 +42,10 @@ impl Proxies {
+         self.testing_since = Some(Instant::now());
+         async move {
+             let _ = tri!(
+-                tokio::task::spawn_blocking(move || { proxies::select_proxy(&group, &node) })
+-                    .await
+-                    .unwrap(),
++                join_blocking(tokio::task::spawn_blocking(move || {
++                    proxies::select_proxy(&group, &node)
++                }))
++                .await,
+                 or_cancel
+             );
+             let response = match tokio::time::timeout(
+@@ -291,9 +292,7 @@ impl Proxies {
+     pub fn refresh(&mut self, task_set: &mut FutureSet<Self>) {
+         async {
+             let response = tri!(
+-                tokio::task::spawn_blocking(proxies::fetch_proxies)
+-                    .await
+-                    .unwrap(),
++                join_blocking(tokio::task::spawn_blocking(proxies::fetch_proxies)).await,
+                 or_set
+             );
+             wrapper(move |content: &mut Self| {
+diff --git a/src/tui/tab/settings.rs b/src/tui/tab/settings.rs
+index f148ea6..343d0ac 100644
+--- a/src/tui/tab/settings.rs
++++ b/src/tui/tab/settings.rs
+@@ -130,9 +130,10 @@ impl TabContent for SettingsContent {
+         }
+ 
+         async move {
+-            let result = tokio::task::spawn_blocking(|| crate::functions::restful::config::fetch())
+-                .await
+-                .unwrap();
++            let result = join_blocking(tokio::task::spawn_blocking(|| {
++                crate::functions::restful::config::fetch()
++            }))
++            .await;
+             match result {
+                 Ok(config) => {
+                     let mode = config.mode.to_string();
+@@ -190,11 +191,10 @@ impl TabContent for SettingsContent {
+                                 return do_nothing();
+                             }
+                             let payload = serde_json::json!({"mode": mode.to_string()}).to_string();
+-                            let result = tokio::task::spawn_blocking(move || {
++                            let result = join_blocking(tokio::task::spawn_blocking(move || {
+                                 crate::functions::restful::config::patch(payload)
+-                            })
+-                            .await
+-                            .unwrap();
++                            }))
++                            .await;
+                             match result {
+                                 Ok(_) => {
+                                     let new_val = mode.to_string();
+@@ -241,11 +241,10 @@ impl TabContent for SettingsContent {
+                             }
+                             let payload = serde_json::json!({"tun": {"stack": stack.to_string()}})
+                                 .to_string();
+-                            let result = tokio::task::spawn_blocking(move || {
++                            let result = join_blocking(tokio::task::spawn_blocking(move || {
+                                 crate::functions::restful::config::patch(payload)
+-                            })
+-                            .await
+-                            .unwrap();
++                            }))
++                            .await;
+                             match result {
+                                 Ok(_) => {
+                                     let new_val = stack.to_string();
+@@ -292,11 +291,10 @@ impl TabContent for SettingsContent {
+                                 return do_nothing();
+                             }
+                             let payload = serde_json::json!({"allow-lan": new_val}).to_string();
+-                            let result = tokio::task::spawn_blocking(move || {
++                            let result = join_blocking(tokio::task::spawn_blocking(move || {
+                                 crate::functions::restful::config::patch(payload)
+-                            })
+-                            .await
+-                            .unwrap();
++                            }))
++                            .await;
+                             match result {
+                                 Ok(_) => wrapper(move |c: &mut SettingsContent| {
+                                     c.allow_lan = new_val;
+@@ -320,11 +318,10 @@ impl TabContent for SettingsContent {
+                             }
+                             let payload =
+                                 serde_json::json!({"tun": {"enable": new_val}}).to_string();
+-                            let result = tokio::task::spawn_blocking(move || {
++                            let result = join_blocking(tokio::task::spawn_blocking(move || {
+                                 crate::functions::restful::config::patch(payload)
+-                            })
+-                            .await
+-                            .unwrap();
++                            }))
++                            .await;
+                             match result {
+                                 Ok(_) => wrapper(move |c: &mut SettingsContent| {
+                                     c.tun_enable = new_val;
+@@ -347,11 +344,10 @@ impl TabContent for SettingsContent {
+                             if crate::config::is_core_mismatch() {
+                                 return do_nothing();
+                             }
+-                            let result = tokio::task::spawn_blocking(|| {
++                            let result = join_blocking(tokio::task::spawn_blocking(|| {
+                                 crate::functions::restful::cache::flush_fakeip()
+-                            })
+-                            .await
+-                            .unwrap();
++                            }))
++                            .await;
+                             match result {
+                                 Ok(_) => do_nothing(),
+                                 Err(e) => {
+@@ -367,11 +363,10 @@ impl TabContent for SettingsContent {
+                             if crate::config::is_core_mismatch() {
+                                 return do_nothing();
+                             }
+-                            let result = tokio::task::spawn_blocking(|| {
++                            let result = join_blocking(tokio::task::spawn_blocking(|| {
+                                 crate::functions::restful::cache::flush_dns()
+-                            })
+-                            .await
+-                            .unwrap();
++                            }))
++                            .await;
+                             match result {
+                                 Ok(_) => do_nothing(),
+                                 Err(e) => {
+@@ -387,11 +382,10 @@ impl TabContent for SettingsContent {
+                             if crate::config::is_core_mismatch() {
+                                 return do_nothing();
+                             }
+-                            let result = tokio::task::spawn_blocking(|| {
++                            let result = join_blocking(tokio::task::spawn_blocking(|| {
+                                 crate::functions::restful::geo::upgrade_geo()
+-                            })
+-                            .await
+-                            .unwrap();
++                            }))
++                            .await;
+                             match result {
+                                 Ok(_) => do_nothing(),
+                                 Err(e) => {
+diff --git a/src/tui/tab/status.rs b/src/tui/tab/status.rs
+index b3502e6..aac3832 100644
+--- a/src/tui/tab/status.rs
++++ b/src/tui/tab/status.rs
+@@ -65,21 +65,16 @@ impl BasicTabContent for Status {
+             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+ 
+             let version = tri!(
+-                tokio::task::spawn_blocking(restful::control::version)
+-                    .await
+-                    .unwrap(),
++                join_blocking(tokio::task::spawn_blocking(restful::control::version)).await,
+                 or_set
+             );
+             let config = tri!(
+-                tokio::task::spawn_blocking(restful::config::fetch)
+-                    .await
+-                    .unwrap(),
++                join_blocking(tokio::task::spawn_blocking(restful::config::fetch)).await,
+                 or_set
+             );
+             let detected = tri!(
+-                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
+-                    .await
+-                    .unwrap(),
++                join_blocking(tokio::task::spawn_blocking(restful::core_detect::detect_core_type))
++                    .await,
+                 or_set
+             );
+ 
+@@ -119,21 +114,16 @@ impl BasicTabContent for Status {
+ 
+         async {
+             let detected = tri!(
+-                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
+-                    .await
+-                    .unwrap(),
++                join_blocking(tokio::task::spawn_blocking(restful::core_detect::detect_core_type))
++                    .await,
+                 or_set
+             );
+             let version = tri!(
+-                tokio::task::spawn_blocking(restful::control::version)
+-                    .await
+-                    .unwrap(),
++                join_blocking(tokio::task::spawn_blocking(restful::control::version)).await,
+                 or_set
+             );
+             let config = tri!(
+-                tokio::task::spawn_blocking(restful::config::fetch)
+-                    .await
+-                    .unwrap(),
++                join_blocking(tokio::task::spawn_blocking(restful::config::fetch)).await,
+                 or_set
+             );
+ 
+diff --git a/src/tui/utils.rs b/src/tui/utils.rs
+index d716168..c62e296 100644
+--- a/src/tui/utils.rs
++++ b/src/tui/utils.rs
+@@ -23,11 +23,54 @@ pub mod raw_mode {
+     }
+ 
+     /// make terminal restorable after panic
++    ///
++    /// The hook must never write to stdout/stderr. When the terminal is gone
++    /// (e.g. its pty returns `EIO`), a failed `println!`/`eprintln!` inside the
++    /// hook would panic again, and with `panic = "abort"` that aborts the
++    /// process and loses the original panic location. Instead the payload and
++    /// location are appended to `clashtui.log` with the same file the logger
++    /// writes to. Any failure while logging the panic is ignored.
+     pub fn set_panic_hook() {
+-        let original_hook = std::panic::take_hook();
+         std::panic::set_hook(Box::new(move |panic| {
+             let _ = restore();
+-            original_hook(panic);
++            log_panic(panic);
+         }));
+     }
++
++    /// Append the panic payload and location to `config_dir/clashtui.log`.
++    ///
++    /// Deliberately uses `writeln!` on a `File` (which never panics on write
++    /// errors) instead of a print macro.
++    fn log_panic(panic: &std::panic::PanicHookInfo<'_>) {
++        use std::io::Write;
++
++        let Some(dir) = crate::config::config_dir_opt() else {
++            return;
++        };
++        let path = dir.join("clashtui.log");
++        let Ok(mut file) = std::fs::OpenOptions::new()
++            .create(true)
++            .append(true)
++            .open(&path)
++        else {
++            return;
++        };
++
++        let payload = panic.payload();
++        let msg = if let Some(s) = payload.downcast_ref::<&str>() {
++            (*s).to_owned()
++        } else if let Some(s) = payload.downcast_ref::<String>() {
++            s.clone()
++        } else {
++            "non-string panic payload".to_owned()
++        };
++        // Keep the panic on a single line so it is easy to grep.
++        let msg = msg.replace(['\n', '\r'], " ");
++        let location = panic
++            .location()
++            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
++            .unwrap_or_else(|| "<unknown>".to_owned());
++
++        let _ = writeln!(file, "PANIC {location}: {msg}");
++    }
+ }
+diff --git a/src/tui/widget/tab.rs b/src/tui/widget/tab.rs
+index 154c568..5593075 100644
+--- a/src/tui/widget/tab.rs
++++ b/src/tui/widget/tab.rs
+@@ -156,6 +156,24 @@ pub fn do_nothing<C>() -> CallBack<C> {
+     wrapper(|_| ())
+ }
+ 
++/// Await a blocking task, turning a [`tokio::task::JoinError`] into a
++/// displayable error instead of panicking.
++///
++/// Used in place of `spawn_blocking(..).await.unwrap()` so that a cancelled or
++/// panicked background task (for example while the core API is unreachable)
++/// surfaces as a TUI error state and the app keeps retrying, rather than
++/// unwrapping and aborting the process.
++pub async fn join_blocking<T, E>(handle: tokio::task::JoinHandle<Result<T, E>>) -> Result<T, String>
++where
++    E: std::fmt::Display,
++{
++    match handle.await {
++        Ok(Ok(value)) => Ok(value),
++        Ok(Err(e)) => Err(e.to_string()),
++        Err(e) => Err(format!("background task failed: {e}")),
++    }
++}
++
+ pub trait FutureSetExt<C>: Future<Output = CallBack<C>>
+ where
+     Self: Sized + Send + 'static,
+@@ -171,3 +189,31 @@ where
+     C: 'static,
+ {
+ }
++
++#[cfg(test)]
++mod tests {
++    use super::join_blocking;
++
++    #[tokio::test]
++    async fn join_blocking_passes_through_ok() {
++        let handle = tokio::spawn(async { Ok::<u8, &'static str>(7) });
++        assert_eq!(join_blocking(handle).await.unwrap(), 7);
++    }
++
++    #[tokio::test]
++    async fn join_blocking_passes_through_err() {
++        let handle = tokio::spawn(async { Err::<u8, &'static str>("nope") });
++        assert_eq!(join_blocking(handle).await.unwrap_err(), "nope");
++    }
++
++    #[tokio::test]
++    async fn join_blocking_surfaces_join_error_instead_of_panicking() {
++        let handle = tokio::spawn(async {
++            std::future::pending::<()>().await;
++            Ok::<u8, &'static str>(1)
++        });
++        handle.abort();
++        let err = join_blocking(handle).await.unwrap_err();
++        assert!(err.contains("background task failed"));
++    }
++}
+-- 
+2.55.0
+
