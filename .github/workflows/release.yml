@@ -1,0 +1,155 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (e.g. v0.3.2)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+      sha: ${{ steps.tag.outputs.sha }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve existing tag
+        id: tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          git check-ref-format "refs/tags/$RELEASE_TAG"
+          SHA=$(git rev-parse --verify "refs/tags/$RELEASE_TAG^{commit}")
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.tag.outputs.sha }}
+
+      - name: Check release version
+        id: version
+        env:
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+        shell: python
+        run: |
+          import os
+          import re
+          import tomllib
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          match = re.fullmatch(r"v([0-9]+\.[0-9]+\.[0-9]+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?", tag)
+          if not match:
+              raise SystemExit(f"Invalid release tag: {tag}")
+          version = tomllib.loads(Path("Cargo.toml").read_text())["package"]["version"]
+          # Verify Cargo.toml base version matches the tag base version
+          if version.split("-", 1)[0].split("+", 1)[0] != match[1]:
+              raise SystemExit(f"Cargo.toml version {version} does not match {tag}")
+          # Detect prerelease: version (without 'v' prefix) contains '-'
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"prerelease={str(match[2] is not None).lower()}\n")
+
+  build:
+    name: Check and build release
+    needs: prepare
+    uses: ./.github/workflows/ci.yml
+    with:
+      source-ref: ${{ needs.prepare.outputs.sha }}
+      release: true
+
+  publish:
+    name: Publish release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v6
+        with:
+          pattern: "*_Build"
+          merge-multiple: true
+          path: ./artifacts
+
+      - name: Generate release body
+        env:
+          REPO: ${{ github.repository }}
+        shell: python
+        run: |
+          import os
+          import re
+          from pathlib import Path
+
+          tag = os.environ["RELEASE_TAG"]
+          version = tag.removeprefix("v")
+          heading = next((line.removeprefix("## ") for line in
+                          Path("CHANGELOG.md").read_text().splitlines()
+                          if line.startswith(f"## [{version}] ")), None)
+          url = f"https://github.com/{os.environ['REPO']}/blob/{tag}/CHANGELOG.md"
+          if heading:
+              anchor = re.sub(r"[\[\].,;:!?()/]", "", heading.lower()).replace(" ", "-")
+              body = f"Please see [CHANGELOG-{tag}]({url}#{anchor})\n"
+          else:
+              body = f"Please see [CHANGELOG.md]({url})\n"
+          Path("release.txt").write_text(body)
+
+      - name: Archive release assets
+        run: |
+          gzip -c ./artifacts/clashtui-amd64 \
+            > "clashtui-linux-amd64-${RELEASE_TAG}.gz"
+          gzip -c ./artifacts/clashtui-arm64 \
+            > "clashtui-linux-arm64-${RELEASE_TAG}.gz"
+          gzip -c ./artifacts/clashtui-darwin-amd64 \
+            > "clashtui-darwin-amd64-${RELEASE_TAG}.gz"
+          gzip -c ./artifacts/clashtui-darwin-arm64 \
+            > "clashtui-darwin-arm64-${RELEASE_TAG}.gz"
+          zip -j "clashtui-windows-amd64-${RELEASE_TAG}.zip" \
+            ./artifacts/clashtui-windows-amd64.exe
+          zip -j "clashtui-windows-arm64-${RELEASE_TAG}.zip" \
+            ./artifacts/clashtui-windows-arm64.exe
+
+      - name: Verify tag still points to the checked commit
+        env:
+          RELEASE_SHA: ${{ needs.prepare.outputs.sha }}
+        run: |
+          git fetch --force origin "refs/tags/$RELEASE_TAG:refs/tags/$RELEASE_TAG"
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$RELEASE_SHA"
+
+      - name: Upload release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
+          body_path: release.txt
+          fail_on_unmatched_files: true
+          files: |
+            clashtui-linux-amd64-${{ env.RELEASE_TAG }}.gz
+            clashtui-linux-arm64-${{ env.RELEASE_TAG }}.gz
+            clashtui-darwin-amd64-${{ env.RELEASE_TAG }}.gz
+            clashtui-darwin-arm64-${{ env.RELEASE_TAG }}.gz
+            clashtui-windows-amd64-${{ env.RELEASE_TAG }}.zip
+            clashtui-windows-arm64-${{ env.RELEASE_TAG }}.zip
