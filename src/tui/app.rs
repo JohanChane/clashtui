@@ -33,14 +33,15 @@ pub(in crate::tui) mod km {
     pub use km::default;
     pub(super) use km::get_submap_name;
 
-    pub fn set(mut map: serde_yml::Value) -> anyhow::Result<bool> {
+    pub fn set(mut map: serde_yml::Value) -> anyhow::Result<()> {
+        use anyhow::Context;
         let mmap = map
             .as_mapping_mut()
-            .unwrap()
+            .context("app keymap must be a mapping")?
             .entry("common".into())
             .or_insert(serde_yml::Value::Mapping(Default::default()))
             .as_mapping_mut()
-            .unwrap();
+            .context("app.common must be a mapping")?;
         (2..=7u8)
             .map(|num| (KeyCode::Char((b'0' + num) as char), AppKey::Tab(num)))
             .chain(APP_KEYS)
@@ -56,7 +57,7 @@ pub(in crate::tui) mod km {
         km::get_docs()
             .into_iter()
             .filter(|(_, b)| *b != TAB_NUM)
-            .chain(std::iter::once(("1~7".to_string(), TAB_NUM)))
+            .chain(std::iter::once(("1~7".to_string(), TAB_NUM.to_string())))
             .collect()
     }
 

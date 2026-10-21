@@ -146,7 +146,7 @@ fn render_shortcut_section(
                     Span::raw(" "),
                     Span::styled(key_str, Style::new().dim()),
                     Span::raw("  "),
-                    Span::styled(*desc, accent),
+                    Span::styled(desc.as_str(), accent),
                 ])
             })
             .collect();

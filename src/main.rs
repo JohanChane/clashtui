@@ -51,7 +51,7 @@ fn main() {
         .init();
 
     if let Err(e) = tui::init() {
-        eprintln!("Failed to initiate TUI due to {e}");
+        eprintln!("Failed to initiate TUI due to {e:#}");
         eprintln!("Exiting");
         return;
     };

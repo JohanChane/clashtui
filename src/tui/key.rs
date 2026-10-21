@@ -1,7 +1,13 @@
 use crossterm::event::{KeyCode, KeyEvent as _KeyEvent, KeyModifiers};
 
-pub type KeyDesc = Vec<(String, &'static str)>;
-pub type KeyDescRef<'a> = &'a [(String, &'a str)];
+pub(super) mod config;
+mod notation;
+
+#[cfg(test)]
+mod tests;
+
+pub type KeyDesc = Vec<(String, String)>;
+pub type KeyDescRef<'a> = &'a [(String, String)];
 pub type KeyMap<A> = std::collections::HashMap<Key, MaybeMap<A>>;
 
 pub trait Document {
@@ -33,10 +39,9 @@ impl Key {
         let c = match self.code {
             KeyCode::Char(c) => c,
             KeyCode::BackTab => {
-                return Self {
-                    code: KeyCode::Tab,
-                    modifiers: KeyModifiers::SHIFT,
-                };
+                self.code = KeyCode::Tab;
+                self.modifiers.insert(KeyModifiers::SHIFT);
+                return self;
             }
             _ => return self,
         };
@@ -46,6 +51,11 @@ impl Key {
         } else if self.modifiers.contains(KeyModifiers::SHIFT) {
             // SHIFT + 小写字母 → 转为大写字母
             self.code = KeyCode::Char(c.to_ascii_uppercase())
+        }
+        // Character events already contain shifted punctuation on both platforms.
+        // Windows may additionally report SHIFT; Unix terminals usually do not.
+        if matches!(self.code, KeyCode::Char(c) if !c.is_ascii_uppercase()) {
+            self.modifiers.remove(KeyModifiers::SHIFT);
         }
         self
     }
@@ -59,26 +69,6 @@ impl Key {
     // pub fn with_modifiers(code: KeyCode, modifiers: KeyModifiers) -> Self {
     //     Self { code, modifiers }
     // }
-}
-
-impl std::fmt::Display for Key {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut prefix = String::new();
-        if self.modifiers.contains(KeyModifiers::ALT) {
-            prefix.push('A');
-        }
-        if self.modifiers.contains(KeyModifiers::CONTROL) {
-            prefix.push('C');
-        }
-        if self.modifiers.contains(KeyModifiers::SHIFT) {
-            prefix.push('S');
-        }
-        if prefix.is_empty() {
-            write!(f, "{}", self.code)
-        } else {
-            write!(f, "{prefix}-{}", self.code)
-        }
-    }
 }
 
 impl From<_KeyEvent> for Key {
@@ -98,36 +88,7 @@ impl From<KeyCode> for Key {
 }
 
 pub mod instancing {
-    use super::{Document, Key, KeyDesc, KeyMap, MaybeMap};
-
-    /// Generate `[(key, description 'about the key's action')]` at runtime
-    pub fn make_docs<A: Document>(keymap: &KeyMap<A>) -> KeyDesc {
-        use crate::tui::key::MaybeMap;
-        let mut iter = keymap.iter();
-        let mut inner_iter: Option<(Key, std::collections::hash_map::Iter<'_, Key, A>)> = None;
-        std::iter::from_fn(|| {
-            if let Some((key, inner_iter)) = inner_iter.as_mut()
-                && let Some((key2, act)) = inner_iter.by_ref().next()
-            {
-                return Some((format!("{key}+{key2}"), act.get_doc()));
-            }
-            for (key, maybe_submap) in iter.by_ref() {
-                match maybe_submap {
-                    MaybeMap::SubMap { name: _, inner } => {
-                        inner_iter = Some((*key, inner.iter()));
-                        if let Some((key2, act)) = inner_iter.as_mut().unwrap().1.by_ref().next() {
-                            return Some((format!("{key}+{key2}"), act.get_doc()));
-                        }
-                    }
-                    MaybeMap::Action(act) => {
-                        return Some((key.to_string(), act.get_doc()));
-                    }
-                };
-            }
-            None
-        })
-        .collect()
-    }
+    use super::{Key, KeyMap, MaybeMap};
 
     /// Try to match an `A` by lookup in `submap` or `keymap`
     pub fn try_from<'a, A: Eq + Copy>(
@@ -150,15 +111,19 @@ pub mod instancing {
     }
 
     pub mod files {
-        use super::{Key, KeyMap, MaybeMap};
-        use std::collections::{HashMap, HashSet};
+        use super::Key;
+        use crate::tui::key::config::Binding;
+        use std::collections::HashMap;
         use std::hash::Hash;
 
         #[derive(serde::Deserialize, serde::Serialize)]
+        #[serde(bound(deserialize = "A: Eq + Hash + serde::Deserialize<'de>"))]
         pub struct FileMap<A: Eq + Hash> {
             // #[serde(flatten)]
+            #[serde(default)]
             common: HashMap<A, Vec<Key>>,
             // #[serde(flatten)]
+            #[serde(default)]
             submap: HashMap<String, SubMap<A>>,
         }
         impl<A: Eq + Hash> FileMap<A> {
@@ -203,54 +168,33 @@ pub mod instancing {
             inner: HashMap<A, Vec<Key>>,
         }
 
-        /// If there is duplicate (e.g. 's' => Search/Import), return true
-        pub fn check_duplicate<A: Eq + Hash>(map: &FileMap<A>) -> bool {
-            let mut set = HashSet::new();
-            let no_duplicate = map
-                .common
-                .values()
-                .flat_map(|keys| keys.iter())
-                .chain(map.submap.values().map(|submap| &submap.key))
-                .all(|key| set.insert(key));
-            if !no_duplicate {
-                return true;
-            }
-            for submap in map.submap.values() {
-                let mut set = HashSet::new();
-                let no_duplicate = submap
-                    .inner
-                    .values()
-                    .flat_map(|keys| keys.iter())
-                    .all(|key| set.insert(key));
-                if !no_duplicate {
-                    return true;
+        impl<A: Eq + Hash + Copy> FileMap<A> {
+            pub fn into_bindings(self) -> Vec<Binding<A>> {
+                let mut bindings = Vec::new();
+                for (action, keys) in self.common {
+                    for key in keys {
+                        bindings.push(Binding {
+                            on: vec![key.normalize()],
+                            action: Some(action),
+                            desc: None,
+                            group: None,
+                        });
+                    }
                 }
+                for (name, submap) in self.submap {
+                    for (action, keys) in submap.inner {
+                        for key in keys {
+                            bindings.push(Binding {
+                                on: vec![submap.key.normalize(), key.normalize()],
+                                action: Some(action),
+                                desc: None,
+                                group: Some(name.clone()),
+                            });
+                        }
+                    }
+                }
+                bindings
             }
-            false
-        }
-
-        pub fn map_from_file<A: Eq + Hash + Copy>(map: FileMap<A>) -> KeyMap<A> {
-            let iter = map.common.into_iter().flat_map(|(act, keys)| {
-                keys.into_iter()
-                    .map(move |key| (key, MaybeMap::Action(act)))
-            });
-            map.submap
-                .into_iter()
-                .map(|(name, submap)| {
-                    (
-                        submap.key,
-                        MaybeMap::SubMap {
-                            name,
-                            inner: submap
-                                .inner
-                                .into_iter()
-                                .flat_map(|(act, keys)| keys.into_iter().map(move |key| (key, act)))
-                                .collect(),
-                        },
-                    )
-                })
-                .chain(iter)
-                .collect()
         }
     }
 }
@@ -262,7 +206,8 @@ pub mod instancing {
 ///
 /// File Format:
 ///
-/// `Act1: [Key1, Key2, ...]`
+/// Legacy format: `Act1: [Key1, Key2, ...]` inside common/submap.
+/// User entries: `[{on: "j", action: MoveDown, desc: "Move down"}, ...]`.
 macro_rules! key_map {
     ($actid:ident, $default_map:expr) => {
         pub(in crate::tui) mod km {
@@ -271,33 +216,38 @@ macro_rules! key_map {
                 Key as _Key, KeyDesc, KeyMap as _KeyMap,
                 instancing::{files::*, *},
             };
-            use anyhow::Context;
             use std::sync::OnceLock;
 
             type KeyMap = _KeyMap<$actid>;
 
-            pub(super) static KEYMAP: OnceLock<KeyMap> = OnceLock::new();
+            pub(super) static KEYMAP: OnceLock<(KeyMap, KeyDesc)> = OnceLock::new();
 
-            pub fn set(map: serde_yml::Value) -> anyhow::Result<bool> {
-                let map = serde_yml::from_value(map).context("Failed to parse keymap")?;
-                let is_duplicated = check_duplicate(&map);
-                if KEYMAP.set(map_from_file(map)).is_err() {
-                    unreachable!("keymap initiated twice");
+            pub fn set(map: serde_yml::Value) -> anyhow::Result<()> {
+                let configured = crate::tui::key::config::merge($default_map, map)?;
+                if KEYMAP.set(configured).is_err() {
+                    anyhow::bail!("keymap initiated twice");
                 }
-                Ok(is_duplicated)
+                Ok(())
+            }
+
+            #[cfg(test)]
+            pub fn validate_config(map: serde_yml::Value) -> anyhow::Result<()> {
+                crate::tui::key::config::merge::<$actid>($default_map, map).map(|_| ())
             }
 
             pub(super) fn get() -> &'static KeyMap {
-                KEYMAP.get().expect("try get keymap without init")
+                &KEYMAP.get().expect("try get keymap without init").0
             }
 
+            #[allow(dead_code)]
             pub fn default() -> serde_yml::Result<serde_yml::Value> {
                 serde_yml::to_value::<FileMap<$actid>>($default_map)
             }
 
             // For re-export like files.rs does
             pub(in super::super) fn get_docs() -> KeyDesc {
-                make_docs(km::get())
+                // Generate [(key, description about the key's action)] once at startup.
+                KEYMAP.get().expect("try get keymap without init").1.clone()
             }
 
             static SUBMAP: std::sync::Mutex<
@@ -326,32 +276,32 @@ macro_rules! key_map {
 
 pub fn load() -> anyhow::Result<()> {
     let path = crate::config::keymap_path();
-    let mut value = read_keymap(&path)?;
+    let core = match crate::config::CONFIG.core_type() {
+        crate::config::CoreType::Mihomo => "mihomo",
+        crate::config::CoreType::Singbox => "sing-box",
+    };
+    let mut value = config::sections(read_keymap(&path)?, core)?;
 
     macro_rules! quick_load {
-        ($rec:expr, files::$id:ident $(, $($rest:tt)*)?) => {
-            if files::$id::km::set(value.remove(concat!("files/", stringify!($id))).unwrap())
-                .context(concat!("failed to load keymap for files/", stringify!($id)))? {
-                $rec.push(concat!("files/", stringify!($id)))
-            }
-            quick_load!($rec $(, $($rest)*)?);
+        (files::$id:ident $(, $($rest:tt)*)?) => {
+            files::$id::km::set(value.remove(concat!("files/", stringify!($id))).unwrap_or_default())
+                .context(concat!("failed to load keymap for files/", stringify!($id)))?;
+            quick_load!($($($rest)*)?);
         };
-        ($rec:expr, $id:ident $(, $($rest:tt)*)?) => {
-            if $id::km::set(value.remove(stringify!($id)).unwrap())
-                .context(concat!("failed to load keymap for ", stringify!($id)))? {
-                $rec.push(stringify!($id))
-            }
-            quick_load!($rec $(, $($rest)*)?);
+        ($id:ident $(, $($rest:tt)*)?) => {
+            $id::km::set(value.remove(stringify!($id)).unwrap_or_default())
+                .context(concat!("failed to load keymap for ", stringify!($id)))?;
+            quick_load!($($($rest)*)?);
         };
-        ($rec: expr) => {}
+        () => {}
     }
     use super::{app, tab::*};
     use anyhow::Context;
 
-    let mut has_duplicate = vec![];
+    // The application's core bindings remain fixed, as in dev.
+    app::km::set(value.remove("app").unwrap_or(app::km::default()?))
+        .context("failed to load keymap for app")?;
     quick_load!(
-        has_duplicate,
-        app,
         connections,
         proxies,
         srvctl,
@@ -366,9 +316,10 @@ pub fn load() -> anyhow::Result<()> {
 
 fn read_keymap(path: &std::path::Path) -> anyhow::Result<serde_yml::Mapping> {
     match std::fs::File::open(path) {
-        Ok(file) => serde_yml::from_reader(file)
+        Ok(file) => serde_yml::from_reader::<_, Option<serde_yml::Mapping>>(file)
+            .map(Option::unwrap_or_default)
             .map_err(|e| anyhow::anyhow!("failed to parse keymap file at {}: {e}", path.display())),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => default_keymap(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(serde_yml::Mapping::new()),
         Err(e) => Err(anyhow::anyhow!(
             "failed to open keymap file at {}: {e}",
             path.display()
@@ -376,41 +327,12 @@ fn read_keymap(path: &std::path::Path) -> anyhow::Result<serde_yml::Mapping> {
     }
 }
 
-fn default_keymap() -> anyhow::Result<serde_yml::Mapping> {
-    macro_rules! quick_default {
-        ($map:expr, files::$id:ident $(, $($rest:tt)*)?) => {
-            $map.insert(concat!("files/", stringify!($id)).into(), files::$id::km::default()?);
-            quick_default!($map $(, $($rest)*)?);
-        };
-        ($map:expr, $id:ident $(, $($rest:tt)*)?) => {
-            $map.insert(stringify!($id).into(), $id::km::default()?);
-            quick_default!($map $(, $($rest)*)?);
-        };
-        ($map: expr $(,)?) => {}
-    }
-    use super::{app, tab::*};
-
-    let mut map = serde_yml::Mapping::new();
-    quick_default!(
-        map,
-        app,
-        connections,
-        proxies,
-        srvctl,
-        settings,
-        logs,
-        files::profile,
-        files::template
-    );
-
-    Ok(map)
-}
-
 pub fn init() -> anyhow::Result<()> {
-    let map = default_keymap()?;
-    let path = crate::config::keymap_path();
-    let file = std::fs::File::create(path)?;
-    serde_yml::to_writer(file, &map)?;
+    std::fs::write(
+        crate::config::keymap_path(),
+        "# Optional overrides; unlisted bindings keep their defaults.\n\
+         # Example: logs: [{on: x, action: Clear, desc: Clear logs}]\n{}\n",
+    )?;
     Ok(())
 }
 
