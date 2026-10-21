@@ -103,6 +103,8 @@ Supported scopes are `connections`, `proxies`, `srvctl`, `settings`, `logs`, `fi
 
 Duplicate sequences and single-key/chord prefix conflicts (such as `d` and `dd`) stop startup with an error. Chords such as `gg` and `ge` can coexist. Restart after editing; keymaps are not reloaded live.
 
+After the first key of a chord, a **Which?** panel appears near the bottom with sorted remaining keys and their descriptions, including custom `desc` values. The file page uses the focused profile or template scope. A matching second key executes the action and closes the panel. Esc or an unmatched key cancels and consumes that input, so plain `<Esc>` cannot be configured as a chord's second key. While a chord is pending, keys such as `q`, `?`, and Tab belong to that chord; cancel first to use their standalone actions. Narrow terminals use one column, and limited height shows a count of hidden choices.
+
 As in dev, place the same page sections under top-level `mihomo:` or `sing-box:` for core-specific configuration. An active core's page section replaces the corresponding common section before merging with built-in defaults.
 
 Only the list format above is supported. Legacy structured Key mappings, `common/submap`, top-level `files/profile` paths, and nested actions such as `action: { Action: Edit }` are no longer accepted. Use nested `file.profile` sections and plain action names such as `action: Edit`.

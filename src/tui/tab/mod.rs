@@ -43,12 +43,12 @@ macro_rules! tri {
 
 macro_rules! newtype_tab {
     ($(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>)) => {
-        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, km::get_docs());
+        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, km::get_docs(), km::pending_keys(), km::cancel_pending(), km::has_binding);
     };
     (@no_key $(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>)) => {
-        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, vec![]);
+        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, vec![], None, (), |_| false);
     };
-    ($(#[$m:meta])* $tab:ident($inner:ty), $title:expr, $key_desc:expr) => {
+    ($(#[$m:meta])* $tab:ident($inner:ty), $title:expr, $key_desc:expr, $pending:expr, $cancel:expr, $has_binding:expr) => {
         $(#[$m])*
         #[derive(Default)]
         pub struct $tab($inner);
@@ -63,6 +63,18 @@ macro_rules! newtype_tab {
             fn key_description(&self) -> crate::tui::key::KeyDesc {
                 $key_desc
             }
+
+            fn pending_keys(&self) -> Option<&'static crate::tui::key::WhichHints> {
+                $pending
+            }
+
+            fn cancel_pending(&self) {
+                $cancel
+            }
+
+            fn has_binding(&self, key: &crate::tui::Key) -> bool {
+                ($has_binding)(key)
+            }
         }
     };
 }
@@ -70,6 +82,9 @@ macro_rules! newtype_tab {
 pub trait TuiTab: super::TuiWidget {
     fn title(&self) -> &'static str;
     fn key_description(&self) -> crate::tui::key::KeyDesc;
+    fn pending_keys(&self) -> Option<&'static crate::tui::key::WhichHints>;
+    fn cancel_pending(&self);
+    fn has_binding(&self, key: &crate::tui::Key) -> bool;
 }
 
 pub(super) mod connections;
@@ -137,6 +152,24 @@ macro_rules! enum_dispatch {
         fn key_description(&self) -> crate::tui::key::KeyDesc {
             match self {
                 $(Self::$item(inner) => inner.key_description(),)+
+            }
+        }
+
+        fn pending_keys(&self) -> Option<&'static crate::tui::key::WhichHints> {
+            match self {
+                $(Self::$item(inner) => inner.pending_keys(),)+
+            }
+        }
+
+        fn cancel_pending(&self) {
+            match self {
+                $(Self::$item(inner) => inner.cancel_pending(),)+
+            }
+        }
+
+        fn has_binding(&self, key: &crate::tui::Key) -> bool {
+            match self {
+                $(Self::$item(inner) => inner.has_binding(key),)+
             }
         }
     }

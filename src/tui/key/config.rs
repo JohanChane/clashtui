@@ -1,6 +1,8 @@
 //! Parse user configuration once, then compile it into the two-level runtime map.
 
-use super::{Document, Key, KeyDesc, KeyMap, MaybeMap, instancing::defaults::DefaultMap};
+use super::{
+    Document, Key, KeyDesc, KeyMap, MaybeMap, SubMap, WhichHints, instancing::defaults::DefaultMap,
+};
 use anyhow::{Context, Result, bail, ensure};
 use serde::de::DeserializeOwned;
 use serde_yml::{Mapping, Value};
@@ -81,6 +83,12 @@ fn validate<A>(bindings: &[Binding<A>]) -> Result<()> {
             "entry #{} must contain 1 or 2 keys",
             i + 1
         );
+        ensure!(
+            binding.action.is_none()
+                || binding.on.len() != 2
+                || binding.on[1] != Key::from_code(super::KeyCode::Esc),
+            "Esc is reserved for cancelling a pending chord; choose another second key"
+        );
         if let Some(previous) = seen.insert(binding.on.as_slice(), i) {
             bail!(
                 "duplicate key binding `{}` in entries #{} and #{}",
@@ -131,29 +139,42 @@ where
     let mut docs = Vec::new();
     for binding in bindings {
         let action = binding.action.expect("unbound keys have been removed");
+        let description = binding.desc.unwrap_or_else(|| action.get_doc().to_owned());
         docs.push((
             super::notation::format_sequence(&binding.on),
-            binding.desc.unwrap_or_else(|| action.get_doc().to_owned()),
+            description.clone(),
         ));
         match binding.on.as_slice() {
             [key] => {
                 map.insert(*key, MaybeMap::Action(action));
             }
             [first, second] => {
-                let entry = map.entry(*first).or_insert_with(|| MaybeMap::SubMap {
-                    name: binding
-                        .group
-                        .or_else(|| groups.get(first).cloned())
-                        .unwrap_or_else(|| first.to_string()),
-                    inner: HashMap::new(),
+                let entry = map.entry(*first).or_insert_with(|| {
+                    MaybeMap::SubMap(SubMap {
+                        hints: WhichHints {
+                            prefix: *first,
+                            name: binding
+                                .group
+                                .or_else(|| groups.get(first).cloned())
+                                .unwrap_or_else(|| first.to_string()),
+                            keys: Vec::new(),
+                        },
+                        inner: HashMap::new(),
+                    })
                 });
-                if let MaybeMap::SubMap { inner, .. } = entry {
-                    inner.insert(*second, action);
+                if let MaybeMap::SubMap(submap) = entry {
+                    submap.inner.insert(*second, action);
+                    submap.hints.keys.push((second.to_string(), description));
                 } else {
                     unreachable!("prefix conflicts have been validated");
                 }
             }
             _ => unreachable!("sequence lengths have been validated"),
+        }
+    }
+    for entry in map.values_mut() {
+        if let MaybeMap::SubMap(submap) = entry {
+            submap.hints.keys.sort_by(|a, b| a.0.cmp(&b.0));
         }
     }
     docs.sort_by(|a, b| a.0.cmp(&b.0));

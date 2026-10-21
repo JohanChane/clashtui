@@ -71,7 +71,9 @@ fn chords_and_modified_keys_dispatch_without_copying_candidates() {
     assert_eq!(resolve(&map, &["<C-j>"]), Some(Action::MoveDown));
     assert_eq!(resolve(&map, &["j"]), Some(Action::MoveDown));
     assert!(docs.contains(&("g e".into(), "Clear by chord".into())));
-    assert!(matches!(&map[&"g".parse().unwrap()], MaybeMap::SubMap {name, ..} if name == "Nav"));
+    assert!(
+        matches!(&map[&"g".parse().unwrap()], MaybeMap::SubMap(submap) if submap.hints.name == "Nav")
+    );
 }
 
 #[test]
@@ -394,4 +396,46 @@ fn sorting_uses_public_names_without_nested_configuration() {
     ] {
         assert!(connections::km::validate_config(serde_yml::from_str(yaml).unwrap()).is_err());
     }
+}
+
+#[test]
+fn pending_hints_follow_overrides_unbinding_and_stable_key_order() {
+    let (map, _) = compile("- {on: [g, z], action: Clear, desc: Last}\n- {on: [g, a], action: MoveUp, desc: First}\n- {on: [g, g], action: null}").unwrap();
+    let mut pending = None;
+    assert_eq!(
+        instancing::try_from(&"g".parse().unwrap(), &map, &mut pending),
+        None
+    );
+    let hints = &pending.unwrap().hints;
+    assert_eq!(hints.prefix, "g".parse().unwrap());
+    assert_eq!(hints.name, "Nav");
+    assert_eq!(
+        hints.keys,
+        vec![("a".into(), "First".into()), ("z".into(), "Last".into())]
+    );
+    assert_eq!(
+        instancing::try_from(&"a".parse().unwrap(), &map, &mut pending),
+        Some(Action::MoveUp)
+    );
+    assert!(pending.is_none());
+}
+
+#[test]
+fn escape_cancels_pending_input_and_is_reserved_as_a_second_key() {
+    let (map, _) =
+        compile("- {on: '<Esc>', action: Clear}\n- {on: [g, '<C-Esc>'], action: MoveDown}")
+            .unwrap();
+    let mut pending = None;
+    instancing::try_from(&"g".parse().unwrap(), &map, &mut pending);
+    assert_eq!(
+        instancing::try_from(&"<Esc>".parse().unwrap(), &map, &mut pending),
+        None
+    );
+    assert!(pending.is_none());
+    assert_eq!(resolve(&map, &["<Esc>"]), Some(Action::Clear));
+    assert_eq!(resolve(&map, &["g", "<C-Esc>"]), Some(Action::MoveDown));
+    let err = compile("- {on: [g, '<Esc>'], action: Clear}")
+        .err()
+        .unwrap();
+    assert!(format!("{err:#}").contains("Esc is reserved"));
 }
