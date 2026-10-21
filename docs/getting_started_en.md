@@ -64,43 +64,49 @@ After entering the TUI, a row of tabs appears at the top, with a hint bar at the
 
 ### Custom Key Bindings
 
-Create a `keymap.yaml` file in the config directory to modify key bindings for each page. For example, changing up/down navigation to `j` `k`:
+Use the `on / action / desc` list format in `keymap.yaml` in your config directory. The default Linux path is `~/.config/clashtui/keymap.yaml`. Configure only the bindings you want to change; omitted pages and bindings keep their built-in defaults.
 
 ```yaml
-proxies:
-  j: SelectDown
-  k: SelectUp
-  enter: ToggleExpand
-
-connections:
-  j: SelectDown
-  k: SelectUp
-
-settings:
-  j: SelectDown
-  k: SelectUp
-  enter: Edit
+logs:
+  - on: "x"
+    action: Clear
+    desc: Clear logs
+  - on: ["g", "e"]
+    action: GoBottom
+    desc: Go to the end
+  - on: "<C-j>"
+    action: MoveDown
 
 file:
   profile:
-    j: SelectDown
-    k: SelectUp
-  template:
-    j: SelectDown
-    k: SelectUp
+    - on: "e"
+      action:
+        Action: Edit
+      desc: Edit profile
 ```
 
-You can also use the list format to customize descriptions:
+- `on`: a single key string or a list of two keys. A modified key counts as one key, as in `["<C-g>", "c"]`. Write `gg` as `["g", "g"]`, not `"gg"`.
+- Key notation includes `"j"`, `"G"`, `"<Enter>"`, `"<Up>"`, and `"<F1>"`. Prefixes `C-`, `A-`, `S-`, and `D-` mean Ctrl, Alt, Shift, and Super. Uppercase letters imply Shift; `"<S-g>"` and `"G"` are equivalent.
+- `action`: an action for that page. File-page operations retain the nested `Action: Edit` format. Optional `desc` appears in the `?` help panel; omit it to use the action's default description.
+- An identical complete key sequence replaces its default binding. Adding a new key for an action does not automatically remove the original key.
+
+Use `action: null` to unbind a default sequence. For example, replace the default single key `j` with the chord `jj`:
 
 ```yaml
-proxies:
-  - key: j
-    action: SelectDown
-    desc: Move down
-  - keys: ["g", "g"]
-    action: ToggleExpand
-    desc: Expand/Collapse
+logs:
+  - on: "j"
+    action: null
+  - on: ["j", "j"]
+    action: MoveDown
 ```
+
+Supported scopes are `connections`, `proxies`, `srvctl`, `settings`, `logs`, `file.profile`, and `file.template`. The two file scopes use the nested YAML structure shown above. Application core keys (`1`–`7`, Tab, `q`, `?`) remain fixed. Conflict checking is limited to each scope; page bindings are not checked against application bindings.
+
+Duplicate sequences and single-key/chord prefix conflicts (such as `d` and `dd`) stop startup with an error. Chords such as `gg` and `ge` can coexist. Restart after editing; keymaps are not reloaded live.
+
+As in dev, place the same page sections under top-level `mihomo:` or `sing-box:` for core-specific configuration. An active core's page section replaces the corresponding common section before merging with built-in defaults. Earlier structured Key mappings and this branch's generated `common/submap` files also remain readable.
+
+See [`default_keymap.yaml`](../contrib/default_configs/default_keymap.yaml) for a complete reference. Missing files, empty files, and `{}` use the defaults.
 
 ## CLI Mode
 

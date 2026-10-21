@@ -1,5 +1,6 @@
 # Default keymap for clashtui (yazi-style list format)
-# Uses the new list-based YAML format.
+# Uses the list-based YAML format. Unlisted bindings keep their defaults.
+# Entries with the same on sequence replace defaults; action: null unbinds a sequence.
 # Single key:    on: "j"
 # Chord:         on: ["g", "g"]
 # Modifier:      on: "<C-u>", on: "<Enter>", on: "<Up>"
@@ -149,12 +150,8 @@ file:
       desc: Toggle no proxy-provider
     - on: "n"
       action:
-        Action: TrafficNext
-      desc: Traffic display next
-    - on: "N"
-      action:
-        Action: TrafficPrev
-      desc: Traffic display prev
+        Action: Traffic
+      desc: Show traffic
 
   template:
     - on: "<Left>"

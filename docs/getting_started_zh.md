@@ -64,43 +64,49 @@ clashtui --config-dir /my/config/path
 
 ### 自定义按键
 
-在配置目录下创建 `keymap.yaml` 即可修改各页面的按键。比如把上下移动改成 `j` `k`：
+在配置目录的 `keymap.yaml` 中使用 `on / action / desc` 列表格式。Linux 默认路径为 `~/.config/clashtui/keymap.yaml`。只需写需要修改的绑定，未配置的页面和按键继续使用内置默认值。
 
 ```yaml
-proxies:
-  j: SelectDown
-  k: SelectUp
-  enter: ToggleExpand
-
-connections:
-  j: SelectDown
-  k: SelectUp
-
-settings:
-  j: SelectDown
-  k: SelectUp
-  enter: Edit
+logs:
+  - on: "x"
+    action: Clear
+    desc: 清空日志
+  - on: ["g", "e"]
+    action: GoBottom
+    desc: 跳到末尾
+  - on: "<C-j>"
+    action: MoveDown
 
 file:
   profile:
-    j: SelectDown
-    k: SelectUp
-  template:
-    j: SelectDown
-    k: SelectUp
+    - on: "e"
+      action:
+        Action: Edit
+      desc: 编辑配置
 ```
 
-也可以写成列表格式，自定义描述文字：
+- `on`：单键字符串，或包含两个键的列表。修饰键组合算一个键，例如 `["<C-g>", "c"]`；双键不能写成 `"gg"`。
+- 按键记法：`"j"`、`"G"`、`"<Enter>"`、`"<Up>"`、`"<F1>"`；`C-`、`A-`、`S-`、`D-` 分别表示 Ctrl、Alt、Shift、Super。大写字母表示 Shift，`"<S-g>"` 与 `"G"` 相同。
+- `action`：当前页面的动作。文件页面的操作保留 `Action: Edit` 这样的嵌套格式。`desc` 可选，用于 `?` 帮助面板；省略时使用动作的默认说明。
+- 相同完整按键序列会替换默认绑定；给同一动作增加新键不会自动删除原键。
+
+用 `action: null` 取消某个默认绑定。例如将默认单键 `j` 改为双键 `jj`：
 
 ```yaml
-proxies:
-  - key: j
-    action: SelectDown
-    desc: 下移
-  - keys: ["g", "g"]
-    action: ToggleExpand
-    desc: 展开/折叠
+logs:
+  - on: "j"
+    action: null
+  - on: ["j", "j"]
+    action: MoveDown
 ```
+
+支持 `connections`、`proxies`、`srvctl`、`settings`、`logs`、`file.profile`、`file.template`。其中 `file.profile` 和 `file.template` 使用上例的 YAML 嵌套结构。应用级核心键（`1`–`7`、Tab、`q`、`?`）保持固定；只检查同一 scope 内的冲突，不检查页面键与应用级键的冲突。
+
+重复绑定以及单键与双键的前缀冲突（如 `d` 和 `dd`）会阻止启动并显示错误；`gg` 和 `ge` 可以共存。修改配置后需要重启，不支持热加载。
+
+与 dev 一样，可以在顶层 `mihomo:` 或 `sing-box:` 下放置同样的页面配置。当前核心的页面配置会替换对应的公共页面配置，然后与内置默认值合并。早期的结构化 Key 映射和本分支生成的 `common/submap` 文件也可读取。
+
+完整参考见 [`default_keymap.yaml`](../contrib/default_configs/default_keymap.yaml)。文件不存在、为空或内容为 `{}` 时，使用默认按键。
 
 ## 命令行模式
 

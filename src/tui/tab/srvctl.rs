@@ -22,6 +22,8 @@ enum Key {
     Execute,
     MoveUp,
     MoveDown,
+    // Retain dev's configurable Esc action, which does not change the service view.
+    Esc,
 }
 
 impl Document for Key {
@@ -31,6 +33,7 @@ impl Document for Key {
             Self::Execute => "Execute",
             Self::MoveUp => MOVE_UP,
             Self::MoveDown => MOVE_DOWN,
+            Self::Esc => "Back",
         }
     }
 }
@@ -294,6 +297,7 @@ impl TabContent for SrvCtlContent {
     ) {
         // ---- main list routing ----
         match key {
+            Key::Esc => {}
             Key::MoveUp => {
                 let i = state.selected().unwrap_or(0);
                 state.select(Some(i.saturating_sub(1)));
