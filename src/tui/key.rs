@@ -15,11 +15,20 @@ pub trait Document {
 }
 
 pub enum MaybeMap<A> {
-    SubMap {
-        name: String,
-        inner: std::collections::HashMap<Key, A>,
-    },
+    SubMap(SubMap<A>),
     Action(A),
+}
+
+pub struct SubMap<A> {
+    pub inner: std::collections::HashMap<Key, A>,
+    pub hints: WhichHints,
+}
+
+/// Presentation data compiled once from the same bindings as the dispatch map.
+pub struct WhichHints {
+    pub prefix: Key,
+    pub name: String,
+    pub keys: KeyDesc,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -84,20 +93,23 @@ impl From<KeyCode> for Key {
 }
 
 pub mod instancing {
-    use super::{Key, KeyMap, MaybeMap};
+    use super::{Key, KeyCode, KeyMap, MaybeMap, SubMap};
 
     /// Try to match an `A` by lookup in `submap` or `keymap`
     pub fn try_from<'a, A: Eq + Copy>(
         ev: &Key,
         keymap: &'a KeyMap<A>,
-        submap: &mut Option<(&'a str, &'a std::collections::HashMap<Key, A>)>,
+        submap: &mut Option<&'a SubMap<A>>,
     ) -> Option<A> {
         let key = if let Some(submap) = submap.take() {
-            submap.1.get(ev).copied()?
+            if *ev == Key::from_code(KeyCode::Esc) {
+                return None;
+            }
+            submap.inner.get(ev).copied()?
         } else {
             match keymap.get(ev)? {
-                MaybeMap::SubMap { name, inner } => {
-                    *submap = Some((name, inner));
+                MaybeMap::SubMap(inner) => {
+                    *submap = Some(inner);
                     return None;
                 }
                 MaybeMap::Action(key) => *key,
@@ -206,16 +218,24 @@ macro_rules! key_map {
                 KEYMAP.get().expect("try get keymap without init").1.clone()
             }
 
-            static SUBMAP: std::sync::Mutex<
-                Option<(
-                    &'static str,
-                    &'static std::collections::HashMap<_Key, $actid>,
-                )>,
-            > = std::sync::Mutex::new(None);
+            static SUBMAP: std::sync::Mutex<Option<&'static crate::tui::key::SubMap<$actid>>> =
+                std::sync::Mutex::new(None);
 
             // For re-export like app.rs does
             pub(in super::super) fn get_submap_name() -> Option<&'static str> {
-                SUBMAP.lock().unwrap().map(|l| l.0)
+                pending_keys().map(|hints| hints.name.as_str())
+            }
+
+            pub(in super::super) fn pending_keys() -> Option<&'static crate::tui::key::WhichHints> {
+                SUBMAP.lock().unwrap().map(|submap| &submap.hints)
+            }
+
+            pub(in super::super) fn cancel_pending() {
+                *SUBMAP.lock().unwrap() = None;
+            }
+
+            pub(in super::super) fn has_binding(key: &_Key) -> bool {
+                get().contains_key(key)
             }
 
             impl TryFrom<&_Key> for $actid {

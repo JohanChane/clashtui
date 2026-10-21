@@ -1,8 +1,8 @@
-// pub mod chord;
 pub mod dualtab;
 pub mod help;
 pub mod popmsg;
 pub mod tab;
+pub mod which;
 
 #[macro_export]
 macro_rules! new_type_impl_tuiwidget {

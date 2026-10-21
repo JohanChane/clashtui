@@ -56,4 +56,25 @@ impl crate::tui::tab::TuiTab for FileTab {
             template::km::get_docs()
         }
     }
+
+    fn pending_keys(&self) -> Option<&'static crate::tui::key::WhichHints> {
+        if self.0.is_foucus_on_left() {
+            profile::km::pending_keys()
+        } else {
+            template::km::pending_keys()
+        }
+    }
+
+    fn cancel_pending(&self) {
+        profile::km::cancel_pending();
+        template::km::cancel_pending();
+    }
+
+    fn has_binding(&self, key: &crate::tui::Key) -> bool {
+        if self.0.is_foucus_on_left() {
+            profile::km::has_binding(key)
+        } else {
+            template::km::has_binding(key)
+        }
+    }
 }
