@@ -114,7 +114,9 @@ The default global `<C-g>` shortcuts work on every page. Press Ctrl+g to show th
 | `f` | Start/restart the active core service |
 | `t` | Close all connections on the active core |
 
-Directory actions use `extra.open_dir_cmd`, or the system default application when unset. Global chord prefixes (by default `<C-g>`) take priority over page shortcuts and cancel a pending page chord; they also work from the help panel. Global single keys run only when the page has not consumed the input. Input and confirmation popups retain priority. Esc or an unmatched second key cancels a global chord as well.
+Directory actions use `extra.open_dir_cmd`, or the system default application when unset. Global and page chords can share a first key: for example, `gp` in `app` and `gg` on a page both remain available. The Which panel combines their candidates, and the second key selects the action. Only an identical complete chord gives the global binding priority, including its description in the hints. A chord prefix takes priority over a single key in the other scope; other global single keys run only when the page has not consumed the input. A pending second key cannot start another chord. Esc or an unmatched key cancels both scopes and consumes that input. Input and confirmation popups retain priority.
+
+Global chords also work from the help panel, using only global candidates in that context. When help exceeds the screen height, scroll with Up/Down or `j`/`k`, use PageUp/PageDown to move a page, or Home/End to reach the beginning or end. Esc or another non-scrolling key closes help. Narrow terminals use a single column.
 
 Customize global shortcuts under `app` using the same merge and unbinding rules as page scopes. For example, move restart from `<C-g> f` to `<C-g> r` and add F1 for help:
 
@@ -132,6 +134,8 @@ app:
 Available actions: `OpenCoreDataDir`, `OpenCoreInstallDir`, `RestartCoreService`, `CloseAllConnections`, `Quit`, `Help`, `TabNext`, `TabPrev`, and `TabStatus`, `TabFile`, `TabProxies`, `TabConnections`, `TabLogs`, `TabSettings`, and `TabCoreSrvCtl`. Use plain names; shell commands and action parameters are not supported. Help and which panels show the configured bindings and descriptions.
 
 `TabNext` switches to the next page (default `<Tab>`); `TabPrev` switches to the previous page (default `<S-Tab>`). Both wrap around at the ends. You can rebind or unbind them in `app`.
+
+The tab bar shows each page's configured navigation keys from `app`, including chords. Multiple bindings are separated by `/`. If all direct navigation bindings for a page are removed, its tab shows only the page name.
 
 As in dev, place the same page sections under top-level `mihomo:` or `sing-box:` for core-specific configuration. An active core's page section replaces the corresponding common section before merging with built-in defaults.
 
