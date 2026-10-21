@@ -2,7 +2,6 @@
 
 本文档描述 Clashtui 的代码架构，供开发者了解项目结构。
 
-> AGENTS.md 是更完整的参考，包含所有宏、约定、细节。本文档侧重于架构概览。
 
 ## 技术栈
 
@@ -37,24 +36,26 @@ src/
 ├── tui.rs               # TUI 模块入口，re-exports from tui/
 │   └── tui/
 │       ├── app.rs       # App 结构体、事件循环（~50fps）、按键路由
-│       ├── agent.rs     # 按键映射加载（keymap.yaml）
-│       ├── key.rs       # Key 结构体（code + 修饰键）
+│       ├── key.rs       # 按键、默认绑定宏和统一加载入口
+│       ├── key/
+│       │   ├── config.rs    # 解析、覆盖、解绑、作用域内校验
+│       │   ├── effective.rs # 合成页面/焦点绑定表、全局冲突校验
+│       │   ├── matcher.rs   # App 持有的组合键状态机
+│       │   └── notation.rs  # 按键记法解析和显示
 │       ├── signals.rs   # OS 信号处理
 │       ├── term.rs      # 终端 raw mode 进入/退出/挂起
 │       ├── theme.rs     # 主题加载
 │       ├── utils.rs     # 工具函数
-│       ├── keymap_default.yaml  # 默认按键映射
 │       ├── popmsg.rs    # 弹窗定义（Confirm、Input 等）
 │       ├── widget/
 │       │   ├── mod.rs   # new_type_impl_tuiwidget! 宏
-│       │   ├── chord.rs # 组合键处理器
 │       │   ├── dualtab.rs  # 双面板标签页容器
-│       │   ├── fzffind.rs  # 模糊搜索组件
-│       │   ├── help.rs  # 帮助面板
+│       │   ├── help.rs  # 可滚动帮助面板
+│       │   ├── which.rs # 后续按键提示
 │       │   ├── popmsg.rs   # 弹窗容器（渲染 + 事件分发）
 │       │   └── tab.rs   # 单面板标签页容器 + BasicTabContent/TabContent trait
 │       └── tab/
-│           ├── mod.rs   # Tab 枚举、newtype_tab!/enum_dispatch! 宏、agent 宏
+│           ├── mod.rs   # Tab 枚举、newtype_tab!/enum_dispatch! 宏
 │           ├── status.rs     # 状态标签页
 │           ├── files.rs      # FileTab（DualTab: Profile + Template）
 │           ├── proxies.rs    # 代理标签页
@@ -113,29 +114,30 @@ src/
 5. 处理按键事件
 ```
 
-### 按键路由（六层）
+### 有效绑定表与输入状态
 
-按键按以下顺序被处理，命中即停：
+`key_map!` 只声明类型化默认动作和配置解析器。`Keymaps::from_config` 先应用核心专属配置、默认覆盖和解绑，再检查全局与每个页面的冲突。完整序列相同、或单键与双键前缀重叠时，报错并阻止启动；`gp` 与 `gg` 可以共享前缀。
 
-| 层级 | 处理器 | 作用 |
-|------|--------|------|
-| 0 — PopUp | `popup.handle_key_event` | 弹窗/对话框劫持所有按键 |
-| 0.5 — GlobalChord | `global_chord.handle` | 全局组合键（如 Ctrl-g c 打开配置目录） |
-| 1 — Help | `help.dismiss` | 帮助面板打开时，按任意键关闭 |
-| 2 — Chord | `chord.handle` | 标签页级别的多键组合 |
-| 3 — Tab | `tabs[ti].handle_key_event` | 当前标签页处理按键 |
-| 4 — Global | `handle_global_kv` | 标签页切换（1-7、Tab）、退出（q、Ctrl-c）、帮助（?） |
+每个页面/焦点对应一份不可变 `EffectiveKeymap`。Files 的 Profile 和 Template 分别合成。Status 使用全局表。全部通过校验后，才将这些表安装到只读 `OnceLock`。
+
+输入顺序：
+
+1. 弹窗接管原始按键，并取消等待中的组合键。
+2. 帮助处理滚动和关闭；启动全局双键时关闭帮助，该次序列仅使用全局候选。
+3. App 的 `Matcher` 使用当前有效表，返回 `Pending`、`Execute(Action)`、`Cancelled` 或 `Unmatched`。
+4. App 执行全局动作，或将类型化动作交给 `TuiTab::handle_action`。
+
+唯一可变的组合键状态属于 App。切页、焦点变化和弹窗不会继承旧候选；Esc 或错误的第二键会被消费。Which、帮助和标签栏从同一份有效表读取数据。组合键分组名由 App 显示在顶部栏，各页面无需维护等待状态。
 
 ### TuiWidget Trait
 
-所有可渲染、可处理按键的元素都实现 `TuiWidget` trait：
+`TuiWidget` 负责界面生命周期：
 
-- `handle_key_event(&mut self, kv: &Key)` — 处理按键
 - `render(&mut self, f, area)` — 绘制界面
 - `sync(&mut self)` — 推进异步任务
-- `on_enter(&mut self)` / `on_leave(&mut self)` — 切换标签页时的回调
+- `on_enter(&mut self)` / `on_leave(&mut self)` — 标签页切换回调
 
-渲染阶段不要修改状态（`render` 接受 `&self`）。状态变更应在 `handle_key_event` 或 `sync` 回调中完成。
+`TuiTab` 另外提供 `title`、`input_scope` 和 `handle_action`。页面容器接收已解析的动作；文本弹窗通过自身的 `handle_key_event` 处理原始按键。
 
 ### Tab 体系
 
@@ -143,7 +145,7 @@ src/
 
 `Tab<C>` 是泛型容器，`C` 需实现两个 trait：
 
-- `BasicTabContent` — 定义 `Key` 枚举（哪些按键触发）、`State` 类型、标题
+- `BasicTabContent` — 定义类型化动作 `Key` 枚举、`State` 类型、标题
 - `TabContent` — 定义 `init`、`handle_key_event`、`render`
 
 #### 双面板（DualTab）
@@ -178,21 +180,17 @@ src/
 | 宏 | 位置 | 用途 |
 |-----|------|------|
 | `tri!` | `tab/mod.rs` | 异步回调中的错误处理 |
-| `mod_agent!` | `tab/mod.rs` | 定义标签页默认按键绑定和组合快捷键 |
+| `key_map!` | `key.rs` | 声明默认绑定和配置解析器；无运行时可变状态 |
 | `newtype_tab!` | `tab/mod.rs` | 生成 Tab 包装器，实现 `TuiWidget` + `TuiTab` |
 | `enum_dispatch!` | `tab/mod.rs` | 将各 Tab 枚举变体分发到 trait 方法 |
 | `new_type_impl_tuiwidget!` | `widget/mod.rs` | 为新类型包装器自动实现 `TuiWidget` |
 | `load_save!` | `config/util.rs` | 为 YAML 配置类型生成 `from_file()` / `to_file()` |
 
-### mod_agent! 宏
+### key_map! 宏
 
-两种 key 定义方式：
-- `[KeyCode::Char('j')]` — 普通字符键
-- `key("<C-a>")` — 修饰键语法（C=Ctrl, A=Alt, S=Shift）
+`key_map!(Logs, Key, DefaultMap::new()...)` 声明 scope 对应的动作变体和默认绑定。生成的 `km::bindings` 应用覆盖，返回统一的类型化 `Action` 绑定供有效表合成。
 
-支持两种 keymap.yaml 格式：
-- **Mapping**: `j: SelectDown`（简单，不含描述和组合键）
-- **Sequence**: `[{on: j, action: SelectDown, desc: "下移"}]`（含描述，支持组合键）
+`keymap.yaml` 使用 `[{on: j, action: MoveDown, desc: "下移"}]` 列表；`on` 支持单键或双键序列，`action: null` 用于解绑。配置格式和详细行为见 [入门文档](getting_started_zh.md)。
 
 ## 特性（Features）
 
@@ -226,16 +224,8 @@ src/
 
 ## 添加标签页
 
-大致步骤：
-
-1. 定义内容类型，实现 `BasicTabContent` + `TabContent`（或 `DualTabContent`）
-2. 在 `tab/mod.rs` 中：
-   - 添加 `mod mytab;`
-   - 用 `newtype_tab!` 生成包装器
-   - 在 `prelude` 的 `enum_dispatch!` 和 agent_init 中注册
-   - 在 `Tab` 枚举中添加变体
-3. 在 `app.rs` 中：
-   - `App::new()` 的 `tabs` vec 中添加实例
-   - 更新 `TAB_COUNT` 和 `'1'..='7'` 范围
-   - 在 `prelude::agent_init` 调用 init
-4. 若为双面板：两个内容类型通过 `DualTabContent` / `DualTabContentMate` 互相指定关联类型
+1. 定义内容类型，实现 `BasicTabContent` 和 `TabContent`（或双面板 traits）。
+2. 在 `key/effective.rs` 添加 `Scope`、`Action` 变体和配置加载器，并在 `key/config.rs` 注册配置作用域。
+3. 用 `key_map!` 声明默认绑定，用 `newtype_tab!(MyTab(Tab<MyContent>), MyScope)` 生成包装器；在 `tab/mod.rs` 的 `enum_dispatch!` 注册。
+4. 在 `App::new()` 添加标签实例，并更新 `TabTarget` 及默认切页绑定；两者顺序必须与标签列表一致。
+5. 双面板分别提供动作类型和作用域，由 `input_scope` 根据焦点选择有效表。

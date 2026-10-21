@@ -43,54 +43,43 @@ macro_rules! tri {
 }
 
 macro_rules! newtype_tab {
-    ($(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>)) => {
-        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, km::get_docs(), km::pending_keys(), km::cancel_pending(), km::has_binding, km::starts_chord);
-    };
-    (@no_key $(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>)) => {
-        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, vec![], None, (), |_| false, |_| false);
-    };
-    ($(#[$m:meta])* $tab:ident($inner:ty), $title:expr, $key_desc:expr, $pending:expr, $cancel:expr, $has_binding:expr, $starts_chord:expr) => {
+    ($(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>), $scope:ident) => {
         $(#[$m])*
         #[derive(Default)]
-        pub struct $tab($inner);
-
+        pub struct $tab($ty<$inner>);
         crate::new_type_impl_tuiwidget!($tab);
-
         impl crate::tui::tab::TuiTab for $tab {
-            fn title(&self) -> &'static str {
-                $title
+            fn title(&self) -> &'static str { $inner::TITLE }
+            fn input_scope(&self) -> crate::tui::key::Scope {
+                crate::tui::key::Scope::$scope
             }
-
-            fn key_description(&self) -> crate::tui::key::KeyDesc {
-                $key_desc
+            fn handle_action(&mut self, action: crate::tui::key::Action) {
+                let crate::tui::key::Action::$scope(action) = action else {
+                    unreachable!("action routed to the wrong page");
+                };
+                self.0.handle_action(action);
             }
-
-            fn pending_keys(&self) -> Option<&'static crate::tui::key::WhichHints> {
-                $pending
-            }
-
-            fn cancel_pending(&self) {
-                $cancel
-            }
-
-            fn has_binding(&self, key: &crate::tui::Key) -> bool {
-                ($has_binding)(key)
-            }
-
-            fn starts_chord(&self, key: &crate::tui::Key) -> bool {
-                ($starts_chord)(key)
+        }
+    };
+    (@no_key $(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>)) => {
+        $(#[$m])*
+        #[derive(Default)]
+        pub struct $tab($ty<$inner>);
+        crate::new_type_impl_tuiwidget!($tab);
+        impl crate::tui::tab::TuiTab for $tab {
+            fn title(&self) -> &'static str { $inner::TITLE }
+            fn input_scope(&self) -> crate::tui::key::Scope { crate::tui::key::Scope::App }
+            fn handle_action(&mut self, _: crate::tui::key::Action) {
+                unreachable!("this page has no local actions");
             }
         }
     };
 }
 
-pub trait TuiTab: super::TuiWidget {
+pub(in crate::tui) trait TuiTab: super::TuiWidget {
     fn title(&self) -> &'static str;
-    fn key_description(&self) -> crate::tui::key::KeyDesc;
-    fn pending_keys(&self) -> Option<&'static crate::tui::key::WhichHints>;
-    fn cancel_pending(&self);
-    fn has_binding(&self, key: &crate::tui::Key) -> bool;
-    fn starts_chord(&self, key: &crate::tui::Key) -> bool;
+    fn input_scope(&self) -> crate::tui::key::Scope;
+    fn handle_action(&mut self, action: crate::tui::key::Action);
 }
 
 pub(super) mod connections;
@@ -117,12 +106,6 @@ macro_rules! enum_dispatch {
     })+
 
     impl crate::tui::TuiWidget for Tab {
-        fn handle_key_event(&mut self, kv: &crate::tui::key::Key) {
-            match self {
-                $(Self::$item(inner) => inner.handle_key_event(kv),)+
-            }
-        }
-
         fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
             match self {
                 $(Self::$item(inner) => inner.render(f, area),)+
@@ -155,33 +138,14 @@ macro_rules! enum_dispatch {
             }
         }
 
-        fn key_description(&self) -> crate::tui::key::KeyDesc {
+        fn input_scope(&self) -> crate::tui::key::Scope {
             match self {
-                $(Self::$item(inner) => inner.key_description(),)+
+                $(Self::$item(inner) => inner.input_scope(),)+
             }
         }
-
-        fn pending_keys(&self) -> Option<&'static crate::tui::key::WhichHints> {
+        fn handle_action(&mut self, action: crate::tui::key::Action) {
             match self {
-                $(Self::$item(inner) => inner.pending_keys(),)+
-            }
-        }
-
-        fn cancel_pending(&self) {
-            match self {
-                $(Self::$item(inner) => inner.cancel_pending(),)+
-            }
-        }
-
-        fn has_binding(&self, key: &crate::tui::Key) -> bool {
-            match self {
-                $(Self::$item(inner) => inner.has_binding(key),)+
-            }
-        }
-
-        fn starts_chord(&self, key: &crate::tui::Key) -> bool {
-            match self {
-                $(Self::$item(inner) => inner.starts_chord(key),)+
+                $(Self::$item(inner) => inner.handle_action(action),)+
             }
         }
     }
@@ -190,7 +154,7 @@ macro_rules! enum_dispatch {
 }
 
 pub mod prelude {
-    pub use super::TuiTab;
+    pub(in crate::tui) use super::TuiTab;
     pub use super::connections::ConnectionsTab;
     pub use super::files::FileTab;
     pub use super::logs::LogsTab;

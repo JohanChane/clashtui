@@ -7,14 +7,6 @@ newtype_tab!(@no_key StatusTab(Tab<Status>));
 #[derive(Clone, Copy)]
 struct Key;
 
-impl TryFrom<&crate::tui::Key> for Key {
-    type Error = ();
-
-    fn try_from(_: &crate::tui::Key) -> Result<Self, Self::Error> {
-        Err(())
-    }
-}
-
 use crate::config::CONFIG;
 use crate::config::CoreType;
 use crate::functions::restful::{self, config_struct::*};

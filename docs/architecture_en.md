@@ -2,7 +2,6 @@
 
 This document describes the code architecture of Clashtui for developers to understand the project structure.
 
-> AGENTS.md is a more complete reference, containing all macros, conventions, and details. This document focuses on the architecture overview.
 
 ## Tech Stack
 
@@ -37,24 +36,26 @@ src/
 ├── tui.rs               # TUI module entry, re-exports from tui/
 │   └── tui/
 │       ├── app.rs       # App struct, event loop (~50fps), key routing
-│       ├── agent.rs     # Keymap loading (keymap.yaml)
-│       ├── key.rs       # Key struct (code + modifiers)
+│       ├── key.rs       # Keys, default-binding macro, and loading entry point
+│       ├── key/
+│       │   ├── config.rs    # Parsing, overrides, unbinding, scope validation
+│       │   ├── effective.rs # Page/focus maps and global conflict validation
+│       │   ├── matcher.rs   # Pending-chord state owned by App
+│       │   └── notation.rs  # Key notation parsing and formatting
 │       ├── signals.rs   # OS signal handling
 │       ├── term.rs      # Terminal raw mode enter/exit/suspend
 │       ├── theme.rs     # Theme loading
 │       ├── utils.rs     # Utility functions
-│       ├── keymap_default.yaml  # Default key bindings
 │       ├── popmsg.rs    # Popup definitions (Confirm, Input, etc.)
 │       ├── widget/
 │       │   ├── mod.rs   # new_type_impl_tuiwidget! macro
-│       │   ├── chord.rs # Chord key handler
 │       │   ├── dualtab.rs  # Dual-panel tab container
-│       │   ├── fzffind.rs  # Fuzzy search component
-│       │   ├── help.rs  # Help panel
+│       │   ├── help.rs  # Scrollable help panel
+│       │   ├── which.rs # Pending-chord hints
 │       │   ├── popmsg.rs   # Popup container (rendering + event dispatch)
 │       │   └── tab.rs   # Single-panel tab container + BasicTabContent/TabContent trait
 │       └── tab/
-│           ├── mod.rs   # Tab enum, newtype_tab!/enum_dispatch! macros, agent macros
+│           ├── mod.rs   # Tab enum, newtype_tab!/enum_dispatch! macros
 │           ├── status.rs     # Status tab
 │           ├── files.rs      # FileTab (DualTab: Profile + Template)
 │           ├── proxies.rs    # Proxies tab
@@ -113,29 +114,30 @@ Per-frame flow:
 5. Handle key event
 ```
 
-### Key Routing (Six Layers)
+### Effective Binding Maps and Input State
 
-Keys are processed in the following order, stopping at the first match:
+`key_map!` declares typed defaults and configuration parsers. `Keymaps::from_config` applies core-specific scopes, default overrides, and unbindings, then checks each page against global bindings. Identical complete sequences and single-key/chord prefix overlaps stop startup with an error; `gp` and `gg` can share a prefix.
 
-| Layer | Handler | Purpose |
-|-------|---------|---------|
-| 0 — PopUp | `popup.handle_key_event` | Popups/dialogs hijack all keys |
-| 0.5 — GlobalChord | `global_chord.handle` | Global chords (e.g. Ctrl-g c to open config dir) |
-| 1 — Help | `help.dismiss` | When help panel is open, press any key to dismiss |
-| 2 — Chord | `chord.handle` | Tab-level multi-key chords |
-| 3 — Tab | `tabs[ti].handle_key_event` | Current tab handles keys |
-| 4 — Global | `handle_global_kv` | Tab switching (1-7, Tab), quit (q, Ctrl-c), help (?) |
+Each page/focus context has an immutable `EffectiveKeymap`. Profile and Template get separate maps; Status uses the global map. The maps are installed in a read-only `OnceLock` only after every context passes validation.
+
+Input handling:
+
+1. Popups capture raw keys and cancel any pending chord.
+2. Help handles scrolling and dismissal. Starting a global chord closes help and retains only global candidates for that sequence.
+3. App's `Matcher` uses the effective map and returns `Pending`, `Execute(Action)`, `Cancelled`, or `Unmatched`.
+4. App executes global actions or passes typed page actions to `TuiTab::handle_action`.
+
+App owns the only mutable pending-chord state. Tab changes, focus changes, and popups do not inherit old candidates. Esc and unmatched second keys are consumed. Which, help, and tab labels read the same effective map. App displays the pending group name in the top bar; pages need no matching state.
 
 ### TuiWidget Trait
 
-All renderable, key-handling elements implement the `TuiWidget` trait:
+`TuiWidget` provides the UI lifecycle:
 
-- `handle_key_event(&mut self, kv: &Key)` — handle key events
 - `render(&mut self, f, area)` — draw UI
 - `sync(&mut self)` — advance async tasks
-- `on_enter(&mut self)` / `on_leave(&mut self)` — callbacks when switching tabs
+- `on_enter(&mut self)` / `on_leave(&mut self)` — tab switch callbacks
 
-Do NOT modify state during rendering (`render` accepts `&self`). State changes should happen in `handle_key_event` or `sync` callbacks.
+`TuiTab` additionally exposes `title`, `input_scope`, and `handle_action`. Page containers receive resolved actions. Text popups handle raw keys through their own `handle_key_event` methods.
 
 ### Tab System
 
@@ -143,7 +145,7 @@ Do NOT modify state during rendering (`render` accepts `&self`). State changes s
 
 `Tab<C>` is a generic container. `C` must implement two traits:
 
-- `BasicTabContent` — defines `Key` enum (which keys trigger), `State` type, title
+- `BasicTabContent` — defines the typed action enum `Key`, `State` type, title
 - `TabContent` — defines `init`, `handle_key_event`, `render`
 
 #### Dual Panel (DualTab)
@@ -178,21 +180,17 @@ Popups use a `oneshot` channel pattern:
 | Macro | Location | Purpose |
 |-------|----------|---------|
 | `tri!` | `tab/mod.rs` | Error handling in async callbacks |
-| `mod_agent!` | `tab/mod.rs` | Define tab default key bindings and chord shortcuts |
+| `key_map!` | `key.rs` | Declare default bindings and parsers, without mutable runtime state |
 | `newtype_tab!` | `tab/mod.rs` | Generate Tab wrapper, implement `TuiWidget` + `TuiTab` |
 | `enum_dispatch!` | `tab/mod.rs` | Dispatch Tab enum variants to trait methods |
 | `new_type_impl_tuiwidget!` | `widget/mod.rs` | Auto-implement `TuiWidget` for newtype wrappers |
 | `load_save!` | `config/util.rs` | Generate `from_file()` / `to_file()` for YAML config types |
 
-### mod_agent! Macro
+### key_map! Macro
 
-Two key definition styles:
-- `[KeyCode::Char('j')]` — plain character key
-- `key("<C-a>")` — modifier syntax (C=Ctrl, A=Alt, S=Shift)
+`key_map!(Logs, Key, DefaultMap::new()...)` declares the scope's action variant and defaults. The generated `km::bindings` applies overrides and returns typed `Action` bindings for context composition.
 
-Supports two keymap.yaml formats:
-- **Mapping**: `j: SelectDown` (simple, no description or chords)
-- **Sequence**: `[{on: j, action: SelectDown, desc: "Move down"}]` (with description, supports chords)
+`keymap.yaml` uses lists such as `[{on: j, action: MoveDown, desc: "Move down"}]`. The `on` field accepts a single key or a two-key sequence; `action: null` unbinds it. See [Getting Started](getting_started_en.md) for the configuration contract.
 
 ## Features
 
@@ -226,16 +224,8 @@ The `functions/` directory contains all business logic, divided into three modul
 
 ## Adding a Tab
 
-Approximate steps:
-
-1. Define the content type, implement `BasicTabContent` + `TabContent` (or `DualTabContent`)
-2. In `tab/mod.rs`:
-   - Add `mod mytab;`
-   - Use `newtype_tab!` to generate the wrapper
-   - Register in `prelude`'s `enum_dispatch!` and agent_init
-   - Add variant to the `Tab` enum
-3. In `app.rs`:
-   - Add instance to the `tabs` vec in `App::new()`
-   - Update `TAB_COUNT` and the `'1'..='7'` range
-   - Call init in `prelude::agent_init`
-4. If dual panel: the two content types specify each other's associated type via `DualTabContent` / `DualTabContentMate`
+1. Define content implementing `BasicTabContent` and `TabContent` (or the dual-panel traits).
+2. Add `Scope`, `Action`, and a configuration loader in `key/effective.rs`; register the configuration scope in `key/config.rs`.
+3. Declare defaults with `key_map!`, generate the wrapper with `newtype_tab!(MyTab(Tab<MyContent>), MyScope)`, and register it in `tab/mod.rs`'s `enum_dispatch!`.
+4. Add the tab to `App::new()` and update `TabTarget` and default navigation bindings. Keep their order consistent with the tab list.
+5. Dual panels expose separate actions and scopes; `input_scope` selects the effective map by focus.

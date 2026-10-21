@@ -1,5 +1,5 @@
 pub use super::tab::*;
-use crate::tui::{Key, TuiWidget};
+use crate::tui::TuiWidget;
 use ratatui::prelude::{Frame, Rect};
 
 pub trait DualTabContent: BasicTabContent
@@ -87,37 +87,38 @@ where
     }
 }
 
+impl<C1, C2> DualTab<C1, C2>
+where
+    C1: DualTabContent<Mate = C2>,
+    C2: DualTabContentMate<Mate = C1>,
+{
+    pub fn handle_left_action(&mut self, action: C1::Key) {
+        debug_assert!(self.is_focus_on_c1);
+        if self
+            .content
+            .0
+            .handle_key_event(action, &mut self.tasks, &mut self.state.0)
+        {
+            self.is_focus_on_c1 = false;
+        }
+    }
+    pub fn handle_right_action(&mut self, action: C2::Key) {
+        debug_assert!(!self.is_focus_on_c1);
+        if self
+            .content
+            .1
+            .handle_key_event(action, &mut self.tasks, &mut self.state.1)
+        {
+            self.is_focus_on_c1 = true;
+        }
+    }
+}
+
 impl<C1, C2> TuiWidget for DualTab<C1, C2>
 where
     C1: DualTabContent<Mate = C2>,
     C2: DualTabContentMate<Mate = C1>,
 {
-    fn handle_key_event(&mut self, kv: &Key) {
-        if self.is_focus_on_c1 {
-            if let Ok(key) = C1::Key::try_from(kv)
-                && DualTabContent::handle_key_event(
-                    &mut self.content.0,
-                    key,
-                    &mut self.tasks,
-                    &mut self.state.0,
-                )
-            {
-                self.is_focus_on_c1 = false
-            }
-        } else {
-            if let Ok(key) = C2::Key::try_from(kv)
-                && DualTabContentMate::handle_key_event(
-                    &mut self.content.1,
-                    key,
-                    &mut self.tasks,
-                    &mut self.state.1,
-                )
-            {
-                self.is_focus_on_c1 = true
-            }
-        }
-    }
-
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
         use ratatui::layout::{Constraint::Ratio, Layout};
 

@@ -687,16 +687,14 @@ Steps:
 
 ## Key Conflict Detection Design
 
-Currently there are two layers of checking:
-1. Runtime — when loading keymap.yaml, check for duplicate keys within the same section. If found, only log `log::warn!` — the config is not rejected.
-2. Compile-time test — verify that within the default key bindings defined by the `mod_agent!` macro, each tab has no duplicate keys internally.
+Startup applies the active core configuration, default overrides, and unbindings before composing an effective map for each page/focus context.
 
-So if you customize keymap.yaml with duplicate keys in the same section, you'll get warn logs, but startup won't be blocked.
+- Duplicate complete sequences within a scope, and single keys overlapping chord prefixes, stop startup with an error.
+- The same conflicts between `app` and any page are also rejected. Errors identify both scopes, sequences, and actions.
+- `gp` and `gg` can share their prefix. Separate pages and file panes can reuse complete sequences.
+- User configuration overrides built-in bindings by complete sequence. `action: null` removes a binding before conflict validation.
 
-When keys conflict, the first one defined takes priority. Key combinations defined in keymap.yaml have higher priority than the defaults.
-
-Key ambiguity:
-- Within the same scope, one key combination is identical to another, or one is a subset of another.
+App owns the single pending-chord state. Dispatch, Which, help, and tab labels read the same effective map so their behavior stays consistent.
 
 ## When API Data Doesn't Match the Current Core
 

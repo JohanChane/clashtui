@@ -85,7 +85,7 @@ pub(in crate::tui) mod km {
     use crate::tui::key::{Document, Key, instancing::defaults::DefaultMap};
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    key_map!(AppKey, super::defaults());
+    key_map!(App, AppKey, super::defaults());
 
     pub(super) fn defaults() -> DefaultMap<AppKey> {
         DefaultMap::new()
@@ -136,25 +136,6 @@ pub(in crate::tui) mod km {
             )
     }
 
-    pub use km::set;
-
-    pub fn get_docs() -> crate::tui::key::KeyDesc {
-        km::get_docs()
-    }
-    pub(super) use km::{cancel_pending, get_submap_name, pending_keys};
-
-    pub(super) fn handles_chord(key: &Key) -> bool {
-        pending_keys().is_some() || km::starts_chord(key)
-    }
-
-    pub(super) fn route_key(tab: &mut impl super::TuiTab, key: &Key) -> Option<AppKey> {
-        super::route_key(tab, key, km::get(), &mut km::SUBMAP.lock().unwrap())
-    }
-
-    pub(super) fn tab_titles(titles: impl IntoIterator<Item = &'static str>) -> Vec<String> {
-        super::tab_titles(titles, km::get())
-    }
-
     const APP_KEYS: [(KeyCode, AppKey); 4] = [
         (KeyCode::Tab, AppKey::TabNext),
         (KeyCode::BackTab, AppKey::TabPrev),
@@ -192,6 +173,7 @@ pub struct App {
     tabs: Vec<Tab>,
     popup: PopUp,
     help: HelpPanel,
+    input: key::Matcher<'static, key::Action>,
 
     tab_index: u8,
 }
@@ -210,6 +192,7 @@ impl App {
             ],
             popup: PopUp::default(),
             help: HelpPanel::default(),
+            input: key::Matcher::default(),
             tab_index: 0,
         };
         app.tabs[0].on_enter();
@@ -265,32 +248,34 @@ impl App {
         Ok(())
     }
 
-    /// KeyEvent Route:
-    /// PopUp → Help → Pending page/global chords → New chords → Page/global single keys.
-    /// Help also allows starting global chords, without activating page bindings.
+    /// Popups capture text input; all page/global shortcuts share one compiled map.
+    /// Help can start a global-only chord, which retains its candidates until completion.
     fn handle_key_event(&mut self, kv: &Key) {
         log::debug!("K: {kv:?}");
-
         if self.popup.check() {
             self.cancel_pending();
             self.popup.handle_key_event(kv);
             return;
         }
-
-        if self.help.is_active() {
+        let scope = self.tabs[self.tab_index as usize].input_scope();
+        let maps = key::keymaps();
+        let bindings = if self.help.is_active() {
             self.cancel_pending();
-            if km::handles_chord(kv) {
-                self.help.dismiss();
-                self.handle_global_kv(kv);
-            } else {
+            let globals = maps.get(key::Scope::App);
+            if !globals.starts_chord(kv) {
                 self.help.handle_key_event(kv);
+                return;
             }
-            return;
-        }
-
-        let ti = self.tab_index as usize;
-        if let Some(action) = km::route_key(&mut self.tabs[ti], kv) {
-            self.handle_action(action);
+            self.help.dismiss();
+            globals
+        } else {
+            maps.get(scope)
+        };
+        if let key::Match::Execute(action) = self.input.feed(kv, scope, &bindings.map) {
+            match action {
+                key::Action::App(action) => self.handle_action(action),
+                action => self.tabs[self.tab_index as usize].handle_action(action),
+            }
         }
     }
     fn render(&mut self, f: &mut ratatui::Frame) {
@@ -300,24 +285,25 @@ impl App {
             .constraints([Constraint::Length(3), Constraint::Fill(1)])
             .split(f.area());
 
+        let scope = self.tabs[self.tab_index as usize].input_scope();
+        let bindings = key::keymaps().get(scope);
+        let hints = self.input.hints(scope);
         render_tabbar(
-            km::tab_titles(self.tabs.iter().map(|tab| tab.title())),
+            tab_titles(self.tabs.iter().map(|tab| tab.title()), bindings),
             self.tab_index,
             f,
             chunks[0],
+            hints.map(|hints| hints.name.as_str()),
         );
 
         self.tabs[self.tab_index as usize].render(f, chunks[1]);
 
-        if let Some(hints) = combined_hints(
-            km::pending_keys(),
-            self.tabs[self.tab_index as usize].pending_keys(),
-        ) {
-            widget::which::render(f, &hints);
+        if let Some(hints) = hints {
+            widget::which::render(f, hints);
         }
-
         if self.help.is_active() {
-            self.help.render(f, &self.tabs[self.tab_index as usize]);
+            self.help
+                .render(f, self.tabs[self.tab_index as usize].title(), bindings);
         }
 
         if self.popup.check() {
@@ -325,9 +311,8 @@ impl App {
         }
     }
 
-    fn cancel_pending(&self) {
-        km::cancel_pending();
-        self.tabs[self.tab_index as usize].cancel_pending();
+    fn cancel_pending(&mut self) {
+        self.input.cancel();
     }
 
     fn switch_tab(&mut self, new_index: u8) {
@@ -337,17 +322,6 @@ impl App {
             self.tab_index = new_index;
             self.tabs[self.tab_index as usize].on_enter();
         }
-    }
-
-    /// Global bindings while help is open; page bindings are inactive here.
-    fn handle_global_kv(&mut self, kv: &Key) -> bool {
-        if km::pending_keys().is_none() && !km::km::has_binding(kv) {
-            return false;
-        }
-        if let Ok(key) = AppKey::try_from(kv) {
-            self.handle_action(key);
-        }
-        true
     }
 
     fn handle_action(&mut self, key: AppKey) {
@@ -381,95 +355,17 @@ impl App {
     }
 }
 
-/// A prefix and its second key are consumed, including a mismatch or Esc.
-/// The router considers global candidates before forwarding a pending key here.
-fn handle_tab_key(tab: &mut impl TuiTab, key: &Key) -> bool {
-    let consumed = tab.pending_keys().is_some() || tab.has_binding(key);
-    tab.handle_key_event(key);
-    consumed
-}
-
-/// Retain both scopes after a shared prefix. Only a complete global chord wins
-/// over a page chord; a mismatch never falls through to a standalone binding.
-fn route_key<'a>(
-    tab: &mut impl TuiTab,
-    key: &Key,
-    globals: &'a key::KeyMap<AppKey>,
-    pending: &mut Option<&'a key::SubMap<AppKey>>,
-) -> Option<AppKey> {
-    if pending.is_some() || tab.pending_keys().is_some() {
-        if pending.is_some()
-            && let Some(action) = key::instancing::try_from(key, globals, pending)
-        {
-            tab.cancel_pending();
-            return Some(action);
-        }
-        if tab.pending_keys().is_some() {
-            tab.handle_key_event(key);
-        }
-        return None;
-    }
-
-    if matches!(globals.get(key), Some(key::MaybeMap::SubMap(_))) {
-        key::instancing::try_from(key, globals, pending);
-        if tab.starts_chord(key) {
-            tab.handle_key_event(key);
-        }
-        return None;
-    }
-
-    if handle_tab_key(tab, key) {
-        None
-    } else {
-        key::instancing::try_from(key, globals, pending)
-    }
-}
-
-fn combined_hints<'a>(
-    global: Option<&'a key::WhichHints>,
-    page: Option<&'a key::WhichHints>,
-) -> Option<std::borrow::Cow<'a, key::WhichHints>> {
-    use std::{borrow::Cow, collections::BTreeMap};
-    match (global, page) {
-        (Some(global), Some(page)) => {
-            debug_assert_eq!(global.prefix, page.prefix);
-            // Global descriptions win on the same second key, just as dispatch does.
-            let keys: BTreeMap<_, _> = page.keys.iter().chain(&global.keys).cloned().collect();
-            Some(Cow::Owned(key::WhichHints {
-                prefix: global.prefix,
-                name: global.name.clone(),
-                keys: keys.into_iter().collect(),
-            }))
-        }
-        (Some(hints), None) | (None, Some(hints)) => Some(Cow::Borrowed(hints)),
-        (None, None) => None,
-    }
-}
-
 fn tab_titles(
     titles: impl IntoIterator<Item = &'static str>,
-    bindings: &key::KeyMap<AppKey>,
+    bindings: &key::EffectiveKeymap,
 ) -> Vec<String> {
     let mut shortcuts: std::collections::HashMap<usize, Vec<String>> = Default::default();
-    for (first, binding) in bindings {
-        match binding {
-            key::MaybeMap::Action(AppKey::Tab(target)) => {
-                shortcuts
-                    .entry(*target as usize)
-                    .or_default()
-                    .push(first.to_string());
-            }
-            key::MaybeMap::SubMap(submap) => {
-                for (second, action) in &submap.inner {
-                    if let AppKey::Tab(target) = action {
-                        shortcuts
-                            .entry(*target as usize)
-                            .or_default()
-                            .push(format!("{first} {second}"));
-                    }
-                }
-            }
-            _ => {}
+    for binding in &bindings.bindings {
+        if let key::Action::App(AppKey::Tab(target)) = binding.action {
+            shortcuts
+                .entry(target as usize)
+                .or_default()
+                .push(key::notation::format_sequence(&binding.on));
         }
     }
     titles
@@ -492,6 +388,7 @@ fn render_tabbar(
     selected: u8,
     f: &mut ratatui::Frame,
     area: ratatui::layout::Rect,
+    pending_name: Option<&str>,
 ) {
     use crate::tui::theme::Theme;
     use ratatui::style::Styled;
@@ -499,7 +396,7 @@ fn render_tabbar(
 
     let theme = Theme::get();
     let block = Block::bordered().title(" Clashtui ");
-    let block = if let Some(submap_name) = km::get_submap_name() {
+    let block = if let Some(submap_name) = pending_name {
         block.title_bottom(submap_name)
     } else {
         block
@@ -541,15 +438,13 @@ fn the_egg(key: crossterm::event::KeyCode) {
 #[cfg(test)]
 mod which_tests {
     use super::*;
-    use crate::tui::key::{self, Document, KeyDesc, KeyMap, SubMap, WhichHints};
-    use std::{cell::Cell, sync::OnceLock};
+    use crate::tui::key::{self, KeyDesc, KeyMap, Match, Matcher, Scope};
 
     #[test]
     fn global_chords_match_dev_bindings_and_clear_pending_state() {
-        km::set(serde_yml::Value::Null).unwrap();
+        let (map, docs) = compile_globals("[]").unwrap();
+        let mut input = Matcher::default();
         let prefix = "<C-g>".parse().unwrap();
-        assert!(km::handles_chord(&prefix));
-        assert!(!km::handles_chord(&"q".parse().unwrap()));
         for (key, expected, description) in [
             ("c", GlobalAction::OpenCoreDataDir, "Open core data dir"),
             (
@@ -564,32 +459,39 @@ mod which_tests {
                 "Close all connections",
             ),
         ] {
-            assert!(AppKey::try_from(&prefix).is_err());
-            let hints = km::pending_keys().unwrap();
+            assert!(matches!(
+                input.feed(&prefix, Scope::App, &map),
+                Match::Pending
+            ));
+            let hints = input.hints(Scope::App).unwrap();
             assert_eq!(hints.prefix, prefix);
             assert_eq!(hints.keys.len(), 4);
             assert!(hints.keys.contains(&(key.into(), description.into())));
-            let actual = AppKey::try_from(&key.parse().unwrap()).ok();
-            assert!(matches!(actual, Some(AppKey::Global(action)) if action == expected));
-            assert!(km::pending_keys().is_none());
-            assert!(km::get_docs().contains(&(format!("<C-g> {key}"), description.into())));
+            assert!(
+                matches!(input.feed(&key.parse().unwrap(), Scope::App, &map),
+                Match::Execute(AppKey::Global(action)) if action == expected)
+            );
+            assert!(input.hints(Scope::App).is_none());
+            assert!(docs.contains(&(format!("<C-g> {key}"), description.into())));
         }
         for key in ["<Esc>", "q", "?", "<Tab>", "1", "x"] {
-            assert!(AppKey::try_from(&prefix).is_err());
-            assert!(km::handles_chord(&key.parse().unwrap()));
-            assert!(AppKey::try_from(&key.parse().unwrap()).is_err());
-            assert!(km::pending_keys().is_none());
+            input.feed(&prefix, Scope::App, &map);
+            assert!(matches!(
+                input.feed(&key.parse().unwrap(), Scope::App, &map),
+                Match::Cancelled
+            ));
+            assert!(input.hints(Scope::App).is_none());
         }
-        assert!(AppKey::try_from(&prefix).is_err());
-        km::cancel_pending();
-        assert!(km::pending_keys().is_none());
+        input.feed(&prefix, Scope::App, &map);
+        input.cancel();
+        assert!(input.hints(Scope::App).is_none());
         assert!(matches!(
-            AppKey::try_from(&"q".parse().unwrap()),
-            Ok(AppKey::Quit)
+            input.feed(&"q".parse().unwrap(), Scope::App, &map),
+            Match::Execute(AppKey::Quit)
         ));
         assert!(matches!(
-            AppKey::try_from(&"?".parse().unwrap()),
-            Ok(AppKey::Help)
+            input.feed(&"?".parse().unwrap(), Scope::App, &map),
+            Match::Execute(AppKey::Help)
         ));
     }
 
@@ -598,10 +500,13 @@ mod which_tests {
     }
 
     fn resolve_global(map: &KeyMap<AppKey>, keys: &[&str]) -> Option<AppKey> {
-        let mut pending = None;
+        let mut input = Matcher::default();
         let mut action = None;
         for text in keys {
-            action = key::instancing::try_from(&text.parse().unwrap(), map, &mut pending);
+            action = match input.feed(&text.parse().unwrap(), Scope::App, map) {
+                Match::Execute(action) => Some(action),
+                _ => None,
+            };
         }
         action
     }
@@ -617,8 +522,8 @@ mod which_tests {
             KeyEvent::new(KeyCode::Tab, KeyModifiers::SHIFT),
         ] {
             assert!(matches!(
-                key::instancing::try_from(&event.into(), &map, &mut None),
-                Some(AppKey::TabPrev)
+                Matcher::default().feed(&event.into(), Scope::App, &map),
+                Match::Execute(AppKey::TabPrev)
             ));
         }
         assert!(matches!(
@@ -767,221 +672,9 @@ mihomo:
         assert!(matches!(resolve_global(&map, &["q"]), Some(AppKey::Quit)));
     }
 
-    #[derive(Clone, Copy, Eq, PartialEq, serde::Deserialize)]
-    enum Action {
-        Trigger,
-    }
-    impl Document for Action {
-        fn get_doc(&self) -> &'static str {
-            "Trigger"
-        }
-    }
-
-    struct TestTab {
-        pending: Cell<Option<&'static SubMap<Action>>>,
-        fired: usize,
-    }
-
-    fn map() -> &'static KeyMap<Action> {
-        static MAP: OnceLock<KeyMap<Action>> = OnceLock::new();
-        MAP.get_or_init(|| key::config::merge(
-            key::instancing::defaults::DefaultMap::new(),
-            serde_yml::from_str("- {on: m, action: Trigger}\n- {on: x, action: Trigger}\n- {on: [g, g], action: Trigger}\n- {on: [g, q], action: Trigger}\n- {on: [g, '?'], action: Trigger}\n- {on: [g, '<Tab>'], action: Trigger}\n- {on: [q, x], action: Trigger}").unwrap()
-        ).unwrap().0)
-    }
-
-    impl TuiWidget for TestTab {
-        fn handle_key_event(&mut self, key: &Key) {
-            if key::instancing::try_from(key, map(), self.pending.get_mut()).is_some() {
-                self.fired += 1;
-            }
-        }
-        fn render(&mut self, _: &mut ratatui::Frame, _: ratatui::layout::Rect) {}
-        fn sync(&mut self) {}
-    }
-    impl TuiTab for TestTab {
-        fn title(&self) -> &'static str {
-            "Test"
-        }
-        fn key_description(&self) -> KeyDesc {
-            vec![]
-        }
-        fn pending_keys(&self) -> Option<&'static WhichHints> {
-            self.pending.get().map(|submap| &submap.hints)
-        }
-        fn cancel_pending(&self) {
-            self.pending.set(None);
-        }
-        fn has_binding(&self, key: &Key) -> bool {
-            map().contains_key(key)
-        }
-        fn starts_chord(&self, key: &Key) -> bool {
-            matches!(map().get(key), Some(key::MaybeMap::SubMap(_)))
-        }
-    }
-
-    #[test]
-    fn chord_prefixes_and_completions_do_not_fall_through_to_global_keys() {
-        let mut tab = TestTab {
-            pending: Cell::new(None),
-            fired: 0,
-        };
-        for second in ["q", "?", "<Tab>"] {
-            assert!(handle_tab_key(&mut tab, &"g".parse().unwrap()));
-            assert!(tab.pending_keys().is_some());
-            assert!(handle_tab_key(&mut tab, &second.parse().unwrap()));
-            assert!(tab.pending_keys().is_none());
-        }
-        assert_eq!(tab.fired, 3);
-        assert!(handle_tab_key(&mut tab, &"q".parse().unwrap()));
-        assert!(tab.pending_keys().is_some());
-        assert!(handle_tab_key(&mut tab, &"x".parse().unwrap()));
-        assert_eq!(tab.fired, 4);
-    }
-
-    #[test]
-    fn mismatch_and_escape_are_consumed_and_do_not_trigger_standalone_actions() {
-        let mut tab = TestTab {
-            pending: Cell::new(None),
-            fired: 0,
-        };
-        for second in ["x", "<Esc>", "1"] {
-            assert!(handle_tab_key(&mut tab, &"g".parse().unwrap()));
-            assert!(handle_tab_key(&mut tab, &second.parse().unwrap()));
-            assert!(tab.pending_keys().is_none());
-            assert_eq!(tab.fired, 0);
-        }
-        assert!(handle_tab_key(&mut tab, &"m".parse().unwrap()));
-        assert_eq!(tab.fired, 1);
-        assert!(!handle_tab_key(&mut tab, &"?".parse().unwrap()));
-        assert!(!handle_tab_key(&mut tab, &"<Tab>".parse().unwrap()));
-    }
-
-    #[test]
-    fn cancelling_a_scope_discards_its_pending_prefix() {
-        let mut tab = TestTab {
-            pending: Cell::new(None),
-            fired: 0,
-        };
-        handle_tab_key(&mut tab, &"g".parse().unwrap());
-        tab.cancel_pending();
-        assert!(tab.pending_keys().is_none());
-        assert!(!handle_tab_key(&mut tab, &"?".parse().unwrap()));
-        assert_eq!(tab.fired, 0);
-    }
-
-    #[test]
-    fn shared_prefix_keeps_page_and_global_chords_reachable() {
-        let (globals, _) =
-            compile_globals("- {on: [g, p], action: TabPrev, desc: Previous page}").unwrap();
-        let mut pending = None;
-        let mut tab = TestTab {
-            pending: Cell::new(None),
-            fired: 0,
-        };
-
-        for second in ["g", "p"] {
-            assert!(route_key(&mut tab, &"g".parse().unwrap(), &globals, &mut pending).is_none());
-            let hints = combined_hints(pending.map(|s| &s.hints), tab.pending_keys()).unwrap();
-            assert!(hints.keys.contains(&("g".into(), "Trigger".into())));
-            assert!(hints.keys.contains(&("p".into(), "Previous page".into())));
-            assert!(hints.keys.windows(2).all(|pair| pair[0].0 < pair[1].0));
-            let action = route_key(&mut tab, &second.parse().unwrap(), &globals, &mut pending);
-            if second == "p" {
-                assert!(matches!(action, Some(AppKey::TabPrev)));
-            } else {
-                assert!(action.is_none());
-            }
-            assert_eq!(tab.fired, 1);
-            assert!(pending.is_none());
-            assert!(tab.pending_keys().is_none());
-        }
-    }
-
-    #[test]
-    fn identical_chords_run_only_global_action_and_show_its_description() {
-        let (globals, _) =
-            compile_globals("- {on: [g, q], action: Help, desc: Global help}").unwrap();
-        let mut pending = None;
-        let mut tab = TestTab {
-            pending: Cell::new(None),
-            fired: 0,
-        };
-        route_key(&mut tab, &"g".parse().unwrap(), &globals, &mut pending);
-        let hints = combined_hints(pending.map(|s| &s.hints), tab.pending_keys()).unwrap();
-        let q: Vec<_> = hints.keys.iter().filter(|(key, _)| key == "q").collect();
-        assert_eq!(q, vec![&("q".into(), "Global help".into())]);
-        assert!(matches!(
-            route_key(&mut tab, &"q".parse().unwrap(), &globals, &mut pending),
-            Some(AppKey::Help)
-        ));
-        assert_eq!(tab.fired, 0);
-        assert!(pending.is_none());
-        assert!(tab.pending_keys().is_none());
-    }
-
-    #[test]
-    fn shared_chord_cancellation_never_runs_single_keys_or_starts_another_chord() {
-        let (globals, _) = compile_globals("- {on: [g, p], action: TabPrev}").unwrap();
-        let mut pending = None;
-        let mut tab = TestTab {
-            pending: Cell::new(None),
-            fired: 0,
-        };
-        for second in ["<Esc>", "x", "1", "<C-g>"] {
-            route_key(&mut tab, &"g".parse().unwrap(), &globals, &mut pending);
-            assert!(
-                route_key(&mut tab, &second.parse().unwrap(), &globals, &mut pending).is_none()
-            );
-            assert_eq!(tab.fired, 0);
-            assert!(pending.is_none());
-            assert!(tab.pending_keys().is_none());
-        }
-    }
-
-    #[test]
-    fn pending_scope_consumes_keys_without_starting_bindings_in_the_other_scope() {
-        let (globals, _) = compile_globals("[]").unwrap();
-        let mut pending = None;
-        let mut tab = TestTab {
-            pending: Cell::new(None),
-            fired: 0,
-        };
-        // Page g q must complete instead of executing the global Quit single key.
-        route_key(&mut tab, &"g".parse().unwrap(), &globals, &mut pending);
-        assert!(route_key(&mut tab, &"q".parse().unwrap(), &globals, &mut pending).is_none());
-        assert_eq!(tab.fired, 1);
-        // An unmatched global second key must not execute the page's x binding.
-        route_key(&mut tab, &"<C-g>".parse().unwrap(), &globals, &mut pending);
-        assert!(route_key(&mut tab, &"x".parse().unwrap(), &globals, &mut pending).is_none());
-        assert_eq!(tab.fired, 1);
-        assert!(pending.is_none());
-        assert!(tab.pending_keys().is_none());
-    }
-
-    #[test]
-    fn chord_prefixes_win_over_single_keys_in_the_other_scope() {
-        let (globals, _) =
-            compile_globals("- {on: [m, p], action: Help}\n- {on: g, action: Help}").unwrap();
-        let mut pending = None;
-        let mut tab = TestTab {
-            pending: Cell::new(None),
-            fired: 0,
-        };
-        route_key(&mut tab, &"m".parse().unwrap(), &globals, &mut pending);
-        assert_eq!(tab.fired, 0);
-        assert!(matches!(
-            route_key(&mut tab, &"p".parse().unwrap(), &globals, &mut pending),
-            Some(AppKey::Help)
-        ));
-        assert!(route_key(&mut tab, &"g".parse().unwrap(), &globals, &mut pending).is_none());
-        assert!(route_key(&mut tab, &"g".parse().unwrap(), &globals, &mut pending).is_none());
-        assert_eq!(tab.fired, 1);
-    }
-
     #[test]
     fn tabbar_uses_rebound_keys_and_omits_unbound_shortcuts() {
-        let (globals, _) = compile_globals(
+        let app: serde_yml::Value = serde_yml::from_str(
             r#"
 - {on: "1", action: TabLogs}
 - {on: "2", action: null}
@@ -992,6 +685,10 @@ mihomo:
 "#,
         )
         .unwrap();
+        let mut config = serde_yml::Mapping::new();
+        config.insert("app".into(), app);
+        let maps = key::Keymaps::from_config(config, "mihomo").unwrap();
+        let bindings = maps.get(Scope::Logs);
         let titles = tab_titles(
             [
                 "Status",
@@ -1002,7 +699,7 @@ mihomo:
                 "Settings",
                 "CoreSrvCtl",
             ],
-            &globals,
+            bindings,
         );
         assert_eq!(
             titles,
@@ -1019,7 +716,7 @@ mihomo:
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 3)).unwrap();
         terminal
-            .draw(|f| render_tabbar(titles, 0, f, f.area()))
+            .draw(|f| render_tabbar(titles, 0, f, f.area(), None))
             .unwrap();
         let screen: String = terminal
             .backend()

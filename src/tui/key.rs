@@ -1,7 +1,12 @@
 use crossterm::event::{KeyCode, KeyEvent as _KeyEvent, KeyModifiers};
 
 pub(super) mod config;
-mod notation;
+mod effective;
+mod matcher;
+pub(super) mod notation;
+
+pub(in crate::tui) use effective::{Action, EffectiveKeymap, Keymaps, Scope};
+pub use matcher::{Match, Matcher};
 
 #[cfg(test)]
 mod tests;
@@ -94,30 +99,7 @@ impl From<KeyCode> for Key {
 }
 
 pub mod instancing {
-    use super::{Key, KeyCode, KeyMap, MaybeMap, SubMap};
-
-    /// Try to match an `A` by lookup in `submap` or `keymap`
-    pub fn try_from<'a, A: Eq + Copy>(
-        ev: &Key,
-        keymap: &'a KeyMap<A>,
-        submap: &mut Option<&'a SubMap<A>>,
-    ) -> Option<A> {
-        let key = if let Some(submap) = submap.take() {
-            if *ev == Key::from_code(KeyCode::Esc) {
-                return None;
-            }
-            submap.inner.get(ev).copied()?
-        } else {
-            match keymap.get(ev)? {
-                MaybeMap::SubMap(inner) => {
-                    *submap = Some(inner);
-                    return None;
-                }
-                MaybeMap::Action(key) => *key,
-            }
-        };
-        Some(key)
-    }
+    use super::Key;
 
     pub mod defaults {
         use super::Key;
@@ -174,121 +156,56 @@ pub mod instancing {
     }
 }
 
-/// Build KeyMap
-///
-/// - load keymapping from file or something via `set`
-/// - get keymapping via `get`
-///
-/// File Format:
-///
+/// Declare a scope's typed defaults and configuration parser.
 /// User entries: `[{on: "j", action: MoveDown, desc: "Move down"}, ...]`.
 macro_rules! key_map {
-    ($actid:ident, $default_map:expr) => {
+    ($scope:ident, $actid:ident, $default_map:expr) => {
         pub(in crate::tui) mod km {
             use super::*;
-            use crate::tui::key::{Key as _Key, KeyDesc, KeyMap as _KeyMap, instancing::*};
-            use std::sync::OnceLock;
 
-            type KeyMap = _KeyMap<$actid>;
-
-            pub(super) static KEYMAP: OnceLock<(KeyMap, KeyDesc)> = OnceLock::new();
-
-            pub fn set(map: serde_yml::Value) -> anyhow::Result<()> {
-                let configured = crate::tui::key::config::merge($default_map, map)?;
-                if KEYMAP.set(configured).is_err() {
-                    anyhow::bail!("keymap initiated twice");
-                }
-                Ok(())
+            pub(in crate::tui) fn bindings(
+                map: serde_yml::Value,
+            ) -> anyhow::Result<
+                Vec<crate::tui::key::config::ResolvedBinding<crate::tui::key::Action>>,
+            > {
+                crate::tui::key::config::resolve::<$actid>($default_map, map).map(|bindings| {
+                    bindings
+                        .into_iter()
+                        .map(|binding| binding.map_action(crate::tui::key::Action::$scope))
+                        .collect()
+                })
             }
 
             #[cfg(test)]
-            pub fn validate_config(map: serde_yml::Value) -> anyhow::Result<KeyDesc> {
-                crate::tui::key::config::merge::<$actid>($default_map, map).map(|(_, docs)| docs)
-            }
-
-            pub(super) fn get() -> &'static KeyMap {
-                &KEYMAP.get().expect("try get keymap without init").0
-            }
-
-            // For re-export like files.rs does
-            pub(in super::super) fn get_docs() -> KeyDesc {
-                // Generate [(key, description about the key's action)] once at startup.
-                KEYMAP.get().expect("try get keymap without init").1.clone()
-            }
-
-            pub(super) static SUBMAP: std::sync::Mutex<
-                Option<&'static crate::tui::key::SubMap<$actid>>,
-            > = std::sync::Mutex::new(None);
-
-            // For re-export like app.rs does
-            pub(in super::super) fn get_submap_name() -> Option<&'static str> {
-                pending_keys().map(|hints| hints.name.as_str())
-            }
-
-            pub(in super::super) fn pending_keys() -> Option<&'static crate::tui::key::WhichHints> {
-                SUBMAP.lock().unwrap().map(|submap| &submap.hints)
-            }
-
-            pub(in super::super) fn cancel_pending() {
-                *SUBMAP.lock().unwrap() = None;
-            }
-
-            pub(in super::super) fn has_binding(key: &_Key) -> bool {
-                get().contains_key(key)
-            }
-
-            pub(in super::super) fn starts_chord(key: &_Key) -> bool {
-                matches!(get().get(key), Some(crate::tui::key::MaybeMap::SubMap(_)))
-            }
-
-            impl TryFrom<&_Key> for $actid {
-                type Error = ();
-
-                fn try_from(ev: &_Key) -> Result<Self, Self::Error> {
-                    let maybe_submap = &mut *SUBMAP.lock().unwrap();
-                    try_from(ev, km::get(), maybe_submap).ok_or(())
-                }
+            pub fn validate_config(
+                map: serde_yml::Value,
+            ) -> anyhow::Result<crate::tui::key::KeyDesc> {
+                bindings(map).map(|bindings| crate::tui::key::config::compile(bindings).1)
             }
         }
     };
 }
 
+static KEYMAPS: std::sync::OnceLock<Keymaps> = std::sync::OnceLock::new();
+
+pub(in crate::tui) fn keymaps() -> &'static Keymaps {
+    KEYMAPS
+        .get()
+        .expect("keymaps must be loaded before starting the TUI")
+}
+
 pub fn load() -> anyhow::Result<()> {
+    use anyhow::Context;
     let path = crate::config::keymap_path();
     let core = match crate::config::CONFIG.core_type() {
         crate::config::CoreType::Mihomo => "mihomo",
         crate::config::CoreType::Singbox => "sing-box",
     };
-    let mut value = config::sections(read_keymap(&path)?, core)?;
-
-    macro_rules! quick_load {
-        (files::$id:ident $(, $($rest:tt)*)?) => {
-            files::$id::km::set(value.remove(concat!("files/", stringify!($id))).unwrap_or_default())
-                .context(concat!("failed to load keymap for files/", stringify!($id)))?;
-            quick_load!($($($rest)*)?);
-        };
-        ($id:ident $(, $($rest:tt)*)?) => {
-            $id::km::set(value.remove(stringify!($id)).unwrap_or_default())
-                .context(concat!("failed to load keymap for ", stringify!($id)))?;
-            quick_load!($($($rest)*)?);
-        };
-        () => {}
-    }
-    use super::{app, tab::*};
-    use anyhow::Context;
-
-    quick_load!(
-        app,
-        connections,
-        proxies,
-        srvctl,
-        settings,
-        logs,
-        files::profile,
-        files::template
-    );
-
-    Ok(())
+    let maps = Keymaps::from_config(read_keymap(&path)?, core)
+        .with_context(|| format!("failed to load keymap at {}", path.display()))?;
+    KEYMAPS
+        .set(maps)
+        .map_err(|_| anyhow::anyhow!("keymaps initialized twice"))
 }
 
 fn read_keymap(path: &std::path::Path) -> anyhow::Result<serde_yml::Mapping> {

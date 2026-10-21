@@ -1,6 +1,5 @@
-use crate::tui::app;
+use crate::tui::key::EffectiveKeymap;
 use crate::tui::key::{Key, KeyDescRef};
-use crate::tui::tab::TuiTab;
 use crossterm::event::KeyCode;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Style, Stylize};
@@ -49,8 +48,8 @@ impl HelpPanel {
         self.scroll = self.scroll.min(self.max_scroll);
     }
 
-    pub fn render(&mut self, f: &mut ratatui::Frame, tab: &impl TuiTab) {
-        self.render_content(f, tab.title(), &tab.key_description(), &app::km::get_docs());
+    pub fn render(&mut self, f: &mut ratatui::Frame, title: &str, bindings: &EffectiveKeymap) {
+        self.render_content(f, title, bindings.page_docs(), bindings.global_docs());
     }
 
     fn render_content(
@@ -188,13 +187,15 @@ fn render_shortcut_section(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tui::{key::KeyDesc, tab::proxies};
+    use crate::tui::key::{KeyDesc, Keymaps, Scope};
     use ratatui::{Terminal, backend::TestBackend};
 
     fn defaults() -> (KeyDesc, KeyDesc) {
+        let maps = Keymaps::from_config(serde_yml::Mapping::new(), "mihomo").unwrap();
+        let bindings = maps.get(Scope::Proxies);
         (
-            proxies::km::validate_config(serde_yml::Value::Null).unwrap(),
-            app::km::km::validate_config(serde_yml::Value::Null).unwrap(),
+            bindings.page_docs().to_vec(),
+            bindings.global_docs().to_vec(),
         )
     }
 

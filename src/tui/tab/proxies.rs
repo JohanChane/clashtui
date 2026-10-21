@@ -6,9 +6,10 @@ pub mod tree;
 use super::dev::*;
 use content::Proxies;
 
-newtype_tab!(ProxiesTab(Tab<Proxies>));
+newtype_tab!(ProxiesTab(Tab<Proxies>), Proxies);
 
 key_map!(
+    Proxies,
     Key,
     DefaultMap::new()
         .with_common([
@@ -61,7 +62,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-enum Key {
+pub(in crate::tui) enum Key {
     MoveUp,
     MoveDown,
     Parent,
@@ -82,7 +83,7 @@ enum Key {
 }
 
 #[derive_aliases::derive(..Action)]
-enum Sort {
+pub(in crate::tui) enum Sort {
     #[serde(rename = "ResetSort")]
     Reset,
     #[serde(rename = "SortByName")]

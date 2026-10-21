@@ -104,7 +104,7 @@ impl fmt::Display for Key {
     }
 }
 
-pub(super) fn format_sequence(keys: &[Key]) -> String {
+pub(in crate::tui) fn format_sequence(keys: &[Key]) -> String {
     keys.iter()
         .map(ToString::to_string)
         .collect::<Vec<_>>()

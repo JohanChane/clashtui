@@ -15,6 +15,25 @@ pub struct Binding<A> {
     pub group: Option<String>,
 }
 
+#[derive(Clone)]
+pub struct ResolvedBinding<A> {
+    pub on: Vec<Key>,
+    pub action: A,
+    pub desc: String,
+    pub group: Option<String>,
+}
+
+impl<A> ResolvedBinding<A> {
+    pub fn map_action<B>(self, map: impl FnOnce(A) -> B) -> ResolvedBinding<B> {
+        ResolvedBinding {
+            on: self.on,
+            action: map(self.action),
+            desc: self.desc,
+            group: self.group,
+        }
+    }
+}
+
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Entry {
@@ -115,9 +134,8 @@ fn validate<A>(bindings: &[Binding<A>]) -> Result<()> {
     Ok(())
 }
 
-/// Generate `[(key, description 'about the key's action')]` at runtime,
-/// alongside the dispatch map, so user descriptions need no leaked strings.
-pub fn merge<A>(defaults: DefaultMap<A>, overrides: Value) -> Result<(KeyMap<A>, KeyDesc)>
+/// Apply overrides and remove unbound keys before composing input contexts.
+pub fn resolve<A>(defaults: DefaultMap<A>, overrides: Value) -> Result<Vec<ResolvedBinding<A>>>
 where
     A: DeserializeOwned + Document,
 {
@@ -135,11 +153,32 @@ where
     bindings.retain(|b| b.action.is_some());
     validate(&bindings)?;
 
+    let mut bindings: Vec<_> = bindings
+        .into_iter()
+        .map(|binding| {
+            let action = binding.action.expect("unbound keys have been removed");
+            ResolvedBinding {
+                desc: binding.desc.unwrap_or_else(|| action.get_doc().to_owned()),
+                group: binding
+                    .group
+                    .or_else(|| groups.get(&binding.on[0]).cloned()),
+                on: binding.on,
+                action,
+            }
+        })
+        .collect();
+    bindings.sort_by_cached_key(|binding| super::notation::format_sequence(&binding.on));
+    Ok(bindings)
+}
+
+/// Generate `[(key, description 'about the key's action')]` at runtime,
+/// alongside the dispatch map, so user descriptions need no leaked strings.
+pub fn compile<A>(bindings: impl IntoIterator<Item = ResolvedBinding<A>>) -> (KeyMap<A>, KeyDesc) {
     let mut map = KeyMap::new();
     let mut docs = Vec::new();
     for binding in bindings {
-        let action = binding.action.expect("unbound keys have been removed");
-        let description = binding.desc.unwrap_or_else(|| action.get_doc().to_owned());
+        let action = binding.action;
+        let description = binding.desc;
         docs.push((
             super::notation::format_sequence(&binding.on),
             description.clone(),
@@ -153,10 +192,7 @@ where
                     MaybeMap::SubMap(SubMap {
                         hints: WhichHints {
                             prefix: *first,
-                            name: binding
-                                .group
-                                .or_else(|| groups.get(first).cloned())
-                                .unwrap_or_else(|| first.to_string()),
+                            name: binding.group.unwrap_or_else(|| first.to_string()),
                             keys: Vec::new(),
                         },
                         inner: HashMap::new(),
@@ -178,7 +214,15 @@ where
         }
     }
     docs.sort_by(|a, b| a.0.cmp(&b.0));
-    Ok((map, docs))
+    (map, docs)
+}
+
+#[cfg(test)]
+pub fn merge<A>(defaults: DefaultMap<A>, overrides: Value) -> Result<(KeyMap<A>, KeyDesc)>
+where
+    A: DeserializeOwned + Document,
+{
+    resolve(defaults, overrides).map(compile)
 }
 
 /// Normalize dev's nested file scopes and optional core-specific sections.

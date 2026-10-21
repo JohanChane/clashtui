@@ -8,9 +8,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-newtype_tab!(LogsTab(Tab<Logs>));
+newtype_tab!(LogsTab(Tab<Logs>), Logs);
 
 key_map!(
+    Logs,
     Key,
     DefaultMap::new()
         .with_common([
@@ -43,7 +44,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-enum Key {
+pub(in crate::tui) enum Key {
     MoveUp,
     MoveDown,
     GoTop,
@@ -437,11 +438,6 @@ impl TabContent for Logs {
         }
         let block = if title_parts.len() > 1 {
             block.title_bottom(Line::raw(title_parts.join(" ")).right_aligned().reversed())
-        } else {
-            block
-        };
-        let block = if let Some(submap_name) = km::get_submap_name() {
-            block.title_bottom(submap_name)
         } else {
             block
         };
