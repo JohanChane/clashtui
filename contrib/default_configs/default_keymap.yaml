@@ -1,11 +1,29 @@
 # Default keymap for clashtui (yazi-style list format)
-# Uses the new list-based YAML format.
+# Uses the list-based YAML format. Unlisted bindings keep their defaults.
+# Entries with the same on sequence replace defaults; action: null unbinds a sequence.
 # Single key:    on: "j"
 # Chord:         on: ["g", "g"]
 # Modifier:      on: "<C-u>", on: "<Enter>", on: "<Up>"
 # Shift:         on: "G"  (uppercase = shift)
-# Nested action: action:\n  Action: Edit
+# Actions use plain names, e.g. action: Edit or action: SortByDelay.
 # Description:   desc: "Optional description"
+
+app:
+  - {on: "1", action: TabStatus}
+  - {on: "2", action: TabFile}
+  - {on: "3", action: TabProxies}
+  - {on: "4", action: TabConnections}
+  - {on: "5", action: TabLogs}
+  - {on: "6", action: TabSettings}
+  - {on: "7", action: TabCoreSrvCtl}
+  - {on: "<Tab>", action: TabNext}
+  - {on: "<S-Tab>", action: TabPrev}
+  - {on: "q", action: Quit}
+  - {on: "?", action: Help}
+  - {on: ["<C-g>", "c"], action: OpenCoreDataDir}
+  - {on: ["<C-g>", "m"], action: OpenCoreInstallDir}
+  - {on: ["<C-g>", "f"], action: RestartCoreService}
+  - {on: ["<C-g>", "t"], action: CloseAllConnections}
 
 connections:
   - on: "<Up>"
@@ -96,65 +114,47 @@ file:
       action: Select
       desc: Select
     - on: "i"
-      action:
-        Action: Add
+      action: Add
       desc: Import (URL or file)
     - on: ["d", "d"]
-      action:
-        Action: Delete
+      action: Delete
       desc: Delete profile
     - on: "e"
-      action:
-        Action: Edit
+      action: Edit
       desc: Edit
     - on: "p"
-      action:
-        Action: Preview
+      action: Preview
       desc: Preview
     - on: "u"
-      action:
-        Action: Update
+      action: Update
       desc: Update
     - on: "/"
-      action:
-        Action: Search
+      action: Search
       desc: Search/Filter
     - on: "t"
-      action:
-        Action: Test
+      action: Test
       desc: Test
     - on: "c"
-      action:
-        Action: Check
+      action: Check
       desc: Check config
     - on: ["C", "u"]
-      action:
-        Action: CopyUrl
+      action: CopyUrl
       desc: Copy URL
     - on: "f"
-      action:
-        Action: FzfFind
+      action: FzfFind
       desc: Find profile
     - on: ["g", "g"]
-      action:
-        Action: GoTop
+      action: GoTop
       desc: Go to top
     - on: "G"
-      action:
-        Action: GoEnd
+      action: GoEnd
       desc: Go to end
     - on: "P"
-      action:
-        Action: ToggleNoPp
+      action: ToggleNoPp
       desc: Toggle no proxy-provider
     - on: "n"
-      action:
-        Action: TrafficNext
-      desc: Traffic display next
-    - on: "N"
-      action:
-        Action: TrafficPrev
-      desc: Traffic display prev
+      action: Traffic
+      desc: Show traffic
 
   template:
     - on: "<Left>"
@@ -182,40 +182,31 @@ file:
       action: MoveUp
       desc: Move up
     - on: ["d", "d"]
-      action:
-        Action: Delete
+      action: Delete
       desc: Delete template
     - on: "e"
-      action:
-        Action: Edit
+      action: Edit
       desc: Edit
     - on: "E"
-      action:
-        Action: EditProviders
+      action: EditProviders
       desc: Edit proxy providers
     - on: "p"
-      action:
-        Action: Preview
+      action: Preview
       desc: Preview
     - on: "<Enter>"
-      action:
-        Action: Generate
+      action: Generate
       desc: Generate
     - on: "f"
-      action:
-        Action: FzfFind
+      action: FzfFind
       desc: Find template
     - on: ["g", "g"]
-      action:
-        Action: GoTop
+      action: GoTop
       desc: Go to top
     - on: "G"
-      action:
-        Action: GoEnd
+      action: GoEnd
       desc: Go to end
     - on: "/"
-      action:
-        Action: Search
+      action: Search
       desc: Search/Filter
 
 proxies:

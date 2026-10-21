@@ -64,43 +64,84 @@ clashtui --config-dir /my/config/path
 
 ### 自定义按键
 
-在配置目录下创建 `keymap.yaml` 即可修改各页面的按键。比如把上下移动改成 `j` `k`：
+在配置目录的 `keymap.yaml` 中使用 `on / action / desc` 列表格式。Linux 默认路径为 `~/.config/clashtui/keymap.yaml`。只需写需要修改的绑定，未配置的页面和按键继续使用内置默认值。
 
 ```yaml
-proxies:
-  j: SelectDown
-  k: SelectUp
-  enter: ToggleExpand
-
-connections:
-  j: SelectDown
-  k: SelectUp
-
-settings:
-  j: SelectDown
-  k: SelectUp
-  enter: Edit
+logs:
+  - on: "x"
+    action: Clear
+    desc: 清空日志
+  - on: ["g", "e"]
+    action: GoBottom
+    desc: 跳到末尾
+  - on: "<C-j>"
+    action: MoveDown
 
 file:
   profile:
-    j: SelectDown
-    k: SelectUp
-  template:
-    j: SelectDown
-    k: SelectUp
+    - on: "e"
+      action: Edit
+      desc: 编辑配置
 ```
 
-也可以写成列表格式，自定义描述文字：
+- `on`：单键字符串，或包含两个键的列表。修饰键组合算一个键，例如 `["<C-g>", "c"]`；双键不能写成 `"gg"`。
+- 按键记法：`"j"`、`"G"`、`"<Enter>"`、`"<Up>"`、`"<F1>"`；`C-`、`A-`、`S-`、`D-` 分别表示 Ctrl、Alt、Shift、Super。大写字母表示 Shift，`"<S-g>"` 与 `"G"` 相同。
+- `action`：当前页面的动作。使用平铺名称，例如文件页面的 `Edit`、代理页面的 `SortByDelay`；`action: null` 表示解绑。`desc` 可选，用于 `?` 帮助面板；省略时使用动作的默认说明。
+- 相同完整按键序列会替换默认绑定；给同一动作增加新键不会自动删除原键。
+
+用 `action: null` 取消某个默认绑定。例如将默认单键 `j` 改为双键 `jj`：
 
 ```yaml
-proxies:
-  - key: j
-    action: SelectDown
-    desc: 下移
-  - keys: ["g", "g"]
-    action: ToggleExpand
-    desc: 展开/折叠
+logs:
+  - on: "j"
+    action: null
+  - on: ["j", "j"]
+    action: MoveDown
 ```
+
+支持 `app`、`connections`、`proxies`、`srvctl`、`settings`、`logs`、`file.profile`、`file.template`。其中 `file.profile` 和 `file.template` 使用上例的 YAML 嵌套结构。`app` 用于全局快捷键，默认的数字切页、Tab、`q`、`?` 和 `<C-g>` 双键均可修改；同时检查同一 scope 内的冲突，以及每个页面与 `app` 的冲突；不同页面之间可以复用按键。
+
+重复绑定以及单键与双键的前缀冲突（如 `d` 和 `dd`）会阻止启动并显示错误。全局与页面的完整序列相同（如双方都绑定 `gg`），或者一方的单键是另一方的双键前缀，也会报错；错误会指出双方作用域、按键和动作。请修改其中一个绑定，或用 `action: null` 解绑。校验在默认值与用户覆盖合并后进行。`gg` 和 `ge` 仅共享前缀，可以共存。修改配置后需要重启，不支持热加载。
+
+按下双键的第一个键后，底部立即显示 **Which?** 面板，列出可接着按的键和对应说明（优先使用自定义 `desc`）。候选按键排序显示；文件页面使用当前获得焦点的 profile 或 template 配置。按第二键执行后面板关闭；按 Esc 或无匹配键取消，该次输入不会触发其他快捷键。因此普通 `<Esc>` 不能作为双键的第二键。等待第二键时，`q`、`?`、Tab 等也按当前双键处理；取消后再按才执行其单键功能。终端较窄时使用单列，空间不足时显示未展示的候选数量。
+
+默认全局 `<C-g>` 快捷键在所有页面生效。先按 Ctrl+g，which panel 显示下列第二键：
+
+| 第二键 | 动作 |
+|---|---|
+| `c` | 打开当前核心的数据目录 |
+| `m` | 打开当前核心的安装目录（核心 `config_dir` 的父目录） |
+| `f` | 启动/重启当前核心服务 |
+| `t` | 关闭当前核心的所有连接 |
+
+打开目录使用 `extra.open_dir_cmd`，未配置时使用系统默认程序。全局与页面双键可以共享首键：例如 `app` 的 `gp` 与页面的 `gg` 同时有效，Which 面板合并显示双方候选，第二键决定执行哪个动作。应用会为每个页面和文件面板预先合成有效绑定表；执行、Which、帮助和标签栏都使用这份表。冲突配置在启动时拒绝，不会静默覆盖。等待第二键期间，不会再启动新的双键；Esc 或无匹配键取消双方候选，并消费该次输入。输入框和确认弹窗仍优先处理输入。
+
+帮助面板中可启动全局双键，此时只使用全局候选。帮助内容超出屏幕时，使用 ↑/↓ 或 `j`/`k` 滚动，PageUp/PageDown 翻页，Home/End 跳到首尾；Esc 或其他非滚动按键关闭面板。窄终端使用单列显示。
+
+通过 `app` 自定义全局绑定，合并和解绑规则与页面相同。例如把重启键从 `<C-g> f` 改为 `<C-g> r`，并增加 F1 帮助键：
+
+```yaml
+app:
+  - on: ["<C-g>", "r"]
+    action: RestartCoreService
+    desc: 重启核心
+  - on: ["<C-g>", "f"]
+    action: null
+  - on: "<F1>"
+    action: Help
+```
+
+可用动作：`OpenCoreDataDir`、`OpenCoreInstallDir`、`RestartCoreService`、`CloseAllConnections`、`Quit`、`Help`、`TabNext`、`TabPrev`，以及按页面命名的 `TabStatus`、`TabFile`、`TabProxies`、`TabConnections`、`TabLogs`、`TabSettings`、`TabCoreSrvCtl`。全部使用平铺名称；不支持 shell 命令和动作参数。帮助面板和 which panel 会显示修改后的绑定及说明。
+
+`TabNext` 切换到下一个页面（默认 `<Tab>`）；`TabPrev` 切换到上一个页面（默认 `<S-Tab>`）。两者均在首尾循环，可在 `app` 中修改或解绑。
+
+顶部标签从当前页面的有效绑定表读取 `app` 切页键，包括双键；多个绑定用 `/` 分隔。解绑某个页面的全部切页键后，只显示页面名称。
+
+与 dev 一样，可以在顶层 `mihomo:` 或 `sing-box:` 下放置同样的页面配置。当前核心的页面配置会替换对应的公共页面配置，然后与内置默认值合并。
+
+仅支持上述列表格式。旧的结构化 Key 映射、`common/submap`、`files/profile` 顶层路径以及嵌套动作（如 `action: { Action: Edit }`）不再支持；请改为 `file.profile` 嵌套页面和 `action: Edit` 这样的平铺动作名。
+
+完整参考见 [`default_keymap.yaml`](../contrib/default_configs/default_keymap.yaml)。文件不存在、为空或内容为 `{}` 时，使用默认按键。
 
 ## 命令行模式
 

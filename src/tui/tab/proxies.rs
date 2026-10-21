@@ -6,11 +6,12 @@ pub mod tree;
 use super::dev::*;
 use content::Proxies;
 
-newtype_tab!(ProxiesTab(Tab<Proxies>));
+newtype_tab!(ProxiesTab(Tab<Proxies>), Proxies);
 
 key_map!(
+    Proxies,
     Key,
-    FileMap::new()
+    DefaultMap::new()
         .with_common([
             (KeyCode::Up, Key::MoveUp),
             (KeyCode::Down, Key::MoveDown),
@@ -61,7 +62,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-enum Key {
+pub(in crate::tui) enum Key {
     MoveUp,
     MoveDown,
     Parent,
@@ -77,16 +78,23 @@ enum Key {
     Search,
     FzfFind,
     GroupSelect,
+    #[serde(untagged)]
     Sort(Sort),
 }
 
 #[derive_aliases::derive(..Action)]
-enum Sort {
+pub(in crate::tui) enum Sort {
+    #[serde(rename = "ResetSort")]
     Reset,
+    #[serde(rename = "SortByName")]
     ByName,
+    #[serde(rename = "SortByDelay")]
     ByDelay,
+    #[serde(rename = "GlobalResetSort")]
     GlobalReset,
+    #[serde(rename = "GlobalSortByName")]
     GlobalByName,
+    #[serde(rename = "GlobalSortByDelay")]
     GlobalByDelay,
 }
 

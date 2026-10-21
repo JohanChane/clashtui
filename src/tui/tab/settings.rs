@@ -7,11 +7,12 @@ use ratatui::{
 };
 use strum::VariantArray;
 
-newtype_tab!(SettingsTab(Tab<SettingsContent>));
+newtype_tab!(SettingsTab(Tab<SettingsContent>), Settings);
 
 key_map!(
+    Settings,
     Key,
-    FileMap::new().with_common([
+    DefaultMap::new().with_common([
         (KeyCode::Enter, Key::Execute),
         (KeyCode::Esc, Key::Esc),
         (KeyCode::Up, Key::MoveUp),
@@ -22,7 +23,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-enum Key {
+pub(in crate::tui) enum Key {
     Execute,
     MoveUp,
     MoveDown,
@@ -401,11 +402,6 @@ impl TabContent for SettingsContent {
         let block = Block::bordered()
             .border_style(Theme::get().section("settings").border)
             .title(Self::TITLE);
-        let block = if let Some(submap_name) = km::get_submap_name() {
-            block.title_bottom(submap_name)
-        } else {
-            block
-        };
 
         if crate::config::is_core_mismatch() {
             let widget = Paragraph::new("API data mismatch with configured core").block(block);

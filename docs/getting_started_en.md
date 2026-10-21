@@ -64,43 +64,84 @@ After entering the TUI, a row of tabs appears at the top, with a hint bar at the
 
 ### Custom Key Bindings
 
-Create a `keymap.yaml` file in the config directory to modify key bindings for each page. For example, changing up/down navigation to `j` `k`:
+Use the `on / action / desc` list format in `keymap.yaml` in your config directory. The default Linux path is `~/.config/clashtui/keymap.yaml`. Configure only the bindings you want to change; omitted pages and bindings keep their built-in defaults.
 
 ```yaml
-proxies:
-  j: SelectDown
-  k: SelectUp
-  enter: ToggleExpand
-
-connections:
-  j: SelectDown
-  k: SelectUp
-
-settings:
-  j: SelectDown
-  k: SelectUp
-  enter: Edit
+logs:
+  - on: "x"
+    action: Clear
+    desc: Clear logs
+  - on: ["g", "e"]
+    action: GoBottom
+    desc: Go to the end
+  - on: "<C-j>"
+    action: MoveDown
 
 file:
   profile:
-    j: SelectDown
-    k: SelectUp
-  template:
-    j: SelectDown
-    k: SelectUp
+    - on: "e"
+      action: Edit
+      desc: Edit profile
 ```
 
-You can also use the list format to customize descriptions:
+- `on`: a single key string or a list of two keys. A modified key counts as one key, as in `["<C-g>", "c"]`. Write `gg` as `["g", "g"]`, not `"gg"`.
+- Key notation includes `"j"`, `"G"`, `"<Enter>"`, `"<Up>"`, and `"<F1>"`. Prefixes `C-`, `A-`, `S-`, and `D-` mean Ctrl, Alt, Shift, and Super. Uppercase letters imply Shift; `"<S-g>"` and `"G"` are equivalent.
+- `action`: an action for that page. Use a plain name, such as `Edit` on a file page or `SortByDelay` on the proxies page; `action: null` unbinds a key. Optional `desc` appears in the `?` help panel; omit it to use the action's default description.
+- An identical complete key sequence replaces its default binding. Adding a new key for an action does not automatically remove the original key.
+
+Use `action: null` to unbind a default sequence. For example, replace the default single key `j` with the chord `jj`:
 
 ```yaml
-proxies:
-  - key: j
-    action: SelectDown
-    desc: Move down
-  - keys: ["g", "g"]
-    action: ToggleExpand
-    desc: Expand/Collapse
+logs:
+  - on: "j"
+    action: null
+  - on: ["j", "j"]
+    action: MoveDown
 ```
+
+Supported scopes are `app`, `connections`, `proxies`, `srvctl`, `settings`, `logs`, `file.profile`, and `file.template`. The two file scopes use the nested YAML structure shown above. The `app` scope configures global shortcuts, including the default number keys, Tab, `q`, `?`, and `<C-g>` chords. Conflicts are checked both within each scope and between each page and `app`. Separate pages can reuse the same keys.
+
+Duplicate sequences and single-key/chord prefix conflicts (such as `d` and `dd`) stop startup with an error. This also applies across global and page scopes: identical complete sequences, or a single key matching the other scope's chord prefix, are rejected. The error identifies both scopes, sequences, and actions. Rebind one sequence or remove it with `action: null`. Validation runs after defaults and user overrides are merged. Chords such as `gg` and `ge` can share a prefix. Restart after editing; keymaps are not reloaded live.
+
+After the first key of a chord, a **Which?** panel appears near the bottom with sorted remaining keys and their descriptions, including custom `desc` values. The file page uses the focused profile or template scope. A matching second key executes the action and closes the panel. Esc or an unmatched key cancels and consumes that input, so plain `<Esc>` cannot be configured as a chord's second key. While a chord is pending, keys such as `q`, `?`, and Tab belong to that chord; cancel first to use their standalone actions. Narrow terminals use one column, and limited height shows a count of hidden choices.
+
+The default global `<C-g>` shortcuts work on every page. Press Ctrl+g to show these second keys in the which panel:
+
+| Second key | Action |
+|---|---|
+| `c` | Open the active core's data directory |
+| `m` | Open the active core's installation directory (the parent of its `config_dir`) |
+| `f` | Start/restart the active core service |
+| `t` | Close all connections on the active core |
+
+Directory actions use `extra.open_dir_cmd`, or the system default application when unset. Global and page chords can share a first key: for example, `gp` in `app` and `gg` on a page both remain available. The Which panel combines their candidates, and the second key selects the action. An effective binding map is compiled for each page and file pane. Dispatch, Which, help, and tab labels all use that map. Conflicting configurations are rejected at startup instead of silently shadowing a binding. A pending second key cannot start another chord. Esc or an unmatched key cancels both scopes and consumes that input. Input and confirmation popups retain priority.
+
+Global chords also work from the help panel, using only global candidates in that context. When help exceeds the screen height, scroll with Up/Down or `j`/`k`, use PageUp/PageDown to move a page, or Home/End to reach the beginning or end. Esc or another non-scrolling key closes help. Narrow terminals use a single column.
+
+Customize global shortcuts under `app` using the same merge and unbinding rules as page scopes. For example, move restart from `<C-g> f` to `<C-g> r` and add F1 for help:
+
+```yaml
+app:
+  - on: ["<C-g>", "r"]
+    action: RestartCoreService
+    desc: Restart core
+  - on: ["<C-g>", "f"]
+    action: null
+  - on: "<F1>"
+    action: Help
+```
+
+Available actions: `OpenCoreDataDir`, `OpenCoreInstallDir`, `RestartCoreService`, `CloseAllConnections`, `Quit`, `Help`, `TabNext`, `TabPrev`, and `TabStatus`, `TabFile`, `TabProxies`, `TabConnections`, `TabLogs`, `TabSettings`, and `TabCoreSrvCtl`. Use plain names; shell commands and action parameters are not supported. Help and which panels show the configured bindings and descriptions.
+
+`TabNext` switches to the next page (default `<Tab>`); `TabPrev` switches to the previous page (default `<S-Tab>`). Both wrap around at the ends. You can rebind or unbind them in `app`.
+
+The tab bar reads navigation bindings from the current page's effective map, including chords configured in `app`. Multiple bindings are separated by `/`. If all direct navigation bindings for a page are removed, its tab shows only the page name.
+
+As in dev, place the same page sections under top-level `mihomo:` or `sing-box:` for core-specific configuration. An active core's page section replaces the corresponding common section before merging with built-in defaults.
+
+Only the list format above is supported. Legacy structured Key mappings, `common/submap`, top-level `files/profile` paths, and nested actions such as `action: { Action: Edit }` are no longer accepted. Use nested `file.profile` sections and plain action names such as `action: Edit`.
+
+See [`default_keymap.yaml`](../contrib/default_configs/default_keymap.yaml) for a complete reference. Missing files, empty files, and `{}` use the defaults.
 
 ## CLI Mode
 

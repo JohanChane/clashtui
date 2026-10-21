@@ -4,11 +4,12 @@ use crate::config::CoreType;
 use ratatui::style::Color;
 use ratatui::widgets::ListItem;
 
-newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
+newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>), Srvctl);
 
 key_map!(
+    Srvctl,
     Key,
-    FileMap::new().with_common([
+    DefaultMap::new().with_common([
         (KeyCode::Enter, Key::Execute),
         (KeyCode::Up, Key::MoveUp),
         (KeyCode::Down, Key::MoveDown),
@@ -18,10 +19,12 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-enum Key {
+pub(in crate::tui) enum Key {
     Execute,
     MoveUp,
     MoveDown,
+    // Retain dev's configurable Esc action, which does not change the service view.
+    Esc,
 }
 
 impl Document for Key {
@@ -31,26 +34,9 @@ impl Document for Key {
             Self::Execute => "Execute",
             Self::MoveUp => MOVE_UP,
             Self::MoveDown => MOVE_DOWN,
+            Self::Esc => "Back",
         }
     }
-}
-
-macro_rules! tri {
-    ($e:expr) => {
-        match $e {
-            Ok(v) => v,
-            Err(e) => {
-                crate::tui::widget::popmsg::Confirm::err(e);
-                return do_nothing();
-            }
-        }
-    };
-    ($e:expr, or_cancel) => {
-        match $e {
-            Ok(v) => v,
-            Err(_) => return do_nothing(),
-        }
-    };
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -294,6 +280,7 @@ impl TabContent for SrvCtlContent {
     ) {
         // ---- main list routing ----
         match key {
+            Key::Esc => {}
             Key::MoveUp => {
                 let i = state.selected().unwrap_or(0);
                 state.select(Some(i.saturating_sub(1)));
@@ -559,11 +546,6 @@ impl TabContent for SrvCtlContent {
                 ));
                 ratatui::text::Line::from(spans).right_aligned()
             });
-        let block = if let Some(submap_name) = km::get_submap_name() {
-            block.title_bottom(submap_name)
-        } else {
-            block
-        };
 
         let items: Vec<ListItem> = self
             .ops

@@ -5,8 +5,9 @@ use ratatui::style::Style;
 use std::cell::Cell;
 
 key_map!(
+    Template,
     Key,
-    FileMap::new()
+    DefaultMap::new()
         .with_common([
             (KeyCode::Left, Key::Switch),
             (KeyCode::Right, Key::Switch),
@@ -33,7 +34,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key, Debug)]
-pub(super) enum Key {
+pub(in crate::tui) enum Key {
     Switch,
     MoveUp,
     MoveDown,
@@ -41,6 +42,8 @@ pub(super) enum Key {
     GoTop,
     GoEnd,
 
+    // Expose file operations as plain action names in user configuration.
+    #[serde(untagged)]
     Action(Action),
 }
 impl Document for Key {
@@ -65,7 +68,7 @@ impl Document for Key {
 }
 
 #[derive_aliases::derive(..Action, Debug)]
-pub(super) enum Action {
+pub(in crate::tui) enum Action {
     Generate,
     Delete,
     Edit,
@@ -177,11 +180,6 @@ impl DualTabContentMate for Template {
         } else {
             block
         };
-        let block = if let Some(submap_name) = km::get_submap_name() {
-            block.title_bottom(submap_name)
-        } else {
-            block
-        };
 
         let iter = self
             .items
@@ -208,7 +206,7 @@ mod actions {
     use super::*;
 
     impl Action {
-        pub async fn act(self, name: String) -> CB {
+        pub(super) async fn act(self, name: String) -> CB {
             match self {
                 Self::Generate => generate(name).await,
                 Self::Delete => delete(name).await,

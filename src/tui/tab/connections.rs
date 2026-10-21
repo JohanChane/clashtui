@@ -4,11 +4,12 @@ use ratatui::text::Line;
 use ratatui::widgets::{Cell, Row, Table};
 use std::collections::HashMap;
 
-newtype_tab!(ConnectionsTab(Tab<Connections>));
+newtype_tab!(ConnectionsTab(Tab<Connections>), Connections);
 
 key_map!(
+    Connections,
     Key,
-    FileMap::new()
+    DefaultMap::new()
         .with_common([
             (KeyCode::Up, Key::MoveUp),
             (KeyCode::Down, Key::MoveDown),
@@ -51,18 +52,19 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-enum Key {
+pub(in crate::tui) enum Key {
     MoveUp,
     MoveDown,
     GoTop,
     GoBottom,
     Terminate,
     TerminateAll,
-    SortBy(SortColumn),
     SortReset,
     Search,
     TogglePause,
     FzfFind,
+    #[serde(untagged)]
+    SortBy(SortColumn),
 }
 
 impl Document for Key {
@@ -121,13 +123,20 @@ macro_rules! tri {
 }
 
 #[derive_aliases::derive(..Key)]
-enum SortColumn {
+pub(in crate::tui) enum SortColumn {
+    #[serde(rename = "SortByHost")]
     Host,
+    #[serde(rename = "SortByRule")]
     Rule,
+    #[serde(rename = "SortByChains")]
     Chains,
+    #[serde(rename = "SortByDownload")]
     Download,
+    #[serde(rename = "SortByUpload")]
     Upload,
+    #[serde(rename = "SortByDlSpeed")]
     DlSpeed,
+    #[serde(rename = "SortByUlSpeed")]
     UlSpeed,
 }
 
@@ -510,11 +519,6 @@ impl TabContent for Connections {
             block
         } else {
             block.title_bottom(Line::raw(title).right_aligned().reversed())
-        };
-        let block = if let Some(submap_name) = km::get_submap_name() {
-            block.title_bottom(submap_name)
-        } else {
-            block
         };
 
         if !self.error.as_deref().unwrap_or("").is_empty() && self.display_rows.is_empty() {
