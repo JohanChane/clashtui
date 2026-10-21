@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block, Clear, Paragraph},
 };
 
-/// The pending SubMap owns both the matching state and the displayed choices.
+/// Choices come from the same immutable context map used by App's matcher.
 pub fn render(f: &mut Frame, hints: &WhichHints) {
     render_panel(f, f.area(), hints, Theme::get().popup.text);
 }

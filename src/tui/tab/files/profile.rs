@@ -75,6 +75,7 @@ fn traffic_percentage(used: u64, total: u64) -> f64 {
 }
 
 key_map!(
+    Profile,
     Key,
     DefaultMap::new()
         .with_common([
@@ -117,7 +118,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-pub(super) enum Key {
+pub(in crate::tui) enum Key {
     Switch,
     MoveUp,
     MoveDown,
@@ -159,7 +160,7 @@ impl Document for Key {
 }
 
 #[derive_aliases::derive(..Action)]
-pub(super) enum Action {
+pub(in crate::tui) enum Action {
     Add,
     Delete,
     Edit,
@@ -284,11 +285,6 @@ impl DualTabContent for Profile {
         } else {
             block
         };
-        let block = if let Some(submap_name) = km::get_submap_name() {
-            block.title_bottom(submap_name)
-        } else {
-            block
-        };
 
         let current = &crate::config::CONFIG
             .data
@@ -337,7 +333,7 @@ mod actions {
     use super::*;
 
     impl Action {
-        pub async fn act(self, name: String) -> CB {
+        pub(super) async fn act(self, name: String) -> CB {
             match self {
                 Self::Search => search().await,
                 Self::Add => import().await,

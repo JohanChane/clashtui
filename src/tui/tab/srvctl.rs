@@ -4,9 +4,10 @@ use crate::config::CoreType;
 use ratatui::style::Color;
 use ratatui::widgets::ListItem;
 
-newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
+newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>), Srvctl);
 
 key_map!(
+    Srvctl,
     Key,
     DefaultMap::new().with_common([
         (KeyCode::Enter, Key::Execute),
@@ -18,7 +19,7 @@ key_map!(
 );
 
 #[derive_aliases::derive(..Key)]
-enum Key {
+pub(in crate::tui) enum Key {
     Execute,
     MoveUp,
     MoveDown,
@@ -545,11 +546,6 @@ impl TabContent for SrvCtlContent {
                 ));
                 ratatui::text::Line::from(spans).right_aligned()
             });
-        let block = if let Some(submap_name) = km::get_submap_name() {
-            block.title_bottom(submap_name)
-        } else {
-            block
-        };
 
         let items: Vec<ListItem> = self
             .ops

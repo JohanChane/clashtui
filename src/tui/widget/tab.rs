@@ -9,11 +9,11 @@
 //! new_type_impl_tuiwidget!(TheTab);
 //! ```
 
-use crate::tui::{Key, TuiWidget};
+use crate::tui::TuiWidget;
 use ratatui::prelude::{Frame, Rect};
 
 pub trait BasicTabContent: 'static {
-    type Key: for<'a> TryFrom<&'a Key, Error = ()> + Copy;
+    type Key: Copy;
     type State;
 
     const TITLE: &str;
@@ -48,17 +48,17 @@ pub struct Tab<C: TabContent> {
     tasks: FutureSet<C>,
 }
 
+impl<C: TabContent> Tab<C> {
+    pub fn handle_action(&mut self, action: C::Key) {
+        self.content
+            .handle_key_event(action, &mut self.tasks, &mut self.state);
+    }
+}
+
 impl<C> TuiWidget for Tab<C>
 where
     C: TabContent,
 {
-    fn handle_key_event(&mut self, kv: &Key) {
-        if let Ok(key) = C::Key::try_from(kv) {
-            self.content
-                .handle_key_event(key, &mut self.tasks, &mut self.state)
-        }
-    }
-
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
         self.content.render(f, area, &mut self.state);
     }

@@ -99,9 +99,9 @@ logs:
     action: MoveDown
 ```
 
-Supported scopes are `app`, `connections`, `proxies`, `srvctl`, `settings`, `logs`, `file.profile`, and `file.template`. The two file scopes use the nested YAML structure shown above. The `app` scope configures global shortcuts, including the default number keys, Tab, `q`, `?`, and `<C-g>` chords. Conflict checking is limited to each scope; page bindings are not checked against application bindings.
+Supported scopes are `app`, `connections`, `proxies`, `srvctl`, `settings`, `logs`, `file.profile`, and `file.template`. The two file scopes use the nested YAML structure shown above. The `app` scope configures global shortcuts, including the default number keys, Tab, `q`, `?`, and `<C-g>` chords. Conflicts are checked both within each scope and between each page and `app`. Separate pages can reuse the same keys.
 
-Duplicate sequences and single-key/chord prefix conflicts (such as `d` and `dd`) stop startup with an error. Chords such as `gg` and `ge` can coexist. Restart after editing; keymaps are not reloaded live.
+Duplicate sequences and single-key/chord prefix conflicts (such as `d` and `dd`) stop startup with an error. This also applies across global and page scopes: identical complete sequences, or a single key matching the other scope's chord prefix, are rejected. The error identifies both scopes, sequences, and actions. Rebind one sequence or remove it with `action: null`. Validation runs after defaults and user overrides are merged. Chords such as `gg` and `ge` can share a prefix. Restart after editing; keymaps are not reloaded live.
 
 After the first key of a chord, a **Which?** panel appears near the bottom with sorted remaining keys and their descriptions, including custom `desc` values. The file page uses the focused profile or template scope. A matching second key executes the action and closes the panel. Esc or an unmatched key cancels and consumes that input, so plain `<Esc>` cannot be configured as a chord's second key. While a chord is pending, keys such as `q`, `?`, and Tab belong to that chord; cancel first to use their standalone actions. Narrow terminals use one column, and limited height shows a count of hidden choices.
 
@@ -114,7 +114,7 @@ The default global `<C-g>` shortcuts work on every page. Press Ctrl+g to show th
 | `f` | Start/restart the active core service |
 | `t` | Close all connections on the active core |
 
-Directory actions use `extra.open_dir_cmd`, or the system default application when unset. Global and page chords can share a first key: for example, `gp` in `app` and `gg` on a page both remain available. The Which panel combines their candidates, and the second key selects the action. Only an identical complete chord gives the global binding priority, including its description in the hints. A chord prefix takes priority over a single key in the other scope; other global single keys run only when the page has not consumed the input. A pending second key cannot start another chord. Esc or an unmatched key cancels both scopes and consumes that input. Input and confirmation popups retain priority.
+Directory actions use `extra.open_dir_cmd`, or the system default application when unset. Global and page chords can share a first key: for example, `gp` in `app` and `gg` on a page both remain available. The Which panel combines their candidates, and the second key selects the action. An effective binding map is compiled for each page and file pane. Dispatch, Which, help, and tab labels all use that map. Conflicting configurations are rejected at startup instead of silently shadowing a binding. A pending second key cannot start another chord. Esc or an unmatched key cancels both scopes and consumes that input. Input and confirmation popups retain priority.
 
 Global chords also work from the help panel, using only global candidates in that context. When help exceeds the screen height, scroll with Up/Down or `j`/`k`, use PageUp/PageDown to move a page, or Home/End to reach the beginning or end. Esc or another non-scrolling key closes help. Narrow terminals use a single column.
 
@@ -135,7 +135,7 @@ Available actions: `OpenCoreDataDir`, `OpenCoreInstallDir`, `RestartCoreService`
 
 `TabNext` switches to the next page (default `<Tab>`); `TabPrev` switches to the previous page (default `<S-Tab>`). Both wrap around at the ends. You can rebind or unbind them in `app`.
 
-The tab bar shows each page's configured navigation keys from `app`, including chords. Multiple bindings are separated by `/`. If all direct navigation bindings for a page are removed, its tab shows only the page name.
+The tab bar reads navigation bindings from the current page's effective map, including chords configured in `app`. Multiple bindings are separated by `/`. If all direct navigation bindings for a page are removed, its tab shows only the page name.
 
 As in dev, place the same page sections under top-level `mihomo:` or `sing-box:` for core-specific configuration. An active core's page section replaces the corresponding common section before merging with built-in defaults.
 

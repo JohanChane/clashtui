@@ -16,7 +16,6 @@ pub use term::hold;
 pub(crate) use theme::Theme;
 
 trait TuiWidget {
-    fn handle_key_event(&mut self, kv: &Key);
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect);
     fn sync(&mut self);
     fn on_enter(&mut self) {}
