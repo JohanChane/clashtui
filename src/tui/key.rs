@@ -326,16 +326,7 @@ macro_rules! key_map {
 
 pub fn load() -> anyhow::Result<()> {
     let path = crate::config::keymap_path();
-
-    let mut value: serde_yml::Mapping = match std::fs::File::open(&path) {
-        Ok(file) => serde_yml::from_reader(file)?,
-        Err(e) => {
-            return Err(anyhow::anyhow!(
-                "failed to open keymap file at {}: {e}",
-                path.display()
-            ));
-        }
-    };
+    let mut value = read_keymap(&path)?;
 
     macro_rules! quick_load {
         ($rec:expr, files::$id:ident $(, $($rest:tt)*)?) => {
@@ -373,7 +364,19 @@ pub fn load() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn init() -> anyhow::Result<()> {
+fn read_keymap(path: &std::path::Path) -> anyhow::Result<serde_yml::Mapping> {
+    match std::fs::File::open(path) {
+        Ok(file) => serde_yml::from_reader(file)
+            .map_err(|e| anyhow::anyhow!("failed to parse keymap file at {}: {e}", path.display())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => default_keymap(),
+        Err(e) => Err(anyhow::anyhow!(
+            "failed to open keymap file at {}: {e}",
+            path.display()
+        )),
+    }
+}
+
+fn default_keymap() -> anyhow::Result<serde_yml::Mapping> {
     macro_rules! quick_default {
         ($map:expr, files::$id:ident $(, $($rest:tt)*)?) => {
             $map.insert(concat!("files/", stringify!($id)).into(), files::$id::km::default()?);
@@ -400,6 +403,11 @@ pub fn init() -> anyhow::Result<()> {
         files::template
     );
 
+    Ok(map)
+}
+
+pub fn init() -> anyhow::Result<()> {
+    let map = default_keymap()?;
     let path = crate::config::keymap_path();
     let file = std::fs::File::create(path)?;
     serde_yml::to_writer(file, &map)?;
