@@ -77,4 +77,12 @@ impl crate::tui::tab::TuiTab for FileTab {
             template::km::has_binding(key)
         }
     }
+
+    fn starts_chord(&self, key: &crate::tui::Key) -> bool {
+        if self.0.is_foucus_on_left() {
+            profile::km::starts_chord(key)
+        } else {
+            template::km::starts_chord(key)
+        }
+    }
 }

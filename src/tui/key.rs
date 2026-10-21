@@ -25,6 +25,7 @@ pub struct SubMap<A> {
 }
 
 /// Presentation data compiled once from the same bindings as the dispatch map.
+#[derive(Clone)]
 pub struct WhichHints {
     pub prefix: Key,
     pub name: String,
@@ -215,8 +216,9 @@ macro_rules! key_map {
                 KEYMAP.get().expect("try get keymap without init").1.clone()
             }
 
-            static SUBMAP: std::sync::Mutex<Option<&'static crate::tui::key::SubMap<$actid>>> =
-                std::sync::Mutex::new(None);
+            pub(super) static SUBMAP: std::sync::Mutex<
+                Option<&'static crate::tui::key::SubMap<$actid>>,
+            > = std::sync::Mutex::new(None);
 
             // For re-export like app.rs does
             pub(in super::super) fn get_submap_name() -> Option<&'static str> {
@@ -233,6 +235,10 @@ macro_rules! key_map {
 
             pub(in super::super) fn has_binding(key: &_Key) -> bool {
                 get().contains_key(key)
+            }
+
+            pub(in super::super) fn starts_chord(key: &_Key) -> bool {
+                matches!(get().get(key), Some(crate::tui::key::MaybeMap::SubMap(_)))
             }
 
             impl TryFrom<&_Key> for $actid {

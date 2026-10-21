@@ -44,12 +44,12 @@ macro_rules! tri {
 
 macro_rules! newtype_tab {
     ($(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>)) => {
-        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, km::get_docs(), km::pending_keys(), km::cancel_pending(), km::has_binding);
+        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, km::get_docs(), km::pending_keys(), km::cancel_pending(), km::has_binding, km::starts_chord);
     };
     (@no_key $(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>)) => {
-        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, vec![], None, (), |_| false);
+        newtype_tab!($(#[$m])* $tab($ty<$inner>), $inner::TITLE, vec![], None, (), |_| false, |_| false);
     };
-    ($(#[$m:meta])* $tab:ident($inner:ty), $title:expr, $key_desc:expr, $pending:expr, $cancel:expr, $has_binding:expr) => {
+    ($(#[$m:meta])* $tab:ident($inner:ty), $title:expr, $key_desc:expr, $pending:expr, $cancel:expr, $has_binding:expr, $starts_chord:expr) => {
         $(#[$m])*
         #[derive(Default)]
         pub struct $tab($inner);
@@ -76,6 +76,10 @@ macro_rules! newtype_tab {
             fn has_binding(&self, key: &crate::tui::Key) -> bool {
                 ($has_binding)(key)
             }
+
+            fn starts_chord(&self, key: &crate::tui::Key) -> bool {
+                ($starts_chord)(key)
+            }
         }
     };
 }
@@ -86,6 +90,7 @@ pub trait TuiTab: super::TuiWidget {
     fn pending_keys(&self) -> Option<&'static crate::tui::key::WhichHints>;
     fn cancel_pending(&self);
     fn has_binding(&self, key: &crate::tui::Key) -> bool;
+    fn starts_chord(&self, key: &crate::tui::Key) -> bool;
 }
 
 pub(super) mod connections;
@@ -171,6 +176,12 @@ macro_rules! enum_dispatch {
         fn has_binding(&self, key: &crate::tui::Key) -> bool {
             match self {
                 $(Self::$item(inner) => inner.has_binding(key),)+
+            }
+        }
+
+        fn starts_chord(&self, key: &crate::tui::Key) -> bool {
+            match self {
+                $(Self::$item(inner) => inner.starts_chord(key),)+
             }
         }
     }
