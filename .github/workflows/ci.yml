@@ -1,0 +1,203 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "build.rs"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/release.yml"
+  push:
+    branches: [main, dev]
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "build.rs"
+      - ".github/workflows/ci.yml"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      source-ref:
+        description: Commit to check and build
+        required: true
+        type: string
+      release:
+        description: Build and test release artifacts
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ inputs.source-ref }}
+  cancel-in-progress: ${{ !inputs.release }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ── always: code quality ──────────────────────────────
+
+  fmt:
+    name: formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: cargo clippy (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Run clippy
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
+
+  test:
+    name: cargo test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run tests (debug)
+        run: cargo test --locked --all-features
+
+  # ── PR/push: debug artifacts; release caller: release artifacts ──
+
+  build:
+    name: build (${{ matrix.target }})
+    needs: [fmt, clippy, test]
+    runs-on: ${{ matrix.os }}
+    env:
+      BUILD_PROFILE: >-
+        ${{ inputs.release && 'release' || 'debug' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # ── Linux: zigbuild for glibc 2.17 compatibility ──
+        # The default host toolchain links against the runner's
+        # glibc.  Older distros (e.g. CentOS 7) ship with glibc
+        # 2.17 and cannot upgrade.  `cargo-zigbuild` vendor-links
+        # a specified glibc so the binary works everywhere.
+        # ── macOS: all native runners ──
+        # macos-26-intel for x86_64, macos-latest (Apple Silicon)
+        # for arm64.  No zig needed — macOS ships its own libc.
+        # ── Windows: all native runners ──
+        # windows-latest (x86_64) and windows-11-arm (arm64).
+        # MSVC toolchain links the Universal CRT; no glibc concern.
+        # Daily CI builds one architecture per OS; releases build all six targets.
+        include: >-
+          ${{ fromJSON(inputs.release &&
+            '[
+              {"os": "ubuntu-latest", "target": "x86_64-unknown-linux-gnu", "zig-target": "x86_64-unknown-linux-gnu.2.17", "artifact-name": "Linux_amd64_Build", "binary-name": "clashtui-amd64"},
+              {"os": "ubuntu-24.04-arm", "target": "aarch64-unknown-linux-gnu", "zig-target": "aarch64-unknown-linux-gnu.2.17", "artifact-name": "Linux_arm64_Build", "binary-name": "clashtui-arm64"},
+              {"os": "macos-26-intel", "target": "x86_64-apple-darwin", "artifact-name": "macOS_x86_64_Build", "binary-name": "clashtui-darwin-amd64"},
+              {"os": "macos-latest", "target": "aarch64-apple-darwin", "artifact-name": "macOS_aarch64_Build", "binary-name": "clashtui-darwin-arm64"},
+              {"os": "windows-latest", "target": "x86_64-pc-windows-msvc", "artifact-name": "Windows_amd64_Build", "binary-name": "clashtui-windows-amd64.exe"},
+              {"os": "windows-11-arm", "target": "aarch64-pc-windows-msvc", "artifact-name": "Windows_arm64_Build", "binary-name": "clashtui-windows-arm64.exe"}
+            ]' ||
+            '[
+              {"os": "ubuntu-latest", "target": "x86_64-unknown-linux-gnu", "zig-target": "x86_64-unknown-linux-gnu.2.17", "artifact-name": "Linux_amd64_Build", "binary-name": "clashtui-amd64"},
+              {"os": "macos-latest", "target": "aarch64-apple-darwin", "artifact-name": "macOS_aarch64_Build", "binary-name": "clashtui-darwin-arm64"},
+              {"os": "windows-latest", "target": "x86_64-pc-windows-msvc", "artifact-name": "Windows_amd64_Build", "binary-name": "clashtui-windows-amd64.exe"}
+            ]') }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref }}
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: mlugg/setup-zig@v2
+        if: matrix.zig-target
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Set PR build version
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          PR_BRANCH: ${{ github.head_ref }}
+        run: echo "CLASHTUI_VERSION=$PR_BRANCH" >> "$GITHUB_ENV"
+
+      - name: Download dependencies
+        shell: bash
+        run: cargo fetch --locked
+
+      - name: Run tests (release)
+        if: inputs.release
+        run: cargo test --release --locked --all-features
+
+      - name: Build (zig)
+        if: matrix.zig-target
+        shell: bash
+        run: |
+          rustup target add ${{ matrix.target }}
+          cargo install cargo-zigbuild
+          cargo zigbuild \
+            --target ${{ matrix.zig-target }} \
+            ${{ env.BUILD_PROFILE == 'release' && '--release' || '' }} \
+            --locked --all-features
+
+      - name: Build (native)
+        if: ${{ !matrix.zig-target }}
+        shell: bash
+        run: |
+          rustup target add ${{ matrix.target }}
+          cargo build \
+            ${{ env.BUILD_PROFILE == 'release' && '--release' || '' }} \
+            --locked \
+            --target ${{ matrix.target }} \
+            --all-features
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          BIN="./target/${{ matrix.target }}/${BUILD_PROFILE}/clashtui"
+          [ "${{ runner.os }}" = "Windows" ] && BIN="${BIN}.exe"
+          "$BIN" --version
+
+      - name: Prepare artifacts
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          SRC="./target/${{ matrix.target }}/${BUILD_PROFILE}/clashtui"
+          [ "${{ runner.os }}" = "Windows" ] && SRC="${SRC}.exe"
+          mv "$SRC" "./artifacts/${{ matrix.binary-name }}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: artifacts
+          retention-days: 7
+          if-no-files-found: error

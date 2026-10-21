@@ -96,3 +96,10 @@ Run once after clone:
 ```bash
 git config core.hooksPath .githooks
 ```
+
+Check manually:
+
+```bash
+sh .githooks/pre-commit
+sh .githooks/pre-push
+```
