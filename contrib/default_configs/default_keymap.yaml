@@ -8,6 +8,23 @@
 # Actions use plain names, e.g. action: Edit or action: SortByDelay.
 # Description:   desc: "Optional description"
 
+app:
+  - {on: "1", action: TabStatus}
+  - {on: "2", action: TabFile}
+  - {on: "3", action: TabProxies}
+  - {on: "4", action: TabConnections}
+  - {on: "5", action: TabLogs}
+  - {on: "6", action: TabSettings}
+  - {on: "7", action: TabCoreSrvCtl}
+  - {on: "<Tab>", action: TabNext}
+  - {on: "<S-Tab>", action: TabPrev}
+  - {on: "q", action: Quit}
+  - {on: "?", action: Help}
+  - {on: ["<C-g>", "c"], action: OpenCoreDataDir}
+  - {on: ["<C-g>", "m"], action: OpenCoreInstallDir}
+  - {on: ["<C-g>", "f"], action: RestartCoreService}
+  - {on: ["<C-g>", "t"], action: CloseAllConnections}
+
 connections:
   - on: "<Up>"
     action: MoveUp

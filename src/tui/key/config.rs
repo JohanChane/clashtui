@@ -199,6 +199,7 @@ pub fn sections(mut map: Mapping, core: &str) -> Result<Mapping> {
             let key = key.as_str().context("scope name must be a string")?;
             ensure!(
                 [
+                    "app",
                     "connections",
                     "proxies",
                     "srvctl",

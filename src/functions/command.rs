@@ -300,6 +300,15 @@ pub fn edit(path: &str) -> Result<()> {
     shell_spawn(tpl, path)
 }
 
+pub fn open_dir(path: &Path) -> Result<()> {
+    let tpl = CONFIG.cfg_file.extra.open_dir_cmd.as_deref().unwrap_or("");
+    let path = path
+        .to_str()
+        .ok_or_else(|| anyhow::anyhow!("directory path is not valid UTF-8"))?;
+    log::debug!("open_dir: path={path} template={tpl}");
+    shell_spawn(tpl, path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
