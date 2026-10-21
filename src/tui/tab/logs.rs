@@ -12,7 +12,7 @@ newtype_tab!(LogsTab(Tab<Logs>));
 
 key_map!(
     Key,
-    FileMap::new()
+    DefaultMap::new()
         .with_common([
             (KeyCode::Up, Key::MoveUp),
             (KeyCode::Down, Key::MoveDown),

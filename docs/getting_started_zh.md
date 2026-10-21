@@ -80,14 +80,13 @@ logs:
 file:
   profile:
     - on: "e"
-      action:
-        Action: Edit
+      action: Edit
       desc: 编辑配置
 ```
 
 - `on`：单键字符串，或包含两个键的列表。修饰键组合算一个键，例如 `["<C-g>", "c"]`；双键不能写成 `"gg"`。
 - 按键记法：`"j"`、`"G"`、`"<Enter>"`、`"<Up>"`、`"<F1>"`；`C-`、`A-`、`S-`、`D-` 分别表示 Ctrl、Alt、Shift、Super。大写字母表示 Shift，`"<S-g>"` 与 `"G"` 相同。
-- `action`：当前页面的动作。文件页面的操作保留 `Action: Edit` 这样的嵌套格式。`desc` 可选，用于 `?` 帮助面板；省略时使用动作的默认说明。
+- `action`：当前页面的动作。使用平铺名称，例如文件页面的 `Edit`、代理页面的 `SortByDelay`；`action: null` 表示解绑。`desc` 可选，用于 `?` 帮助面板；省略时使用动作的默认说明。
 - 相同完整按键序列会替换默认绑定；给同一动作增加新键不会自动删除原键。
 
 用 `action: null` 取消某个默认绑定。例如将默认单键 `j` 改为双键 `jj`：
@@ -104,7 +103,9 @@ logs:
 
 重复绑定以及单键与双键的前缀冲突（如 `d` 和 `dd`）会阻止启动并显示错误；`gg` 和 `ge` 可以共存。修改配置后需要重启，不支持热加载。
 
-与 dev 一样，可以在顶层 `mihomo:` 或 `sing-box:` 下放置同样的页面配置。当前核心的页面配置会替换对应的公共页面配置，然后与内置默认值合并。早期的结构化 Key 映射和本分支生成的 `common/submap` 文件也可读取。
+与 dev 一样，可以在顶层 `mihomo:` 或 `sing-box:` 下放置同样的页面配置。当前核心的页面配置会替换对应的公共页面配置，然后与内置默认值合并。
+
+仅支持上述列表格式。旧的结构化 Key 映射、`common/submap`、`files/profile` 顶层路径以及嵌套动作（如 `action: { Action: Edit }`）不再支持；请改为 `file.profile` 嵌套页面和 `action: Edit` 这样的平铺动作名。
 
 完整参考见 [`default_keymap.yaml`](../contrib/default_configs/default_keymap.yaml)。文件不存在、为空或内容为 `{}` 时，使用默认按键。
 

@@ -405,38 +405,6 @@ pub mod api_log {
     fn is_leap(y: i64) -> bool {
         (y % 4 == 0 && y % 100 != 0) || (y % 400 == 0)
     }
-
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub fn parse_log_entries(body: &str) -> Vec<LogEntry> {
-        body.lines()
-            .filter(|line| !line.is_empty())
-            .filter_map(
-                |line| match serde_json::from_str::<serde_json::Value>(line) {
-                    Ok(v) => {
-                        let type_ = v
-                            .get("type")
-                            .and_then(|t| t.as_str())
-                            .unwrap_or("unknown")
-                            .to_owned();
-                        let payload = v
-                            .get("payload")
-                            .and_then(|p| p.as_str())
-                            .unwrap_or("")
-                            .to_owned();
-                        Some(LogEntry {
-                            type_,
-                            payload,
-                            time: timestamp(),
-                        })
-                    }
-                    Err(_) => {
-                        log::warn!("Failed to parse log line as JSON: {line}");
-                        None
-                    }
-                },
-            )
-            .collect()
-    }
 }
 
 #[cfg(test)]

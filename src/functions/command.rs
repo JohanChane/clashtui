@@ -300,12 +300,6 @@ pub fn edit(path: &str) -> Result<()> {
     shell_spawn(tpl, path)
 }
 
-pub fn open_dir(path: &str) -> Result<()> {
-    let tpl = CONFIG.cfg_file.extra.open_dir_cmd.as_deref().unwrap_or("");
-    log::debug!("open_dir: path={path} template={tpl}");
-    shell_spawn(tpl, path)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,6 +1,6 @@
 use super::*;
 use crossterm::event::KeyEvent;
-use instancing::files::FileMap;
+use instancing::defaults::DefaultMap;
 use serde_yml::Value;
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -22,8 +22,8 @@ impl Document for Action {
     }
 }
 
-fn defaults() -> FileMap<Action> {
-    FileMap::new()
+fn defaults() -> DefaultMap<Action> {
+    DefaultMap::new()
         .with_common([
             (KeyCode::Char('j'), Action::MoveDown),
             (KeyCode::Char('k'), Action::MoveUp),
@@ -139,35 +139,30 @@ fn bad_configurations_return_errors_instead_of_panicking() {
 }
 
 #[test]
-fn nested_dev_action_format_is_supported() {
-    #[derive(Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
-    enum Nested {
-        Action(Action),
+fn legacy_configuration_formats_are_rejected() {
+    for yaml in [
+        "- {on: x, action: {Action: Clear}}",
+        "- on: x\n  action: !Action Clear",
+        "- {on: x, action: [Clear]}",
+        "- {on: x, action: true}",
+        "- {on: x, action: 42}",
+        "- on: x\n  action: !Legacy null",
+        "- on: x\n  action: !Legacy Clear",
+        "common: {}\nsubmap: {}",
+        "x: Clear",
+        "x: {action: Clear, desc: Custom}",
+        "? code: !Char x\n  ctrl: true\n: action: Clear\n  desc: Custom control binding",
+    ] {
+        assert!(
+            compile(yaml).is_err(),
+            "accepted legacy configuration: {yaml}"
+        );
     }
-    impl Document for Nested {
-        fn get_doc(&self) -> &'static str {
-            "Nested action"
-        }
-    }
-    let overrides: Value = serde_yml::from_str("- on: x\n  action:\n    Action: Clear").unwrap();
-    let (map, _) = config::merge(FileMap::<Nested>::new(), overrides).unwrap();
-    assert!(matches!(
-        map[&"x".parse().unwrap()],
-        MaybeMap::Action(Nested::Action(Action::Clear))
-    ));
-}
-
-#[test]
-fn earlier_submap_configuration_remains_readable() {
-    let value = serde_yml::to_value(defaults()).unwrap();
-    let (map, _) = config::merge(FileMap::<Action>::new(), value).unwrap();
-    assert_eq!(resolve(&map, &["j"]), Some(Action::MoveDown));
-    assert_eq!(resolve(&map, &["g", "g"]), Some(Action::GoTop));
 }
 
 #[test]
 fn core_specific_file_scopes_override_only_the_selected_core() {
-    let yaml = "logs: [{on: x, action: Clear}]\nfile:\n  profile: [{on: e, action: {Action: Edit}}]\nmihomo:\n  logs: [{on: y, action: Clear}]\n  file:\n    template: [{on: p, action: {Action: Preview}}]\nsing-box:\n  logs: [{on: z, action: Clear}]";
+    let yaml = "logs: [{on: x, action: Clear}]\nfile:\n  profile: [{on: e, action: Edit}]\nmihomo:\n  logs: [{on: y, action: Clear}]\n  file:\n    template: [{on: p, action: Preview}]\nsing-box:\n  logs: [{on: z, action: Clear}]";
     let input = serde_yml::from_str(yaml).unwrap();
     let map = config::sections(input, "mihomo").unwrap();
     assert!(map.contains_key("files/profile"));
@@ -186,6 +181,8 @@ fn malformed_scopes_are_rejected() {
         "file: {unknown: []}",
         "mihomo: []",
         "file: {profile: []}\nfiles/profile: []",
+        "files/profile: []",
+        "app: {common: {}}",
     ] {
         assert!(config::sections(serde_yml::from_str(yaml).unwrap(), "mihomo").is_err());
     }
@@ -274,17 +271,10 @@ fn unbinding_allows_single_keys_and_chords_to_replace_each_other() {
 }
 
 #[test]
-fn dev_structured_key_format_retains_modifiers_and_descriptions() {
-    let yaml = "? code: !Char x\n  ctrl: true\n: action: Clear\n  desc: Custom control binding\n";
-    let (map, docs) = compile(yaml).unwrap();
-    assert_eq!(resolve(&map, &["<C-x>"]), Some(Action::Clear));
-    assert_eq!(resolve(&map, &["x"]), None);
-    assert!(docs.contains(&("<C-x>".into(), "Custom control binding".into())));
-}
-
-#[test]
-fn all_real_scopes_accept_the_bundled_user_configuration_and_legacy_defaults() {
-    crate::tui::app::km::km::validate_config(crate::tui::app::km::default().unwrap()).unwrap();
+fn all_real_scopes_accept_defaults_and_the_bundled_user_configuration() {
+    let app_docs = crate::tui::app::km::km::validate_config(Value::Null).unwrap();
+    assert_eq!(app_docs.len(), 10);
+    assert!(app_docs.contains(&("q".into(), "Quit".into())));
     use crate::tui::tab::{connections, files, logs, proxies, settings, srvctl};
     let mut bundled = config::sections(
         serde_yml::from_str(include_str!(
@@ -298,7 +288,6 @@ fn all_real_scopes_accept_the_bundled_user_configuration_and_legacy_defaults() {
         ($module:path, $scope:literal) => {{
             use $module as km;
             km::validate_config(Value::Null).unwrap();
-            km::validate_config(km::default().unwrap()).unwrap();
             km::validate_config(bundled.remove($scope).unwrap())
                 .unwrap_or_else(|e| panic!("{}: {e:#}", $scope));
         }};
@@ -311,4 +300,98 @@ fn all_real_scopes_accept_the_bundled_user_configuration_and_legacy_defaults() {
     check!(files::profile::km, "files/profile");
     check!(files::template::km, "files/template");
     assert!(bundled.is_empty());
+}
+
+#[test]
+fn file_actions_use_plain_names_and_reject_nested_actions() {
+    use crate::tui::tab::files::{profile, template};
+    for (name, description) in [
+        ("Add", "Import (URL or file)"),
+        ("Delete", "Delete"),
+        ("Edit", "Edit"),
+        ("Preview", "Preview"),
+        ("Update", "Update"),
+        ("UpdateAll", "Update all"),
+        ("Search", "Search/Filter"),
+        ("Test", "Test"),
+        ("Check", "Check config"),
+        ("CopyUrl", "Copy URL"),
+        ("FzfFind", "Find profile"),
+        ("ToggleNoPp", "Toggle no proxy-provider"),
+        ("ToggleUpdateWithProxy", "Toggle update with proxy"),
+        ("Traffic", "Show traffic"),
+        ("GoTop", "Go to top"),
+        ("GoEnd", "Go to bottom"),
+    ] {
+        let input = serde_yml::from_str(&format!("- {{on: x, action: {name}}}")).unwrap();
+        let docs = profile::km::validate_config(input).unwrap();
+        assert!(docs.contains(&("x".into(), description.into())), "{name}");
+    }
+    for (name, description) in [
+        ("Generate", "Generate"),
+        ("Delete", "Delete"),
+        ("Edit", "Edit"),
+        ("EditProviders", "Edit proxy providers"),
+        ("Preview", "Preview"),
+        ("Search", "Search/Filter"),
+        ("FzfFind", "Find template"),
+    ] {
+        let input = serde_yml::from_str(&format!("- {{on: x, action: {name}}}")).unwrap();
+        let docs = template::km::validate_config(input).unwrap();
+        assert!(docs.contains(&("x".into(), description.into())), "{name}");
+    }
+    for yaml in [
+        "- {on: x, action: {Action: Edit}}",
+        "- on: x\n  action: !Action Edit",
+        "- {on: x, action: UnknownAction}",
+    ] {
+        let input: Value = serde_yml::from_str(yaml).unwrap();
+        assert!(profile::km::validate_config(input.clone()).is_err());
+        assert!(template::km::validate_config(input).is_err());
+    }
+    assert!(
+        profile::km::validate_config(serde_yml::from_str("- {on: x, action: Generate}").unwrap())
+            .is_err()
+    );
+    assert!(
+        template::km::validate_config(serde_yml::from_str("- {on: x, action: Update}").unwrap())
+            .is_err()
+    );
+}
+
+#[test]
+fn sorting_uses_public_names_without_nested_configuration() {
+    use crate::tui::tab::{connections, proxies};
+    for (name, description) in [
+        ("SortByName", "Sort by name"),
+        ("SortByDelay", "Sort by delay"),
+        ("ResetSort", "Reset sort"),
+        ("GlobalSortByName", "Global sort by name"),
+        ("GlobalSortByDelay", "Global sort by delay"),
+        ("GlobalResetSort", "Global reset sort"),
+    ] {
+        let input = serde_yml::from_str(&format!("- {{on: x, action: {name}}}")).unwrap();
+        let docs = proxies::km::validate_config(input).unwrap();
+        assert!(docs.contains(&("x".into(), description.into())), "{name}");
+    }
+    for name in [
+        "Host", "Rule", "Chains", "Download", "Upload", "DlSpeed", "UlSpeed",
+    ] {
+        let input = serde_yml::from_str(&format!("- {{on: x, action: SortBy{name}}}")).unwrap();
+        connections::km::validate_config(input).unwrap();
+    }
+    for yaml in [
+        "- {on: x, action: {Sort: ByDelay}}",
+        "- on: x\n  action: !Sort ByDelay",
+        "- {on: x, action: ByDelay}",
+    ] {
+        assert!(proxies::km::validate_config(serde_yml::from_str(yaml).unwrap()).is_err());
+    }
+    for yaml in [
+        "- {on: x, action: {SortBy: Host}}",
+        "- on: x\n  action: !SortBy Host",
+        "- {on: x, action: Host}",
+    ] {
+        assert!(connections::km::validate_config(serde_yml::from_str(yaml).unwrap()).is_err());
+    }
 }

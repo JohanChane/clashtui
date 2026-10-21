@@ -10,7 +10,7 @@ newtype_tab!(ProxiesTab(Tab<Proxies>));
 
 key_map!(
     Key,
-    FileMap::new()
+    DefaultMap::new()
         .with_common([
             (KeyCode::Up, Key::MoveUp),
             (KeyCode::Down, Key::MoveDown),
@@ -77,16 +77,23 @@ enum Key {
     Search,
     FzfFind,
     GroupSelect,
+    #[serde(untagged)]
     Sort(Sort),
 }
 
 #[derive_aliases::derive(..Action)]
 enum Sort {
+    #[serde(rename = "ResetSort")]
     Reset,
+    #[serde(rename = "SortByName")]
     ByName,
+    #[serde(rename = "SortByDelay")]
     ByDelay,
+    #[serde(rename = "GlobalResetSort")]
     GlobalReset,
+    #[serde(rename = "GlobalSortByName")]
     GlobalByName,
+    #[serde(rename = "GlobalSortByDelay")]
     GlobalByDelay,
 }
 
