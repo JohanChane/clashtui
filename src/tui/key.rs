@@ -22,14 +22,10 @@ pub enum MaybeMap<A> {
     Action(A),
 }
 
-#[derive_aliases::derive(..Key, Debug)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub struct Key {
     /// The key itself.
     pub code: KeyCode,
-    #[serde(
-        default = "KeyModifiers::empty",
-        skip_serializing_if = "KeyModifiers::is_empty"
-    )]
     /// Additional key modifiers.
     pub modifiers: KeyModifiers,
 }
@@ -110,90 +106,56 @@ pub mod instancing {
         Some(key)
     }
 
-    pub mod files {
+    pub mod defaults {
         use super::Key;
         use crate::tui::key::config::Binding;
-        use std::collections::HashMap;
-        use std::hash::Hash;
 
-        #[derive(serde::Deserialize, serde::Serialize)]
-        #[serde(bound(deserialize = "A: Eq + Hash + serde::Deserialize<'de>"))]
-        pub struct FileMap<A: Eq + Hash> {
-            // #[serde(flatten)]
-            #[serde(default)]
-            common: HashMap<A, Vec<Key>>,
-            // #[serde(flatten)]
-            #[serde(default)]
-            submap: HashMap<String, SubMap<A>>,
+        /// Built-in bindings in declaration order; no configuration serialization needed.
+        pub struct DefaultMap<A> {
+            bindings: Vec<Binding<A>>,
         }
-        impl<A: Eq + Hash> FileMap<A> {
+
+        impl<A> DefaultMap<A> {
             pub fn new() -> Self {
                 Self {
-                    common: Default::default(),
-                    submap: Default::default(),
+                    bindings: Vec::new(),
                 }
             }
+
             pub fn with_common(
                 mut self,
                 map: impl IntoIterator<Item = (impl Into<Key>, A)>,
             ) -> Self {
-                map.into_iter()
-                    .for_each(|(key, act)| self.common.entry(act).or_default().push(key.into()));
+                self.bindings
+                    .extend(map.into_iter().map(|(key, action)| Binding {
+                        on: vec![key.into().normalize()],
+                        action: Some(action),
+                        desc: None,
+                        group: None,
+                    }));
                 self
             }
+
             pub fn with_submap(
                 mut self,
                 name: impl ToString,
                 key: impl Into<Key>,
                 map: impl IntoIterator<Item = (impl Into<Key>, A)>,
             ) -> Self {
-                let inner = &mut self
-                    .submap
-                    .entry(name.to_string())
-                    .or_insert(SubMap {
-                        key: key.into(),
-                        inner: Default::default(),
-                    })
-                    .inner;
-                map.into_iter()
-                    .for_each(|(key, act)| inner.entry(act).or_default().push(key.into()));
+                let name = name.to_string();
+                let first = key.into().normalize();
+                self.bindings
+                    .extend(map.into_iter().map(|(key, action)| Binding {
+                        on: vec![first, key.into().normalize()],
+                        action: Some(action),
+                        desc: None,
+                        group: Some(name.clone()),
+                    }));
                 self
             }
-        }
 
-        #[derive(serde::Deserialize, serde::Serialize)]
-        pub struct SubMap<A: Eq + Hash> {
-            key: Key,
-            // #[serde(flatten)]
-            inner: HashMap<A, Vec<Key>>,
-        }
-
-        impl<A: Eq + Hash + Copy> FileMap<A> {
             pub fn into_bindings(self) -> Vec<Binding<A>> {
-                let mut bindings = Vec::new();
-                for (action, keys) in self.common {
-                    for key in keys {
-                        bindings.push(Binding {
-                            on: vec![key.normalize()],
-                            action: Some(action),
-                            desc: None,
-                            group: None,
-                        });
-                    }
-                }
-                for (name, submap) in self.submap {
-                    for (action, keys) in submap.inner {
-                        for key in keys {
-                            bindings.push(Binding {
-                                on: vec![submap.key.normalize(), key.normalize()],
-                                action: Some(action),
-                                desc: None,
-                                group: Some(name.clone()),
-                            });
-                        }
-                    }
-                }
-                bindings
+                self.bindings
             }
         }
     }
@@ -206,7 +168,6 @@ pub mod instancing {
 ///
 /// File Format:
 ///
-/// Legacy format: `Act1: [Key1, Key2, ...]` inside common/submap.
 /// User entries: `[{on: "j", action: MoveDown, desc: "Move down"}, ...]`.
 macro_rules! key_map {
     ($actid:ident, $default_map:expr) => {
@@ -214,7 +175,7 @@ macro_rules! key_map {
             use super::*;
             use crate::tui::key::{
                 Key as _Key, KeyDesc, KeyMap as _KeyMap,
-                instancing::{files::*, *},
+                instancing::{defaults::*, *},
             };
             use std::sync::OnceLock;
 
@@ -231,17 +192,12 @@ macro_rules! key_map {
             }
 
             #[cfg(test)]
-            pub fn validate_config(map: serde_yml::Value) -> anyhow::Result<()> {
-                crate::tui::key::config::merge::<$actid>($default_map, map).map(|_| ())
+            pub fn validate_config(map: serde_yml::Value) -> anyhow::Result<KeyDesc> {
+                crate::tui::key::config::merge::<$actid>($default_map, map).map(|(_, docs)| docs)
             }
 
             pub(super) fn get() -> &'static KeyMap {
                 &KEYMAP.get().expect("try get keymap without init").0
-            }
-
-            #[allow(dead_code)]
-            pub fn default() -> serde_yml::Result<serde_yml::Value> {
-                serde_yml::to_value::<FileMap<$actid>>($default_map)
             }
 
             // For re-export like files.rs does
@@ -299,8 +255,7 @@ pub fn load() -> anyhow::Result<()> {
     use anyhow::Context;
 
     // The application's core bindings remain fixed, as in dev.
-    app::km::set(value.remove("app").unwrap_or(app::km::default()?))
-        .context("failed to load keymap for app")?;
+    app::km::set().context("failed to load keymap for app")?;
     quick_load!(
         connections,
         proxies,

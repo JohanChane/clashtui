@@ -11,7 +11,7 @@ newtype_tab!(SettingsTab(Tab<SettingsContent>));
 
 key_map!(
     Key,
-    FileMap::new().with_common([
+    DefaultMap::new().with_common([
         (KeyCode::Enter, Key::Execute),
         (KeyCode::Esc, Key::Esc),
         (KeyCode::Up, Key::MoveUp),

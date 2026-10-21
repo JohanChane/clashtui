@@ -80,14 +80,13 @@ logs:
 file:
   profile:
     - on: "e"
-      action:
-        Action: Edit
+      action: Edit
       desc: Edit profile
 ```
 
 - `on`: a single key string or a list of two keys. A modified key counts as one key, as in `["<C-g>", "c"]`. Write `gg` as `["g", "g"]`, not `"gg"`.
 - Key notation includes `"j"`, `"G"`, `"<Enter>"`, `"<Up>"`, and `"<F1>"`. Prefixes `C-`, `A-`, `S-`, and `D-` mean Ctrl, Alt, Shift, and Super. Uppercase letters imply Shift; `"<S-g>"` and `"G"` are equivalent.
-- `action`: an action for that page. File-page operations retain the nested `Action: Edit` format. Optional `desc` appears in the `?` help panel; omit it to use the action's default description.
+- `action`: an action for that page. Use a plain name, such as `Edit` on a file page or `SortByDelay` on the proxies page; `action: null` unbinds a key. Optional `desc` appears in the `?` help panel; omit it to use the action's default description.
 - An identical complete key sequence replaces its default binding. Adding a new key for an action does not automatically remove the original key.
 
 Use `action: null` to unbind a default sequence. For example, replace the default single key `j` with the chord `jj`:
@@ -104,7 +103,9 @@ Supported scopes are `connections`, `proxies`, `srvctl`, `settings`, `logs`, `fi
 
 Duplicate sequences and single-key/chord prefix conflicts (such as `d` and `dd`) stop startup with an error. Chords such as `gg` and `ge` can coexist. Restart after editing; keymaps are not reloaded live.
 
-As in dev, place the same page sections under top-level `mihomo:` or `sing-box:` for core-specific configuration. An active core's page section replaces the corresponding common section before merging with built-in defaults. Earlier structured Key mappings and this branch's generated `common/submap` files also remain readable.
+As in dev, place the same page sections under top-level `mihomo:` or `sing-box:` for core-specific configuration. An active core's page section replaces the corresponding common section before merging with built-in defaults.
+
+Only the list format above is supported. Legacy structured Key mappings, `common/submap`, top-level `files/profile` paths, and nested actions such as `action: { Action: Edit }` are no longer accepted. Use nested `file.profile` sections and plain action names such as `action: Edit`.
 
 See [`default_keymap.yaml`](../contrib/default_configs/default_keymap.yaml) for a complete reference. Missing files, empty files, and `{}` use the defaults.
 

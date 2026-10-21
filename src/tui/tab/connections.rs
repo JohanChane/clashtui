@@ -8,7 +8,7 @@ newtype_tab!(ConnectionsTab(Tab<Connections>));
 
 key_map!(
     Key,
-    FileMap::new()
+    DefaultMap::new()
         .with_common([
             (KeyCode::Up, Key::MoveUp),
             (KeyCode::Down, Key::MoveDown),
@@ -58,11 +58,12 @@ enum Key {
     GoBottom,
     Terminate,
     TerminateAll,
-    SortBy(SortColumn),
     SortReset,
     Search,
     TogglePause,
     FzfFind,
+    #[serde(untagged)]
+    SortBy(SortColumn),
 }
 
 impl Document for Key {
@@ -122,12 +123,19 @@ macro_rules! tri {
 
 #[derive_aliases::derive(..Key)]
 enum SortColumn {
+    #[serde(rename = "SortByHost")]
     Host,
+    #[serde(rename = "SortByRule")]
     Rule,
+    #[serde(rename = "SortByChains")]
     Chains,
+    #[serde(rename = "SortByDownload")]
     Download,
+    #[serde(rename = "SortByUpload")]
     Upload,
+    #[serde(rename = "SortByDlSpeed")]
     DlSpeed,
+    #[serde(rename = "SortByUlSpeed")]
     UlSpeed,
 }
 

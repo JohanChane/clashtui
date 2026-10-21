@@ -8,7 +8,7 @@ newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
 
 key_map!(
     Key,
-    FileMap::new().with_common([
+    DefaultMap::new().with_common([
         (KeyCode::Enter, Key::Execute),
         (KeyCode::Up, Key::MoveUp),
         (KeyCode::Down, Key::MoveDown),

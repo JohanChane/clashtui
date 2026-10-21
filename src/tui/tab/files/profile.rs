@@ -76,7 +76,7 @@ fn traffic_percentage(used: u64, total: u64) -> f64 {
 
 key_map!(
     Key,
-    FileMap::new()
+    DefaultMap::new()
         .with_common([
             (KeyCode::Left, Key::Switch),
             (KeyCode::Right, Key::Switch),
@@ -125,6 +125,8 @@ pub(super) enum Key {
     GoTop,
     GoEnd,
 
+    // Expose file operations as plain action names in user configuration.
+    #[serde(untagged)]
     Action(Action),
 }
 
