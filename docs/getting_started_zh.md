@@ -99,11 +99,39 @@ logs:
     action: MoveDown
 ```
 
-支持 `connections`、`proxies`、`srvctl`、`settings`、`logs`、`file.profile`、`file.template`。其中 `file.profile` 和 `file.template` 使用上例的 YAML 嵌套结构。应用级核心键（`1`–`7`、Tab、`q`、`?`）保持固定；只检查同一 scope 内的冲突，不检查页面键与应用级键的冲突。
+支持 `app`、`connections`、`proxies`、`srvctl`、`settings`、`logs`、`file.profile`、`file.template`。其中 `file.profile` 和 `file.template` 使用上例的 YAML 嵌套结构。`app` 用于全局快捷键，默认的数字切页、Tab、`q`、`?` 和 `<C-g>` 双键均可修改；只检查同一 scope 内的冲突，不检查页面键与应用级键的冲突。
 
 重复绑定以及单键与双键的前缀冲突（如 `d` 和 `dd`）会阻止启动并显示错误；`gg` 和 `ge` 可以共存。修改配置后需要重启，不支持热加载。
 
 按下双键的第一个键后，底部立即显示 **Which?** 面板，列出可接着按的键和对应说明（优先使用自定义 `desc`）。候选按键排序显示；文件页面使用当前获得焦点的 profile 或 template 配置。按第二键执行后面板关闭；按 Esc 或无匹配键取消，该次输入不会触发其他快捷键。因此普通 `<Esc>` 不能作为双键的第二键。等待第二键时，`q`、`?`、Tab 等也按当前双键处理；取消后再按才执行其单键功能。终端较窄时使用单列，空间不足时显示未展示的候选数量。
+
+默认全局 `<C-g>` 快捷键在所有页面生效。先按 Ctrl+g，which panel 显示下列第二键：
+
+| 第二键 | 动作 |
+|---|---|
+| `c` | 打开当前核心的数据目录 |
+| `m` | 打开当前核心的安装目录（核心 `config_dir` 的父目录） |
+| `f` | 启动/重启当前核心服务 |
+| `t` | 关闭当前核心的所有连接 |
+
+打开目录使用 `extra.open_dir_cmd`，未配置时使用系统默认程序。全局双键前缀（默认 `<C-g>`）优先于页面快捷键，并取消正在等待的页面双键；在帮助面板中也可使用。全局单键在页面未消费该键时执行。输入框和确认弹窗仍优先处理输入。全局双键同样支持 Esc 和无匹配键取消。
+
+通过 `app` 自定义全局绑定，合并和解绑规则与页面相同。例如把重启键从 `<C-g> f` 改为 `<C-g> r`，并增加 F1 帮助键：
+
+```yaml
+app:
+  - on: ["<C-g>", "r"]
+    action: RestartCoreService
+    desc: 重启核心
+  - on: ["<C-g>", "f"]
+    action: null
+  - on: "<F1>"
+    action: Help
+```
+
+可用动作：`OpenCoreDataDir`、`OpenCoreInstallDir`、`RestartCoreService`、`CloseAllConnections`、`Quit`、`Help`、`TabNext`、`TabPrev`，以及按页面命名的 `TabStatus`、`TabFile`、`TabProxies`、`TabConnections`、`TabLogs`、`TabSettings`、`TabCoreSrvCtl`。全部使用平铺名称；不支持 shell 命令和动作参数。帮助面板和 which panel 会显示修改后的绑定及说明。
+
+`TabNext` 切换到下一个页面（默认 `<Tab>`）；`TabPrev` 切换到上一个页面（默认 `<S-Tab>`）。两者均在首尾循环，可在 `app` 中修改或解绑。
 
 与 dev 一样，可以在顶层 `mihomo:` 或 `sing-box:` 下放置同样的页面配置。当前核心的页面配置会替换对应的公共页面配置，然后与内置默认值合并。
 

@@ -184,7 +184,6 @@ fn malformed_scopes_are_rejected() {
         "mihomo: []",
         "file: {profile: []}\nfiles/profile: []",
         "files/profile: []",
-        "app: {common: {}}",
     ] {
         assert!(config::sections(serde_yml::from_str(yaml).unwrap(), "mihomo").is_err());
     }
@@ -275,7 +274,7 @@ fn unbinding_allows_single_keys_and_chords_to_replace_each_other() {
 #[test]
 fn all_real_scopes_accept_defaults_and_the_bundled_user_configuration() {
     let app_docs = crate::tui::app::km::km::validate_config(Value::Null).unwrap();
-    assert_eq!(app_docs.len(), 10);
+    assert_eq!(app_docs.len(), 15);
     assert!(app_docs.contains(&("q".into(), "Quit".into())));
     use crate::tui::tab::{connections, files, logs, proxies, settings, srvctl};
     let mut bundled = config::sections(
@@ -294,6 +293,7 @@ fn all_real_scopes_accept_defaults_and_the_bundled_user_configuration() {
                 .unwrap_or_else(|e| panic!("{}: {e:#}", $scope));
         }};
     }
+    check!(crate::tui::app::km::km, "app");
     check!(connections::km, "connections");
     check!(proxies::km, "proxies");
     check!(logs::km, "logs");

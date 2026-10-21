@@ -185,10 +185,7 @@ macro_rules! key_map {
     ($actid:ident, $default_map:expr) => {
         pub(in crate::tui) mod km {
             use super::*;
-            use crate::tui::key::{
-                Key as _Key, KeyDesc, KeyMap as _KeyMap,
-                instancing::{defaults::*, *},
-            };
+            use crate::tui::key::{Key as _Key, KeyDesc, KeyMap as _KeyMap, instancing::*};
             use std::sync::OnceLock;
 
             type KeyMap = _KeyMap<$actid>;
@@ -274,9 +271,8 @@ pub fn load() -> anyhow::Result<()> {
     use super::{app, tab::*};
     use anyhow::Context;
 
-    // The application's core bindings remain fixed, as in dev.
-    app::km::set().context("failed to load keymap for app")?;
     quick_load!(
+        app,
         connections,
         proxies,
         srvctl,

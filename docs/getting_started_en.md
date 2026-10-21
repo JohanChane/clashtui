@@ -99,11 +99,39 @@ logs:
     action: MoveDown
 ```
 
-Supported scopes are `connections`, `proxies`, `srvctl`, `settings`, `logs`, `file.profile`, and `file.template`. The two file scopes use the nested YAML structure shown above. Application core keys (`1`–`7`, Tab, `q`, `?`) remain fixed. Conflict checking is limited to each scope; page bindings are not checked against application bindings.
+Supported scopes are `app`, `connections`, `proxies`, `srvctl`, `settings`, `logs`, `file.profile`, and `file.template`. The two file scopes use the nested YAML structure shown above. The `app` scope configures global shortcuts, including the default number keys, Tab, `q`, `?`, and `<C-g>` chords. Conflict checking is limited to each scope; page bindings are not checked against application bindings.
 
 Duplicate sequences and single-key/chord prefix conflicts (such as `d` and `dd`) stop startup with an error. Chords such as `gg` and `ge` can coexist. Restart after editing; keymaps are not reloaded live.
 
 After the first key of a chord, a **Which?** panel appears near the bottom with sorted remaining keys and their descriptions, including custom `desc` values. The file page uses the focused profile or template scope. A matching second key executes the action and closes the panel. Esc or an unmatched key cancels and consumes that input, so plain `<Esc>` cannot be configured as a chord's second key. While a chord is pending, keys such as `q`, `?`, and Tab belong to that chord; cancel first to use their standalone actions. Narrow terminals use one column, and limited height shows a count of hidden choices.
+
+The default global `<C-g>` shortcuts work on every page. Press Ctrl+g to show these second keys in the which panel:
+
+| Second key | Action |
+|---|---|
+| `c` | Open the active core's data directory |
+| `m` | Open the active core's installation directory (the parent of its `config_dir`) |
+| `f` | Start/restart the active core service |
+| `t` | Close all connections on the active core |
+
+Directory actions use `extra.open_dir_cmd`, or the system default application when unset. Global chord prefixes (by default `<C-g>`) take priority over page shortcuts and cancel a pending page chord; they also work from the help panel. Global single keys run only when the page has not consumed the input. Input and confirmation popups retain priority. Esc or an unmatched second key cancels a global chord as well.
+
+Customize global shortcuts under `app` using the same merge and unbinding rules as page scopes. For example, move restart from `<C-g> f` to `<C-g> r` and add F1 for help:
+
+```yaml
+app:
+  - on: ["<C-g>", "r"]
+    action: RestartCoreService
+    desc: Restart core
+  - on: ["<C-g>", "f"]
+    action: null
+  - on: "<F1>"
+    action: Help
+```
+
+Available actions: `OpenCoreDataDir`, `OpenCoreInstallDir`, `RestartCoreService`, `CloseAllConnections`, `Quit`, `Help`, `TabNext`, `TabPrev`, and `TabStatus`, `TabFile`, `TabProxies`, `TabConnections`, `TabLogs`, `TabSettings`, and `TabCoreSrvCtl`. Use plain names; shell commands and action parameters are not supported. Help and which panels show the configured bindings and descriptions.
+
+`TabNext` switches to the next page (default `<Tab>`); `TabPrev` switches to the previous page (default `<S-Tab>`). Both wrap around at the ends. You can rebind or unbind them in `app`.
 
 As in dev, place the same page sections under top-level `mihomo:` or `sing-box:` for core-specific configuration. An active core's page section replaces the corresponding common section before merging with built-in defaults.
 
