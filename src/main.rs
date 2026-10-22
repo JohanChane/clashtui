@@ -3,6 +3,19 @@ mod config;
 mod functions;
 mod tui;
 
+mod derive_alias {
+    // Define the aliases
+    derive_aliases::define! {
+        // For HashMap: Hash, Eq, PartialEq
+        // For Serde: Serialize, Deserialize
+        // For Copy: Copy, Clone
+        Action = ::core::hash::Hash, ::core::cmp::PartialEq, ::core::cmp::Eq,
+            ::serde::Serialize, ::serde::Deserialize,
+            ::core::marker::Copy, ::core::clone::Clone;
+        Key = ..Action;
+    }
+}
+
 fn main() {
     #[cfg(target_os = "linux")]
     nix::sys::stat::umask(nix::sys::stat::Mode::from_bits_truncate(0o002));
@@ -15,6 +28,7 @@ fn main() {
         eprintln!("Failed to load Config\n{e}");
         return;
     }
+    config::check_startup_perms();
 
     // Handle CLI subcommands (profile, service, mode, update)
     if cmd.command.is_some() {
@@ -36,7 +50,11 @@ fn main() {
         .target(env_logger::Target::Pipe(Box::new(log_file)))
         .init();
 
-    tui::init().unwrap();
+    if let Err(e) = tui::init() {
+        eprintln!("Failed to initiate TUI due to {e}");
+        eprintln!("Exiting");
+        return;
+    };
 
     tui::App::serve().unwrap();
 

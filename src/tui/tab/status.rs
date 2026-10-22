@@ -2,10 +2,10 @@ use ratatui::{text::Text, widgets::Paragraph};
 
 use super::dev::*;
 
-newtype_tab!(StatusTab(Tab<Status>));
+newtype_tab!(@no_key StatusTab(Tab<Status>));
 
 #[derive(Clone, Copy)]
-enum Key {}
+struct Key;
 
 impl TryFrom<&crate::tui::Key> for Key {
     type Error = ();

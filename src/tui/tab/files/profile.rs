@@ -74,198 +74,91 @@ fn traffic_percentage(used: u64, total: u64) -> f64 {
     }
 }
 
-mod_agent!(
+key_map!(
     Key,
-    [
-        ([KeyCode::Left], Key::Switch, "Switch pane"),
-        ([KeyCode::Right], Key::Switch, "Switch pane"),
-        ([KeyCode::Char('h')], Key::Switch, "Switch pane"),
-        ([KeyCode::Char('l')], Key::Switch, "Switch pane"),
-        ([KeyCode::Down], Key::MoveDown, "Move down"),
-        ([KeyCode::Up], Key::MoveUp, "Move up"),
-        ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
-        ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
-        ([KeyCode::Enter], Key::Select, "Select"),
-        (
-            [KeyCode::Char('i')],
-            Key::Action(Action::Add),
-            "Import (URL or file)"
-        ),
-        (
-            [KeyCode::Char('d'), KeyCode::Char('d')],
-            Key::Action(Action::Delete),
-            "Delete profile"
-        ),
-        ([KeyCode::Char('e')], Key::Action(Action::Edit), "Edit"),
-        (
-            [KeyCode::Char('p')],
-            Key::Action(Action::Preview),
-            "Preview"
-        ),
-        ([KeyCode::Char('u')], Key::Action(Action::Update), "Update"),
-        (
-            [KeyCode::Char('/')],
-            Key::Action(Action::Search),
-            "Search/Filter"
-        ),
-        ([KeyCode::Char('t')], Key::Action(Action::Test), "Test"),
-        (
-            [KeyCode::Char('c')],
-            Key::Action(Action::Check),
-            "Check config"
-        ),
-        (
-            [KeyCode::Char('C'), KeyCode::Char('u')],
-            Key::Action(Action::CopyUrl),
-            "Copy URL"
-        ),
-        (
-            [KeyCode::Char('f')],
-            Key::Action(Action::FzfFind),
-            "Find profile"
-        ),
-        (
-            [KeyCode::Char('g'), KeyCode::Char('g')],
-            Key::Action(Action::GoTop),
-            "Go to top"
-        ),
-        (
-            [KeyCode::Char('G')],
-            Key::Action(Action::GoEnd),
-            "Go to end"
-        ),
-        (
-            key("P"),
-            Key::Action(Action::ToggleNoPp),
-            "Toggle no proxy-provider"
-        ),
-        (
-            key("O"),
-            Key::Action(Action::ToggleUpdateWithProxy),
-            "Toggle update with proxy"
-        ),
-        (key("n"), Key::Action(Action::Traffic), "Show traffic"),
-    ]
+    FileMap::new()
+        .with_common([
+            (KeyCode::Left, Key::Switch),
+            (KeyCode::Right, Key::Switch),
+            (KeyCode::Char('h'), Key::Switch),
+            (KeyCode::Char('l'), Key::Switch),
+            (KeyCode::Down, Key::MoveDown),
+            (KeyCode::Up, Key::MoveUp),
+            (KeyCode::Char('j'), Key::MoveDown),
+            (KeyCode::Char('k'), Key::MoveUp),
+            (KeyCode::Enter, Key::Select),
+            (KeyCode::Char('i'), Key::Action(Action::Add)),
+            (KeyCode::Char('D'), Key::Action(Action::Delete)),
+            (KeyCode::Char('e'), Key::Action(Action::Edit)),
+            (KeyCode::Char('p'), Key::Action(Action::Preview)),
+            (KeyCode::Char('u'), Key::Action(Action::Update)),
+            (KeyCode::Char('/'), Key::Action(Action::Search)),
+            (KeyCode::Char('t'), Key::Action(Action::Test)),
+            (KeyCode::Char('c'), Key::Action(Action::Check)),
+            (KeyCode::Char('f'), Key::Action(Action::FzfFind)),
+            (KeyCode::Char('G'), Key::GoEnd),
+            (KeyCode::Char('P'), Key::Action(Action::ToggleNoPp)),
+            (
+                KeyCode::Char('O'),
+                Key::Action(Action::ToggleUpdateWithProxy)
+            ),
+            (KeyCode::Char('n'), Key::Action(Action::Traffic)),
+        ])
+        .with_submap(
+            "Nav",
+            KeyCode::Char('g'),
+            [(KeyCode::Char('g'), Key::GoTop)]
+        ) // God knows why, but this won't serlize (while deserlizing is fine)
+          // .with_submap(
+          //     "Copy Url",
+          //     KeyCode::Char('C'),
+          //     [(KeyCode::Char('u'), Key::Action(Action::CopyUrl))]
+          // )
 );
 
-#[derive(Clone, Copy)]
-pub enum Key {
+#[derive_aliases::derive(..Key)]
+pub(super) enum Key {
     Switch,
     MoveUp,
     MoveDown,
     Select,
+    GoTop,
+    GoEnd,
 
     Action(Action),
 }
 
-impl serde::Serialize for Key {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+impl Document for Key {
+    fn get_doc(&self) -> &'static str {
+        use crate::tui::key::consts::*;
         match self {
-            Key::Switch => serializer.serialize_str("Switch"),
-            Key::MoveUp => serializer.serialize_str("MoveUp"),
-            Key::MoveDown => serializer.serialize_str("MoveDown"),
-            Key::Select => serializer.serialize_str("Select"),
-            Key::Action(action) => {
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry("Action", action)?;
-                map.end()
-            }
+            Self::Switch => "Switch panel",
+            Self::MoveUp => MOVE_UP,
+            Self::MoveDown => MOVE_DOWN,
+            Self::Select => "Select",
+            Self::GoTop => GO_TOP,
+            Self::GoEnd => GO_BOTTOM,
+            Self::Action(Action::Add) => "Import (URL or file)",
+            Self::Action(Action::Delete) => "Delete",
+            Self::Action(Action::Edit) => "Edit",
+            Self::Action(Action::Preview) => "Preview",
+            Self::Action(Action::Update) => "Update",
+            Self::Action(Action::UpdateAll) => "Update all",
+            Self::Action(Action::Search) => FILTER,
+            Self::Action(Action::Test) => "Test",
+            Self::Action(Action::Check) => "Check config",
+            Self::Action(Action::CopyUrl) => "Copy URL",
+            Self::Action(Action::FzfFind) => "Find profile",
+            Self::Action(Action::ToggleNoPp) => "Toggle no proxy-provider",
+            Self::Action(Action::ToggleUpdateWithProxy) => "Toggle update with proxy",
+            Self::Action(Action::Traffic) => "Show traffic",
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for Key {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de::{self, Visitor};
-        use std::fmt;
-
-        struct KeyVisitor;
-
-        impl<'de> Visitor<'de> for KeyVisitor {
-            type Value = Key;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a string (unit variant) or mapping (Action: <name>)")
-            }
-
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Key, E> {
-                match v {
-                    "Switch" => Ok(Key::Switch),
-                    "MoveUp" => Ok(Key::MoveUp),
-                    "MoveDown" => Ok(Key::MoveDown),
-                    "Select" => Ok(Key::Select),
-                    s => Err(de::Error::unknown_variant(
-                        s,
-                        &["Switch", "MoveUp", "MoveDown", "Select", "Action: ..."],
-                    )),
-                }
-            }
-
-            fn visit_map<M: de::MapAccess<'de>>(self, mut map: M) -> Result<Key, M::Error> {
-                let k: String = map
-                    .next_key()?
-                    .ok_or_else(|| de::Error::missing_field("variant"))?;
-                if k == "Action" {
-                    let v: String = map.next_value()?;
-                    match v.as_str() {
-                        "Add" => Ok(Key::Action(Action::Add)),
-                        "ImportFile" => Ok(Key::Action(Action::ImportFile)),
-                        "Delete" => Ok(Key::Action(Action::Delete)),
-                        "Edit" => Ok(Key::Action(Action::Edit)),
-                        "Preview" => Ok(Key::Action(Action::Preview)),
-                        "Update" => Ok(Key::Action(Action::Update)),
-                        "UpdateAll" => Ok(Key::Action(Action::UpdateAll)),
-                        "Search" => Ok(Key::Action(Action::Search)),
-                        "Test" => Ok(Key::Action(Action::Test)),
-                        "Check" => Ok(Key::Action(Action::Check)),
-                        "CopyUrl" => Ok(Key::Action(Action::CopyUrl)),
-                        "FzfFind" => Ok(Key::Action(Action::FzfFind)),
-                        "GoTop" => Ok(Key::Action(Action::GoTop)),
-                        "GoEnd" => Ok(Key::Action(Action::GoEnd)),
-                        "ToggleNoPp" => Ok(Key::Action(Action::ToggleNoPp)),
-                        "ToggleUpdateWithProxy" => Ok(Key::Action(Action::ToggleUpdateWithProxy)),
-                        "Traffic" => Ok(Key::Action(Action::Traffic)),
-                        s => Err(de::Error::unknown_variant(
-                            s,
-                            &[
-                                "Add",
-                                "ImportFile",
-                                "Delete",
-                                "Edit",
-                                "Preview",
-                                "Update",
-                                "UpdateAll",
-                                "Search",
-                                "Test",
-                                "Check",
-                                "CopyUrl",
-                                "FzfFind",
-                                "GoTop",
-                                "GoEnd",
-                                "ToggleNoPp",
-                                "ToggleUpdateWithProxy",
-                                "Traffic",
-                            ],
-                        )),
-                    }
-                } else {
-                    Err(de::Error::unknown_field(&k, &["Action"]))
-                }
-            }
-        }
-
-        deserializer.deserialize_any(KeyVisitor)
-    }
-}
-
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
-pub enum Action {
+#[derive_aliases::derive(..Action)]
+pub(super) enum Action {
     Add,
-    ImportFile,
     Delete,
     Edit,
     Preview,
@@ -276,37 +169,13 @@ pub enum Action {
     Check,
     CopyUrl,
     FzfFind,
-    GoTop,
-    GoEnd,
     ToggleNoPp,
     ToggleUpdateWithProxy,
     Traffic,
 }
 
-impl TryFrom<&crate::tui::Key> for Key {
-    type Error = ();
-
-    fn try_from(value: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(value).copied().ok_or(());
-        }
-
-        Ok(match value.code {
-            KeyCode::Right | KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('l') => {
-                Self::Switch
-            }
-            KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
-            KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
-            KeyCode::Enter => Self::Select,
-
-            _ => return Err(()),
-        })
-    }
-}
-
 #[derive(Default)]
-pub struct Profile {
+pub(super) struct Profile {
     items: Vec<String>,
     atime: Vec<String>,
     filter: Option<String>,
@@ -319,10 +188,6 @@ impl BasicTabContent for Profile {
     type State = ListState;
 
     const TITLE: &str = "Profile";
-
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
-    }
 }
 
 impl DualTabContent for Profile {
@@ -353,9 +218,9 @@ impl DualTabContent for Profile {
                 }
                 .spawn_at(task_set);
             }
+            Key::GoTop => state.select_first(),
+            Key::GoEnd => state.select_last(),
             Key::Action(action) => match action {
-                Action::GoTop => state.select_first(),
-                Action::GoEnd => state.select_last(),
                 Action::Traffic => {
                     let name = get_name!(self, state);
                     actions::show_traffic(name).spawn_at(task_set);
@@ -364,7 +229,7 @@ impl DualTabContent for Profile {
                     let items = self.items.clone();
                     actions::fzf_find(items).spawn_at(task_set)
                 }
-                Action::Add | Action::ImportFile => action.act(String::new()).spawn_at(task_set),
+                Action::Add => action.act(String::new()).spawn_at(task_set),
                 Action::UpdateAll => {
                     for name in &self.items {
                         self.updating.insert(name.clone());
@@ -414,6 +279,11 @@ impl DualTabContent for Profile {
 
         let block = if let Some(filter) = self.filter.as_ref() {
             block.title_bottom(Line::raw(format!(" {filter} ")).right_aligned().reversed())
+        } else {
+            block
+        };
+        let block = if let Some(submap_name) = km::get_submap_name() {
+            block.title_bottom(submap_name)
         } else {
             block
         };
@@ -468,7 +338,7 @@ mod actions {
         pub async fn act(self, name: String) -> CB {
             match self {
                 Self::Search => search().await,
-                Self::Add | Self::ImportFile => import().await,
+                Self::Add => import().await,
                 Self::Edit => _edit(name).await,
                 Self::Delete => delete(name).await,
                 Self::Preview => preview(name).await,
@@ -482,7 +352,6 @@ mod actions {
                     unreachable!("traffic handled in handle_key_event directly")
                 }
                 Self::FzfFind => unreachable!("FzfFind handled directly"),
-                Self::GoTop | Self::GoEnd => do_nothing(),
                 Self::UpdateAll => unreachable!("UpdateAll handled directly in handle_key_event"),
             }
         }

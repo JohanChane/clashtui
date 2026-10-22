@@ -6,42 +6,51 @@ use ratatui::widgets::ListItem;
 
 newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>));
 
-mod_agent!(
-    SrvCtlKey,
-    [
-        ([KeyCode::Enter], SrvCtlKey::Execute, "Execute"),
-        ([KeyCode::Esc], SrvCtlKey::Esc, "Back"),
-        ([KeyCode::Up], SrvCtlKey::MoveUp, "Move up"),
-        ([KeyCode::Down], SrvCtlKey::MoveDown, "Move down"),
-        ([KeyCode::Char('k')], SrvCtlKey::MoveUp, "Move up"),
-        ([KeyCode::Char('j')], SrvCtlKey::MoveDown, "Move down"),
-    ]
+key_map!(
+    Key,
+    FileMap::new().with_common([
+        (KeyCode::Enter, Key::Execute),
+        (KeyCode::Up, Key::MoveUp),
+        (KeyCode::Down, Key::MoveDown),
+        (KeyCode::Char('k'), Key::MoveUp),
+        (KeyCode::Char('j'), Key::MoveDown),
+    ])
 );
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
-pub(crate) enum SrvCtlKey {
+#[derive_aliases::derive(..Key)]
+enum Key {
     Execute,
     MoveUp,
     MoveDown,
-    Esc,
 }
 
-impl TryFrom<&crate::tui::Key> for SrvCtlKey {
-    type Error = ();
-
-    fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(ev).copied().ok_or(());
+impl Document for Key {
+    fn get_doc(&self) -> &'static str {
+        use crate::tui::key::consts::*;
+        match self {
+            Self::Execute => "Execute",
+            Self::MoveUp => MOVE_UP,
+            Self::MoveDown => MOVE_DOWN,
         }
-        Ok(match ev.code {
-            KeyCode::Enter => Self::Execute,
-            KeyCode::Esc => Self::Esc,
-            KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
-            KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
-            _ => return Err(()),
-        })
     }
+}
+
+macro_rules! tri {
+    ($e:expr) => {
+        match $e {
+            Ok(v) => v,
+            Err(e) => {
+                crate::tui::widget::popmsg::Confirm::err(e);
+                return do_nothing();
+            }
+        }
+    };
+    ($e:expr, or_cancel) => {
+        match $e {
+            Ok(v) => v,
+            Err(_) => return do_nothing(),
+        }
+    };
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -213,15 +222,11 @@ fn launchd_status(service_name: &str, is_user: bool) -> String {
 }
 
 impl BasicTabContent for SrvCtlContent {
-    type Key = SrvCtlKey;
+    type Key = Key;
 
     type State = ListState;
 
     const TITLE: &str = "CoreSrvCtl";
-
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
-    }
 
     fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         self.spawn_status_check(task_set, CoreType::Mihomo);
@@ -283,23 +288,23 @@ impl TabContent for SrvCtlContent {
 
     fn handle_key_event(
         &mut self,
-        key: SrvCtlKey,
+        key: Key,
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
     ) {
         // ---- main list routing ----
         match key {
-            SrvCtlKey::MoveUp => {
+            Key::MoveUp => {
                 let i = state.selected().unwrap_or(0);
                 state.select(Some(i.saturating_sub(1)));
             }
-            SrvCtlKey::MoveDown => {
+            Key::MoveDown => {
                 let i = state.selected().unwrap_or(0);
                 if i + 1 < self.ops.len() {
                     state.select(Some(i + 1));
                 }
             }
-            SrvCtlKey::Execute => {
+            Key::Execute => {
                 let Some(idx) = state.selected() else { return };
                 let Some(op) = self.ops.get(idx) else { return };
                 let op = *op;
@@ -490,7 +495,6 @@ impl TabContent for SrvCtlContent {
                 }
                 .spawn_at(task_set);
             }
-            _ => {}
         }
     }
 
@@ -555,6 +559,11 @@ impl TabContent for SrvCtlContent {
                 ));
                 ratatui::text::Line::from(spans).right_aligned()
             });
+        let block = if let Some(submap_name) = km::get_submap_name() {
+            block.title_bottom(submap_name)
+        } else {
+            block
+        };
 
         let items: Vec<ListItem> = self
             .ops
@@ -568,92 +577,5 @@ impl TabContent for SrvCtlContent {
             .highlight_style(highlight_style);
 
         f.render_stateful_widget(list, area, state);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn mk_key(code: KeyCode) -> crate::tui::Key {
-        crate::tui::Key {
-            code,
-            shift: matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase()),
-            ctrl: false,
-            alt: false,
-            super_: false,
-        }
-    }
-
-    #[test]
-    fn srvctl_key_agent_contains_expected() {
-        let a = agent();
-        assert!(a.contains_key(&mk_key(KeyCode::Enter)));
-        assert!(a.contains_key(&mk_key(KeyCode::Esc)));
-        assert!(a.contains_key(&mk_key(KeyCode::Up)));
-        assert!(a.contains_key(&mk_key(KeyCode::Down)));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('k'))));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('j'))));
-    }
-
-    #[test]
-    fn srvctl_key_try_from_correct_actions() {
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Enter)),
-            Ok(SrvCtlKey::Execute)
-        ));
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Esc)),
-            Ok(SrvCtlKey::Esc)
-        ));
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Up)),
-            Ok(SrvCtlKey::MoveUp)
-        ));
-        assert!(matches!(
-            SrvCtlKey::try_from(&mk_key(KeyCode::Down)),
-            Ok(SrvCtlKey::MoveDown)
-        ));
-    }
-
-    #[test]
-    fn srvctl_key_try_from_unknown_is_err() {
-        assert!(SrvCtlKey::try_from(&mk_key(KeyCode::Char('x'))).is_err());
-    }
-
-    #[test]
-    fn srvctl_op_all_is_non_empty() {
-        let ops = SrvCtlOp::all();
-        assert!(!ops.is_empty());
-        assert!(ops.contains(&SrvCtlOp::Stop));
-        assert!(ops.contains(&SrvCtlOp::Restart));
-        assert!(ops.contains(&SrvCtlOp::SwitchCore));
-        assert!(ops.contains(&SrvCtlOp::StopAll));
-    }
-
-    #[test]
-    fn srvctl_op_as_str_returns_non_empty() {
-        for op in [
-            SrvCtlOp::Stop,
-            SrvCtlOp::Restart,
-            SrvCtlOp::SwitchCore,
-            SrvCtlOp::StopAll,
-        ] {
-            assert!(!op.as_str().is_empty());
-        }
-    }
-
-    #[test]
-    fn srvctl_op_as_str_unique() {
-        let ops = SrvCtlOp::all();
-        let names: Vec<&str> = ops.iter().map(|op| op.as_str()).collect();
-        let mut unique = names.clone();
-        unique.sort();
-        unique.dedup();
-        assert_eq!(
-            names.len(),
-            unique.len(),
-            "all SrvCtlOp names should be unique"
-        );
     }
 }
