@@ -106,6 +106,8 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
 
     let block = if let Some(ref s) = spinner_str {
         block.title_bottom(Line::raw(s.as_str()))
+    } else if let Some(ref error) = content.error {
+        block.title_bottom(Line::raw(error.as_str()))
     } else if !footer.is_empty() {
         block.title_bottom(Line::raw(footer).right_aligned().reversed())
     } else {
@@ -194,6 +196,9 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
                 };
                 spans.push(Span::styled(delay_str, style));
             }
+            if node.ambiguous {
+                spans.push(Span::styled("  (ambiguous name)", style));
+            }
 
             ListItem::new(Line::from(spans))
         })
@@ -217,4 +222,40 @@ pub fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut ListStat
         .highlight_style(section.highlight);
 
     f.render_stateful_widget(list, area, state);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::functions::restful::proxies::ProxyCatalog;
+    use crate::tui::tab::proxies::tree::ProxyTree;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    #[test]
+    fn completed_test_errors_remain_visible_with_a_populated_tree() {
+        let catalog: ProxyCatalog = serde_json::from_str(include_str!(
+            "../../../../tests/apidata/mihomo/provider-groups.json"
+        ))
+        .unwrap();
+        let content = Proxies {
+            tree: ProxyTree::build(catalog.clone()),
+            proxies: catalog,
+            error: Some("Multiple proxies named node; test the parent group instead".into()),
+            testing_since: None,
+            ..Default::default()
+        };
+        let mut terminal = Terminal::new(TestBackend::new(100, 12)).unwrap();
+        terminal
+            .draw(|frame| render(&content, frame, frame.area(), &mut ListState::default()))
+            .unwrap();
+        let screen: String = terminal
+            .backend()
+            .buffer()
+            .content()
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect();
+        assert!(screen.contains("test the parent group instead"));
+        assert!(screen.contains("Select"));
+    }
 }

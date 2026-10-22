@@ -427,7 +427,7 @@ mod tests {
 
     #[test]
     fn expand_all_preserves_selected_node() {
-        use crate::functions::restful::proxies::ProxiesResponse;
+        use crate::functions::restful::proxies::ProxyCatalog;
         use crate::tui::tab::proxies::tree::{NodeType, ProxyTree};
         use crate::tui::widget::tab::FutureSet;
         use ratatui::widgets::ListState;
@@ -437,13 +437,11 @@ mod tests {
             "/tests/apidata/mihomo/proxies.json"
         );
         let data = std::fs::read_to_string(path).unwrap();
-        let response: ProxiesResponse = serde_json::from_str(&data).unwrap();
-        let proxies = response.proxies;
+        let response: ProxyCatalog = serde_json::from_str(&data).unwrap();
+        let proxies = response;
 
         let mut content = Proxies {
-            tree: ProxyTree::build(ProxiesResponse {
-                proxies: proxies.clone(),
-            }),
+            tree: ProxyTree::build(proxies.clone()),
             proxies: proxies.clone(),
             ..Default::default()
         };
@@ -530,7 +528,7 @@ mod tests {
 
     #[test]
     fn group_select_on_folder_collects_siblings() {
-        use crate::functions::restful::proxies::ProxiesResponse;
+        use crate::functions::restful::proxies::ProxyCatalog;
         use crate::tui::tab::proxies::tree::{NodeType, ProxyTree};
 
         let path = concat!(
@@ -538,13 +536,11 @@ mod tests {
             "/tests/apidata/mihomo/proxies.json"
         );
         let data = std::fs::read_to_string(path).unwrap();
-        let response: ProxiesResponse = serde_json::from_str(&data).unwrap();
-        let proxies = response.proxies;
+        let response: ProxyCatalog = serde_json::from_str(&data).unwrap();
+        let proxies = response;
 
         let content = Proxies {
-            tree: ProxyTree::build(ProxiesResponse {
-                proxies: proxies.clone(),
-            }),
+            tree: ProxyTree::build(proxies.clone()),
             proxies: proxies.clone(),
             ..Default::default()
         };
@@ -583,7 +579,7 @@ mod tests {
 
     #[test]
     fn group_select_on_child_collects_siblings_in_same_group() {
-        use crate::functions::restful::proxies::ProxiesResponse;
+        use crate::functions::restful::proxies::ProxyCatalog;
         use crate::tui::tab::proxies::tree::{NodeType, ProxyTree};
         use crate::tui::widget::tab::FutureSet;
         use ratatui::widgets::ListState;
@@ -593,13 +589,11 @@ mod tests {
             "/tests/apidata/mihomo/proxies.json"
         );
         let data = std::fs::read_to_string(path).unwrap();
-        let response: ProxiesResponse = serde_json::from_str(&data).unwrap();
-        let proxies = response.proxies;
+        let response: ProxyCatalog = serde_json::from_str(&data).unwrap();
+        let proxies = response;
 
         let mut content = Proxies {
-            tree: ProxyTree::build(ProxiesResponse {
-                proxies: proxies.clone(),
-            }),
+            tree: ProxyTree::build(proxies.clone()),
             proxies: proxies.clone(),
             ..Default::default()
         };

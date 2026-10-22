@@ -1,4 +1,4 @@
-use indexmap::IndexMap;
+use crate::functions::restful::proxies::ProxyCatalog;
 use std::collections::{HashMap, HashSet};
 
 #[derive(Clone, Copy, PartialEq, Eq, Default, Debug)]
@@ -23,6 +23,7 @@ pub struct NodeItem {
     pub node_type: NodeType,
     pub proxy_type: String,
     pub delay: Option<u64>,
+    pub ambiguous: bool,
     pub parent: Option<String>,
     pub expanded: bool,
     pub is_now: bool,
@@ -38,17 +39,14 @@ pub struct ProxyTree {
 }
 
 impl ProxyTree {
-    pub fn build(response: crate::functions::restful::proxies::ProxiesResponse) -> Self {
-        let proxies = response.proxies;
+    pub fn build(response: ProxyCatalog) -> Self {
+        let proxies = response;
         let mut tree = ProxyTree::default();
         tree.rebuild_from_proxies(&proxies);
         tree
     }
 
-    pub fn rebuild_from_proxies(
-        &mut self,
-        proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,
-    ) {
+    pub fn rebuild_from_proxies(&mut self, proxies: &ProxyCatalog) {
         let expanded_map: HashMap<String, bool> = self
             .nodes
             .iter()
@@ -66,6 +64,7 @@ impl ProxyTree {
         let mut nodes = Vec::new();
 
         let mut top: Vec<&str> = proxies
+            .primary
             .iter()
             .filter(|(_, p)| !p.hidden && p.all.as_ref().map(|a| !a.is_empty()).unwrap_or(false))
             .map(|(name, _)| name.as_str())
@@ -74,7 +73,7 @@ impl ProxyTree {
         let global_sort = sort_map.get("GLOBAL").copied().unwrap_or(SortMode::None);
         if global_sort == SortMode::ByName {
             top.sort();
-        } else if let Some(global) = proxies.get("GLOBAL")
+        } else if let Some(global) = proxies.primary.get("GLOBAL")
             && let Some(ref group_all) = global.all
         {
             let sort_index: Vec<&str> = group_all.iter().map(|s| s.as_str()).collect();
@@ -115,11 +114,11 @@ impl ProxyTree {
         parent: Option<String>,
         parent_now: Option<&str>,
         depth: usize,
-        proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,
+        proxies: &ProxyCatalog,
         expanded_map: &HashMap<String, bool>,
         sort_mode: SortMode,
     ) {
-        let proxy = match proxies.get(name) {
+        let proxy = match proxies.primary.get(name) {
             Some(p) => p,
             None => return,
         };
@@ -140,6 +139,7 @@ impl ProxyTree {
             node_type,
             proxy_type: proxy.proxy_type.clone(),
             delay: None,
+            ambiguous: false,
             parent,
             expanded,
             is_now: parent_now == Some(name),
@@ -171,8 +171,9 @@ impl ProxyTree {
                 SortMode::None => kids.iter().collect(),
             };
             for kid in &ordered_kids {
-                let is_group = proxies
-                    .get(kid.as_str())
+                let resolved = proxies.resolve(kid);
+                let kid_proxy = resolved.as_ref().ok().map(|p| p.proxy);
+                let is_group = kid_proxy
                     .map(|p| p.all.as_ref().map(|a| !a.is_empty()).unwrap_or(false))
                     .unwrap_or(false);
                 let ntype = if is_group {
@@ -180,13 +181,16 @@ impl ProxyTree {
                 } else {
                     NodeType::File
                 };
-                let kid_proxy = proxies.get(kid.as_str());
                 nodes.push(NodeItem {
                     name: (*kid).clone(),
                     depth: depth + 1,
                     node_type: ntype,
                     proxy_type: kid_proxy.map(|p| p.proxy_type.clone()).unwrap_or_default(),
                     delay: resolve_delay(kid.as_str(), proxies),
+                    ambiguous: matches!(
+                        resolved,
+                        Err(crate::functions::restful::proxies::LookupError::Ambiguous)
+                    ),
                     parent: Some(name.to_owned()),
                     expanded: false,
                     is_now: my_now == Some(kid.as_str()),
@@ -198,42 +202,28 @@ impl ProxyTree {
         }
     }
 
-    pub fn toggle_expand_at(
-        &mut self,
-        name: &str,
-        proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,
-    ) {
+    pub fn toggle_expand_at(&mut self, name: &str, proxies: &ProxyCatalog) {
         if let Some(idx) = self.find_folder_index(name) {
             self.nodes[idx].expanded = !self.nodes[idx].expanded;
             self.rebuild_from_proxies(proxies);
         }
     }
 
-    pub fn expand_at(
-        &mut self,
-        name: &str,
-        proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,
-    ) {
+    pub fn expand_at(&mut self, name: &str, proxies: &ProxyCatalog) {
         if let Some(idx) = self.find_folder_index(name) {
             self.nodes[idx].expanded = true;
             self.rebuild_from_proxies(proxies);
         }
     }
 
-    pub fn collapse_all(
-        &mut self,
-        proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,
-    ) {
+    pub fn collapse_all(&mut self, proxies: &ProxyCatalog) {
         for n in &mut self.nodes {
             n.expanded = false;
         }
         self.rebuild_from_proxies(proxies);
     }
 
-    pub fn expand_all(
-        &mut self,
-        proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,
-    ) {
+    pub fn expand_all(&mut self, proxies: &ProxyCatalog) {
         for n in &mut self.nodes {
             if n.node_type == NodeType::Folder {
                 n.expanded = true;
@@ -272,11 +262,8 @@ fn pick_delay(r: Option<&crate::functions::restful::proxies::DelayRecord>) -> Op
     r.and_then(|r| if r.delay > 0 { Some(r.delay) } else { None })
 }
 
-pub fn resolve_delay(
-    name: &str,
-    proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,
-) -> Option<u64> {
-    let proxy = proxies.get(name)?;
+pub fn resolve_delay(name: &str, proxies: &ProxyCatalog) -> Option<u64> {
+    let proxy = proxies.resolve(name).ok()?.proxy;
     if let Some(d) = pick_delay(proxy.history.last()) {
         return Some(d);
     }
@@ -290,17 +277,14 @@ pub fn resolve_delay(
     None
 }
 
-fn resolve_now_delay(
-    start: &str,
-    proxies: &IndexMap<String, crate::functions::restful::proxies::Proxy>,
-) -> Option<u64> {
+fn resolve_now_delay(start: &str, proxies: &ProxyCatalog) -> Option<u64> {
     let mut current = start.to_string();
     let mut visited = HashSet::new();
     loop {
         if !visited.insert(current.clone()) {
             return None;
         }
-        let proxy = proxies.get(current.as_str())?;
+        let proxy = proxies.resolve(current.as_str()).ok()?.proxy;
         let has_kids = proxy.all.as_ref().map(|a| !a.is_empty()).unwrap_or(false);
         if !has_kids {
             return pick_delay(proxy.history.last());
@@ -315,27 +299,110 @@ fn resolve_now_delay(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::functions::restful::proxies::{self, ProxiesResponse, Proxy};
-    use indexmap::IndexMap;
+    use crate::functions::restful::proxies::{self, Proxy};
 
-    fn load_fixture() -> IndexMap<String, Proxy> {
+    fn provider_fixture() -> ProxyCatalog {
+        let mut catalog: ProxyCatalog = serde_json::from_str(include_str!(
+            "../../../../tests/apidata/mihomo/provider-groups.json"
+        ))
+        .unwrap();
+        let response: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../tests/apidata/mihomo/provider-nodes.json"
+        ))
+        .unwrap();
+        catalog.providers = serde_json::from_value(response["providers"].clone()).unwrap();
+        catalog
+    }
+
+    #[test]
+    fn provider_members_display_history_and_resolve_selector_now_chain() {
+        let catalog = provider_fixture();
+        assert_eq!(resolve_delay("Select", &catalog), Some(212));
+        assert_eq!(resolve_delay("GLOBAL", &catalog), Some(212));
+        let mut tree = ProxyTree::build(catalog.clone());
+        assert_eq!(tree.nodes.len(), 2);
+        tree.expand_at("Select", &catalog);
+        let node = tree.nodes.iter().find(|n| n.name == "node /日本").unwrap();
+        assert_eq!(node.delay, Some(212));
+        assert_eq!(node.proxy_type, "Vless");
+        assert_eq!(node.node_type, NodeType::File);
+        assert!(node.tcp && node.udp && node.is_now);
+        assert!(!node.ambiguous);
+        assert_eq!(
+            tree.nodes
+                .iter()
+                .find(|n| n.name == "failed")
+                .unwrap()
+                .delay,
+            Some(0)
+        );
+        assert_eq!(
+            tree.nodes
+                .iter()
+                .find(|n| n.name == "untested")
+                .unwrap()
+                .delay,
+            None
+        );
+    }
+
+    #[test]
+    fn provider_members_sort_by_delay_and_refresh_without_losing_expansion() {
+        let mut catalog = provider_fixture();
+        let mut tree = ProxyTree::build(catalog.clone());
+        tree.expand_at("Select", &catalog);
+        let group = tree.find_folder_index("Select").unwrap();
+        tree.nodes[group].sort_mode = SortMode::ByDelay;
+        tree.rebuild_from_proxies(&catalog);
+        let children = |tree: &ProxyTree| {
+            tree.nodes
+                .iter()
+                .filter(|n| n.parent.as_deref() == Some("Select"))
+                .map(|n| n.name.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(&children(&tree)[..2], ["inline", "node /日本"]);
+        catalog.providers["subscription /一"].proxies[0]
+            .history
+            .push(proxies::DelayRecord { delay: 5 });
+        tree.rebuild_from_proxies(&catalog);
+        assert_eq!(&children(&tree)[..2], ["node /日本", "inline"]);
+        assert!(tree.nodes[tree.find_folder_index("Select").unwrap()].expanded);
+    }
+
+    #[test]
+    fn conflicting_provider_names_are_marked_without_borrowing_latency() {
+        let mut catalog = provider_fixture();
+        let mut other = catalog.providers["subscription /一"].clone();
+        other.proxies[0].id = Some("different-id".into());
+        other.proxies[0].history = vec![proxies::DelayRecord { delay: 999 }];
+        catalog.providers.insert("other".into(), other);
+        assert_eq!(resolve_delay("node /日本", &catalog), None);
+        assert_eq!(resolve_delay("Select", &catalog), None);
+        let mut tree = ProxyTree::build(catalog.clone());
+        tree.expand_at("Select", &catalog);
+        let node = tree.nodes.iter().find(|n| n.name == "node /日本").unwrap();
+        assert!(node.ambiguous);
+        assert_eq!(node.delay, None);
+        assert_eq!(node.proxy_type, "");
+    }
+
+    fn load_fixture() -> ProxyCatalog {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/apidata/mihomo/proxies.json"
         );
         let data = std::fs::read_to_string(path).expect("Failed to read fixture");
-        let response: ProxiesResponse =
-            serde_json::from_str(&data).expect("Failed to parse fixture");
-        response.proxies
+        let response: ProxyCatalog = serde_json::from_str(&data).expect("Failed to parse fixture");
+        response
     }
 
     #[test]
     fn tree_builds_all_top_level_groups() {
         let proxies = load_fixture();
-        let tree = ProxyTree::build(ProxiesResponse {
-            proxies: proxies.clone(),
-        });
+        let tree = ProxyTree::build(proxies.clone());
         let top_count = proxies
+            .primary
             .iter()
             .filter(|(_, p)| !p.hidden && p.all.as_ref().map(|a| !a.is_empty()).unwrap_or(false))
             .count();
@@ -399,8 +466,8 @@ mod tests {
 
     #[test]
     fn cycle_detection_returns_none() {
-        let mut proxies = IndexMap::new();
-        proxies.insert(
+        let mut proxies = ProxyCatalog::default();
+        proxies.primary.insert(
             "A".to_string(),
             Proxy {
                 name: "A".to_string(),
@@ -409,7 +476,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        proxies.insert(
+        proxies.primary.insert(
             "B".to_string(),
             Proxy {
                 name: "B".to_string(),
@@ -424,9 +491,7 @@ mod tests {
     #[test]
     fn node_types_are_correct() {
         let proxies = load_fixture();
-        let tree = ProxyTree::build(ProxiesResponse {
-            proxies: proxies.clone(),
-        });
+        let tree = ProxyTree::build(proxies.clone());
         for node in &tree.nodes {
             match node.node_type {
                 NodeType::Folder => assert!(
@@ -456,6 +521,7 @@ mod tests {
     fn expanded_folder_has_nested_children() {
         let proxies = load_fixture();
         let child_count = proxies
+            .primary
             .get("Entry")
             .unwrap()
             .all
@@ -484,8 +550,8 @@ mod tests {
 
     #[test]
     fn empty_history_returns_none() {
-        let mut proxies = IndexMap::new();
-        proxies.insert(
+        let mut proxies = ProxyCatalog::default();
+        proxies.primary.insert(
             "empty".to_string(),
             Proxy {
                 name: "empty".to_string(),
@@ -499,8 +565,8 @@ mod tests {
 
     #[test]
     fn zero_delay_produces_fail() {
-        let mut proxies = IndexMap::new();
-        proxies.insert(
+        let mut proxies = ProxyCatalog::default();
+        proxies.primary.insert(
             "dead".to_string(),
             Proxy {
                 name: "dead".to_string(),
@@ -514,8 +580,8 @@ mod tests {
 
     #[test]
     fn now_chain_multiple_levels() {
-        let mut proxies = IndexMap::new();
-        proxies.insert(
+        let mut proxies = ProxyCatalog::default();
+        proxies.primary.insert(
             "G1".to_string(),
             Proxy {
                 name: "G1".to_string(),
@@ -525,7 +591,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        proxies.insert(
+        proxies.primary.insert(
             "G2".to_string(),
             Proxy {
                 name: "G2".to_string(),
@@ -535,7 +601,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        proxies.insert(
+        proxies.primary.insert(
             "LEAF".to_string(),
             Proxy {
                 name: "LEAF".to_string(),
@@ -550,8 +616,8 @@ mod tests {
 
     #[test]
     fn now_chain_self_ref_stops() {
-        let mut proxies = IndexMap::new();
-        proxies.insert(
+        let mut proxies = ProxyCatalog::default();
+        proxies.primary.insert(
             "self-ref".to_string(),
             Proxy {
                 name: "self-ref".to_string(),
@@ -567,8 +633,8 @@ mod tests {
 
     #[test]
     fn node_item_populates_udp_and_tcp_from_proxy() {
-        let mut proxies = IndexMap::new();
-        proxies.insert(
+        let mut proxies = ProxyCatalog::default();
+        proxies.primary.insert(
             "leaf".to_string(),
             Proxy {
                 name: "leaf".to_string(),
@@ -598,8 +664,8 @@ mod tests {
 
     #[test]
     fn node_item_populates_protocol_false_from_proxy() {
-        let mut proxies = IndexMap::new();
-        proxies.insert(
+        let mut proxies = ProxyCatalog::default();
+        proxies.primary.insert(
             "tcp_only".to_string(),
             Proxy {
                 name: "tcp_only".to_string(),
@@ -609,7 +675,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        proxies.insert(
+        proxies.primary.insert(
             "none".to_string(),
             Proxy {
                 name: "none".to_string(),
@@ -652,8 +718,8 @@ mod tests {
     #[test]
     fn tcp_defaults_to_false_when_missing_from_json() {
         let json = r#"{"proxies":{"node":{"name":"node","type":"Vmess","udp":true}}}"#;
-        let response: ProxiesResponse = serde_json::from_str(json).unwrap();
-        let proxy = response.proxies.get("node").unwrap();
+        let response: ProxyCatalog = serde_json::from_str(json).unwrap();
+        let proxy = response.primary.get("node").unwrap();
         assert!(proxy.udp);
         assert!(
             !proxy.tcp,
@@ -663,8 +729,8 @@ mod tests {
 
     #[test]
     fn child_link_node_copies_udp_tcp_from_referenced_proxy() {
-        let mut proxies = IndexMap::new();
-        proxies.insert(
+        let mut proxies = ProxyCatalog::default();
+        proxies.primary.insert(
             "Parent".to_string(),
             Proxy {
                 name: "Parent".to_string(),
@@ -673,7 +739,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        proxies.insert(
+        proxies.primary.insert(
             "Child".to_string(),
             Proxy {
                 name: "Child".to_string(),
@@ -703,23 +769,21 @@ mod tests {
         assert!(!child.tcp);
     }
 
-    fn load_singbox_fixture() -> IndexMap<String, Proxy> {
+    fn load_singbox_fixture() -> ProxyCatalog {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/apidata/sing-box/proxies.json"
         );
         let data = std::fs::read_to_string(path).expect("Failed to read sing-box fixture");
-        let response: ProxiesResponse =
+        let response: ProxyCatalog =
             serde_json::from_str(&data).expect("Failed to parse sing-box fixture");
-        response.proxies
+        response
     }
 
     #[test]
     fn singbox_tree_builds_correct_top_level_groups() {
         let proxies = load_singbox_fixture();
-        let tree = ProxyTree::build(ProxiesResponse {
-            proxies: proxies.clone(),
-        });
+        let tree = ProxyTree::build(proxies.clone());
         let top_names: Vec<&str> = tree.nodes.iter().map(|n| n.name.as_str()).collect();
         assert!(top_names.contains(&"Entry"));
         assert!(top_names.contains(&"Select-hajimi"));
@@ -730,12 +794,13 @@ mod tests {
     #[test]
     fn singbox_hidden_node_not_in_top_level() {
         let proxies = load_singbox_fixture();
-        let hidden = proxies.get("hidden-node").expect("hidden-node missing");
+        let hidden = proxies
+            .primary
+            .get("hidden-node")
+            .expect("hidden-node missing");
         assert!(hidden.hidden);
 
-        let tree = ProxyTree::build(ProxiesResponse {
-            proxies: proxies.clone(),
-        });
+        let tree = ProxyTree::build(proxies.clone());
         let top_names: Vec<&str> = tree.nodes.iter().map(|n| n.name.as_str()).collect();
         assert!(!top_names.contains(&"hidden-node"));
     }
@@ -743,7 +808,10 @@ mod tests {
     #[test]
     fn singbox_tcp_defaults_false_when_absent() {
         let proxies = load_singbox_fixture();
-        let jp = proxies.get("🇯🇵 日本-优化").expect("JP node missing");
+        let jp = proxies
+            .primary
+            .get("🇯🇵 日本-优化")
+            .expect("JP node missing");
         assert!(!jp.tcp);
         assert!(jp.udp);
     }
@@ -751,7 +819,7 @@ mod tests {
     #[test]
     fn singbox_tcp_true_when_explicit() {
         let proxies = load_singbox_fixture();
-        let tcp_node = proxies.get("tcp-node").expect("tcp-node missing");
+        let tcp_node = proxies.primary.get("tcp-node").expect("tcp-node missing");
         assert!(tcp_node.tcp);
         assert!(!tcp_node.udp);
     }
@@ -759,7 +827,7 @@ mod tests {
     #[test]
     fn singbox_alive_false_node() {
         let proxies = load_singbox_fixture();
-        let dead = proxies.get("dead-node").expect("dead-node missing");
+        let dead = proxies.primary.get("dead-node").expect("dead-node missing");
         assert!(!dead.alive);
         assert_eq!(dead.proxy_type, "Shadowsocks");
     }
@@ -767,7 +835,10 @@ mod tests {
     #[test]
     fn singbox_trojan_node_type() {
         let proxies = load_singbox_fixture();
-        let trojan = proxies.get("trojan-node").expect("trojan-node missing");
+        let trojan = proxies
+            .primary
+            .get("trojan-node")
+            .expect("trojan-node missing");
         assert_eq!(trojan.proxy_type, "Trojan");
         assert!(trojan.tcp);
         assert!(trojan.udp);
@@ -776,9 +847,7 @@ mod tests {
     #[test]
     fn singbox_child_node_in_expanded_group() {
         let proxies = load_singbox_fixture();
-        let mut tree = ProxyTree::build(ProxiesResponse {
-            proxies: proxies.clone(),
-        });
+        let mut tree = ProxyTree::build(proxies.clone());
         tree.expand_all(&proxies);
         let tcp_child = tree.nodes.iter().find(|n| n.name == "tcp-node");
         assert!(tcp_child.is_some());
@@ -789,12 +858,13 @@ mod tests {
     #[test]
     fn mihomo_hidden_not_in_top_level() {
         let proxies = load_fixture();
-        let hidden = proxies.get("hidden-proxy").expect("hidden-proxy missing");
+        let hidden = proxies
+            .primary
+            .get("hidden-proxy")
+            .expect("hidden-proxy missing");
         assert!(hidden.hidden);
 
-        let tree = ProxyTree::build(ProxiesResponse {
-            proxies: proxies.clone(),
-        });
+        let tree = ProxyTree::build(proxies.clone());
         let names: Vec<&str> = tree.nodes.iter().map(|n| n.name.as_str()).collect();
         assert!(!names.contains(&"hidden-proxy"));
     }
@@ -802,7 +872,7 @@ mod tests {
     #[test]
     fn mihomo_tcp_only_leaf() {
         let proxies = load_fixture();
-        let tcp = proxies.get("tcp-only").expect("tcp-only missing");
+        let tcp = proxies.primary.get("tcp-only").expect("tcp-only missing");
         assert!(tcp.tcp);
         assert!(!tcp.udp);
     }
@@ -810,7 +880,10 @@ mod tests {
     #[test]
     fn mihomo_dead_proxy_alive_false() {
         let proxies = load_fixture();
-        let dead = proxies.get("dead-proxy").expect("dead-proxy missing");
+        let dead = proxies
+            .primary
+            .get("dead-proxy")
+            .expect("dead-proxy missing");
         assert!(!dead.alive);
         assert_eq!(dead.proxy_type, "Shadowsocks");
     }
@@ -818,7 +891,7 @@ mod tests {
     #[test]
     fn mihomo_loadbalance_group_type() {
         let proxies = load_fixture();
-        let lb = proxies.get("LB-group").expect("LB-group missing");
+        let lb = proxies.primary.get("LB-group").expect("LB-group missing");
         assert_eq!(lb.proxy_type, "LoadBalance");
         assert!(lb.all.as_ref().map(|a| a.len()).unwrap_or(0) > 0);
         assert!(lb.now.is_some());
@@ -827,7 +900,7 @@ mod tests {
     #[test]
     fn mihomo_hysteria2_type_exists() {
         let proxies = load_fixture();
-        let hy2 = proxies.get("日本JP-HY2").expect("JP HY2 missing");
+        let hy2 = proxies.primary.get("日本JP-HY2").expect("JP HY2 missing");
         assert_eq!(hy2.proxy_type, "Hysteria2");
     }
 
@@ -842,9 +915,7 @@ mod tests {
     #[test]
     fn mihomo_expand_all_tcp_child_visible() {
         let proxies = load_fixture();
-        let mut tree = ProxyTree::build(ProxiesResponse {
-            proxies: proxies.clone(),
-        });
+        let mut tree = ProxyTree::build(proxies.clone());
         tree.expand_all(&proxies);
         let tcp = tree.nodes.iter().find(|n| n.name == "tcp-only");
         assert!(tcp.is_some());

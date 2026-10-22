@@ -1,0 +1,27 @@
+{
+  "proxies": {
+    "GLOBAL": {
+      "name": "GLOBAL",
+      "type": "Selector",
+      "all": ["Select", "DIRECT", "inline"],
+      "now": "Select",
+      "history": []
+    },
+    "Select": {
+      "name": "Select",
+      "type": "Selector",
+      "all": ["node /日本", "untested", "failed", "inline", "DIRECT"],
+      "now": "node /日本",
+      "testUrl": "https://group.example/check",
+      "history": []
+    },
+    "DIRECT": {"name": "DIRECT", "type": "Direct", "id": "direct-id"},
+    "inline": {
+      "name": "inline",
+      "type": "Vmess",
+      "id": "inline-id",
+      "provider-name": "",
+      "history": [{"delay": 15}]
+    }
+  }
+}
