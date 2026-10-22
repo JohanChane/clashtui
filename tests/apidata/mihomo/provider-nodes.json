@@ -1,0 +1,49 @@
+{
+  "providers": {
+    "subscription /一": {
+      "name": "subscription /一",
+      "type": "Proxy",
+      "vehicleType": "HTTP",
+      "testUrl": "https://provider.example/check?q=a%20b&x=1",
+      "proxies": [
+        {
+          "name": "node /日本",
+          "type": "Vless",
+          "id": "provider-node-id",
+          "provider-name": "subscription /一",
+          "udp": true,
+          "tcp": true,
+          "history": [{"delay": 212}]
+        },
+        {
+          "name": "untested",
+          "type": "Vmess",
+          "id": "untested-id",
+          "provider-name": "subscription /一",
+          "history": []
+        },
+        {
+          "name": "failed",
+          "type": "Vmess",
+          "id": "failed-id",
+          "provider-name": "subscription /一",
+          "history": [{"delay": 0}]
+        }
+      ]
+    },
+    "Select": {
+      "name": "Select",
+      "type": "Proxy",
+      "vehicleType": "Compatible",
+      "proxies": [
+        {
+          "name": "inline",
+          "type": "Vmess",
+          "id": "inline-id",
+          "provider-name": "",
+          "history": [{"delay": 15}]
+        }
+      ]
+    }
+  }
+}

@@ -1,6 +1,5 @@
 use super::super::dev::*;
 use crate::functions::restful::proxies::{self};
-use indexmap::IndexMap;
 use std::cell::Cell;
 use std::time::Instant;
 
@@ -9,7 +8,7 @@ use super::tree::{NodeItem, NodeType, ProxyTree, SortMode};
 #[derive(Default)]
 pub struct Proxies {
     pub tree: ProxyTree,
-    pub proxies: IndexMap<String, crate::functions::restful::proxies::Proxy>,
+    pub proxies: proxies::ProxyCatalog,
     pub error: Option<String>,
     pub testing_since: Option<Instant>,
     pub jump_target: Cell<Option<usize>>,
@@ -48,6 +47,9 @@ impl Proxies {
                 format!("  {}ms", d)
             };
             s.push_str(&delay_str);
+        }
+        if node.ambiguous {
+            s.push_str("  (ambiguous name)");
         }
         s
     }
@@ -329,7 +331,7 @@ impl BasicTabContent for Proxies {
                 or_set
             );
             wrapper(|content: &mut Self| {
-                content.proxies = response.proxies;
+                content.proxies = response;
                 content.tree.rebuild_from_proxies(&content.proxies);
                 content.error = None;
             })
@@ -340,7 +342,7 @@ impl BasicTabContent for Proxies {
     fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         self.paused = false;
         if crate::config::is_core_mismatch() {
-            self.proxies = IndexMap::new();
+            self.proxies = proxies::ProxyCatalog::default();
             self.tree = ProxyTree::default();
             self.error = Some("API data mismatch with configured core".to_owned());
             return;
@@ -352,7 +354,7 @@ impl BasicTabContent for Proxies {
                     .unwrap()
             );
             wrapper(|content: &mut Self| {
-                content.proxies = response.proxies.clone();
+                content.proxies = response.clone();
                 content.tree = ProxyTree::build(response);
                 content.error = None;
             })
@@ -393,7 +395,7 @@ impl TabContent for Proxies {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::functions::restful::proxies::ProxiesResponse;
+    use crate::functions::restful::proxies::ProxyCatalog;
     use ratatui::widgets::ListState;
 
     fn load_fixture() -> (Proxies, ListState) {
@@ -402,12 +404,10 @@ mod tests {
             "/tests/apidata/mihomo/proxies.json"
         );
         let data = std::fs::read_to_string(path).unwrap();
-        let response: ProxiesResponse = serde_json::from_str(&data).unwrap();
+        let response: ProxyCatalog = serde_json::from_str(&data).unwrap();
         let content = Proxies {
-            tree: ProxyTree::build(ProxiesResponse {
-                proxies: response.proxies.clone(),
-            }),
-            proxies: response.proxies,
+            tree: ProxyTree::build(response.clone()),
+            proxies: response,
             ..Default::default()
         };
         let mut state = ListState::default();
@@ -515,6 +515,7 @@ mod tests {
             proxy_type: "vmess".into(),
             depth: 0,
             delay: None,
+            ambiguous: false,
             expanded: false,
             is_now: false,
             sort_mode: SortMode::None,
@@ -535,6 +536,7 @@ mod tests {
             proxy_type: "".into(),
             depth: 0,
             delay: None,
+            ambiguous: false,
             expanded: false,
             is_now: false,
             sort_mode: SortMode::None,
@@ -555,6 +557,7 @@ mod tests {
             proxy_type: "".into(),
             depth: 0,
             delay: None,
+            ambiguous: false,
             expanded: false,
             is_now: false,
             sort_mode: SortMode::None,
