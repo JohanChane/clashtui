@@ -270,7 +270,7 @@ impl BasicTabContent for Logs {
         // Refresh log level from core on every re-entry
         async {
             let cfg = tri!(
-                tokio::task::spawn_blocking(config::fetch).await.unwrap(),
+                join_blocking(tokio::task::spawn_blocking(config::fetch)).await,
                 or_set
             );
             wrapper(move |content: &mut Self| {
@@ -331,7 +331,7 @@ impl TabContent for Logs {
         // Fetch initial log level
         async {
             let cfg = tri!(
-                tokio::task::spawn_blocking(config::fetch).await.unwrap(),
+                join_blocking(tokio::task::spawn_blocking(config::fetch)).await,
                 or_set
             );
             wrapper(move |content: &mut Self| {

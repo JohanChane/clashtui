@@ -130,9 +130,10 @@ impl TabContent for SettingsContent {
         }
 
         async move {
-            let result = tokio::task::spawn_blocking(crate::functions::restful::config::fetch)
-                .await
-                .unwrap();
+            let result = join_blocking(tokio::task::spawn_blocking(
+                crate::functions::restful::config::fetch,
+            ))
+            .await;
             match result {
                 Ok(config) => {
                     let mode = config.mode.to_string();
@@ -190,11 +191,10 @@ impl TabContent for SettingsContent {
                                 return do_nothing();
                             }
                             let payload = serde_json::json!({"mode": mode.to_string()}).to_string();
-                            let result = tokio::task::spawn_blocking(move || {
+                            let result = join_blocking(tokio::task::spawn_blocking(move || {
                                 crate::functions::restful::config::patch(payload)
-                            })
-                            .await
-                            .unwrap();
+                            }))
+                            .await;
                             match result {
                                 Ok(_) => {
                                     let new_val = mode.to_string();
@@ -241,11 +241,10 @@ impl TabContent for SettingsContent {
                             }
                             let payload = serde_json::json!({"tun": {"stack": stack.to_string()}})
                                 .to_string();
-                            let result = tokio::task::spawn_blocking(move || {
+                            let result = join_blocking(tokio::task::spawn_blocking(move || {
                                 crate::functions::restful::config::patch(payload)
-                            })
-                            .await
-                            .unwrap();
+                            }))
+                            .await;
                             match result {
                                 Ok(_) => {
                                     let new_val = stack.to_string();
@@ -292,11 +291,10 @@ impl TabContent for SettingsContent {
                                 return do_nothing();
                             }
                             let payload = serde_json::json!({"allow-lan": new_val}).to_string();
-                            let result = tokio::task::spawn_blocking(move || {
+                            let result = join_blocking(tokio::task::spawn_blocking(move || {
                                 crate::functions::restful::config::patch(payload)
-                            })
-                            .await
-                            .unwrap();
+                            }))
+                            .await;
                             match result {
                                 Ok(_) => wrapper(move |c: &mut SettingsContent| {
                                     c.allow_lan = new_val;
@@ -320,11 +318,10 @@ impl TabContent for SettingsContent {
                             }
                             let payload =
                                 serde_json::json!({"tun": {"enable": new_val}}).to_string();
-                            let result = tokio::task::spawn_blocking(move || {
+                            let result = join_blocking(tokio::task::spawn_blocking(move || {
                                 crate::functions::restful::config::patch(payload)
-                            })
-                            .await
-                            .unwrap();
+                            }))
+                            .await;
                             match result {
                                 Ok(_) => wrapper(move |c: &mut SettingsContent| {
                                     c.tun_enable = new_val;
@@ -347,11 +344,10 @@ impl TabContent for SettingsContent {
                             if crate::config::is_core_mismatch() {
                                 return do_nothing();
                             }
-                            let result = tokio::task::spawn_blocking(|| {
+                            let result = join_blocking(tokio::task::spawn_blocking(|| {
                                 crate::functions::restful::cache::flush_fakeip()
-                            })
-                            .await
-                            .unwrap();
+                            }))
+                            .await;
                             match result {
                                 Ok(_) => do_nothing(),
                                 Err(e) => {
@@ -367,11 +363,10 @@ impl TabContent for SettingsContent {
                             if crate::config::is_core_mismatch() {
                                 return do_nothing();
                             }
-                            let result = tokio::task::spawn_blocking(|| {
+                            let result = join_blocking(tokio::task::spawn_blocking(|| {
                                 crate::functions::restful::cache::flush_dns()
-                            })
-                            .await
-                            .unwrap();
+                            }))
+                            .await;
                             match result {
                                 Ok(_) => do_nothing(),
                                 Err(e) => {
@@ -387,11 +382,10 @@ impl TabContent for SettingsContent {
                             if crate::config::is_core_mismatch() {
                                 return do_nothing();
                             }
-                            let result = tokio::task::spawn_blocking(|| {
+                            let result = join_blocking(tokio::task::spawn_blocking(|| {
                                 crate::functions::restful::geo::upgrade_geo()
-                            })
-                            .await
-                            .unwrap();
+                            }))
+                            .await;
                             match result {
                                 Ok(_) => do_nothing(),
                                 Err(e) => {

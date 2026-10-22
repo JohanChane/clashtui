@@ -65,21 +65,18 @@ impl BasicTabContent for Status {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
             let version = tri!(
-                tokio::task::spawn_blocking(restful::control::version)
-                    .await
-                    .unwrap(),
+                join_blocking(tokio::task::spawn_blocking(restful::control::version)).await,
                 or_set
             );
             let config = tri!(
-                tokio::task::spawn_blocking(restful::config::fetch)
-                    .await
-                    .unwrap(),
+                join_blocking(tokio::task::spawn_blocking(restful::config::fetch)).await,
                 or_set
             );
             let detected = tri!(
-                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
-                    .await
-                    .unwrap(),
+                join_blocking(tokio::task::spawn_blocking(
+                    restful::core_detect::detect_core_type
+                ))
+                .await,
                 or_set
             );
 
@@ -119,21 +116,18 @@ impl BasicTabContent for Status {
 
         async {
             let detected = tri!(
-                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
-                    .await
-                    .unwrap(),
+                join_blocking(tokio::task::spawn_blocking(
+                    restful::core_detect::detect_core_type
+                ))
+                .await,
                 or_set
             );
             let version = tri!(
-                tokio::task::spawn_blocking(restful::control::version)
-                    .await
-                    .unwrap(),
+                join_blocking(tokio::task::spawn_blocking(restful::control::version)).await,
                 or_set
             );
             let config = tri!(
-                tokio::task::spawn_blocking(restful::config::fetch)
-                    .await
-                    .unwrap(),
+                join_blocking(tokio::task::spawn_blocking(restful::config::fetch)).await,
                 or_set
             );
 

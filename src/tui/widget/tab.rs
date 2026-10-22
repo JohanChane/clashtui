@@ -156,6 +156,24 @@ pub fn do_nothing<C>() -> CallBack<C> {
     wrapper(|_| ())
 }
 
+/// Await a blocking task, turning a [`tokio::task::JoinError`] into a
+/// displayable error instead of panicking.
+///
+/// Used in place of `spawn_blocking(..).await.unwrap()` so that a cancelled or
+/// panicked background task (for example while the core API is unreachable)
+/// surfaces as a TUI error state and the app keeps retrying, rather than
+/// unwrapping and aborting the process.
+pub async fn join_blocking<T, E>(handle: tokio::task::JoinHandle<Result<T, E>>) -> Result<T, String>
+where
+    E: std::fmt::Display,
+{
+    match handle.await {
+        Ok(Ok(value)) => Ok(value),
+        Ok(Err(e)) => Err(e.to_string()),
+        Err(e) => Err(format!("background task failed: {e}")),
+    }
+}
+
 pub trait FutureSetExt<C>: Future<Output = CallBack<C>>
 where
     Self: Sized + Send + 'static,
@@ -170,4 +188,32 @@ where
     F: Future<Output = CallBack<C>> + Send + 'static,
     C: 'static,
 {
+}
+
+#[cfg(test)]
+mod tests {
+    use super::join_blocking;
+
+    #[tokio::test]
+    async fn join_blocking_passes_through_ok() {
+        let handle = tokio::spawn(async { Ok::<u8, &'static str>(7) });
+        assert_eq!(join_blocking(handle).await.unwrap(), 7);
+    }
+
+    #[tokio::test]
+    async fn join_blocking_passes_through_err() {
+        let handle = tokio::spawn(async { Err::<u8, &'static str>("nope") });
+        assert_eq!(join_blocking(handle).await.unwrap_err(), "nope");
+    }
+
+    #[tokio::test]
+    async fn join_blocking_surfaces_join_error_instead_of_panicking() {
+        let handle = tokio::spawn(async {
+            std::future::pending::<()>().await;
+            Ok::<u8, &'static str>(1)
+        });
+        handle.abort();
+        let err = join_blocking(handle).await.unwrap_err();
+        assert!(err.contains("background task failed"));
+    }
 }
