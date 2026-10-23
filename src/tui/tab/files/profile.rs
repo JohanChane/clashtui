@@ -75,6 +75,8 @@ fn traffic_percentage(used: u64, total: u64) -> f64 {
 }
 
 mod_agent!(
+    keymap,
+    crate::tui::binding::Scope::FileProfile,
     Key,
     [
         ([KeyCode::Left], Key::Switch, "Switch pane"),
@@ -86,183 +88,100 @@ mod_agent!(
         ([KeyCode::Char('j')], Key::MoveDown, "Move down"),
         ([KeyCode::Char('k')], Key::MoveUp, "Move up"),
         ([KeyCode::Enter], Key::Select, "Select"),
-        (
-            [KeyCode::Char('i')],
-            Key::Action(Action::Add),
-            "Import (URL or file)"
-        ),
+        ([KeyCode::Char('i')], Key::Add, "Import (URL or file)"),
         (
             [KeyCode::Char('d'), KeyCode::Char('d')],
-            Key::Action(Action::Delete),
+            Key::Delete,
             "Delete profile"
         ),
-        ([KeyCode::Char('e')], Key::Action(Action::Edit), "Edit"),
-        (
-            [KeyCode::Char('p')],
-            Key::Action(Action::Preview),
-            "Preview"
-        ),
-        ([KeyCode::Char('u')], Key::Action(Action::Update), "Update"),
-        (
-            [KeyCode::Char('/')],
-            Key::Action(Action::Search),
-            "Search/Filter"
-        ),
-        ([KeyCode::Char('t')], Key::Action(Action::Test), "Test"),
-        (
-            [KeyCode::Char('c')],
-            Key::Action(Action::Check),
-            "Check config"
-        ),
+        ([KeyCode::Char('e')], Key::Edit, "Edit"),
+        ([KeyCode::Char('p')], Key::Preview, "Preview"),
+        ([KeyCode::Char('u')], Key::Update, "Update"),
+        ([KeyCode::Char('/')], Key::Search, "Search/Filter"),
+        ([KeyCode::Char('t')], Key::Test, "Test"),
+        ([KeyCode::Char('c')], Key::Check, "Check config"),
         (
             [KeyCode::Char('C'), KeyCode::Char('u')],
-            Key::Action(Action::CopyUrl),
+            Key::CopyUrl,
             "Copy URL"
         ),
-        (
-            [KeyCode::Char('f')],
-            Key::Action(Action::FzfFind),
-            "Find profile"
-        ),
+        ([KeyCode::Char('f')], Key::FzfFind, "Find profile"),
         (
             [KeyCode::Char('g'), KeyCode::Char('g')],
-            Key::Action(Action::GoTop),
+            Key::GoTop,
             "Go to top"
         ),
-        (
-            [KeyCode::Char('G')],
-            Key::Action(Action::GoEnd),
-            "Go to end"
-        ),
-        (
-            key("P"),
-            Key::Action(Action::ToggleNoPp),
-            "Toggle no proxy-provider"
-        ),
+        ([KeyCode::Char('G')], Key::GoEnd, "Go to end"),
+        (key("P"), Key::ToggleNoPp, "Toggle no proxy-provider"),
         (
             key("O"),
-            Key::Action(Action::ToggleUpdateWithProxy),
+            Key::ToggleUpdateWithProxy,
             "Toggle update with proxy"
         ),
-        (key("n"), Key::Action(Action::Traffic), "Show traffic"),
+        (key("n"), Key::Traffic, "Show traffic"),
     ]
 );
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "PascalCase")]
 pub enum Key {
     Switch,
     MoveUp,
     MoveDown,
     Select,
 
-    Action(Action),
+    Add,
+    ImportFile,
+    Delete,
+    Edit,
+    Preview,
+    Update,
+    UpdateAll,
+    Search,
+    Test,
+    Check,
+    CopyUrl,
+    FzfFind,
+    GoTop,
+    GoEnd,
+    ToggleNoPp,
+    ToggleUpdateWithProxy,
+    Traffic,
 }
 
-impl serde::Serialize for Key {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+impl Key {
+    /// Bridge to the internal dispatch-only `Action` enum for variants that
+    /// have async `act()` handlers. Returns `None` for directly-handled
+    /// variants (GoTop, GoEnd, Traffic, FzfFind, UpdateAll).
+    fn to_action(self) -> Option<Action> {
         match self {
-            Key::Switch => serializer.serialize_str("Switch"),
-            Key::MoveUp => serializer.serialize_str("MoveUp"),
-            Key::MoveDown => serializer.serialize_str("MoveDown"),
-            Key::Select => serializer.serialize_str("Select"),
-            Key::Action(action) => {
-                use serde::ser::SerializeMap;
-                let mut map = serializer.serialize_map(Some(1))?;
-                map.serialize_entry("Action", action)?;
-                map.end()
-            }
+            Key::Add => Some(Action::Add),
+            Key::ImportFile => Some(Action::ImportFile),
+            Key::Delete => Some(Action::Delete),
+            Key::Edit => Some(Action::Edit),
+            Key::Preview => Some(Action::Preview),
+            Key::Update => Some(Action::Update),
+            Key::Search => Some(Action::Search),
+            Key::Test => Some(Action::Test),
+            Key::Check => Some(Action::Check),
+            Key::CopyUrl => Some(Action::CopyUrl),
+            Key::ToggleNoPp => Some(Action::ToggleNoPp),
+            Key::ToggleUpdateWithProxy => Some(Action::ToggleUpdateWithProxy),
+            // Directly handled in handle_key_event -- no act() needed
+            Key::Switch
+            | Key::MoveUp
+            | Key::MoveDown
+            | Key::Select
+            | Key::GoTop
+            | Key::GoEnd
+            | Key::Traffic
+            | Key::FzfFind
+            | Key::UpdateAll => None,
         }
     }
 }
 
-impl<'de> serde::Deserialize<'de> for Key {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        use serde::de::{self, Visitor};
-        use std::fmt;
-
-        struct KeyVisitor;
-
-        impl<'de> Visitor<'de> for KeyVisitor {
-            type Value = Key;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("a string (unit variant) or mapping (Action: <name>)")
-            }
-
-            fn visit_str<E: de::Error>(self, v: &str) -> Result<Key, E> {
-                match v {
-                    "Switch" => Ok(Key::Switch),
-                    "MoveUp" => Ok(Key::MoveUp),
-                    "MoveDown" => Ok(Key::MoveDown),
-                    "Select" => Ok(Key::Select),
-                    s => Err(de::Error::unknown_variant(
-                        s,
-                        &["Switch", "MoveUp", "MoveDown", "Select", "Action: ..."],
-                    )),
-                }
-            }
-
-            fn visit_map<M: de::MapAccess<'de>>(self, mut map: M) -> Result<Key, M::Error> {
-                let k: String = map
-                    .next_key()?
-                    .ok_or_else(|| de::Error::missing_field("variant"))?;
-                if k == "Action" {
-                    let v: String = map.next_value()?;
-                    match v.as_str() {
-                        "Add" => Ok(Key::Action(Action::Add)),
-                        "ImportFile" => Ok(Key::Action(Action::ImportFile)),
-                        "Delete" => Ok(Key::Action(Action::Delete)),
-                        "Edit" => Ok(Key::Action(Action::Edit)),
-                        "Preview" => Ok(Key::Action(Action::Preview)),
-                        "Update" => Ok(Key::Action(Action::Update)),
-                        "UpdateAll" => Ok(Key::Action(Action::UpdateAll)),
-                        "Search" => Ok(Key::Action(Action::Search)),
-                        "Test" => Ok(Key::Action(Action::Test)),
-                        "Check" => Ok(Key::Action(Action::Check)),
-                        "CopyUrl" => Ok(Key::Action(Action::CopyUrl)),
-                        "FzfFind" => Ok(Key::Action(Action::FzfFind)),
-                        "GoTop" => Ok(Key::Action(Action::GoTop)),
-                        "GoEnd" => Ok(Key::Action(Action::GoEnd)),
-                        "ToggleNoPp" => Ok(Key::Action(Action::ToggleNoPp)),
-                        "ToggleUpdateWithProxy" => Ok(Key::Action(Action::ToggleUpdateWithProxy)),
-                        "Traffic" => Ok(Key::Action(Action::Traffic)),
-                        s => Err(de::Error::unknown_variant(
-                            s,
-                            &[
-                                "Add",
-                                "ImportFile",
-                                "Delete",
-                                "Edit",
-                                "Preview",
-                                "Update",
-                                "UpdateAll",
-                                "Search",
-                                "Test",
-                                "Check",
-                                "CopyUrl",
-                                "FzfFind",
-                                "GoTop",
-                                "GoEnd",
-                                "ToggleNoPp",
-                                "ToggleUpdateWithProxy",
-                                "Traffic",
-                            ],
-                        )),
-                    }
-                } else {
-                    Err(de::Error::unknown_field(&k, &["Action"]))
-                }
-            }
-        }
-
-        deserializer.deserialize_any(KeyVisitor)
-    }
-}
-
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Action {
     Add,
     ImportFile,
@@ -283,28 +202,6 @@ pub enum Action {
     Traffic,
 }
 
-impl TryFrom<&crate::tui::Key> for Key {
-    type Error = ();
-
-    fn try_from(value: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(value).copied().ok_or(());
-        }
-
-        Ok(match value.code {
-            KeyCode::Right | KeyCode::Left | KeyCode::Char('h') | KeyCode::Char('l') => {
-                Self::Switch
-            }
-            KeyCode::Down | KeyCode::Char('j') => Self::MoveDown,
-            KeyCode::Up | KeyCode::Char('k') => Self::MoveUp,
-            KeyCode::Enter => Self::Select,
-
-            _ => return Err(()),
-        })
-    }
-}
-
 #[derive(Default)]
 pub struct Profile {
     items: Vec<String>,
@@ -320,8 +217,8 @@ impl BasicTabContent for Profile {
 
     const TITLE: &str = "Profile";
 
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
+    fn keymap() -> &'static crate::tui::binding::Keymap<Self::Key> {
+        keymap::get()
     }
 }
 
@@ -353,32 +250,41 @@ impl DualTabContent for Profile {
                 }
                 .spawn_at(task_set);
             }
-            Key::Action(action) => match action {
-                Action::GoTop => state.select_first(),
-                Action::GoEnd => state.select_last(),
-                Action::Traffic => {
-                    let name = get_name!(self, state);
-                    actions::show_traffic(name).spawn_at(task_set);
+
+            Key::GoTop => state.select_first(),
+            Key::GoEnd => state.select_last(),
+
+            Key::Traffic => {
+                let name = get_name!(self, state);
+                actions::show_traffic(name).spawn_at(task_set);
+            }
+            Key::FzfFind => {
+                let items = self.items.clone();
+                actions::fzf_find(items).spawn_at(task_set)
+            }
+
+            Key::Add | Key::ImportFile => {
+                // `to_action` never returns None for these variants
+                key.to_action()
+                    .unwrap()
+                    .act(String::new())
+                    .spawn_at(task_set)
+            }
+            Key::UpdateAll => {
+                for name in &self.items {
+                    self.updating.insert(name.clone());
                 }
-                Action::FzfFind => {
-                    let items = self.items.clone();
-                    actions::fzf_find(items).spawn_at(task_set)
+                actions::update_all(self.items.clone()).spawn_at(task_set)
+            }
+
+            _ => {
+                let name = get_name!(self, state);
+                if matches!(key, Key::Update) {
+                    self.updating.insert(name.clone());
                 }
-                Action::Add | Action::ImportFile => action.act(String::new()).spawn_at(task_set),
-                Action::UpdateAll => {
-                    for name in &self.items {
-                        self.updating.insert(name.clone());
-                    }
-                    actions::update_all(self.items.clone()).spawn_at(task_set)
-                }
-                _ => {
-                    let name = get_name!(self, state);
-                    if matches!(action, Action::Update) {
-                        self.updating.insert(name.clone());
-                    }
-                    action.act(name).spawn_at(task_set)
-                }
-            },
+                // `to_action` never returns None for remaining variants
+                key.to_action().unwrap().act(name).spawn_at(task_set)
+            }
         }
         false
     }

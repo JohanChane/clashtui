@@ -11,8 +11,6 @@ mod dev {
     pub(crate) use crate::tui::theme::Theme;
 }
 
-use crate::tui::widget::tab::KeyCombo;
-
 macro_rules! tri {
     ($e:expr) => {
         match $e {
@@ -44,165 +42,67 @@ macro_rules! tri {
 }
 
 macro_rules! mod_agent {
-    ($ident:ident, [$($tokens:tt)*]) => {
-#[allow(clippy::vec_init_then_push)]
-pub(crate) mod agent {
-    use super::*;
-    use std::collections::HashMap;
-    use std::sync::OnceLock;
+    ($keymap_name:ident, $scope:expr, $action_ty:ty, [$($tokens:tt)*]) => {
+        #[allow(clippy::vec_init_then_push)]
+        pub(crate) mod $keymap_name {
+            use super::*;
+            use std::sync::OnceLock;
+            use crate::tui::binding::{Binding, Keymap};
 
-    pub type Agent = HashMap<crate::tui::Key, $ident>;
+            static KEYMAP: OnceLock<Keymap<$action_ty>> = OnceLock::new();
 
-    static AGENT: OnceLock<Agent> = OnceLock::new();
-
-    #[allow(dead_code)]
-    fn key_from_str(s: &str) -> crate::tui::Key {
-        use std::str::FromStr;
-        crate::tui::Key::from_str(s).expect("invalid key string in mod_agent!")
-    }
-
-    fn quick_map(code: KeyCode) -> crate::tui::Key {
-        crate::tui::Key {
-            code,
-            shift: matches!(code, KeyCode::Char(c) if c.is_ascii_uppercase()),
-            ctrl: false,
-            alt: false,
-            super_: false,
-        }
-    }
-
-    fn default_agent() -> Agent {
-        let mut m = Agent::new();
-        mod_agent!(@agent m, $($tokens)*);
-        m
-    }
-
-    pub fn agent() -> &'static Agent {
-        AGENT.get_or_init(default_agent)
-    }
-
-    pub fn init(map: Agent) {
-        if AGENT.set(map).is_err() {
-            unreachable!("KeyMap Init Twice!")
-        }
-    }
-
-    static DESC_OVERRIDES: OnceLock<HashMap<crate::tui::Key, String>> = OnceLock::new();
-
-    pub fn init_descs(map: HashMap<crate::tui::Key, String>) {
-        if !map.is_empty() {
-            let _ = DESC_OVERRIDES.set(map);
-        }
-    }
-
-    static USER_CHORDS: OnceLock<Vec<(KeyCombo, $ident, String)>> = OnceLock::new();
-
-    pub fn init_chords(chords: Vec<(KeyCombo, $ident, String)>) {
-        if !chords.is_empty() {
-            let _ = USER_CHORDS.set(chords);
-        }
-    }
-
-    static SHORTCUTS: OnceLock<Vec<(KeyCombo, $ident, &'static str)>> = OnceLock::new();
-
-    pub fn all_shortcuts() -> &'static [(KeyCombo, $ident, &'static str)] {
-        SHORTCUTS.get_or_init(|| {
-            // Build default shortcuts from macro tokens
-            let mut default_v: Vec<(KeyCombo, $ident, &'static str)> = Vec::new();
-            mod_agent!(@shortcuts default_v, $($tokens)*);
-
-            // Build default desc map for single-key entries
-            let default_descs: HashMap<crate::tui::Key, &'static str> = default_v
-                .iter()
-                .filter(|(c, _, _)| c.len() == 1)
-                .map(|(c, _, d)| (c[0], *d))
-                .collect();
-
-            let mut v = Vec::new();
-
-            // If user config was loaded (init() already called), replace
-            // single-key shortcuts with entries from the user's agent,
-            // keeping chord shortcuts from defaults.
-            if let Some(agent) = AGENT.get() {
-                // Keep chord shortcuts from defaults
-                for (combo, action, desc) in &default_v {
-                    if combo.len() != 1 {
-                        v.push((combo.clone(), *action, *desc));
-                    }
-                }
-                // Add single-key entries from the user's agent
-                for (key, action) in agent.iter() {
-                    let desc = default_descs.get(key).copied().unwrap_or("");
-                    v.push((KeyCombo(vec![*key]), *action, desc));
-                }
-            } else {
-                v = default_v;
+            pub fn init(keymap: Keymap<$action_ty>) {
+                KEYMAP.set(keymap).expect("Keymap init twice");
             }
 
-            // Apply desc overrides from YAML
-            if let Some(overrides) = DESC_OVERRIDES.get() {
-                for (combo, _, desc) in &mut v {
-                    if combo.len() == 1 {
-                        if let Some(d) = overrides.get(&combo[0]) {
-                            *desc = Box::leak(d.clone().into_boxed_str());
-                        }
-                    }
-                }
+            pub fn get() -> &'static Keymap<$action_ty> {
+                KEYMAP.get_or_init(|| {
+                    Keymap::merge(&default_bindings(), &[], $scope)
+                        .expect("default bindings must be conflict-free")
+                })
             }
 
-            // Add user-defined chords
-            if let Some(user_chords) = USER_CHORDS.get() {
-                if !user_chords.is_empty() {
-                    // Remove default chords whose key sequence conflicts with user chords
-                    let user_combos: std::collections::HashSet<KeyCombo> =
-                        user_chords.iter().map(|(c, _, _)| c.clone()).collect();
-                    v.retain(|(combo, _, _)| combo.len() == 1 || !user_combos.contains(combo));
-                }
-                for (combo, key, desc) in user_chords {
-                    v.push((combo.clone(), *key, Box::leak(desc.clone().into_boxed_str())));
-                }
+            pub fn default_bindings() -> Vec<Binding<$action_ty>> {
+                let mut v = Vec::new();
+                mod_agent!(@push v, $($tokens)*);
+                v
             }
-
-            v
-        })
-    }
-}
-
-#[allow(unused_imports)]
-pub use agent::{agent, all_shortcuts};
-pub use agent::{init as agent_init, init_descs, init_chords};
+        }
     };
 
-    // ---- tt-muncher: agent (only single-key shortcuts) ----
-    (@agent $m:ident, ([$code:expr], $map:expr, $desc:expr) $($rest:tt)*) => {
-        $m.insert(quick_map($code), $map);
-        mod_agent!(@agent $m, $($rest)*);
+    // Single TT muncher -- unifies [KeyCode] and key("str") token forms
+    // These arms must be at the top level of the macro, NOT inside the module block
+    (@push $v:ident,
+     ([$($codes:expr),+], $map:expr, $desc:expr)
+     $($rest:tt)*) => {
+        $v.push(crate::tui::binding::Binding {
+            on: vec![$($crate::tui::Key {
+                code: $codes,
+                shift: matches!($codes, crossterm::event::KeyCode::Char(c) if c.is_ascii_uppercase()),
+                ctrl: false, alt: false, super_: false,
+            }),+],
+            exec: $map,
+            desc: Some($desc.into()),
+        });
+        mod_agent!(@push $v, $($rest)*);
     };
-    (@agent $m:ident, (key($s:literal), $map:expr, $desc:expr) $($rest:tt)*) => {
-        $m.insert(key_from_str($s), $map);
-        mod_agent!(@agent $m, $($rest)*);
+    (@push $v:ident,
+     (key($($s:literal),+), $map:expr, $desc:expr)
+     $($rest:tt)*) => {
+        $v.push(crate::tui::binding::Binding {
+            on: vec![$({
+                use std::str::FromStr;
+                crate::tui::Key::from_str($s).expect("invalid key string in mod_agent!")
+            }),+],
+            exec: $map,
+            desc: Some($desc.into()),
+        });
+        mod_agent!(@push $v, $($rest)*);
     };
-    (@agent $m:ident, ([$($codes:expr),+], $map:expr, $desc:expr) $($rest:tt)*) => {
-        mod_agent!(@agent $m, $($rest)*);
+    (@push $v:ident, , $($rest:tt)*) => {
+        mod_agent!(@push $v, $($rest)*);
     };
-    (@agent $m:ident, , $($rest:tt)*) => {
-        mod_agent!(@agent $m, $($rest)*);
-    };
-    (@agent $m:ident,) => {};
-
-    // ---- tt-muncher: shortcuts (both single-key and chords) ----
-    (@shortcuts $v:ident, ([$($codes:expr),+], $map:expr, $desc:expr) $($rest:tt)*) => {
-        $v.push((KeyCombo(vec![$(quick_map($codes)),+]), $map, $desc));
-        mod_agent!(@shortcuts $v, $($rest)*);
-    };
-    (@shortcuts $v:ident, (key($s:literal), $map:expr, $desc:expr) $($rest:tt)*) => {
-        $v.push((KeyCombo(vec![key_from_str($s)]), $map, $desc));
-        mod_agent!(@shortcuts $v, $($rest)*);
-    };
-    (@shortcuts $v:ident, , $($rest:tt)*) => {
-        mod_agent!(@shortcuts $v, $($rest)*);
-    };
-    (@shortcuts $v:ident,) => {};
+    (@push $v:ident,) => {};
 }
 
 macro_rules! newtype_tab {
@@ -218,12 +118,12 @@ macro_rules! newtype_tab {
                 $inner::TITLE
             }
 
-            fn shortcuts(&self) -> &[(KeyCombo, &'static str)] {
+            fn shortcuts(&self) -> &[crate::tui::binding::DisplayBinding] {
                 self.0.shortcuts()
             }
 
-            fn dispatch_shortcut(&mut self, seq: &[crate::tui::Key]) {
-                self.0.dispatch_shortcut(seq)
+            fn dispatch_by_seq(&mut self, seq: &[crate::tui::Key]) {
+                self.0.dispatch_by_seq(seq)
             }
         }
     };
@@ -239,12 +139,12 @@ macro_rules! newtype_tab {
                 $title
             }
 
-            fn shortcuts(&self) -> &[(KeyCombo, &'static str)] {
+            fn shortcuts(&self) -> &[crate::tui::binding::DisplayBinding] {
                 self.0.shortcuts()
             }
 
-            fn dispatch_shortcut(&mut self, seq: &[crate::tui::Key]) {
-                self.0.dispatch_shortcut(seq)
+            fn dispatch_by_seq(&mut self, seq: &[crate::tui::Key]) {
+                self.0.dispatch_by_seq(seq)
             }
         }
     };
@@ -252,8 +152,8 @@ macro_rules! newtype_tab {
 
 pub trait TuiTab: super::TuiWidget {
     fn title(&self) -> &'static str;
-    fn shortcuts(&self) -> &[(KeyCombo, &'static str)];
-    fn dispatch_shortcut(&mut self, seq: &[crate::tui::Key]);
+    fn shortcuts(&self) -> &[crate::tui::binding::DisplayBinding];
+    fn dispatch_by_seq(&mut self, seq: &[crate::tui::Key]);
 }
 
 pub(crate) mod connections;
@@ -280,11 +180,6 @@ macro_rules! enum_dispatch {
     })+
 
     impl crate::tui::TuiWidget for Tab {
-        fn handle_key_event(&mut self, kv: &crate::tui::Key) {
-            match self {
-                $(Self::$item(inner) => inner.handle_key_event(kv),)+
-            }
-        }
 
         fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
             match self {
@@ -318,15 +213,15 @@ macro_rules! enum_dispatch {
             }
         }
 
-        fn shortcuts(&self) -> &[(crate::tui::widget::tab::KeyCombo, &'static str)] {
+        fn shortcuts(&self) -> &[crate::tui::binding::DisplayBinding] {
             match self {
                 $(Self::$item(inner) => inner.shortcuts(),)+
             }
         }
 
-        fn dispatch_shortcut(&mut self, seq: &[crate::tui::Key]) {
+        fn dispatch_by_seq(&mut self, seq: &[crate::tui::Key]) {
             match self {
-                $(Self::$item(inner) => inner.dispatch_shortcut(seq),)+
+                $(Self::$item(inner) => inner.dispatch_by_seq(seq),)+
             }
         }
     }
@@ -347,54 +242,192 @@ pub mod prelude {
     pub fn agent_init(keymap: &mut serde_yml::Mapping) -> anyhow::Result<()> {
         use anyhow::Context;
 
-        // Helper: dispatch Mapping (old) vs Sequence (new list-format)
+        // Helper: dispatch Sequence (list-format) into each tab's keymap module.
         macro_rules! init_section {
-            ($keymap:expr, $section:literal, $tab:ident) => {
-                if let Some(section_val) = crate::tui::agent::take_section($keymap, $section) {
+            ($keymap:expr, $section:literal, $mod:ident, $action_ty:ty, $scope:expr) => {
+                if let Some(section_val) = $keymap.remove($section) {
                     match section_val {
-                        serde_yml::Value::Mapping(map) => {
-                            crate::tui::agent::check_duplicate_keys($section, &map);
-                            let (keys, descs) = crate::tui::agent::extract_keymap_with_descs(map)?;
-                            super::$tab::agent_init(keys);
-                            super::$tab::init_descs(descs);
-                        }
                         serde_yml::Value::Sequence(seq) => {
-                            let entries: Vec<crate::tui::agent::Entry> =
+                            let entries: Vec<crate::tui::agent::RawEntry> =
                                 serde_yml::from_value(serde_yml::Value::Sequence(seq))
                                     .context(concat!("parsing ", $section, " entries"))?;
-                            crate::tui::agent::check_duplicate_keys_list($section, &entries);
-                            let (keys, descs, chords) =
-                                crate::tui::agent::extract_keymap_list(entries)?;
-                            super::$tab::agent_init(keys);
-                            super::$tab::init_descs(descs);
-                            super::$tab::init_chords(chords);
+                            let defaults = super::$mod::keymap::default_bindings();
+                            let overrides: Vec<crate::tui::binding::Binding<$action_ty>> = entries
+                                .iter()
+                                .map(|e| {
+                                    let exec: $action_ty = serde_yml::from_value(e.exec.clone())?;
+                                    anyhow::Ok(crate::tui::binding::Binding {
+                                        on: e.on.clone(),
+                                        exec,
+                                        desc: e.desc.clone(),
+                                    })
+                                })
+                                .collect::<anyhow::Result<Vec<_>>>()?;
+                            let keymap =
+                                crate::tui::binding::Keymap::merge(&defaults, &overrides, $scope)?;
+                            super::$mod::keymap::init(keymap);
                         }
                         _ => {
-                            anyhow::bail!("Section `{}` is neither Mapping nor Sequence", $section);
+                            anyhow::bail!(
+                                "Section `{}` must be a Sequence (list-format). \
+                                 Mapping format is no longer supported.",
+                                $section
+                            );
                         }
                     }
                 }
             };
         }
 
-        init_section!(keymap, "connections", connections);
-        init_section!(keymap, "proxies", proxies);
-        init_section!(keymap, "srvctl", srvctl);
-        init_section!(keymap, "settings", settings);
-        init_section!(keymap, "logs", logs);
+        init_section!(
+            keymap,
+            "connections",
+            connections,
+            super::connections::Key,
+            crate::tui::binding::Scope::Connections
+        );
+        init_section!(
+            keymap,
+            "proxies",
+            proxies,
+            super::proxies::Key,
+            crate::tui::binding::Scope::Proxies
+        );
+        init_section!(
+            keymap,
+            "srvctl",
+            srvctl,
+            super::srvctl::SrvCtlKey,
+            crate::tui::binding::Scope::SrvCtl
+        );
+        init_section!(
+            keymap,
+            "settings",
+            settings,
+            super::settings::SettingsKey,
+            crate::tui::binding::Scope::Settings
+        );
+        init_section!(
+            keymap,
+            "logs",
+            logs,
+            super::logs::Key,
+            crate::tui::binding::Scope::Logs
+        );
 
-        // FileTab has nested sections — delegate to files::agent_init
-        if let Some(section_val) = crate::tui::agent::take_section(keymap, "file") {
-            match section_val {
-                serde_yml::Value::Mapping(map) => {
-                    super::files::agent_init(map).context("Loading FileTab KeyMap")?;
-                }
-                _ => {
-                    anyhow::bail!(
-                        "`file` section only supports Mapping format (nested profile/template)"
-                    );
+        // FileTab: init profile and template individually (previously nested under `file:`)
+        {
+            use super::files::profile;
+            use super::files::template;
+
+            if let Some(section_val) = keymap.remove("file/profile") {
+                match section_val {
+                    serde_yml::Value::Sequence(seq) => {
+                        let entries: Vec<crate::tui::agent::RawEntry> =
+                            serde_yml::from_value(serde_yml::Value::Sequence(seq))
+                                .context("parsing file/profile entries")?;
+                        let defaults = profile::keymap::default_bindings();
+                        let overrides: Vec<crate::tui::binding::Binding<profile::Key>> = entries
+                            .iter()
+                            .map(|e| {
+                                let exec: profile::Key = serde_yml::from_value(e.exec.clone())?;
+                                anyhow::Ok(crate::tui::binding::Binding {
+                                    on: e.on.clone(),
+                                    exec,
+                                    desc: e.desc.clone(),
+                                })
+                            })
+                            .collect::<anyhow::Result<Vec<_>>>()?;
+                        let km = crate::tui::binding::Keymap::merge(
+                            &defaults,
+                            &overrides,
+                            crate::tui::binding::Scope::FileProfile,
+                        )?;
+                        profile::keymap::init(km);
+                    }
+                    _ => anyhow::bail!(
+                        "`file/profile` must be a Sequence (list-format). Mapping format is no longer supported."
+                    ),
                 }
             }
+
+            if let Some(section_val) = keymap.remove("file/template") {
+                match section_val {
+                    serde_yml::Value::Sequence(seq) => {
+                        let entries: Vec<crate::tui::agent::RawEntry> =
+                            serde_yml::from_value(serde_yml::Value::Sequence(seq))
+                                .context("parsing file/template entries")?;
+                        let defaults = template::keymap::default_bindings();
+                        let overrides: Vec<crate::tui::binding::Binding<template::Key>> = entries
+                            .iter()
+                            .map(|e| {
+                                let exec: template::Key = serde_yml::from_value(e.exec.clone())?;
+                                anyhow::Ok(crate::tui::binding::Binding {
+                                    on: e.on.clone(),
+                                    exec,
+                                    desc: e.desc.clone(),
+                                })
+                            })
+                            .collect::<anyhow::Result<Vec<_>>>()?;
+                        let km = crate::tui::binding::Keymap::merge(
+                            &defaults,
+                            &overrides,
+                            crate::tui::binding::Scope::FileTemplate,
+                        )?;
+                        template::keymap::init(km);
+                    }
+                    _ => anyhow::bail!(
+                        "`file/template` must be a Sequence (list-format). Mapping format is no longer supported."
+                    ),
+                }
+            }
+        }
+
+        // Warn about leftover keys (e.g. old `file:` nested format)
+        for leftover in keymap.keys() {
+            if let Some(k) = leftover.as_str() {
+                log::warn!(
+                    "Unrecognized keymap section `{k}` -- ignored. Did you mean `file/profile` or `file/template`?"
+                );
+            }
+        }
+
+        // Global scope: init from YAML or use defaults-only
+        {
+            let defaults = crate::tui::global_keymap::default_bindings();
+            let overrides: Vec<
+                crate::tui::binding::Binding<crate::tui::global_keymap::GlobalAction>,
+            > = if let Some(section_val) = keymap.remove("global") {
+                match section_val {
+                    serde_yml::Value::Sequence(seq) => {
+                        let entries: Vec<crate::tui::agent::RawEntry> =
+                            serde_yml::from_value(serde_yml::Value::Sequence(seq))
+                                .context("parsing global entries")?;
+                        entries
+                            .iter()
+                            .map(|e| {
+                                let exec = serde_yml::from_value(e.exec.clone())?;
+                                anyhow::Ok(crate::tui::binding::Binding {
+                                    on: e.on.clone(),
+                                    exec,
+                                    desc: e.desc.clone(),
+                                })
+                            })
+                            .collect::<anyhow::Result<Vec<_>>>()?
+                    }
+                    _ => anyhow::bail!(
+                        "`global` section must be a Sequence (list-format). Mapping format is no longer supported."
+                    ),
+                }
+            } else {
+                Vec::new()
+            };
+            let keymap = crate::tui::binding::Keymap::merge(
+                &defaults,
+                &overrides,
+                crate::tui::binding::Scope::Global,
+            )?;
+            crate::tui::global_keymap::init(keymap);
         }
 
         Ok(())

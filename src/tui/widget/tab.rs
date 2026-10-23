@@ -9,28 +9,19 @@
 //! new_type_impl_tuiwidget!(TheTab);
 //! ```
 
+use crate::tui::binding::DisplayBinding;
+use crate::tui::binding::Keymap;
 use crate::tui::{Key, TuiWidget};
 use ratatui::prelude::{Frame, Rect};
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct KeyCombo(pub Vec<Key>);
-
-impl std::ops::Deref for KeyCombo {
-    type Target = [Key];
-    fn deref(&self) -> &[Key] {
-        &self.0
-    }
-}
-
 pub trait BasicTabContent: 'static {
-    type Key: for<'a> TryFrom<&'a Key, Error = ()> + Copy;
+    type Key: Copy;
     type State;
 
     const TITLE: &str;
 
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        &[]
-    }
+    /// Return the keymap for this tab content (per-scope Keymap).
+    fn keymap() -> &'static Keymap<Self::Key>;
 
     /// Allow you to do something after one task is done
     fn after_sync(&self, _task_set: &mut FutureSet<Self>) {}
@@ -60,20 +51,13 @@ pub struct Tab<C: TabContent> {
     content: C,
     state: C::State,
     tasks: FutureSet<C>,
-    shortcuts: Vec<(KeyCombo, &'static str)>,
+    shortcuts: Vec<DisplayBinding>,
 }
 
 impl<C> TuiWidget for Tab<C>
 where
     C: TabContent,
 {
-    fn handle_key_event(&mut self, kv: &Key) {
-        if let Ok(key) = C::Key::try_from(kv) {
-            self.content
-                .handle_key_event(key, &mut self.tasks, &mut self.state)
-        }
-    }
-
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
         self.content.render(f, area, &mut self.state);
     }
@@ -105,10 +89,7 @@ where
         let mut state = Default::default();
         let mut tasks = Default::default();
         content.init(&mut tasks, &mut state);
-        let shortcuts: Vec<(KeyCombo, &'static str)> = C::all_shortcuts()
-            .iter()
-            .map(|(combo, _, desc)| (combo.clone(), *desc))
-            .collect();
+        let shortcuts: Vec<DisplayBinding> = C::keymap().to_display();
         Self {
             content,
             state,
@@ -119,17 +100,14 @@ where
 }
 
 impl<C: TabContent> Tab<C> {
-    pub fn shortcuts(&self) -> &[(KeyCombo, &'static str)] {
+    pub fn shortcuts(&self) -> &[DisplayBinding] {
         &self.shortcuts
     }
 
-    pub fn dispatch_shortcut(&mut self, seq: &[Key]) {
-        for (s, key, _) in C::all_shortcuts() {
-            if &**s == seq {
-                self.content
-                    .handle_key_event(*key, &mut self.tasks, &mut self.state);
-                return;
-            }
+    pub fn dispatch_by_seq(&mut self, seq: &[Key]) {
+        if let Some(action) = C::keymap().find_by_seq(seq) {
+            self.content
+                .handle_key_event(*action, &mut self.tasks, &mut self.state);
         }
     }
 }

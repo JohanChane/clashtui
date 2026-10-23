@@ -7,6 +7,8 @@ use std::collections::HashMap;
 newtype_tab!(ConnectionsTab(Tab<Connections>));
 
 mod_agent!(
+    keymap,
+    crate::tui::binding::Scope::Connections,
     Key,
     [
         ([KeyCode::Up], Key::MoveUp, "Move up"),
@@ -75,7 +77,7 @@ mod_agent!(
     ]
 );
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Key {
     MoveUp,
     MoveDown,
@@ -94,18 +96,6 @@ pub enum Key {
     Search,
     TogglePause,
     FzfFind,
-}
-
-impl TryFrom<&crate::tui::Key> for Key {
-    type Error = ();
-
-    fn try_from(ev: &crate::tui::Key) -> Result<Self, Self::Error> {
-        let agent = agent();
-        if !agent.is_empty() {
-            return agent.get(ev).copied().ok_or(());
-        }
-        Err(())
-    }
 }
 
 macro_rules! tri {
@@ -290,8 +280,8 @@ impl BasicTabContent for Connections {
 
     const TITLE: &str = "Connections";
 
-    fn all_shortcuts() -> &'static [(KeyCombo, Self::Key, &'static str)] {
-        agent::all_shortcuts()
+    fn keymap() -> &'static crate::tui::binding::Keymap<Self::Key> {
+        keymap::get()
     }
 
     fn after_sync(&self, task_set: &mut FutureSet<Self>) {
@@ -501,33 +491,6 @@ mod tests {
         };
         c.display_rows = make_display_rows(&c.conns, &mut c.last_bytes);
         c
-    }
-
-    #[test]
-    fn key_agent_contains_single_keys() {
-        let a = agent();
-        assert!(a.contains_key(&mk_key(KeyCode::Char('j'))));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('k'))));
-        assert!(a.contains_key(&mk_key(KeyCode::Char('G'))));
-        assert!(a.contains_key(&mk_key(KeyCode::Up)));
-        assert!(a.contains_key(&mk_key(KeyCode::Down)));
-    }
-
-    #[test]
-    fn key_try_from_returns_correct_actions() {
-        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('j'))), Ok(Key::MoveDown)));
-        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('k'))), Ok(Key::MoveUp)));
-        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('G'))), Ok(Key::GoBottom)));
-        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('/'))), Ok(Key::Search)));
-        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('p'))), Ok(Key::TogglePause)));
-        assert!(matches!(Key::try_from(&mk_key(KeyCode::Char('f'))), Ok(Key::FzfFind)));
-    }
-
-    #[test]
-    fn chord_keys_not_in_try_from() {
-        assert!(Key::try_from(&mk_key(KeyCode::Char('s'))).is_err());
-        assert!(Key::try_from(&mk_key(KeyCode::Char('d'))).is_err());
-        assert!(Key::try_from(&mk_key(KeyCode::Char('a'))).is_err());
     }
 
     #[test]
@@ -765,14 +728,6 @@ mod tests {
         assert!(!c.paused);
     }
 
-    #[test]
-    fn all_shortcuts_has_expected_count() {
-        let shortcuts = agent::all_shortcuts();
-        let single_key_count = shortcuts.iter().filter(|(c, _, _)| c.len() == 1).count();
-        let chord_count = shortcuts.iter().filter(|(c, _, _)| c.len() > 1).count();
-        assert!(single_key_count >= 6, "should have at least 6 single-key shortcuts");
-        assert!(chord_count >= 7, "should have at least 7 chord shortcuts");
-    }
 }
                         connection::get_connections()
                     })

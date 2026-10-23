@@ -7,14 +7,6 @@ newtype_tab!(StatusTab(Tab<Status>));
 #[derive(Clone, Copy)]
 enum Key {}
 
-impl TryFrom<&crate::tui::Key> for Key {
-    type Error = ();
-
-    fn try_from(_: &crate::tui::Key) -> Result<Self, Self::Error> {
-        Err(())
-    }
-}
-
 use crate::config::CONFIG;
 use crate::config::CoreType;
 use crate::functions::restful::{self, config_struct::*};
@@ -56,6 +48,13 @@ impl BasicTabContent for Status {
     type State = ();
 
     const TITLE: &str = "Status";
+
+    fn keymap() -> &'static crate::tui::binding::Keymap<Self::Key> {
+        use crate::tui::binding::{Keymap, Scope};
+        use std::sync::OnceLock;
+        static EMPTY_KEYMAP: OnceLock<Keymap<Key>> = OnceLock::new();
+        EMPTY_KEYMAP.get_or_init(|| Keymap::merge(&[], &[], Scope::Status).unwrap())
+    }
 
     fn after_sync(&self, task_set: &mut FutureSet<Self>) {
         if self.paused {

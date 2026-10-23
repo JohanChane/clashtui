@@ -5,6 +5,22 @@ use std::{
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+/// Format a key sequence (vec of keys) as a human-readable string.
+/// Single keys appear as-is; chords are joined with " → ".
+/// Example: `["g", "g"]` becomes `g → g`, `<C-g>` becomes `<C-g>`.
+pub fn format_key_sequence(keys: &[Key]) -> String {
+    let mut s = String::new();
+    for (i, k) in keys.iter().enumerate() {
+        if i > 0 {
+            s.push(' ');
+            s.push('\u{2192}'); // →
+            s.push(' ');
+        }
+        let _ = write!(s, "{k}");
+    }
+    s
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Key {
     pub code: KeyCode,
@@ -257,5 +273,38 @@ mod tests {
         let k = Key::from(key_event(KeyCode::Up, KeyModifiers::SHIFT));
         assert_eq!(k.code, KeyCode::Up);
         assert!(k.shift);
+    }
+
+    // -- format_key_sequence --
+
+    #[test]
+    fn format_key_sequence_single() {
+        let k = Key::from(key_event(KeyCode::Char('a'), KeyModifiers::NONE));
+        assert_eq!(format_key_sequence(&[k]), "a");
+    }
+
+    #[test]
+    fn format_key_sequence_chord() {
+        let g = Key::from(key_event(KeyCode::Char('g'), KeyModifiers::NONE));
+        assert_eq!(format_key_sequence(&[g, g]), "g → g");
+    }
+
+    #[test]
+    fn format_key_sequence_ctrl_chord() {
+        use std::str::FromStr;
+        let cg = Key::from_str("<C-g>").unwrap();
+        let c = Key::from(key_event(KeyCode::Char('c'), KeyModifiers::NONE));
+        assert_eq!(format_key_sequence(&[cg, c]), "<C-g> → c");
+    }
+
+    #[test]
+    fn format_key_sequence_empty() {
+        assert_eq!(format_key_sequence(&[]), "");
+    }
+
+    #[test]
+    fn format_key_sequence_upper() {
+        let kg = Key::from(key_event(KeyCode::Char('G'), KeyModifiers::NONE));
+        assert_eq!(format_key_sequence(&[kg]), "G");
     }
 }

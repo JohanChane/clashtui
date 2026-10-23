@@ -107,7 +107,7 @@ impl Config {
                     }
                 } else {
                     log::warn!(
-                        "Template file '{template_name}' not found for migration — groups will be dropped on next save"
+                        "Template file '{template_name}' not found for migration -- groups will be dropped on next save"
                     );
                 }
             }
@@ -313,6 +313,7 @@ fn singbox_dir() -> PathBuf {
 pub fn config_dir_path() -> PathBuf {
     DATA_DIR.get().unwrap().clone()
 }
+#[allow(dead_code)]
 pub fn core_data_dir(core_type: CoreType) -> PathBuf {
     match core_type {
         CoreType::Mihomo => mihomo_dir(),

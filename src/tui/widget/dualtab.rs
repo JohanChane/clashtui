@@ -1,4 +1,5 @@
 pub use super::tab::*;
+use crate::tui::binding::DisplayBinding;
 use crate::tui::{Key, TuiWidget};
 use ratatui::prelude::{Frame, Rect};
 
@@ -51,8 +52,8 @@ where
     state: (C1::State, C2::State),
     tasks: FutureSet<(C1, C2)>,
     is_focus_on_c1: bool,
-    c1_shortcuts: Vec<(KeyCombo, &'static str)>,
-    c2_shortcuts: Vec<(KeyCombo, &'static str)>,
+    c1_shortcuts: Vec<DisplayBinding>,
+    c2_shortcuts: Vec<DisplayBinding>,
 }
 
 impl<C1, C2> Default for DualTab<C1, C2>
@@ -68,14 +69,8 @@ where
         let mut tasks = Default::default();
         content.0.init(&mut tasks, &mut state.0);
         content.1.init(&mut tasks, &mut state.1);
-        let c1_shortcuts: Vec<(KeyCombo, &'static str)> = C1::all_shortcuts()
-            .iter()
-            .map(|(combo, _, desc)| (combo.clone(), *desc))
-            .collect();
-        let c2_shortcuts: Vec<(KeyCombo, &'static str)> = C2::all_shortcuts()
-            .iter()
-            .map(|(combo, _, desc)| (combo.clone(), *desc))
-            .collect();
+        let c1_shortcuts: Vec<DisplayBinding> = C1::keymap().to_display();
+        let c2_shortcuts: Vec<DisplayBinding> = C2::keymap().to_display();
         Self {
             content,
             state,
@@ -92,7 +87,7 @@ where
     C1: DualTabContent<Mate = C2>,
     C2: DualTabContentMate<Mate = C1>,
 {
-    pub fn shortcuts(&self) -> &[(KeyCombo, &'static str)] {
+    pub fn shortcuts(&self) -> &[DisplayBinding] {
         if self.is_focus_on_c1 {
             &self.c1_shortcuts
         } else {
@@ -100,39 +95,33 @@ where
         }
     }
 
-    pub fn dispatch_shortcut(&mut self, seq: &[Key]) {
+    pub fn dispatch_by_seq(&mut self, seq: &[Key]) {
         log::debug!(
-            "dispatch_shortcut: seq={seq:?} focus_c1={}",
+            "dispatch_by_seq: seq={seq:?} focus_c1={}",
             self.is_focus_on_c1
         );
         if self.is_focus_on_c1 {
-            for (s, key, desc) in C1::all_shortcuts() {
-                if &**s == seq {
-                    log::debug!("dispatch_shortcut: matched C1 '{desc}'");
-                    if DualTabContent::handle_key_event(
-                        &mut self.content.0,
-                        *key,
-                        &mut self.tasks,
-                        &mut self.state.0,
-                    ) {
-                        self.is_focus_on_c1 = false;
-                    }
-                    return;
+            if let Some(action) = C1::keymap().find_by_seq(seq) {
+                log::debug!("dispatch_by_seq: matched C1");
+                if DualTabContent::handle_key_event(
+                    &mut self.content.0,
+                    *action,
+                    &mut self.tasks,
+                    &mut self.state.0,
+                ) {
+                    self.is_focus_on_c1 = false;
                 }
             }
         } else {
-            for (s, key, desc) in C2::all_shortcuts() {
-                if &**s == seq {
-                    log::debug!("dispatch_shortcut: matched C2 '{desc}'");
-                    if DualTabContentMate::handle_key_event(
-                        &mut self.content.1,
-                        *key,
-                        &mut self.tasks,
-                        &mut self.state.1,
-                    ) {
-                        self.is_focus_on_c1 = true;
-                    }
-                    return;
+            if let Some(action) = C2::keymap().find_by_seq(seq) {
+                log::debug!("dispatch_by_seq: matched C2");
+                if DualTabContentMate::handle_key_event(
+                    &mut self.content.1,
+                    *action,
+                    &mut self.tasks,
+                    &mut self.state.1,
+                ) {
+                    self.is_focus_on_c1 = true;
                 }
             }
         }
@@ -144,32 +133,6 @@ where
     C1: DualTabContent<Mate = C2>,
     C2: DualTabContentMate<Mate = C1>,
 {
-    fn handle_key_event(&mut self, kv: &Key) {
-        if self.is_focus_on_c1 {
-            if let Ok(key) = C1::Key::try_from(kv)
-                && DualTabContent::handle_key_event(
-                    &mut self.content.0,
-                    key,
-                    &mut self.tasks,
-                    &mut self.state.0,
-                )
-            {
-                self.is_focus_on_c1 = false
-            }
-        } else {
-            if let Ok(key) = C2::Key::try_from(kv)
-                && DualTabContentMate::handle_key_event(
-                    &mut self.content.1,
-                    key,
-                    &mut self.tasks,
-                    &mut self.state.1,
-                )
-            {
-                self.is_focus_on_c1 = true
-            }
-        }
-    }
-
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
         use ratatui::layout::{Constraint::Ratio, Layout};
 
