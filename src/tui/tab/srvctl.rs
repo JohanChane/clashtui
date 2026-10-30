@@ -1,7 +1,7 @@
 use super::dev::*;
 use crate::config::CoreType;
 use crate::config::scripts::ScriptConfig;
-use crate::functions::service::{self, CORES, ServiceState, StatusReport, core_index};
+use crate::functions::service::{self, Operation, ServiceState, StatusReport};
 use ratatui::widgets::ListItem;
 use std::{cell::Cell, path::PathBuf, sync::Arc};
 
@@ -40,93 +40,82 @@ impl Document for Action {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum Operation {
-    Script {
-        id: String,
-        label: String,
-    },
-    SwitchCore,
-    StopAll,
-    Unavailable {
-        id: &'static str,
-        label: String,
-        reason: String,
-    },
+#[derive(Clone, Debug)]
+struct MenuEntry {
+    operation: Operation,
+    label: String,
+    unavailable_reason: Option<String>,
 }
 
-impl Operation {
+impl MenuEntry {
+    fn new(operation: Operation, label: impl Into<String>, scripts: &ScriptConfig) -> Self {
+        let missing = operation.missing_actions(scripts);
+        let mut label = label.into();
+        let unavailable_reason = if missing.is_empty() {
+            None
+        } else {
+            let missing = missing.join(", ");
+            label.push_str(&format!(" (unsupported: {missing})"));
+            Some(format!("Missing actions: {missing}"))
+        };
+        Self {
+            operation,
+            label,
+            unavailable_reason,
+        }
+    }
+
     fn key(&self) -> &str {
-        match self {
-            Self::Script { id, .. } => id,
-            Self::SwitchCore => ":switch_core",
-            Self::StopAll => ":stop_all",
-            Self::Unavailable { id, .. } => id,
-        }
-    }
-    fn label(&self) -> &str {
-        match self {
-            Self::Script { label, .. } => label,
-            Self::SwitchCore => "Switch Core",
-            Self::StopAll => "Stop All Services",
-            Self::Unavailable { label, .. } => label,
+        match &self.operation {
+            Operation::Script { id, .. } => id,
+            Operation::SwitchCore(_) => ":switch_core",
+            Operation::StopAll => ":stop_all",
         }
     }
 }
 
-fn menu(scripts: &ScriptConfig, core: CoreType) -> Vec<Operation> {
-    let mut ops: Vec<_> = scripts
+fn menu(scripts: &ScriptConfig, core: CoreType) -> Vec<MenuEntry> {
+    let mut entries: Vec<_> = scripts
         .actions_for(core)
-        .map(|action| Operation::Script {
-            id: action.id.clone(),
+        .map(|action| MenuEntry {
+            operation: Operation::Script {
+                core,
+                id: action.id.clone(),
+            },
             label: action.label.clone(),
+            unavailable_reason: None,
         })
         .collect();
-    if !ops.is_empty() {
-        let missing_stops: Vec<_> = CORES
-            .iter()
-            .filter(|core| scripts.find(**core, "stop_core").is_none())
-            .map(|core| format!("{core}/stop_core"))
-            .collect();
-        let other = match core {
-            CoreType::Mihomo => CoreType::Singbox,
-            CoreType::Singbox => CoreType::Mihomo,
-        };
-        let mut missing_switch = missing_stops.clone();
-        if scripts.find(other, "start_core").is_none() {
-            missing_switch.push(format!("{other}/start_core"));
-        }
-        let capability = |op: Operation, missing: Vec<String>| {
-            if missing.is_empty() {
-                op
-            } else {
-                Operation::Unavailable {
-                    id: if op == Operation::SwitchCore {
-                        ":switch_core"
-                    } else {
-                        ":stop_all"
-                    },
-                    label: format!("{} (unsupported: {})", op.label(), missing.join(", ")),
-                    reason: format!("Missing actions: {}", missing.join(", ")),
-                }
-            }
-        };
-        ops.push(capability(Operation::SwitchCore, missing_switch));
-        ops.push(capability(Operation::StopAll, missing_stops));
+    if !entries.is_empty() {
+        entries.push(MenuEntry::new(
+            Operation::SwitchCore(core.other()),
+            "Switch Core",
+            scripts,
+        ));
+        entries.push(MenuEntry::new(
+            Operation::StopAll,
+            "Stop All Services",
+            scripts,
+        ));
     }
-    ops
+    entries
+}
+
+#[derive(Default)]
+struct StatusQuery {
+    report: Option<StatusReport>,
+    pending: Cell<bool>,
+    refresh: Cell<bool>,
 }
 
 #[derive(Default)]
 struct SrvCtlContent {
-    ops: Vec<Operation>,
+    entries: Vec<MenuEntry>,
     scripts: Option<Arc<ScriptConfig>>,
     root: PathBuf,
     core: CoreType,
     generation: u64,
-    statuses: [Option<StatusReport>; 2],
-    pending: [Cell<bool>; 2],
-    refresh: [Cell<bool>; 2],
+    statuses: [StatusQuery; 2],
     error: Option<String>,
     visible: bool,
     busy: bool,
@@ -140,32 +129,27 @@ impl SrvCtlContent {
             .then(|| {
                 state
                     .selected()
-                    .and_then(|index| self.ops.get(index))
-                    .map(|op| op.key().to_owned())
+                    .and_then(|index| self.entries.get(index))
+                    .map(|entry| entry.key().to_owned())
             })
             .flatten();
         self.core = core;
-        self.generation = self.generation.wrapping_add(1);
-        self.revision = service::revision();
-        self.statuses = [None, None];
         // Clear before parsing: invalid edits must never leave executable stale actions.
         self.scripts = None;
-        self.ops.clear();
+        self.entries.clear();
         self.error = None;
         match ScriptConfig::load(&self.root) {
             Ok(scripts) => {
-                self.ops = menu(&scripts, core);
+                self.entries = menu(&scripts, core);
                 self.scripts = Some(Arc::new(scripts));
             }
             Err(error) => self.error = Some(format!("{error:#}")),
         }
         let index = selected
-            .and_then(|id| self.ops.iter().position(|op| op.key() == id))
-            .or_else(|| (!self.ops.is_empty()).then_some(0));
+            .and_then(|id| self.entries.iter().position(|entry| entry.key() == id))
+            .or_else(|| (!self.entries.is_empty()).then_some(0));
         state.select(index);
-        for refresh in &self.refresh {
-            refresh.set(self.scripts.is_some());
-        }
+        self.invalidate_statuses(service::revision());
     }
 
     fn spawn_status_checks(&self, tasks: &mut FutureSet<Self>) {
@@ -175,13 +159,14 @@ impl SrvCtlContent {
         let Some(scripts) = &self.scripts else {
             return;
         };
-        for core in CORES {
-            let index = core_index(core);
-            if self.pending[index].get() || !self.refresh[index].get() {
+        for core in CoreType::ALL {
+            let index = core.index();
+            let status = &self.statuses[index];
+            if status.pending.get() || !status.refresh.get() {
                 continue;
             }
-            self.pending[index].set(true);
-            self.refresh[index].set(false);
+            status.pending.set(true);
+            status.refresh.set(false);
             let scripts = Arc::clone(scripts);
             let root = self.root.clone();
             let generation = self.generation;
@@ -192,10 +177,7 @@ impl SrvCtlContent {
                 .await
                 .unwrap_or_else(StatusReport::unknown);
                 wrapper(move |content: &mut Self| {
-                    content.pending[index].set(false);
-                    if content.generation == generation {
-                        content.statuses[index] = Some(report);
-                    }
+                    content.complete_status(core, generation, report);
                 })
             }
             .spawn_at(tasks);
@@ -219,21 +201,34 @@ impl SrvCtlContent {
         .spawn_at(tasks);
     }
 
+    fn invalidate_statuses(&mut self, revision: u64) {
+        self.revision = revision;
+        self.generation = self.generation.wrapping_add(1);
+        for status in &mut self.statuses {
+            status.report = None;
+            status.refresh.set(self.scripts.is_some());
+        }
+    }
+
+    fn complete_status(&mut self, core: CoreType, generation: u64, report: StatusReport) {
+        let status = &mut self.statuses[core.index()];
+        status.pending.set(false);
+        if self.generation == generation {
+            status.report = Some(report);
+        }
+    }
+
     fn refresh_after_operation(&mut self, revision: u64) {
         if self.revision != revision {
-            self.revision = revision;
-            self.generation = self.generation.wrapping_add(1);
-            self.statuses = [None, None];
-            for refresh in &self.refresh {
-                refresh.set(true);
-            }
+            self.invalidate_statuses(revision);
         }
-        for (index, status) in self.statuses.iter().enumerate() {
+        for status in &self.statuses {
             if status
+                .report
                 .as_ref()
                 .is_some_and(|report| report.state == ServiceState::Checking)
             {
-                self.refresh[index].set(true);
+                status.refresh.set(true);
             }
         }
     }
@@ -279,25 +274,25 @@ impl TabContent for SrvCtlContent {
         match action {
             Action::Esc => {}
             Action::MoveUp => {
-                if !self.ops.is_empty() {
+                if !self.entries.is_empty() {
                     state.select(Some(state.selected().unwrap_or(0).saturating_sub(1)));
                 }
             }
             Action::MoveDown => {
                 let index = state.selected().unwrap_or(0);
-                if index + 1 < self.ops.len() {
+                if index + 1 < self.entries.len() {
                     state.select(Some(index + 1));
                 }
             }
             Action::Execute => {
-                let Some(op) = state
+                let Some(entry) = state
                     .selected()
-                    .and_then(|index| self.ops.get(index))
+                    .and_then(|index| self.entries.get(index))
                     .cloned()
                 else {
                     return;
                 };
-                if let Operation::Unavailable { reason, .. } = &op {
+                if let Some(reason) = &entry.unavailable_reason {
                     Confirm::err(reason);
                     return;
                 }
@@ -305,27 +300,14 @@ impl TabContent for SrvCtlContent {
                     return;
                 };
                 let root = self.root.clone();
-                let core = self.core;
                 self.busy = true;
-                let switching = op == Operation::SwitchCore;
+                let operation = entry.operation;
+                let switching = matches!(operation, Operation::SwitchCore(_));
                 async move {
-                    let result = tokio::task::spawn_blocking(move || match op {
-                        Operation::Script { id, .. } => {
-                            service::execute(&scripts, &root, core, &id)
-                        }
-                        Operation::StopAll => service::stop_all(&scripts, &root),
-                        Operation::Unavailable { .. } => unreachable!("disabled action"),
-                        Operation::SwitchCore => service::switch_core(
-                            &scripts,
-                            &root,
-                            match core {
-                                CoreType::Mihomo => CoreType::Singbox,
-                                CoreType::Singbox => CoreType::Mihomo,
-                            },
-                        ),
-                    })
-                    .await
-                    .unwrap_or_else(|error| Err(error.into()));
+                    let result =
+                        tokio::task::spawn_blocking(move || operation.execute(&scripts, &root))
+                            .await
+                            .unwrap_or_else(|error| Err(error.into()));
                     if let Err(error) = &result {
                         Confirm::err(format!("{error:#}"));
                     }
@@ -334,12 +316,7 @@ impl TabContent for SrvCtlContent {
                     }
                     wrapper(move |content: &mut Self| {
                         content.busy = false;
-                        content.revision = service::revision();
-                        content.generation = content.generation.wrapping_add(1);
-                        content.statuses = [None, None];
-                        for refresh in &content.refresh {
-                            refresh.set(true);
-                        }
+                        content.invalidate_statuses(service::revision());
                     })
                 }
                 .spawn_at(tasks);
@@ -354,9 +331,10 @@ impl TabContent for SrvCtlContent {
         };
         let theme = Theme::get();
         let section = theme.section("srvctl");
-        let status = CORES
+        let status = CoreType::ALL
             .map(|core| {
-                let label = self.statuses[core_index(core)]
+                let label = self.statuses[core.index()]
+                    .report
                     .as_ref()
                     .map_or("...", |report| report.state.as_str());
                 format!(
@@ -384,17 +362,18 @@ impl TabContent for SrvCtlContent {
             );
             return;
         }
-        if self.ops.is_empty() {
+        if self.entries.is_empty() {
             frame.render_widget(
                 Paragraph::new("未配置服务动作 / No service actions configured").block(block),
                 area,
             );
             return;
         }
-        let diagnostics = CORES
+        let diagnostics = CoreType::ALL
             .iter()
             .filter_map(|core| {
-                self.statuses[core_index(*core)]
+                self.statuses[core.index()]
+                    .report
                     .as_ref()
                     .and_then(|report| {
                         report
@@ -413,11 +392,11 @@ impl TabContent for SrvCtlContent {
         ])
         .areas(inner);
         let items: Vec<_> = self
-            .ops
+            .entries
             .iter()
-            .map(|op| {
-                let item = ListItem::new(format!("  {}", op.label()));
-                if matches!(op, Operation::Unavailable { .. }) {
+            .map(|entry| {
+                let item = ListItem::new(format!("  {}", entry.label));
+                if entry.unavailable_reason.is_some() {
                     item.fg(Color::DarkGray)
                 } else {
                     item
@@ -455,7 +434,7 @@ mod tests {
         ]}));
         let labels: Vec<_> = menu(&config, CoreType::Mihomo)
             .iter()
-            .map(|op| op.label().to_owned())
+            .map(|entry| entry.label.clone())
             .collect();
         assert_eq!(&labels[..2], ["Second", "Third"]);
         assert!(labels[2].contains("unsupported: mihomo/stop_core, sing-box/stop_core"));
@@ -496,11 +475,11 @@ mod tests {
         assert_eq!(state.selected(), Some(0));
         std::fs::write(&path, "bad json").unwrap();
         content.reload(CoreType::Mihomo, &mut state);
-        assert!(content.scripts.is_none() && content.ops.is_empty() && content.error.is_some());
+        assert!(content.scripts.is_none() && content.entries.is_empty() && content.error.is_some());
         assert_eq!(state.selected(), None);
         std::fs::remove_file(&path).unwrap();
         content.reload(CoreType::Mihomo, &mut state);
-        assert!(content.scripts.is_none() && content.ops.is_empty());
+        assert!(content.scripts.is_none() && content.entries.is_empty());
         assert!(
             content
                 .error
@@ -514,23 +493,67 @@ mod tests {
 
     #[test]
     fn global_operation_invalidates_status_and_busy_query_gets_retried() {
-        let mut content = SrvCtlContent::default();
-        content.statuses[0] = Some(StatusReport {
+        let mut content = SrvCtlContent {
+            scripts: Some(Arc::new(scripts(
+                serde_json::json!({"root":".","actions":[]}),
+            ))),
+            ..Default::default()
+        };
+        content.statuses[0].report = Some(StatusReport {
             state: ServiceState::Checking,
             diagnostic: None,
         });
         content.refresh_after_operation(0);
-        assert!(content.refresh[0].get());
-        assert!(!content.refresh[1].get());
-        content.statuses[0] = Some(StatusReport {
+        assert!(content.statuses[0].refresh.get());
+        assert!(!content.statuses[1].refresh.get());
+        content.statuses[0].report = Some(StatusReport {
             state: ServiceState::Active,
             diagnostic: None,
         });
-        content.refresh[0].set(false);
+        content.statuses[0].refresh.set(false);
         let generation = content.generation;
         content.refresh_after_operation(1);
-        assert!(content.statuses.iter().all(Option::is_none));
-        assert!(content.refresh.iter().all(Cell::get));
+        assert!(
+            content
+                .statuses
+                .iter()
+                .all(|status| status.report.is_none())
+        );
+        assert!(content.statuses.iter().all(|status| status.refresh.get()));
         assert_ne!(content.generation, generation);
+    }
+
+    #[test]
+    fn invalidation_waits_for_old_queries_and_discards_their_results() {
+        for configured in [true, false] {
+            let mut content = SrvCtlContent {
+                scripts: configured.then(|| {
+                    Arc::new(scripts(serde_json::json!({
+                        "root": ".", "actions": []
+                    })))
+                }),
+                ..Default::default()
+            };
+            let generation = content.generation;
+            for status in &content.statuses {
+                status.pending.set(true);
+            }
+            content.invalidate_statuses(1);
+            for core in CoreType::ALL {
+                assert!(content.statuses[core.index()].pending.get());
+                content.complete_status(
+                    core,
+                    generation,
+                    StatusReport {
+                        state: ServiceState::Active,
+                        diagnostic: None,
+                    },
+                );
+                let status = &content.statuses[core.index()];
+                assert!(!status.pending.get());
+                assert!(status.report.is_none());
+                assert_eq!(status.refresh.get(), configured);
+            }
+        }
     }
 }

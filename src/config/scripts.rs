@@ -10,7 +10,6 @@ use std::{
 };
 
 pub const FILE_NAME: &str = "scripts.json";
-const CORES: [CoreType; 2] = [CoreType::Mihomo, CoreType::Singbox];
 const VARIABLES: [&str; 8] = [
     "root",
     "config_root",
@@ -144,7 +143,7 @@ impl ScriptConfig {
                     ensure!(
                         !cores[..i].contains(core),
                         "{field}.cores[{i}]: duplicate core {}",
-                        core_name(*core)
+                        core.id()
                     );
                 }
             }
@@ -158,7 +157,7 @@ impl ScriptConfig {
                 validate_template(arg).with_context(|| format!("{field}.cmd.args[{i}]"))?;
             }
         }
-        for core in CORES {
+        for core in CoreType::ALL {
             let mut seen = HashMap::new();
             for (index, action) in self.actions.iter().enumerate() {
                 if action.applies_to(core)
@@ -166,7 +165,7 @@ impl ScriptConfig {
                 {
                     bail!(
                         "actions[{index}].cores: ({}, {}) overlaps actions[{first}]",
-                        core_name(core),
+                        core.id(),
                         action.id
                     );
                 }
@@ -251,13 +250,6 @@ impl ScriptConfig {
             args,
             cwd: root,
         })
-    }
-}
-
-fn core_name(core: CoreType) -> &'static str {
-    match core {
-        CoreType::Mihomo => "mihomo",
-        CoreType::Singbox => "singbox",
     }
 }
 
@@ -361,7 +353,11 @@ mod tests {
 
     #[test]
     fn conflicting_scopes_are_rejected_before_filtering() {
-        for scopes in [None, Some(vec![CoreType::Mihomo]), Some(CORES.to_vec())] {
+        for scopes in [
+            None,
+            Some(vec![CoreType::Mihomo]),
+            Some(CoreType::ALL.to_vec()),
+        ] {
             let config = config(vec![
                 action("start_core", scopes),
                 action("start_core", Some(vec![CoreType::Mihomo])),

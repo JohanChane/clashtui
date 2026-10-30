@@ -13,7 +13,6 @@ use std::{
     },
 };
 
-pub const CORES: [CoreType; 2] = [CoreType::Mihomo, CoreType::Singbox];
 static STATUS_LOCKS: [Mutex<()>; 2] = [Mutex::new(()), Mutex::new(())];
 static REVISION: AtomicU64 = AtomicU64::new(0);
 
@@ -27,23 +26,45 @@ fn with_operation<T>(job: impl FnOnce() -> Result<T>) -> Result<T> {
     result
 }
 
-pub fn core_index(core: CoreType) -> usize {
-    match core {
-        CoreType::Mihomo => 0,
-        CoreType::Singbox => 1,
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Operation {
+    Script { core: CoreType, id: String },
+    StopAll,
+    SwitchCore(CoreType),
+}
+
+impl Operation {
+    pub fn missing_actions(&self, scripts: &ScriptConfig) -> Vec<String> {
+        let mut required = match self {
+            Self::Script { core, id } => vec![(*core, id.as_str())],
+            Self::StopAll | Self::SwitchCore(_) => {
+                CoreType::ALL.map(|core| (core, "stop_core")).to_vec()
+            }
+        };
+        if let Self::SwitchCore(target) = self {
+            required.push((*target, "start_core"));
+        }
+        required
+            .into_iter()
+            .filter(|(core, id)| scripts.find(*core, id).is_none())
+            .map(|(core, id)| format!("{core}/{id}"))
+            .collect()
+    }
+
+    pub fn execute(&self, scripts: &ScriptConfig, root: &Path) -> Result<String> {
+        match self {
+            Self::Script { core, id } => {
+                let action = plan(scripts, root, &TargetContext::snapshot(*core), id)?;
+                with_operation(|| run(&action))
+            }
+            Self::StopAll => stop_all(scripts, root),
+            Self::SwitchCore(target) => switch_core(scripts, root, *target),
+        }
     }
 }
 
-pub fn core_id(core: CoreType) -> &'static str {
-    match core {
-        CoreType::Mihomo => "mihomo",
-        CoreType::Singbox => "singbox",
-    }
-}
-
-#[derive(Clone)]
-pub struct TargetContext {
-    pub core: CoreType,
+struct TargetContext {
+    core: CoreType,
     service_name: String,
     core_bin: String,
     core_config_dir: String,
@@ -53,7 +74,7 @@ pub struct TargetContext {
 }
 
 impl TargetContext {
-    pub fn snapshot(core: CoreType) -> Self {
+    fn snapshot(core: CoreType) -> Self {
         let (paths, service, controller, secret) = match core {
             CoreType::Mihomo => (
                 &CONFIG.cfg_file.mihomo.core,
@@ -79,34 +100,26 @@ impl TargetContext {
         }
     }
 
-    fn value(&self, name: &str, config_root: &Path, port: &mut Option<u16>) -> Result<String> {
+    fn value(&self, name: &str, config_root: &Path) -> Result<String> {
         let raw = match name {
-            "core_type" => return Ok(core_id(self.core).into()),
+            "core_type" => return Ok(self.core.id().into()),
             "service_name" => &self.service_name,
             "core_bin" => &self.core_bin,
             "core_config_dir" => &self.core_config_dir,
             "core_config_path" => &self.core_config_path,
             "proxy_port" => {
-                if port.is_none() {
-                    let response = super::restful::config::fetch_from(
-                        &self.controller,
-                        self.secret.as_deref(),
-                    )
-                    .context("Cannot query target core proxy port")?;
-                    *port = Some(proxy_port(
-                        valid_port(response.get("mixed-port")),
-                        valid_port(response.get("port")),
-                    )?);
-                }
-                return Ok(port.unwrap().to_string());
+                let response =
+                    super::restful::config::fetch_from(&self.controller, self.secret.as_deref())
+                        .context("Cannot query target core proxy port")?;
+                return proxy_port(
+                    valid_port(response.get("mixed-port")),
+                    valid_port(response.get("port")),
+                )
+                .map(|port| port.to_string());
             }
             _ => bail!("Unknown script variable: {name}"),
         };
-        ensure!(
-            !raw.is_empty(),
-            "{}: missing ${{{name}}}",
-            core_id(self.core)
-        );
+        ensure!(!raw.is_empty(), "{}: missing ${{{name}}}", self.core.id());
         if name == "service_name" {
             return Ok(raw.clone());
         }
@@ -161,29 +174,23 @@ fn proxy_port(mixed_port: Option<u16>, port: Option<u16>) -> Result<u16> {
         .context("Target core has no valid mixed-port or port")
 }
 
-#[derive(Clone, Debug)]
-pub struct PlannedAction {
-    pub core: CoreType,
-    pub id: String,
-    pub command: ResolvedCommand,
+#[derive(Debug)]
+struct PlannedAction {
+    core: CoreType,
+    id: String,
+    command: ResolvedCommand,
 }
 
-pub fn plan(
+fn plan(
     scripts: &ScriptConfig,
     config_root: &Path,
     target: &TargetContext,
     id: &str,
 ) -> Result<PlannedAction> {
-    let action = scripts.find(target.core, id).with_context(|| {
-        format!(
-            "{} does not support {id} in scripts.json",
-            core_id(target.core)
-        )
-    })?;
-    let mut port = None;
-    let command = scripts.resolve(config_root, action, |name| {
-        target.value(name, config_root, &mut port)
-    })?;
+    let action = scripts
+        .find(target.core, id)
+        .with_context(|| format!("{} does not support {id} in scripts.json", target.core.id()))?;
+    let command = scripts.resolve(config_root, action, |name| target.value(name, config_root))?;
     Ok(PlannedAction {
         core: target.core,
         id: id.into(),
@@ -192,28 +199,27 @@ pub fn plan(
 }
 
 fn run(action: &PlannedAction) -> Result<String> {
-    println!("{}: {}", core_id(action.core), action.id);
+    println!("{}: {}", action.core.id(), action.id);
     let outcome = super::process::run_foreground(&action.command)?;
     ensure!(
         outcome.status.success(),
         "{} {} failed: {}",
-        core_id(action.core),
+        action.core.id(),
         action.id,
         outcome.status
     );
-    Ok(format!("{} {}: OK", core_id(action.core), action.id))
-}
-
-pub fn execute(scripts: &ScriptConfig, root: &Path, core: CoreType, id: &str) -> Result<String> {
-    let action = plan(scripts, root, &TargetContext::snapshot(core), id)?;
-    with_operation(|| run(&action))
+    Ok(format!("{} {}: OK", action.core.id(), action.id))
 }
 
 pub fn execute_current(id: &str) -> Result<String> {
     let core = CONFIG.core_type();
     let root = config::config_dir_path();
     let scripts = ScriptConfig::load(&root)?;
-    execute(&scripts, &root, core, id)
+    Operation::Script {
+        core,
+        id: id.into(),
+    }
+    .execute(&scripts, &root)
 }
 
 fn stop_plan(
@@ -239,7 +245,7 @@ fn run_stops(
             Ok(report) => reports.push(report),
             Err(error) => {
                 failed = true;
-                reports.push(format!("{} {}: {error:#}", core_id(action.core), action.id));
+                reports.push(format!("{} {}: {error:#}", action.core.id(), action.id));
             }
         }
     }
@@ -248,8 +254,8 @@ fn run_stops(
     Ok(report)
 }
 
-pub fn stop_all(scripts: &ScriptConfig, root: &Path) -> Result<String> {
-    let targets = CORES.map(TargetContext::snapshot);
+fn stop_all(scripts: &ScriptConfig, root: &Path) -> Result<String> {
+    let targets = CoreType::ALL.map(TargetContext::snapshot);
     let stops = stop_plan(scripts, root, &targets)?;
     with_operation(|| run_stops(&stops, run))
 }
@@ -266,15 +272,15 @@ fn run_switch(
     save(start.core).with_context(|| format!("{stopped}\n{started}\nTarget was started, but saving selection failed; previous selection retained"))?;
     Ok(format!(
         "{stopped}\n{started}\nCore switched to {}",
-        core_id(start.core)
+        start.core.id()
     ))
 }
 
-pub fn switch_core(scripts: &ScriptConfig, root: &Path, target: CoreType) -> Result<String> {
-    let targets = CORES.map(TargetContext::snapshot);
+fn switch_core(scripts: &ScriptConfig, root: &Path, target: CoreType) -> Result<String> {
+    let targets = CoreType::ALL.map(TargetContext::snapshot);
     // Resolve every required capability before any side effect.
     let stops = stop_plan(scripts, root, &targets)?;
-    let start = plan(scripts, root, &targets[core_index(target)], "start_core")?;
+    let start = plan(scripts, root, &targets[target.index()], "start_core")?;
     with_operation(|| {
         run_switch(&stops, &start, run, |target| {
             let mut data = CONFIG.data.lock().unwrap();
@@ -375,7 +381,7 @@ pub fn query_status(scripts: &ScriptConfig, root: &Path, core: CoreType) -> Stat
             diagnostic: None,
         };
     }
-    let Ok(_query) = STATUS_LOCKS[core_index(core)].try_lock() else {
+    let Ok(_query) = STATUS_LOCKS[core.index()].try_lock() else {
         return StatusReport {
             state: ServiceState::Checking,
             diagnostic: None,
@@ -432,6 +438,46 @@ mod tests {
     }
 
     #[test]
+    fn operation_capabilities_follow_the_target_core() {
+        for target in CoreType::ALL {
+            let scripts = ScriptConfig::parse(&serde_json::json!({
+                "root": ".",
+                "actions": [
+                    {"id": "stop_core", "label": "Stop", "cmd": {"program": "tool", "args": []}},
+                    {"id": "start_core", "label": "Start", "cores": [target], "cmd": {"program": "tool", "args": []}},
+                    {"id": "custom", "label": "Custom", "cores": [target], "cmd": {"program": "tool", "args": []}}
+                ]
+            }).to_string()).unwrap();
+            assert!(Operation::StopAll.missing_actions(&scripts).is_empty());
+            assert!(
+                Operation::SwitchCore(target)
+                    .missing_actions(&scripts)
+                    .is_empty()
+            );
+            assert_eq!(
+                Operation::SwitchCore(target.other()).missing_actions(&scripts),
+                [format!("{}/start_core", target.other())]
+            );
+            assert!(
+                Operation::Script {
+                    core: target,
+                    id: "custom".into()
+                }
+                .missing_actions(&scripts)
+                .is_empty()
+            );
+            assert_eq!(
+                Operation::Script {
+                    core: target.other(),
+                    id: "custom".into()
+                }
+                .missing_actions(&scripts),
+                [format!("{}/custom", target.other())]
+            );
+        }
+    }
+
+    #[test]
     fn status_protocol_is_exact() {
         for value in [b"active".as_slice(), b"active\n", b"active\r\n"] {
             assert_eq!(parse_status(value).unwrap(), ServiceState::Active);
@@ -471,7 +517,7 @@ mod tests {
 
     #[test]
     fn stops_attempt_all_and_report_partial_success() {
-        let stops = CORES.map(|core| action(core, "stop_core"));
+        let stops = CoreType::ALL.map(|core| action(core, "stop_core"));
         let mut seen = Vec::new();
         let error = run_stops(&stops, |action| {
             seen.push(action.core);
@@ -482,13 +528,13 @@ mod tests {
         })
         .unwrap_err()
         .to_string();
-        assert_eq!(seen, CORES);
+        assert_eq!(seen, CoreType::ALL);
         assert!(error.contains("denied") && error.contains("singbox stopped"));
     }
 
     #[test]
     fn switch_never_starts_after_failed_stop_or_saves_failed_start() {
-        let stops = CORES.map(|core| action(core, "stop_core"));
+        let stops = CoreType::ALL.map(|core| action(core, "stop_core"));
         let start = action(CoreType::Singbox, "start_core");
         for failed in ["stop_core", "start_core"] {
             let mut seen = Vec::new();
@@ -518,7 +564,7 @@ mod tests {
 
     #[test]
     fn switch_saves_after_target_success_and_reports_save_failure() {
-        let stops = CORES.map(|core| action(core, "stop_core"));
+        let stops = CoreType::ALL.map(|core| action(core, "stop_core"));
         let start = action(CoreType::Singbox, "start_core");
         let calls = Cell::new(0);
         let error = run_switch(
@@ -549,25 +595,15 @@ mod tests {
             controller: "unreachable".into(),
             secret: None,
         };
-        let mut port = None;
         assert_eq!(
-            target
-                .value("service_name", Path::new("/tmp"), &mut port)
-                .unwrap(),
+            target.value("service_name", Path::new("/tmp")).unwrap(),
             target.service_name
         );
         assert_eq!(
-            target
-                .value("core_type", Path::new("/tmp"), &mut port)
-                .unwrap(),
+            target.value("core_type", Path::new("/tmp")).unwrap(),
             "singbox"
         );
-        assert!(
-            target
-                .value("core_bin", Path::new("/tmp"), &mut port)
-                .is_err()
-        );
-        assert!(port.is_none());
+        assert!(target.value("core_bin", Path::new("/tmp")).is_err());
     }
 
     #[test]

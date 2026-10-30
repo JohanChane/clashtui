@@ -10,6 +10,33 @@ pub enum CoreType {
     #[serde(rename = "singbox")]
     Singbox,
 }
+
+impl CoreType {
+    pub const ALL: [Self; 2] = [Self::Mihomo, Self::Singbox];
+
+    /// Stable configuration and script identifier, independent of the display name.
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::Mihomo => "mihomo",
+            Self::Singbox => "singbox",
+        }
+    }
+
+    pub const fn index(self) -> usize {
+        match self {
+            Self::Mihomo => 0,
+            Self::Singbox => 1,
+        }
+    }
+
+    pub const fn other(self) -> Self {
+        match self {
+            Self::Mihomo => Self::Singbox,
+            Self::Singbox => Self::Mihomo,
+        }
+    }
+}
+
 impl std::fmt::Display for CoreType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

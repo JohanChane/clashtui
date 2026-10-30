@@ -60,13 +60,7 @@ impl Coordinator {
             let _ = request.ready.send(Err(error));
             return Ok(());
         }
-        if let Err(error) = raw_mode::restore() {
-            let _ = raw_mode::setup();
-            let _ = input.resume();
-            let _ = request.ready.send(Err(error.into()));
-            return Ok(());
-        }
-        let state = match TerminalState::capture() {
+        let state = match raw_mode::restore().and_then(|()| TerminalState::capture()) {
             Ok(state) => state,
             Err(error) => {
                 let _ = raw_mode::setup();
@@ -112,8 +106,12 @@ impl Drop for RestoreTerminal {
 
 struct TerminalLease {
     _lock: MutexGuard<'static, ()>,
-    release: Option<oneshot::Sender<()>>,
-    normal_modes: Option<TerminalState>,
+    tui: Option<TuiLease>,
+}
+
+struct TuiLease {
+    release: oneshot::Sender<()>,
+    normal_modes: TerminalState,
 }
 
 impl TerminalLease {
@@ -129,7 +127,7 @@ impl TerminalLease {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clone();
-        let (release, normal_modes) = if let Some(coordinator) = coordinator {
+        let tui = if let Some(coordinator) = coordinator {
             let (ready, receiver) = mpsc::sync_channel(1);
             let (release, released) = oneshot::channel();
             coordinator
@@ -138,26 +136,25 @@ impl TerminalLease {
             let modes = receiver
                 .recv()
                 .context("Terminal coordinator stopped before handoff")??;
-            (Some(release), Some(modes))
+            Some(TuiLease {
+                release,
+                normal_modes: modes,
+            })
         } else {
-            (None, None)
+            None
         };
-        Ok(Self {
-            _lock: lock,
-            release,
-            normal_modes,
-        })
+        Ok(Self { _lock: lock, tui })
     }
 
     fn is_tui(&self) -> bool {
-        self.release.is_some()
+        self.tui.is_some()
     }
 }
 
 impl Drop for TerminalLease {
     fn drop(&mut self) {
-        if let Some(release) = self.release.take() {
-            let _ = release.send(());
+        if let Some(tui) = self.tui.take() {
+            let _ = tui.release.send(());
         } else {
             EXTERNAL.store(false, Ordering::SeqCst);
         }
@@ -176,12 +173,10 @@ pub fn with_terminal<T>(job: impl FnOnce() -> Result<T>) -> Result<T> {
         None
     };
     let result = job();
-    if lease.is_tui() {
+    if let Some(tui) = &lease.tui {
         // A command may leave the terminal raw or disable CR-to-LF translation.
         // Restore normal modes before reading the acknowledgement line.
-        if let Some(modes) = &lease.normal_modes
-            && let Err(error) = modes.restore()
-        {
+        if let Err(error) = tui.normal_modes.restore() {
             eprintln!("Failed to restore normal terminal modes: {error}");
             drop(lease);
             return result.and(Err(error.into()));
