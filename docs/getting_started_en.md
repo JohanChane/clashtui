@@ -265,7 +265,6 @@ mihomo:
     config_path: /opt/clashtui/mihomo/config/config.yaml  # Final config file path
   core_service:
     service_name: clashtui_mihomo                # systemd service name
-    is_user: false                               # Whether it's a user service
 singbox:
   core:
     bin_path: /opt/clashtui/sing-box/sing-box
@@ -273,7 +272,6 @@ singbox:
     config_path: /opt/clashtui/sing-box/config/config.json
   core_service:
     service_name: clashtui_singbox
-    is_user: false
 timeout: null
 extra:
   edit_cmd: kitty -e nvim "%s"      # Command for editing files, %s is replaced by file path
@@ -373,7 +371,7 @@ clashtui -vv    # Debug info
 ## FAQ
 
 **In non-is-user mode, the core can't download rule files after starting?**
-Non-`is_user` installations enable TUN by default, which may prevent the core from downloading required startup files (like rule-set, geoip, etc.). A temporary workaround: switch mode to Direct (`clashtui mode direct`), wait for the core to download the needed files, then switch back to the original mode (`clashtui mode rule`).
+System installations enable TUN by default, which may prevent the core from downloading required startup files (like rule-set, geoip, etc.). A temporary workaround: switch mode to Direct (`clashtui mode direct`), wait for the core to download the needed files, then switch back to the original mode (`clashtui mode rule`).
 
 **No data displayed after startup?**
 Make sure the Mihomo or sing-box core has been started. Go to the CoreSrvCtl tab (press `7`) to start the service.

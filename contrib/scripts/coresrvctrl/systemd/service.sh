@@ -10,7 +10,13 @@ case "$scope" in system|user) ;; *) fail "Unknown scope: $scope";; esac
 case "$service" in ''|-*|*[!a-zA-Z0-9_.@:-]*) fail 'Invalid service name';; esac
 command -v systemctl >/dev/null 2>&1 || fail 'systemctl is not available'
 ctl() {
-    if [ "$scope" = user ]; then systemctl --user "$@"; else systemctl "$@"; fi
+    if [ "$scope" = user ]; then
+        systemctl --user "$@"
+    elif [ "$1" = show ] || [ "$(id -u)" -eq 0 ]; then
+        systemctl "$@"
+    else
+        sudo -- systemctl "$@"
+    fi
 }
 query() {
     result=0

@@ -191,15 +191,38 @@ class TerminalTests(unittest.TestCase):
         self.assertIn(b"17", result.stderr)
         self.assertNotIn(ENTER, result.stdout)
 
+    def test_nested_command_owns_stdin_and_propagates_failure(self):
+        # Model a script waiting for sudo without invoking the host's real sudo.
+        (self.root / "fake-sudo.sh").write_text(
+            "printf 'NESTED_INPUT_READY\\n'\nIFS= read -r value\n"
+            "printf '%s\\n' \"$value\" > nested-input\nexit 17\n",
+            encoding="utf-8",
+        )
+        self.configure('/bin/sh ./fake-sudo.sh\nresult=$?\nexit "$result"\n')
+        session = self.start()
+        session.send(b"\r")
+        session.expect(b"NESTED_INPUT_READY")
+        session.send(b"fixture input\n")
+        session.expect(b"17")
+        session.expect(ENTER)
+        self.assertEqual((self.root / "nested-input").read_text(), "fixture input\n")
+        session.send(b"\n")
+        session.expect(RESTORED)
+
     def test_sigterm_reaps_foreground_command_and_restores_terminal(self):
-        self.configure("printf '%s\\n' \"$$\" > child-pid\nprintf 'CANCEL_READY\\n'\nexec sleep 30\n")
+        self.configure("printf '%s\\n' \"$$\" > wrapper-pid\n"
+                       "/bin/sh -c 'echo $$ > child-pid; printf \"CANCEL_READY\\n\"; exec sleep 30'\n"
+                       "result=$?\nexit \"$result\"\n")
         session = self.start()
         session.send(b"\r")
         session.expect(b"CANCEL_READY")
         child = int((self.root / "child-pid").read_text())
+        wrapper = int((self.root / "wrapper-pid").read_text())
         session.close()
         with self.assertRaises(ProcessLookupError):
             os.kill(child, 0)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(wrapper, 0)
 
     def test_stop_all_uses_one_terminal_handoff(self):
         self.configure("printf '%s\\n' \"$1\" >> stopped\n")

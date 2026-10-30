@@ -90,7 +90,6 @@ mihomo:
     config_path: /opt/clashtui/mihomo/config/config.yaml
   core_service:
     service_name: clashtui_mihomo
-    is_user: false
 singbox:
   core:
     bin_path: /opt/clashtui/sing-box/sing-box
@@ -98,7 +97,6 @@ singbox:
     config_path: /opt/clashtui/sing-box/config/config.json
   core_service:
     service_name: clashtui_singbox
-    is_user: false
 timeout: null
 extra:
   edit_cmd: ghostty -e nvim "%s"
@@ -1245,20 +1243,9 @@ The script registers Windows Services via clashtui's own `clashtui service insta
 
 ClashTui defaults to `systemd` as the service manager on Linux. Support for `openrc` is added for Linux distributions running OpenRC (e.g. Gentoo, Alpine).
 
-### Configuration Field
+### Configuration
 
-The `service_controller` field is added to `core_service` sections in `config.yaml`:
-
-```yaml
-core_service:
-  service_name: clashtui_mihomo
-  is_user: false
-  service_controller: openrc   # Optional: systemd (default) / openrc
-```
-
-- `"systemd"` or absent → uses systemd
-- `"openrc"` → uses OpenRC (`rc-service`/`rc-update`)
-- Non-Linux platforms ignore this field, using platform default
+The installer option `--service-controller openrc` selects the OpenRC template; `--is-user` selects user scope. Defaults use systemd/system on Linux. The installer writes literal scope arguments into `scripts.json`; `config.yaml` only stores the service name under `core_service`. Runtime service commands come from `scripts.json`.
 
 ### Runtime Behavior
 
@@ -1270,10 +1257,10 @@ core_service:
 | Reload       | `systemctl reload <name>`          | `rc-service <name> restart`      |
 | Status       | `systemctl is-active <name>`       | `rc-service <name> status`       |
 
-`is_user` determines sudo/--user prefix:
+The script scope argument controls runtime privileges:
 
-- `is_user: false`: `sudo rc-service <name> <op>` (system mode)
-- `is_user: true`: `rc-service --user <name> <op>` (user mode)
+- `scope=system`: writes use `sudo rc-service <name> <op>` when needed; queries do not elevate
+- `scope=user`: `rc-service --user <name> <op>`, without elevation
 - OpenRC has supported user services since v0.60; scripts go in `/etc/user/init.d/`; requires `XDG_RUNTIME_DIR` to be set
 
 ### Install Script (`installs/install`)
@@ -1294,7 +1281,7 @@ The `install` script accepts a `--service-controller` argument:
 When `--service-controller openrc`:
 - System mode: generates OpenRC init scripts in `/etc/init.d/`, uses `command_user` for the service user
 - User mode: generates OpenRC init scripts in `/etc/user/init.d/` (requires sudo to write), no `command_user` (runs as current user)
-- `config.yaml` is written with `service_controller: openrc` and the corresponding `is_user` value
+- Installs the OpenRC script and writes its literal scope into `scripts.json`
 - Uses `supervise-daemon` to manage foreground processes
 
 Generated OpenRC init script — system mode (mihomo):

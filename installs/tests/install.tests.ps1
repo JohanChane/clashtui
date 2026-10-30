@@ -165,3 +165,38 @@ Describe "UTF-8 BOM-free file writing" {
 
 
 }
+
+Describe "Service script installation" {
+    BeforeEach {
+        $script:CLASHTUI_CONFIG_DIR = Join-Path $TestDrive "config"
+        $script:CONTRIB_SOURCE = "local"
+        $script:CONTRIB_DIR = Join-Path (Split-Path $scriptRoot -Parent) "contrib"
+        Mock Invoke-WebRequest { throw "Unexpected network access" }
+    }
+
+    It "Installs Windows scripts and the system template without changing bytes" {
+        New-ServiceScripts
+        foreach ($name in @("service.ps1", "sysproxy.ps1")) {
+            $source = Join-Path $CONTRIB_DIR "scripts/coresrvctrl/windows/$name"
+            $target = Join-Path $CLASHTUI_CONFIG_DIR "scripts/coresrvctrl/windows/$name"
+            (Get-FileHash $target).Hash | Should -Be (Get-FileHash $source).Hash
+        }
+        $jsonPath = Join-Path $CLASHTUI_CONFIG_DIR "scripts.json"
+        $source = Join-Path $CONTRIB_DIR "scripts/coresrvctrl/windows/system.json"
+        (Get-FileHash $jsonPath).Hash | Should -Be (Get-FileHash $source).Hash
+        $config = Get-Content $jsonPath -Raw | ConvertFrom-Json
+        $config.root | Should -Be "scripts/coresrvctrl"
+        @($config.actions).Count | Should -Be 10
+        @(Get-ChildItem $CLASHTUI_CONFIG_DIR -Filter ".service-scripts.*" -Force).Count | Should -Be 0
+    }
+
+    It "Preserves published files when downloading the last input fails" {
+        New-ServiceScripts
+        $jsonPath = Join-Path $CLASHTUI_CONFIG_DIR "scripts.json"
+        $before = (Get-FileHash $jsonPath).Hash
+        Mock Copy-Contrib { throw "Download failed" } -ParameterFilter { $RelativePath -like "*/system.json" }
+        { New-ServiceScripts } | Should -Throw "*Download failed*"
+        (Get-FileHash $jsonPath).Hash | Should -Be $before
+        @(Get-ChildItem $CLASHTUI_CONFIG_DIR -Filter ".service-scripts.*" -Force).Count | Should -Be 0
+    }
+}

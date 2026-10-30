@@ -5,7 +5,6 @@ mihomo:
     config_path: ""
   core_service:
     service_name: ""
-    is_user: false
 singbox:
   core:
     config_dir: ""
@@ -13,4 +12,3 @@ singbox:
     config_path: ""
   core_service:
     service_name: ""
-    is_user: false

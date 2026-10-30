@@ -472,6 +472,7 @@ mod tests {
             fastrand::u64(..)
         ));
         std::fs::create_dir(&root).unwrap();
+        let root = root.canonicalize().unwrap();
         let path = root.join("scripts.json");
         let action =
             |id: &str| serde_json::json!({"id":id,"label":id,"cmd":{"program":"tool","args":[]}});
@@ -496,6 +497,17 @@ mod tests {
         std::fs::write(&path, "bad json").unwrap();
         content.reload(CoreType::Mihomo, &mut state);
         assert!(content.scripts.is_none() && content.ops.is_empty() && content.error.is_some());
+        assert_eq!(state.selected(), None);
+        std::fs::remove_file(&path).unwrap();
+        content.reload(CoreType::Mihomo, &mut state);
+        assert!(content.scripts.is_none() && content.ops.is_empty());
+        assert!(
+            content
+                .error
+                .as_ref()
+                .unwrap()
+                .contains("run the installer")
+        );
         assert_eq!(state.selected(), None);
         std::fs::remove_dir_all(root).unwrap();
     }

@@ -6,6 +6,7 @@ on:
     paths:
       - 'contrib/scripts/coresrvctrl/**'
       - 'tests/coresrvctrl/**'
+      - 'installs/**'
       - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -14,6 +15,7 @@ on:
     paths:
       - 'contrib/scripts/coresrvctrl/**'
       - 'tests/coresrvctrl/**'
+      - 'installs/**'
       - 'src/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -29,7 +31,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: POSIX syntax, backend contracts and resources
-        run: python3 tests/coresrvctrl/test_backends.py
+        run: |
+          python3 tests/coresrvctrl/test_backends.py
+          python3 tests/coresrvctrl/test_install.py
 
   windows:
     runs-on: windows-latest

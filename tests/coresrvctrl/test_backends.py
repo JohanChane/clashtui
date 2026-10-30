@@ -1,6 +1,7 @@
 """Exercise shipped scripts against fake managers; never touch real services."""
 import json
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import sys
@@ -16,6 +17,17 @@ s = json.loads(path.read_text())
 tool = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 with open(os.environ['FAKE_LOG'], 'a') as log: log.write(json.dumps([tool] + args) + '\n')
+if tool == 'id':
+ assert args == ['-u'], args
+ print(os.environ['FAKE_UID']); sys.exit(0)
+if tool == 'sudo':
+ if s.get('sudo_error'):
+  print('sudo: authentication denied', file=sys.stderr); sys.exit(23)
+ args = args[1:] if args[:1] == ['-n'] else args
+ assert args[:1] == ['--'], args
+ args = args[1:]
+ assert args[0] in ('systemctl', 'rc-service', 'rc-update', 'launchctl'), args
+ os.execv(str(pathlib.Path(sys.argv[0]).with_name(args[0])), args)
 args = [a for a in args if a not in ('--user', '--')]
 def save(): path.write_text(json.dumps(s))
 def error(text='Permission denied', code=1):
@@ -50,12 +62,14 @@ elif tool == 'rc-update':
 elif tool == 'launchctl':
  if args[0] == 'print':
   if s.get('query_error'): error()
-  if args[1] == 'system' or (args[1].startswith('gui/') and args[1].count('/') == 1): print('domain'); sys.exit(0)
+  if args[1] == 'system' or (args[1].startswith('gui/') and args[1].count('/') == 1):
+   if s.get('domain_error'): error()
+   print('domain'); sys.exit(0)
   if s.get('loaded'): print('state = ' + ('running' if s.get('state') == 'active' else 'waiting')); sys.exit(0)
   error('Could not find service "svc" in domain',113)
  if s.get('write_error'): error()
  if args[0] == 'load':
-  if not s.get('enabled',True) or s.get('silent_load_failure'): sys.exit(0)
+  if (not s.get('enabled',True) and '-F' not in args) or s.get('silent_load_failure'): sys.exit(0)
   s['loaded']=True; s['state']='active'
  if args[0] == 'unload':
   if not s.get('silent_unload_failure'): s['loaded']=False; s['state']='inactive'
@@ -78,7 +92,7 @@ class BackendTests(unittest.TestCase):
         self.state = self.base / "state.json"
         self.log = self.base / "calls.jsonl"
         self.log.touch()
-        for tool in ("systemctl", "rc-service", "rc-update", "launchctl"):
+        for tool in ("systemctl", "rc-service", "rc-update", "launchctl", "sudo", "id"):
             path = self.bin / tool
             path.write_text(FAKE.replace("#!PYTHON", "#!" + sys.executable))
             path.chmod(0o755)
@@ -86,17 +100,26 @@ class BackendTests(unittest.TestCase):
         agents.mkdir(parents=True)
         self.plist = agents / "svc.plist"
         self.plist.write_text("<plist/>")
+        daemons = self.base / "Library/LaunchDaemons"
+        daemons.mkdir()
+        self.system_plist = daemons / "svc.plist"
+        self.system_plist.write_text("<plist/>")
+        # Relocate only the system plist directory; never inspect host services.
+        self.launchd_script = self.base / "launchd-service.sh"
+        self.launchd_script.write_text((ROOT / "launchd/service.sh").read_text().replace(
+            "directory=/Library/LaunchDaemons", "directory=" + shlex.quote(str(daemons))))
         self.env = dict(os.environ, PATH=str(self.bin) + os.pathsep + os.environ["PATH"],
                         HOME=str(self.base), XDG_RUNTIME_DIR=str(self.base),
-                        FAKE_STATE=str(self.state), FAKE_LOG=str(self.log))
+                        FAKE_STATE=str(self.state), FAKE_LOG=str(self.log), FAKE_UID="1000")
         self.set_state()
 
     def set_state(self, **values):
         self.state.write_text(json.dumps(dict(state="inactive", **values)))
         self.log.write_text("")
 
-    def run_script(self, backend, operation, scope="user", service="svc"):
-        return subprocess.run(["/bin/sh", str(ROOT / backend / "service.sh"), operation, scope, service],
+    def run_script(self, backend, operation, scope="user", service="svc", trace=False):
+        return subprocess.run(["/bin/sh", *(["-x"] if trace else []),
+                               str(self.launchd_script if backend == "launchd" else ROOT / backend / "service.sh"), operation, scope, service],
                               env=self.env, capture_output=True, text=True, timeout=10)
 
     def calls(self):
@@ -113,7 +136,7 @@ class BackendTests(unittest.TestCase):
             if backend != "launchd":
                 self.assertTrue(all("--user" in call for call in self.calls() if call[1:] != ["--help"]))
             else:
-                self.assertIn("gui/" + str(os.getuid()) + "/svc", self.calls()[-1])
+                self.assertIn("gui/" + self.env["FAKE_UID"] + "/svc", self.calls()[-1])
             self.log.write_text("")
 
     def test_missing_is_successful_status_and_stop(self):
@@ -212,11 +235,19 @@ class BackendTests(unittest.TestCase):
         self.assertNotEqual(self.run_script("launchd", "restart").returncode, 0)
         self.assertFalse(any("load" in call for call in self.calls()))
 
-    def test_launchd_does_not_enable_during_start(self):
-        self.set_state(enabled=False)
-        result = self.run_script("launchd", "start")
-        self.assertNotEqual(result.returncode, 0)
-        self.assertFalse(any("enable" in call for call in self.calls()))
+    def test_launchd_manual_start_and_restart_preserve_disabled_autostart(self):
+        for scope in ("system", "user"):
+            self.set_state(enabled=False)
+            for op in ("start", "stop", "start", "restart"):
+                result = self.run_script("launchd", op, scope=scope)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                state = json.loads(self.state.read_text())
+                self.assertFalse(state["enabled"])
+                self.assertEqual(state["loaded"], op != "stop")
+            self.assertFalse(any("enable" in call or "disable" in call for call in self.calls()))
+            loads = [call for call in self.calls() if call[:2] == ["launchctl", "load"]]
+            self.assertTrue(loads)
+            self.assertTrue(all(call[2] == "-F" for call in loads))
 
     def test_invalid_service_never_reaches_manager(self):
         for backend in ("systemd", "openrc", "launchd"):
@@ -225,24 +256,157 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(self.calls(), [])
 
     def test_shell_syntax(self):
-        for script in ROOT.glob("*/service.sh"):
+        for script in ROOT.glob("*/*.sh"):
             subprocess.run(["/bin/sh", "-n", str(script)], check=True)
+
+    def test_system_writes_elevate_specific_commands(self):
+        for backend in ("systemd", "openrc", "launchd"):
+            for op in ("start", "stop", "restart", "enable-autostart", "disable-autostart"):
+                with self.subTest(backend=backend, op=op):
+                    self.state.write_text(json.dumps({"state": "inactive" if op == "start" else "active",
+                                                     "loaded": op != "start", "enabled": True}))
+                    self.log.write_text("")
+                    result = self.run_script(backend, op, scope="system")
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    elevated = [call for call in self.calls() if call[0] == "sudo"]
+                    self.assertTrue(elevated, self.calls())
+                    self.assertTrue(all(call[1] == "--" for call in elevated))
+                    self.assertFalse(any("show" in call or "--exists" in call or "status" in call
+                                         or "print" in call for call in elevated))
+                    self.assertEqual((result.stdout, result.stderr), ("", ""))
+
+    def test_user_commands_never_elevate(self):
+        for backend in ("systemd", "openrc", "launchd"):
+            for op in ("start", "stop", "restart", "status", "enable-autostart", "disable-autostart"):
+                self.state.write_text(json.dumps({"state": "active", "loaded": True,
+                                                 "enabled": True, "sudo_error": True}))
+                self.log.write_text("")
+                result = self.run_script(backend, op)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertFalse(any(call[0] == "sudo" for call in self.calls()))
+
+    def test_root_does_not_elevate_again(self):
+        self.env["FAKE_UID"] = "0"
+        for backend in ("systemd", "openrc", "launchd"):
+            for op in ("status", "stop", "enable-autostart", "disable-autostart"):
+                self.state.write_text(json.dumps({"state": "active", "loaded": True,
+                                                 "enabled": True, "sudo_error": True}))
+                self.log.write_text("")
+                result = self.run_script(backend, op, scope="system")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertFalse(any(call[0] == "sudo" for call in self.calls()))
+
+    def test_status_never_needs_sudo_credentials(self):
+        for backend in ("systemd", "openrc", "launchd"):
+            self.state.write_text(json.dumps({"state": "active", "loaded": True, "sudo_error": True}))
+            self.log.write_text("")
+            result = self.run_script(backend, "status", scope="system")
+            self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "active\n", ""))
+            self.assertFalse(any(call[0] == "sudo" for call in self.calls()))
+
+    def test_authentication_failure_never_becomes_missing(self):
+        for backend in ("systemd", "openrc", "launchd"):
+            self.set_state(sudo_error=True)
+            result = self.run_script(backend, "start", scope="system")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("authentication denied", result.stderr)
+            self.assertEqual(result.stdout, "")
+            self.assertEqual(sum(call[0] == "sudo" for call in self.calls()), 1)
+            if backend != "launchd": self.assertEqual(result.returncode, 23)
+
+    def test_launchd_unloaded_states_need_no_sudo(self):
+        for scope, plist in (("system", self.system_plist), ("user", self.plist)):
+            for state in ("inactive", "missing"):
+                if state == "missing": plist.unlink()
+                self.set_state(sudo_error=True)
+                result = self.run_script("launchd", "status", scope=scope)
+                self.assertEqual((result.returncode, result.stdout, result.stderr), (0, state + "\n", ""))
+                self.assertFalse(any(call[0] == "sudo" for call in self.calls()))
+                traced = self.run_script("launchd", "status", scope=scope, trace=True)
+                self.assertEqual((traced.returncode, traced.stdout), (0, result.stdout), traced.stderr)
+                self.assertIn("+", traced.stderr)
+
+    def test_launchd_query_denial_does_not_prompt_or_report_missing(self):
+        for scope in ("system", "user"):
+            self.set_state(query_error=True, sudo_error=True)
+            result = self.run_script("launchd", "status", scope=scope)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(result.stdout, "")
+            self.assertIn("Permission denied", result.stderr)
+            self.assertFalse(any(call[0] == "sudo" for call in self.calls()))
+
+    def test_launchd_missing_target_with_denied_domain_is_query_failure(self):
+        self.set_state(domain_error=True)
+        result = self.run_script("launchd", "status", scope="system")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("Cannot query launchd domain", result.stderr)
+        self.assertFalse(any(call[0] == "sudo" for call in self.calls()))
+
+    def test_launchd_already_active_start_needs_no_sudo(self):
+        self.state.write_text(json.dumps({"state": "active", "loaded": True, "sudo_error": True}))
+        result = self.run_script("launchd", "start", scope="system")
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
+        self.assertFalse(any(call[0] == "sudo" for call in self.calls()))
+
+    @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root bypasses mode-based read denial")
+    def test_launchd_unreadable_plist_paths_fail_closed(self):
+        for scope, plist in (("system", self.system_plist), ("user", self.plist)):
+            for path in (plist, plist.parent, plist.parent.parent):
+                mode = path.stat().st_mode
+                try:
+                    path.chmod(0)
+                    self.set_state(sudo_error=True)
+                    result = self.run_script("launchd", "status", scope=scope)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(result.stdout, "")
+                    self.assertIn("Cannot", result.stderr)
+                    self.assertFalse(any(call[0] == "sudo" for call in self.calls()))
+                finally:
+                    path.chmod(mode)
+
+    def test_invalid_scope_or_operation_never_reaches_tools(self):
+        for backend in ("systemd", "openrc", "launchd"):
+            for op, scope in (("status", "admin"), ("invalid", "system")):
+                self.assertNotEqual(self.run_script(backend, op, scope=scope).returncode, 0)
+        self.assertEqual(self.calls(), [])
+
+    def test_xtrace_is_opt_in_and_preserves_status_stdout(self):
+        for backend in ("systemd", "openrc", "launchd"):
+            for scope in ("system", "user"):
+                for state in ("active", "inactive", "missing"):
+                    with self.subTest(backend=backend, scope=scope, state=state):
+                        self.state.write_text(json.dumps({"state": state, "loaded": state != "missing",
+                                                         "missing": state == "missing"}))
+                        if state == "missing":
+                            self.plist.unlink(missing_ok=True)
+                            self.system_plist.unlink(missing_ok=True)
+                        plain = self.run_script(backend, "status", scope=scope)
+                        traced = self.run_script(backend, "status", scope=scope, trace=True)
+                        self.assertEqual((plain.returncode, plain.stdout, plain.stderr), (0, state + "\n", ""))
+                        self.assertEqual((traced.returncode, traced.stdout), (0, plain.stdout), traced.stderr)
+                        self.assertIn("+", traced.stderr)
 
 
 class ResourceTests(unittest.TestCase):
     def test_templates_have_required_actions_and_noninteractive_status(self):
-        mapping = json.loads((ROOT / "defaults.json").read_text())
         ids = {"start_core", "stop_core", "restart_core", "status_core", "enable_autostart_core", "disable_autostart_core"}
-        for entry in mapping["templates"]:
-            template = json.loads((ROOT / entry["path"]).read_text())
+        for backend in ("systemd", "openrc", "launchd", "windows"):
+            name = "system.json" if backend == "windows" else "default.json"
+            template = json.loads((ROOT / backend / name).read_text())
             self.assertEqual(template["root"], "scripts/coresrvctrl")
             actions = {action["id"]: action for action in template["actions"]}
             self.assertTrue(ids <= actions.keys())
             self.assertTrue(all("cores" not in action for action in actions.values()))
-            status = actions["status_core"]["cmd"]
-            if status["program"] == "sudo": self.assertIn("-n", status["args"])
-            if entry["scope"] == "system" and entry["os"] != "windows":
-                self.assertEqual(actions["start_core"]["cmd"]["program"], "sudo")
+            if backend != "windows":
+                for action in actions.values():
+                    self.assertEqual(action["cmd"]["program"], "/bin/sh")
+                    args = action["cmd"]["args"]
+                    self.assertEqual(args[2], "${scope}")
+                    self.assertTrue((ROOT / args[0].removeprefix("${root}/")).is_file())
+                    self.assertNotIn("sudo", args)
+                self.assertEqual(actions["enable_autostart_core"]["label"], "Enable Autostart")
+                self.assertEqual(actions["disable_autostart_core"]["label"], "Disable Autostart")
 
     def test_windows_bom_and_proxy_disable_has_no_port_dependency(self):
         for script in (ROOT / "windows").glob("*.ps1"):

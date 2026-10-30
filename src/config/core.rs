@@ -31,11 +31,6 @@ pub struct CoreConfig {
 #[serde(default)]
 pub struct CoreServiceConfig {
     pub service_name: String,
-    /// Legacy scope, used only when scripts.json is first generated.
-    pub is_user: bool,
-    /// Legacy backend, used only when scripts.json is first generated.
-    /// Unknown backends fail migration; existing scripts.json takes precedence.
-    pub service_controller: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default)]
@@ -84,8 +79,6 @@ impl Default for ConfigFile {
                     },
                     core_service: CoreServiceConfig {
                         service_name: "clashtui_mihomo".into(),
-                        is_user: false,
-                        service_controller: None,
                     },
                 },
                 singbox: SingboxSection {
@@ -96,8 +89,6 @@ impl Default for ConfigFile {
                     },
                     core_service: CoreServiceConfig {
                         service_name: "clashtui_singbox".into(),
-                        is_user: false,
-                        service_controller: None,
                     },
                 },
                 timeout: Default::default(),
@@ -114,8 +105,6 @@ impl Default for ConfigFile {
                 },
                 core_service: CoreServiceConfig {
                     service_name: "clashtui_mihomo".into(),
-                    is_user: false,
-                    service_controller: None,
                 },
             },
             singbox: SingboxSection {
@@ -126,8 +115,6 @@ impl Default for ConfigFile {
                 },
                 core_service: CoreServiceConfig {
                     service_name: "clashtui_singbox".into(),
-                    is_user: false,
-                    service_controller: None,
                 },
             },
             timeout: Default::default(),
@@ -194,7 +181,6 @@ mod test {
     config_path: /opt/clashtui/mihomo/config/config.yaml
   core_service:
     service_name: clashtui_mihomo
-    is_user: false
 singbox:
   core:
     bin_path: /opt/clashtui/sing-box/sing-box
@@ -202,7 +188,6 @@ singbox:
     config_path: /opt/clashtui/sing-box/config/config.json
   core_service:
     service_name: clashtui_singbox
-    is_user: false
 timeout: 5
 extra:
   edit_cmd: kitty -e nvim "%s"
@@ -216,7 +201,6 @@ extra:
             "/opt/clashtui/mihomo/config/config.yaml"
         );
         assert_eq!(cfg.mihomo.core_service.service_name, "clashtui_mihomo");
-        assert!(!cfg.mihomo.core_service.is_user);
         assert_eq!(cfg.singbox.core.bin_path, "/opt/clashtui/sing-box/sing-box");
         assert_eq!(cfg.singbox.core.config_dir, "/opt/clashtui/sing-box/config");
         assert_eq!(
@@ -243,7 +227,6 @@ extra:
         let cfg: ConfigFile = serde_yml::from_str(yaml).unwrap();
         assert_eq!(cfg.mihomo.core.config_dir, "");
         assert_eq!(cfg.mihomo.core_service.service_name, "");
-        assert!(!cfg.mihomo.core_service.is_user);
         assert_eq!(cfg.timeout, None);
     }
 
@@ -317,35 +300,20 @@ open_dir_cmd: ""
     }
 
     #[test]
-    fn core_service_config_deser_openrc() {
-        let yaml = "service_name: svc\nis_user: false\nservice_controller: openrc";
+    fn core_service_config_deser() {
+        let yaml = "service_name: svc";
         let csc: CoreServiceConfig = serde_yml::from_str(yaml).unwrap();
         assert_eq!(csc.service_name, "svc");
-        assert!(!csc.is_user);
-        assert_eq!(csc.service_controller.as_deref(), Some("openrc"));
-    }
-
-    #[test]
-    fn core_service_config_deser_absent() {
-        let yaml = "service_name: svc\nis_user: true";
-        let csc: CoreServiceConfig = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(csc.service_name, "svc");
-        assert!(csc.is_user);
-        assert_eq!(csc.service_controller, None);
     }
 
     #[test]
     fn core_service_config_roundtrip() {
         let csc = CoreServiceConfig {
             service_name: "roundtrip_svc".into(),
-            is_user: true,
-            service_controller: Some("openrc".into()),
         };
         let yaml = serde_yml::to_string(&csc).unwrap();
         let deser: CoreServiceConfig = serde_yml::from_str(&yaml).unwrap();
         assert_eq!(deser.service_name, csc.service_name);
-        assert_eq!(deser.is_user, csc.is_user);
-        assert_eq!(deser.service_controller.as_deref(), Some("openrc"));
     }
 
     fn fixture_path(name: &str) -> String {
@@ -372,11 +340,6 @@ open_dir_cmd: ""
             "/opt/clashtui/mihomo/config/config.yaml"
         );
         assert_eq!(cfg.mihomo.core_service.service_name, "clashtui_mihomo");
-        assert!(!cfg.mihomo.core_service.is_user);
-        assert_eq!(
-            cfg.mihomo.core_service.service_controller.as_deref(),
-            Some("systemd")
-        );
         assert_eq!(cfg.timeout, Some(5));
         assert_eq!(cfg.extra.edit_cmd.as_deref(), Some(r#"vim "%s""#));
         assert_eq!(cfg.extra.open_dir_cmd.as_deref(), Some(r#"yazi "%s""#));
@@ -392,10 +355,6 @@ open_dir_cmd: ""
         assert_eq!(deser.singbox.core.bin_path, cfg.singbox.core.bin_path);
         assert_eq!(deser.timeout, cfg.timeout);
         assert_eq!(deser.extra.edit_cmd, cfg.extra.edit_cmd);
-        assert_eq!(
-            deser.mihomo.core_service.service_controller,
-            cfg.mihomo.core_service.service_controller
-        );
     }
 
     #[test]
@@ -405,13 +364,10 @@ open_dir_cmd: ""
         assert_eq!(cfg.mihomo.core.bin_path, "");
         assert_eq!(cfg.mihomo.core.config_path, "");
         assert_eq!(cfg.mihomo.core_service.service_name, "");
-        assert!(!cfg.mihomo.core_service.is_user);
-        assert_eq!(cfg.mihomo.core_service.service_controller, None);
         assert_eq!(cfg.singbox.core.config_dir, "");
         assert_eq!(cfg.singbox.core.bin_path, "");
         assert_eq!(cfg.singbox.core.config_path, "");
         assert_eq!(cfg.singbox.core_service.service_name, "");
-        assert!(!cfg.singbox.core_service.is_user);
         assert_eq!(cfg.timeout, None);
         assert_eq!(cfg.extra.edit_cmd, None);
         assert_eq!(cfg.extra.open_dir_cmd, None);
@@ -422,7 +378,6 @@ open_dir_cmd: ""
         let cfg = load_config_fixture("mihomo/null_optionals.yaml");
         assert_eq!(cfg.mihomo.core.config_dir, "/opt/mihomo");
         assert_eq!(cfg.mihomo.core_service.service_name, "mihomo_svc");
-        assert!(cfg.mihomo.core_service.is_user);
         assert_eq!(cfg.timeout, None);
         assert_eq!(cfg.extra.edit_cmd, None);
         assert_eq!(cfg.extra.open_dir_cmd, None);
@@ -438,11 +393,6 @@ open_dir_cmd: ""
             "/opt/clashtui/sing-box/config/config.json"
         );
         assert_eq!(cfg.singbox.core_service.service_name, "clashtui_singbox");
-        assert!(!cfg.singbox.core_service.is_user);
-        assert_eq!(
-            cfg.singbox.core_service.service_controller.as_deref(),
-            Some("openrc")
-        );
         assert_eq!(cfg.timeout, Some(30));
         assert_eq!(cfg.extra.edit_cmd.as_deref(), Some(r#"nvim "%s""#));
         assert_eq!(cfg.extra.open_dir_cmd.as_deref(), Some(r#"lf "%s""#));
@@ -455,12 +405,10 @@ open_dir_cmd: ""
         assert_eq!(cfg.mihomo.core.bin_path, "");
         assert_eq!(cfg.mihomo.core.config_path, "");
         assert_eq!(cfg.mihomo.core_service.service_name, "");
-        assert!(!cfg.mihomo.core_service.is_user);
         assert_eq!(cfg.singbox.core.config_dir, "");
         assert_eq!(cfg.singbox.core.bin_path, "");
         assert_eq!(cfg.singbox.core.config_path, "");
         assert_eq!(cfg.singbox.core_service.service_name, "");
-        assert!(!cfg.singbox.core_service.is_user);
         assert_eq!(cfg.timeout, None);
         assert_eq!(cfg.extra.edit_cmd, None);
         assert_eq!(cfg.extra.open_dir_cmd, None);

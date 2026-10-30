@@ -18,10 +18,8 @@ extern "C" fn receive(signal: libc::c_int) {
     // Only lock-free atomic stores/loads are allowed in the signal handler.
     // Terminal changes, task creation and logging happen in normal execution.
     match signal {
-        libc::SIGINT => {
-            if super::term::is_external() {
-                crate::functions::process::cancel_foreground();
-            }
+        libc::SIGINT if super::term::is_external() => {
+            crate::functions::process::cancel_foreground();
         }
         libc::SIGQUIT | libc::SIGHUP | libc::SIGTERM => {
             crate::functions::process::request_shutdown();

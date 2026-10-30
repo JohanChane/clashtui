@@ -87,8 +87,6 @@ mihomo:
     config_path: /opt/clashtui/mihomo/config/config.yaml
   core_service:
     service_name: clashtui_mihomo
-    is_user: false
-    service_controller: systemd
 singbox:
   core:
     bin_path: /opt/clashtui/sing-box/sing-box
@@ -96,12 +94,19 @@ singbox:
     config_path: /opt/clashtui/sing-box/config/config.json
   core_service:
     service_name: clashtui_singbox
-    is_user: false
-    service_controller: systemd
 timeout: null
 extra:
   edit_cmd:
   open_dir_cmd:
+```
+
+Install the service command script and materialize its template:
+
+```sh
+mkdir -p ~/.config/clashtui/scripts/coresrvctrl/systemd
+curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/service.sh -o ~/.config/clashtui/scripts/coresrvctrl/systemd/service.sh
+curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/default.json -o /tmp/clashtui-scripts-template.json
+sed 's/"${scope}"/"system"/g' /tmp/clashtui-scripts-template.json > ~/.config/clashtui/scripts.json
 ```
 
 ## 5. Create Core Configs
@@ -353,8 +358,6 @@ mihomo:
     config_path: <HOME_REPLACE>/.local/clashtui/mihomo/config/config.yaml
   core_service:
     service_name: clashtui_mihomo
-    is_user: true
-    service_controller: systemd
 singbox:
   core:
     bin_path: <HOME_REPLACE>/.local/clashtui/sing-box/sing-box
@@ -362,8 +365,6 @@ singbox:
     config_path: <HOME_REPLACE>/.local/clashtui/sing-box/config/config.json
   core_service:
     service_name: clashtui_singbox
-    is_user: true
-    service_controller: systemd
 timeout: null
 extra:
   edit_cmd:
@@ -371,6 +372,15 @@ extra:
 ```
 
 > Replace `<HOME_REPLACE>` with your home directory path, e.g. `/home/johan`. Do not use `~` or `$HOME`.
+
+Install the service command script and materialize its template:
+
+```sh
+mkdir -p ~/.config/clashtui/scripts/coresrvctrl/systemd
+curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/service.sh -o ~/.config/clashtui/scripts/coresrvctrl/systemd/service.sh
+curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/default.json -o /tmp/clashtui-scripts-template.json
+sed 's/"${scope}"/"user"/g' /tmp/clashtui-scripts-template.json > ~/.config/clashtui/scripts.json
+```
 
 ## 5. Create Core Configs
 

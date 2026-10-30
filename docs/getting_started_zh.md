@@ -265,7 +265,6 @@ mihomo:
     config_path: /opt/clashtui/mihomo/config/config.yaml  # 最终配置文件路径
   core_service:
     service_name: clashtui_mihomo                # systemd 服务名
-    is_user: false                               # 是否为用户服务
 singbox:
   core:
     bin_path: /opt/clashtui/sing-box/sing-box
@@ -273,7 +272,6 @@ singbox:
     config_path: /opt/clashtui/sing-box/config/config.json
   core_service:
     service_name: clashtui_singbox
-    is_user: false
 timeout: null
 extra:
   edit_cmd: kitty -e nvim "%s"      # 编辑文件使用的命令，%s 替换为文件路径

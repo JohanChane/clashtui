@@ -14,17 +14,35 @@ if [ "$scope" = user ]; then
     help=$(rc-service --help 2>&1) || fail 'Cannot inspect rc-service capabilities'
     case "$help" in *--user*) ;; *) fail 'This OpenRC version does not support user services';; esac
 fi
+privileged() {
+    if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo -- "$@"; fi
+}
 svc() {
-    if [ "$scope" = user ]; then rc-service --user "$@"; else rc-service "$@"; fi
+    if [ "$scope" = user ]; then
+        rc-service --user "$@"
+    elif [ "$1" = --exists ] || [ "${2:-}" = status ]; then
+        rc-service "$@"
+    else
+        privileged rc-service "$@"
+    fi
 }
 update() {
     command -v rc-update >/dev/null 2>&1 || fail 'rc-update is not available'
-    if [ "$scope" = user ]; then rc-update --user "$@"; else rc-update "$@"; fi
+    if [ "$scope" = user ]; then
+        rc-update --user "$@"
+    elif [ "$1" = show ]; then
+        rc-update "$@"
+    else
+        privileged rc-update "$@"
+    fi
 }
 query() {
     stopped=false
     result=0
-    details=$(svc --exists "$service" 2>&1) || result=$?
+    # Redirect the external command only, so shell xtrace is not mistaken for
+    # an existence-query diagnostic when rc-service returns an empty exit 1.
+    if [ "$scope" = user ]; then set -- rc-service --user; else set -- rc-service; fi
+    details=$("$@" --exists "$service" 2>&1) || result=$?
     if [ "$result" -ne 0 ]; then
         [ "$result" -eq 1 ] && [ -z "$details" ] || fail "OpenRC existence query failed: $details"
         # Do not infer absence from a service directory we cannot inspect.

@@ -3,13 +3,14 @@
 
 Usage: verify_install.py [--verbose] <path-to-config.yaml>
 
-When config.yaml has core_service.is_user: false, also verifies system users,
-groups, and file ownership/permissions.
+The installed scripts.json selects backend and scope. System scope also verifies
+system users, groups, and file ownership/permissions.
 
 --verbose / -v  Print file trees of config/core install dirs and file contents.
 """
 
 import argparse
+import json
 import os
 import stat
 import subprocess
@@ -120,7 +121,7 @@ def resolve_service_path(name: str, controller: str, is_user: bool) -> str | Non
     return os.path.expanduser(template.format(name=name))
 
 
-def show_service_files(cfg: dict) -> None:
+def show_service_files(cfg: dict, controller: str, scope: str) -> None:
     for section_name in ("mihomo", "singbox"):
         section = cfg.get(section_name, {})
         if not isinstance(section, dict):
@@ -129,14 +130,12 @@ def show_service_files(cfg: dict) -> None:
         if not isinstance(svc, dict):
             continue
         name = svc.get("service_name", "")
-        controller = svc.get("service_controller", "")
-        is_user = svc.get("is_user", True)
         if not name or not controller:
             continue
-        path = resolve_service_path(name, controller, is_user)
+        path = resolve_service_path(name, controller, scope == "user")
         if path:
             print_file(f"{section_name} service file", path)
-        if not os.path.exists(path):
+        if path and not os.path.exists(path):
             print(f"\n{RED}[MISSING]{NC} {section_name} service file not found: {path}")
             global ERROR_COUNT
             ERROR_COUNT += 1
@@ -309,26 +308,24 @@ def verify_user_install(cfg: dict) -> None:
     pass
 
 
-def is_system_install(cfg: dict) -> bool:
-    mihomo = cfg.get("mihomo", {})
-    if isinstance(mihomo, dict):
-        service = mihomo.get("core_service", {})
-        if isinstance(service, dict) and service.get("is_user") is False:
-            return True
-    singbox = cfg.get("singbox", {})
-    if isinstance(singbox, dict):
-        service = singbox.get("core_service", {})
-        if isinstance(service, dict) and service.get("is_user") is False:
-            return True
-    if isinstance(mihomo, dict):
-        service = mihomo.get("core_service", {})
-        if isinstance(service, dict) and service.get("is_user") is True:
-            return False
-    if isinstance(singbox, dict):
-        service = singbox.get("core_service", {})
-        if isinstance(service, dict) and service.get("is_user") is True:
-            return False
-    return False
+def load_service_setup(config_dir: str) -> tuple[str, str]:
+    """Read the installer's standard command template, failing on unknown layouts."""
+    with open(os.path.join(config_dir, "scripts.json"), encoding="utf-8") as stream:
+        scripts = json.load(stream)
+    root = os.path.join(config_dir, scripts["root"])
+    for action in scripts["actions"]:
+        for arg in action["cmd"]["args"]:
+            if arg.startswith("${root}/"):
+                check_path("service script", os.path.join(root, arg[len("${root}/"):]), "file")
+    start = next(action for action in scripts["actions"] if action["id"] == "start_core")
+    args = start["cmd"]["args"]
+    if "${root}/windows/service.ps1" in args:
+        return "nssm", "system"
+    for backend in ("systemd", "openrc", "launchd"):
+        if (len(args) == 4 and args[0] == "${root}/" + backend + "/service.sh"
+                and args[1] == "start" and args[2] in ("system", "user")):
+            return backend, args[2]
+    raise ValueError("scripts.json does not contain an installer-generated service command")
 
 
 def check_no_bom(label: str, path: str) -> None:
@@ -392,6 +389,12 @@ def main() -> None:
     with open(config_path) as f:
         cfg = yaml.load(f.read()) or {}
 
+    try:
+        controller, scope = load_service_setup(config_dir)
+    except (OSError, ValueError, KeyError, TypeError, StopIteration) as error:
+        print(f"{RED}[ERROR]{NC} Invalid service configuration: {error}", file=sys.stderr)
+        sys.exit(1)
+
     if args.verbose:
         print_file("clashtui config.yaml", config_path)
         print_tree("clashtui config dir", config_dir)
@@ -403,12 +406,12 @@ def main() -> None:
                 core = core.get("core", {})
             if isinstance(core, dict) and core.get("config_path"):
                 print_file(f"{core_name} core config", core["config_path"])
-        show_service_files(cfg)
+        show_service_files(cfg, controller, scope)
         print()
 
     check_clashtui_config(config_path, yaml, cfg)
 
-    if is_system_install(cfg):
+    if scope == "system":
         verify_system_install(cfg)
     else:
         verify_user_install(cfg)

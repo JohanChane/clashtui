@@ -9,7 +9,7 @@
         "args": [
           "${root}/systemd/service.sh",
           "start",
-          "user",
+          "${scope}",
           "${service_name}"
         ]
       }
@@ -22,7 +22,7 @@
         "args": [
           "${root}/systemd/service.sh",
           "stop",
-          "user",
+          "${scope}",
           "${service_name}"
         ]
       }
@@ -35,7 +35,7 @@
         "args": [
           "${root}/systemd/service.sh",
           "restart",
-          "user",
+          "${scope}",
           "${service_name}"
         ]
       }
@@ -48,33 +48,33 @@
         "args": [
           "${root}/systemd/service.sh",
           "status",
-          "user",
+          "${scope}",
           "${service_name}"
         ]
       }
     },
     {
       "id": "enable_autostart_core",
-      "label": "Enable User Autostart",
+      "label": "Enable Autostart",
       "cmd": {
         "program": "/bin/sh",
         "args": [
           "${root}/systemd/service.sh",
           "enable-autostart",
-          "user",
+          "${scope}",
           "${service_name}"
         ]
       }
     },
     {
       "id": "disable_autostart_core",
-      "label": "Disable User Autostart",
+      "label": "Disable Autostart",
       "cmd": {
         "program": "/bin/sh",
         "args": [
           "${root}/systemd/service.sh",
           "disable-autostart",
-          "user",
+          "${scope}",
           "${service_name}"
         ]
       }

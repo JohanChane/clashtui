@@ -5,13 +5,11 @@
       "id": "start_core",
       "label": "Start Core",
       "cmd": {
-        "program": "sudo",
+        "program": "/bin/sh",
         "args": [
-          "--",
-          "/bin/sh",
-          "${root}/openrc/service.sh",
+          "${root}/launchd/service.sh",
           "start",
-          "system",
+          "${scope}",
           "${service_name}"
         ]
       }
@@ -20,13 +18,11 @@
       "id": "stop_core",
       "label": "Stop Core",
       "cmd": {
-        "program": "sudo",
+        "program": "/bin/sh",
         "args": [
-          "--",
-          "/bin/sh",
-          "${root}/openrc/service.sh",
+          "${root}/launchd/service.sh",
           "stop",
-          "system",
+          "${scope}",
           "${service_name}"
         ]
       }
@@ -35,13 +31,11 @@
       "id": "restart_core",
       "label": "Restart Core",
       "cmd": {
-        "program": "sudo",
+        "program": "/bin/sh",
         "args": [
-          "--",
-          "/bin/sh",
-          "${root}/openrc/service.sh",
+          "${root}/launchd/service.sh",
           "restart",
-          "system",
+          "${scope}",
           "${service_name}"
         ]
       }
@@ -52,39 +46,35 @@
       "cmd": {
         "program": "/bin/sh",
         "args": [
-          "${root}/openrc/service.sh",
+          "${root}/launchd/service.sh",
           "status",
-          "system",
+          "${scope}",
           "${service_name}"
         ]
       }
     },
     {
       "id": "enable_autostart_core",
-      "label": "Enable Boot Autostart",
+      "label": "Enable Autostart",
       "cmd": {
-        "program": "sudo",
+        "program": "/bin/sh",
         "args": [
-          "--",
-          "/bin/sh",
-          "${root}/openrc/service.sh",
+          "${root}/launchd/service.sh",
           "enable-autostart",
-          "system",
+          "${scope}",
           "${service_name}"
         ]
       }
     },
     {
       "id": "disable_autostart_core",
-      "label": "Disable Boot Autostart",
+      "label": "Disable Autostart",
       "cmd": {
-        "program": "sudo",
+        "program": "/bin/sh",
         "args": [
-          "--",
-          "/bin/sh",
-          "${root}/openrc/service.sh",
+          "${root}/launchd/service.sh",
           "disable-autostart",
-          "system",
+          "${scope}",
           "${service_name}"
         ]
       }

@@ -14,9 +14,11 @@ CONFIG_ROOT/
     windows/sysproxy.ps1
 ```
 
-The binary embeds all default resources. Startup creates missing files offline and never overwrites existing files. Extraction rejects symbolic links and reports unwritable paths without elevation. Updated defaults may appear as `.new` samples beside modified resources; existing samples are preserved too.
+The installer selects the backend (Linux: systemd/OpenRC, macOS: launchd, Windows: NSSM), installs only its scripts, and writes `scripts.json`. Unix `--is-user` selects `user`; otherwise the scope is `system`. Reinstallation backs up the config directory with a numbered suffix, then replaces the selected default scripts and configuration. Other custom files remain in place.
 
-Only when `scripts.json` is absent, legacy `service_controller` and `is_user` select data templates. Different core backends or scopes produce separate actions with `cores`. Unknown backends fail migration. `config.yaml` remains unchanged; its service names and core paths still supply variables.
+Each Unix backend has one `default.json`. The installer replaces standalone `"${scope}"` arguments with `"system"` or `"user"`; other variables stay intact. Neither `${scope}` nor `${is_user}` is a runtime variable. Windows uses `windows/system.json` directly. There is no template index or runtime migration. `config.yaml` supplies service names and core paths; it contains no backend or scope selector.
+
+For manual installation, copy the chosen backend's script(s) from `contrib/scripts/coresrvctrl/` into the matching directory above. Copy its JSON template to `CONFIG_ROOT/scripts.json`, replacing `"${scope}"` with the desired literal on Unix. The application only reads these files; missing or invalid configuration disables service actions and reports the path. Other tabs remain available.
 
 ## Configuration
 
@@ -28,8 +30,8 @@ Only when `scripts.json` is absent, legacy `service_controller` and `is_user` se
       "id": "start_core",
       "label": "Start core",
       "cmd": {
-        "program": "sudo",
-        "args": ["--", "/bin/sh", "${root}/systemd/service.sh", "start", "system", "${service_name}"]
+        "program": "/bin/sh",
+        "args": ["${root}/systemd/service.sh", "start", "system", "${service_name}"]
       }
     },
     {
@@ -95,13 +97,17 @@ Background queries close stdin, have a total five-second deadline and capture at
 
 Foreground commands exclusively own the terminal after the input reader acknowledges suspension. They inherit all standard streams. Press Enter once to return; Ctrl-C interrupts the command. CLI adds no Enter prompt.
 
-Configure sudo directly as program, rather than nesting it inside scripts. The same clashtui parent and controlling terminal preserve the system tty/ppid timestamp scope. There is no password storage, keepalive or cache invalidation on exit. Policy expiry can prompt again. `sudo /bin/sh SCRIPT` may differ from an existing exact NOPASSWD rule; configure the previously authorized command directly if needed. Clashtui does not modify sudoers.
+Unix defaults invoke `/bin/sh`; scripts use sudo only for commands that require system privileges. User scope never elevates; root does not elevate again. Status queries use no sudo on systemd, OpenRC or launchd. Launchd reads the domain and plist as the current user; read failures remain query errors. Only service writes may authenticate. Custom scripts can call sudo directly without a special wrapper.
+
+Sudo controls credential reuse. A valid tty timestamp can span scripts in the same terminal/session; ppid timestamps may require authentication for new script processes. Clashtui does not store passwords, keep credentials alive, clear caches on exit or modify sudoers. Command-specific authorization rules must match the commands actually invoked.
+
+Command tracing is off by default. Use `/bin/sh -x service.sh restart system mihomo`, or `set -x` / `set +x` inside a script. When editing `scripts.json`, place `-x` before the script path in `/bin/sh` arguments. Tracing writes to stderr; status stdout still follows the protocol.
 
 ## Platform behavior
 
 - systemd: enable/disable omit `--now`; user services do not enable linger automatically.
 - OpenRC: user queries and writes preserve `--user`, requiring manager support and `XDG_RUNTIME_DIR`. Only the `default` runlevel is changed.
-- launchd: lifecycle uses load/unload; persistent autostart uses enable/disable. User scope means login autostart. Disable also blocks later loading; manual start does not silently re-enable it.
+- launchd: lifecycle uses load/unload; persistent autostart uses enable/disable. User scope means login autostart. Manual start/restart uses `load -F` to run even when autostart is disabled, preserving the persistent enable/disable setting.
 - Windows: NSSM manages lifecycle; SCM queries state. Autostart uses AUTO_START/DEMAND_START. Service writes request UAC when needed; cancellation fails. PowerShell files use UTF-8 BOM, protocol output does not. ExecutionPolicy Bypass cannot override group policy.
 - Windows proxy: current-user HKCU settings plus a change broadcast; enabling and disabling are independent actions.
 

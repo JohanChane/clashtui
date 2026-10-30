@@ -15,9 +15,36 @@ case "$scope" in
 esac
 target=$domain/$service
 plist=$directory/$service.plist
+privileged() {
+    if [ "$scope" = user ] || [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    else
+        sudo -- "$@"
+    fi
+}
+ctl() {
+    # Read-only queries do not require system privileges or a sudo timestamp.
+    if [ "$1" = print ]; then launchctl "$@"; else privileged launchctl "$@"; fi
+}
+inspect_plist() {
+    # Unreadable paths are query failures, not evidence that a service is absent.
+    probe=$directory
+    # Check the nearest existing ancestor before treating an absent path as missing.
+    while [ ! -e "$probe" ] && [ ! -L "$probe" ]; do
+        parent=${probe%/*}
+        [ "$parent" != "$probe" ] || fail "Cannot inspect $directory"
+        probe=${parent:-/}
+    done
+    [ -d "$probe" ] && [ -r "$probe" ] && [ -x "$probe" ] || fail "Cannot inspect $directory"
+    if [ -f "$plist" ]; then
+        [ -r "$plist" ] || fail "Cannot read $plist"
+        printf 'inactive\n'
+    else printf 'missing\n'; fi
+}
+
 query() {
     loaded=false
-    if details=$(launchctl print "$target" 2>&1); then
+    if details=$(ctl print "$target" 2>&1); then
         loaded=true
         case "$details" in
             *'state = running'*) state=active;;
@@ -28,22 +55,20 @@ query() {
     fi
     # A failed query is not evidence of absence until its domain is accessible
     # and launchctl explicitly identifies the service as absent.
-    launchctl print "$domain" >/dev/null || fail "Cannot query launchd domain: $domain"
     case "$details" in *'Could not find service'*|*'Could not find specified service'*) ;; *) fail "$details";; esac
-    [ ! -d "$directory" ] || { [ -r "$directory" ] && [ -x "$directory" ]; } || fail "Cannot inspect $directory"
-    if [ -f "$plist" ]; then
-        [ -r "$plist" ] || fail "Cannot read $plist"
-        state=inactive
-    else state=missing; fi
+    ctl print "$domain" >/dev/null || fail "Cannot query launchd domain: $domain"
+    state=$(inspect_plist) || fail "Cannot inspect $plist"
 }
 unload() {
-    launchctl unload "$plist" || fail "Could not unload $plist"
+    ctl unload "$plist" || fail "Could not unload $plist"
     query
     [ "$loaded" = false ] || fail 'launchctl unload left the service loaded'
 }
 load() {
-    [ -r "$plist" ] || fail "Cannot read $plist"
-    launchctl load "$plist" || fail 'launchctl load failed; the service may be disabled'
+    file_state=$(inspect_plist) || fail "Cannot inspect $plist"
+    [ "$file_state" = inactive ] || fail "Cannot read $plist"
+    # Force this manual load without changing the persistent autostart override.
+    ctl load -F "$plist" || fail 'launchctl load failed'
     query
     attempts=0
     while [ "$loaded" = true ] && [ "$state" != active ] && [ "$attempts" -lt 5 ]; do
@@ -51,7 +76,7 @@ load() {
         attempts=$((attempts + 1))
         query
     done
-    [ "$state" = active ] || fail 'Service did not start; check its config and launchctl enable/disable policy'
+    [ "$state" = active ] || fail 'Service did not start; check its plist and core logs'
 }
 query
 case "$op" in
@@ -69,5 +94,5 @@ case "$op" in
         load;;
     enable-autostart|disable-autostart)
         [ "$state" != missing ] || fail "Service is not installed: $service"
-        case "$op" in enable-autostart) launchctl enable "$target";; *) launchctl disable "$target";; esac;;
+        case "$op" in enable-autostart) ctl enable "$target";; *) ctl disable "$target";; esac;;
 esac

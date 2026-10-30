@@ -14,9 +14,11 @@ CONFIG_ROOT/
     windows/sysproxy.ps1
 ```
 
-首次运行从二进制内嵌资源补齐文件，无需网络。已有文件不覆盖；符号链接写入被拒绝。目录不可写时显示路径，不自动提权。修改过的默认资源旁可生成 `.new` 样本；已有 `.new` 也保留。
+安装器根据平台和选项选择后端（Linux：systemd/OpenRC；macOS：launchd；Windows：NSSM），只安装对应脚本并生成 `scripts.json`。Unix 的 `--is-user` 选择 `user`，否则为 `system`。重装先按编号后缀备份配置目录，再替换所选默认脚本和配置；其他自定义文件保留。
 
-仅在 `scripts.json` 缺失时，旧 `service_controller`、`is_user` 用于选择默认模板。未知后端报错。两核后端或权限不同，生成带 `cores` 的同 ID 动作。`config.yaml` 不改写；其中服务名和 core 路径仍提供动态参数。
+每个 Unix 后端只有一个 `default.json`。安装器将独立的 `"${scope}"` 参数替换为 `"system"` 或 `"user"`，保留其余变量。`${scope}`、`${is_user}` 均不是运行期变量。Windows 直接使用 `windows/system.json`。不设模板索引，不做运行期迁移。`config.yaml` 只提供服务名和 core 路径，不再保存后端或 scope。
+
+手动安装时，将 `contrib/scripts/coresrvctrl/` 中所选后端的脚本复制到上图对应目录，再将其 JSON 模板复制为 `CONFIG_ROOT/scripts.json`；Unix 需把 `"${scope}"` 改为所需字面值。应用只读取文件；配置缺失或无效时禁用服务动作并显示路径，其他 tab 仍可用。
 
 ## 配置
 
@@ -28,8 +30,8 @@ CONFIG_ROOT/
       "id": "start_core",
       "label": "启动核心",
       "cmd": {
-        "program": "sudo",
-        "args": ["--", "/bin/sh", "${root}/systemd/service.sh", "start", "system", "${service_name}"]
+        "program": "/bin/sh",
+        "args": ["${root}/systemd/service.sh", "start", "system", "${service_name}"]
       }
     },
     {
@@ -95,13 +97,17 @@ CONFIG_ROOT/
 
 前台动作独占终端。输入线程确认停读后交接，命令继承标准流，结束后回车一次返回；Ctrl-C 中断命令。CLI 不增加回车等待。
 
-sudo 应直接作为 program，脚本内不要再套 sudo。同一 clashtui 进程复用系统 tty/ppid 时间戳。无密码存储、无保活、退出不清缓存；策略过期仍可能再询问。`sudo /bin/sh SCRIPT` 与原来的精确 NOPASSWD 规则可能不同，可直接配置原授权命令；clashtui 不修改 sudoers。
+Unix 默认配置通过 `/bin/sh` 调用脚本；脚本仅给需要 system 权限的具体命令加 sudo。user 不提权，root 不重复提权。systemd、OpenRC、launchd 状态查询均不使用 sudo。launchd 以当前用户读取域和 plist；读取失败仍报告查询错误。只有服务写操作可能要求认证。自定义脚本可直接调用 sudo，无需特殊包装。
+
+凭据复用由 sudo 管理：有效 tty 缓存可在同一终端与会话内跨脚本使用；ppid 策略下，新脚本进程可能需要重新认证。clashtui 不存密码、不保活、退出不清缓存、不修改 sudoers。命令专属授权规则需匹配实际调用的命令。
+
+默认不打印命令。调试时用 `/bin/sh -x service.sh restart system mihomo`，或在脚本内用 `set -x` / `set +x`。修改 `scripts.json` 时，将 `-x` 放在 `/bin/sh` 参数的脚本路径之前。跟踪输出写 stderr，状态 stdout 仍遵守协议。
 
 ## 平台边界
 
 - systemd：enable/disable 不带 `--now`；用户服务不自动设置 linger。
 - OpenRC：用户模式所有查询与写操作保留 `--user`，需管理器支持及 `XDG_RUNTIME_DIR`；只修改 `default` runlevel。
-- launchd：启停保留 load/unload；自启用 enable/disable。用户模式是登录自启。disable 也阻止后续加载，手动启动不会暗中 enable。
+- launchd：启停保留 load/unload；自启用 enable/disable。用户模式是登录自启。手动启动/重启使用 `load -F`，允许关闭自启后仍运行，并保留持久 enable/disable 设置。
 - Windows：NSSM 管理生命周期，SCM 查询状态；自启为 AUTO_START/DEMAND_START。写服务时按需 UAC，拒绝即失败。PowerShell 脚本 UTF-8 BOM，协议输出无 BOM；ExecutionPolicy Bypass 不覆盖组策略。
 - Windows 代理：以当前用户修改 HKCU 并广播变更；启用、关闭各自独立。
 

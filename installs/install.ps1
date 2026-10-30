@@ -432,6 +432,26 @@ function Install-ClashTui {
     New-ClashTuiConfig $CoreType
 }
 
+# --- Service commands: Windows uses the system-scope NSSM template ---
+function New-ServiceScripts {
+    $stage = Join-Path $CLASHTUI_CONFIG_DIR (".service-scripts." + [guid]::NewGuid())
+    $target = Join-Path $CLASHTUI_CONFIG_DIR "scripts/coresrvctrl/windows"
+    New-Item -ItemType Directory -Path $stage -Force | Out-Null
+    try {
+        # Download all inputs before publishing the configuration.
+        Copy-Contrib "scripts/coresrvctrl/windows/service.ps1" (Join-Path $stage "service.ps1")
+        Copy-Contrib "scripts/coresrvctrl/windows/sysproxy.ps1" (Join-Path $stage "sysproxy.ps1")
+        Copy-Contrib "scripts/coresrvctrl/windows/system.json" (Join-Path $stage "scripts.json")
+        New-Item -ItemType Directory -Path $target -Force | Out-Null
+        Move-Item (Join-Path $stage "service.ps1") (Join-Path $target "service.ps1") -Force
+        Move-Item (Join-Path $stage "sysproxy.ps1") (Join-Path $target "sysproxy.ps1") -Force
+        Move-Item (Join-Path $stage "scripts.json") (Join-Path $CLASHTUI_CONFIG_DIR "scripts.json") -Force
+    } finally {
+        Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    Write-Info "Service scripts installed: $CLASHTUI_CONFIG_DIR/scripts.json (windows/system)"
+}
+
 # --- Config generation ---
 function New-ClashTuiConfig {
     param([string]$CoreType)
@@ -461,7 +481,6 @@ mihomo:
     config_path: ${mihomoCfgDir}/config.yaml
   core_service:
     service_name: clashtui_mihomo
-    is_user: false
 singbox:
   core:
     bin_path: ${singboxBinDir}/sing-box.exe
@@ -469,7 +488,6 @@ singbox:
     config_path: ${singboxCfgDir}/config.json
   core_service:
     service_name: clashtui_singbox
-    is_user: false
 timeout:
 extra:
   edit_cmd:
@@ -479,6 +497,7 @@ extra:
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllText($configPath, $configContent, $utf8NoBom)
     Write-Info "Config written to: $configPath"
+    New-ServiceScripts
 
     # Create directories and template_proxy_providers.yaml
     $tppContent = @'
@@ -647,8 +666,7 @@ function Main {
     Write-Info "Installed cores: $Core"
     Write-Info "Clashtui binary: $INSTALL_BIN/clashtui.exe"
     Write-Info "Clashtui config: $CLASHTUI_CONFIG_DIR"
-    Write-Info "Service scripts initialize from the binary on first launch: $CLASHTUI_CONFIG_DIR/scripts.json"
-    Write-Info "Existing scripts.json and scripts/coresrvctrl files are preserved."
+    Write-Info "Service commands: $CLASHTUI_CONFIG_DIR/scripts.json"
     Write-Info "Core configs written to core config directories"
     Write-Info "Install directory: $InstallDir"
     Write-Info "Use ClashTui's CoreSrvCtl to manage core services (install/start/stop via nssm)."

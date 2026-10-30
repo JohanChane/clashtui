@@ -1,9 +1,5 @@
 //! The single, platform-independent service command configuration.
 
-mod assets;
-
-pub use assets::bootstrap;
-
 use super::CoreType;
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
@@ -79,12 +75,37 @@ impl ScriptAction {
     }
 }
 
+/// Check existing ancestors as well as the target; dangling symlinks count too.
+fn reject_symlinks(path: &Path) -> Result<()> {
+    let mut current = PathBuf::new();
+    for component in path.components() {
+        current.push(component.as_os_str());
+        match std::fs::symlink_metadata(&current) {
+            Ok(metadata) => ensure!(
+                !metadata.file_type().is_symlink(),
+                "Refusing symbolic link: {}",
+                current.display()
+            ),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => {
+                return Err(error)
+                    .with_context(|| format!("Failed to inspect {}", current.display()));
+            }
+        }
+    }
+    Ok(())
+}
+
 impl ScriptConfig {
     pub fn load(config_root: &Path) -> Result<Self> {
         let path = config_root.join(FILE_NAME);
-        assets::reject_symlinks(&path)?;
-        let text = std::fs::read_to_string(&path)
-            .with_context(|| format!("Failed to read {}", path.display()))?;
+        reject_symlinks(&path)?;
+        let text = std::fs::read_to_string(&path).with_context(|| {
+            format!(
+                "Failed to read {}; run the installer or create scripts.json manually",
+                path.display()
+            )
+        })?;
         Self::parse(&text).with_context(|| format!("Invalid {}", path.display()))
     }
 

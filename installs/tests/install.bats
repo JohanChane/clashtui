@@ -183,6 +183,12 @@ teardown() {
 
 @test "all contrib files referenced by install scripts exist" {
   local files=(
+    "scripts/coresrvctrl/systemd/default.json"
+    "scripts/coresrvctrl/systemd/service.sh"
+    "scripts/coresrvctrl/openrc/default.json"
+    "scripts/coresrvctrl/openrc/service.sh"
+    "scripts/coresrvctrl/launchd/default.json"
+    "scripts/coresrvctrl/launchd/service.sh"
     "default_configs/default_keymap.yaml"
     "default_configs/default_theme.yaml"
     "default_configs/mihomo/core_override_config.yaml"
@@ -215,31 +221,29 @@ teardown() {
 @test "resolve_paths with SERVICE_CONTROLLER=openrc sets UNIT_DIR to /etc/init.d" {
   run bash -c "
     source '${PROJECT_ROOT}/installs/install'
+    detect_is_macos() { IS_MACOS=false; }
     SERVICE_CONTROLLER=openrc
     IS_USER=false
     resolve_paths
     echo \"UNIT_DIR=\$UNIT_DIR\"
-    echo \"SERVICE_IS_USER=\$SERVICE_IS_USER\"
     echo \"SYSTEMD_RELOAD=\${SYSTEMD_RELOAD:-NOT_SET}\"
   "
   [ "$status" -eq 0 ]
   [[ "$output" == *"UNIT_DIR=/etc/init.d"* ]]
-  [[ "$output" == *"SERVICE_IS_USER=false"* ]]
   [[ "$output" == *"SYSTEMD_RELOAD=NOT_SET"* ]]
 }
 
 @test "resolve_paths with SERVICE_CONTROLLER=openrc and IS_USER=true keeps IS_USER=true" {
   run bash -c "
     source '${PROJECT_ROOT}/installs/install'
+    detect_is_macos() { IS_MACOS=false; }
     SERVICE_CONTROLLER=openrc
     IS_USER=true
     resolve_paths
     echo \"IS_USER=\$IS_USER\"
-    echo \"SERVICE_IS_USER=\$SERVICE_IS_USER\"
   "
   [ "$status" -eq 0 ]
   [[ "$output" == *"IS_USER=true"* ]]
-  [[ "$output" == *"SERVICE_IS_USER=true"* ]]
 }
 
 # ---------------------------------------------------------------------------

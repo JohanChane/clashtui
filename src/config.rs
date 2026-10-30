@@ -270,11 +270,6 @@ pub fn init(base_path: Option<PathBuf>) -> Result<()> {
         unreachable!("init twice")
     }
 
-    // A broken service configuration must not prevent access to other tabs.
-    if let Err(error) = scripts::bootstrap(&config_dir_path(), &CONFIG.cfg_file) {
-        eprintln!("Service scripts: {error:#}");
-    }
-
     Ok(())
 }
 
