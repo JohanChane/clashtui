@@ -179,12 +179,12 @@ pub fn with_terminal<T>(job: impl FnOnce() -> Result<T>) -> Result<T> {
     if lease.is_tui() {
         // A command may leave the terminal raw or disable CR-to-LF translation.
         // Restore normal modes before reading the acknowledgement line.
-        if let Some(modes) = &lease.normal_modes {
-            if let Err(error) = modes.restore() {
-                eprintln!("Failed to restore normal terminal modes: {error}");
-                drop(lease);
-                return result.and(Err(error.into()));
-            }
+        if let Some(modes) = &lease.normal_modes
+            && let Err(error) = modes.restore()
+        {
+            eprintln!("Failed to restore normal terminal modes: {error}");
+            drop(lease);
+            return result.and(Err(error.into()));
         }
         if let Err(error) = &result {
             eprintln!("{error:#}");

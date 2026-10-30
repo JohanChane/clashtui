@@ -280,7 +280,7 @@ pub fn switch_core(scripts: &ScriptConfig, root: &Path, target: CoreType) -> Res
             let mut data = CONFIG.data.lock().unwrap();
             let previous = data.core_type;
             data.core_type = target;
-            let result = save_selection(&*data, root);
+            let result = save_selection(&data, root);
             if let Err(error) = result {
                 data.core_type = previous;
                 return Err(error);

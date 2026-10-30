@@ -140,14 +140,14 @@ impl ScriptConfig {
         for core in CORES {
             let mut seen = HashMap::new();
             for (index, action) in self.actions.iter().enumerate() {
-                if action.applies_to(core) {
-                    if let Some(first) = seen.insert(action.id.as_str(), index) {
-                        bail!(
-                            "actions[{index}].cores: ({}, {}) overlaps actions[{first}]",
-                            core_name(core),
-                            action.id
-                        );
-                    }
+                if action.applies_to(core)
+                    && let Some(first) = seen.insert(action.id.as_str(), index)
+                {
+                    bail!(
+                        "actions[{index}].cores: ({}, {}) overlaps actions[{first}]",
+                        core_name(core),
+                        action.id
+                    );
                 }
             }
         }

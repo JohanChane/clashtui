@@ -5,9 +5,11 @@ use std::{
     process::{Child, Command, ExitStatus},
 };
 
-pub fn configure(command: &mut Command) -> Result<()> {
+pub struct PreparedGroup;
+
+pub fn configure(command: &mut Command) -> Result<PreparedGroup> {
     command.process_group(0);
-    Ok(())
+    Ok(PreparedGroup)
 }
 
 pub struct ProcessGroup {
@@ -17,7 +19,7 @@ pub struct ProcessGroup {
 }
 
 impl ProcessGroup {
-    pub fn attach(child: &mut Child, foreground: bool, _prepared: ()) -> Result<Self> {
+    pub fn attach(child: &mut Child, foreground: bool, _prepared: PreparedGroup) -> Result<Self> {
         let mut group = Self {
             pid: child.id() as libc::pid_t,
             previous_foreground: None,
