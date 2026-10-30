@@ -397,6 +397,8 @@ class ResourceTests(unittest.TestCase):
             self.assertEqual(template["root"], "scripts/coresrvctrl")
             actions = {action["id"]: action for action in template["actions"]}
             self.assertTrue(ids <= actions.keys())
+            self.assertNotIn("label", actions["status_core"])
+            self.assertTrue(all(action.get("label") for action_id, action in actions.items() if action_id != "status_core"))
             self.assertTrue(all("cores" not in action for action in actions.values()))
             if backend != "windows":
                 for action in actions.values():

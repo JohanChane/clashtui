@@ -36,7 +36,6 @@ CONFIG_ROOT/
     },
     {
       "id": "status_core",
-      "label": "查看状态",
       "cmd": {
         "program": "/bin/sh",
         "args": ["${root}/systemd/service.sh", "status", "system", "${service_name}"]
@@ -46,11 +45,13 @@ CONFIG_ROOT/
 }
 ```
 
-`root`、`actions`、`id`、`label`、`cmd.program`、`cmd.args` 必填。拒绝未知字段、空标签、空程序。`id` 格式为 `[a-z][a-z0-9_-]*`。
+`root`、`actions`、`id`、`cmd.program`、`cmd.args` 必填。`label` 可选：省略或设为 `null` 时，动作不显示在菜单中；填写时必须是非空白字符串。拒绝未知字段和空程序。`id` 格式为 `[a-z][a-z0-9_-]*`。
+
+隐藏只影响显示，不影响执行和能力判断。隐藏动作仍可供后台查询、快捷键和组合操作调用。默认模板隐藏 `status_core`，其他动作也可用相同方式隐藏。内置 Switch Core、Stop All 仍根据全部已配置动作判断可用性。
 
 可选 `"cores": ["mihomo"]` 或 `["singbox"]`；省略表示全部 core。使用机器名 `singbox`，不是显示名 `sing-box`。数组不可为空或重复。同 ID 可分核定义不同命令，但作用域不可重叠；共用动作不能再用同 ID 定向覆盖。
 
-按当前 core 筛选，保持数组顺序。自定义 ID 可直接显示、执行。重新进入 tab 读取文件，保留仍存在的选中 ID。文件无效则禁用动作，不运行上次命令；正在执行的操作使用原快照。
+按当前 core 和标签筛选菜单，保持数组顺序。自定义 ID 可直接执行，提供 `label` 即可显示。重新进入 tab 读取文件，保留仍存在的选中 ID。文件无效则禁用动作，不运行上次命令；正在执行的操作使用原快照。
 
 | 标准 ID | 语义 |
 | --- | --- |

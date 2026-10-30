@@ -32,7 +32,8 @@ pub struct ScriptConfig {
 #[serde(deny_unknown_fields)]
 pub struct ScriptAction {
     pub id: String,
-    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -133,10 +134,9 @@ impl ScriptConfig {
                         || c == b'-'),
                 "{field}.id: expected [a-z][a-z0-9_-]*"
             );
-            ensure!(
-                !action.label.trim().is_empty(),
-                "{field}.label: must not be empty"
-            );
+            if let Some(label) = &action.label {
+                ensure!(!label.trim().is_empty(), "{field}.label: must not be empty");
+            }
             if let Some(cores) = &action.cores {
                 ensure!(!cores.is_empty(), "{field}.cores: must not be empty");
                 for (i, core) in cores.iter().enumerate() {
@@ -312,7 +312,7 @@ mod tests {
     fn action(id: &str, cores: Option<Vec<CoreType>>) -> ScriptAction {
         ScriptAction {
             id: id.into(),
-            label: id.into(),
+            label: Some(id.into()),
             cores,
             cmd: ScriptCommand {
                 program: "test-command".into(),
@@ -369,9 +369,34 @@ mod tests {
     }
 
     #[test]
+    fn unlabeled_actions_remain_resolvable_and_serialize_without_a_label() {
+        for label in [None, Some(json!(null))] {
+            let mut value = json!({"root":".", "actions":[{
+                "id":"status_core", "cmd":{"program":"tool", "args":["${core_type}"]}
+            }]});
+            if let Some(label) = label {
+                value["actions"][0]["label"] = label;
+            }
+            let config = ScriptConfig::parse(&value.to_string()).unwrap();
+            let action = config.find(CoreType::Mihomo, "status_core").unwrap();
+            assert!(action.label.is_none());
+            let command = config
+                .resolve(Path::new("."), action, |_| Ok("mihomo".into()))
+                .unwrap();
+            assert_eq!(command.program, "tool");
+            assert_eq!(command.args, ["mihomo"]);
+            assert!(
+                serde_json::to_value(&config).unwrap()["actions"][0]
+                    .get("label")
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
     fn malformed_schema_and_core_arrays_are_rejected() {
         let valid = json!({"root":"scripts", "actions":[{
-            "id":"start_core", "label":"Start", "cmd":{"program":"sh", "args":[]}
+            "id":"start_core", "cmd":{"program":"sh", "args":[]}
         }]});
         for cores in [
             json!([]),
@@ -385,7 +410,9 @@ mod tests {
             assert!(ScriptConfig::parse(&value.to_string()).is_err());
         }
         for (field, bad) in [
+            ("label", json!("")),
             ("label", json!(" ")),
+            ("label", json!(42)),
             ("id", json!("1bad")),
             ("unknown", json!(true)),
         ] {

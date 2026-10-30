@@ -57,7 +57,6 @@
     },
     {
       "id": "status_core",
-      "label": "Core Status",
       "cmd": {
         "program": "powershell.exe",
         "args": [

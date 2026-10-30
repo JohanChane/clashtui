@@ -77,16 +77,19 @@ impl MenuEntry {
 fn menu(scripts: &ScriptConfig, core: CoreType) -> Vec<MenuEntry> {
     let mut entries: Vec<_> = scripts
         .actions_for(core)
-        .map(|action| MenuEntry {
-            operation: Operation::Script {
-                core,
-                id: action.id.clone(),
-            },
-            label: action.label.clone(),
-            unavailable_reason: None,
+        .filter_map(|action| {
+            let label = action.label.as_ref()?;
+            Some(MenuEntry {
+                operation: Operation::Script {
+                    core,
+                    id: action.id.clone(),
+                },
+                label: label.clone(),
+                unavailable_reason: None,
+            })
         })
         .collect();
-    if !entries.is_empty() {
+    if scripts.actions_for(core).next().is_some() {
         entries.push(MenuEntry::new(
             Operation::SwitchCore(core.other()),
             "Switch Core",
@@ -441,6 +444,42 @@ mod tests {
         assert!(labels[3].contains("unsupported:"));
         let empty = scripts(serde_json::json!({"root":".","actions":[]}));
         assert!(menu(&empty, CoreType::Mihomo).is_empty());
+    }
+
+    #[test]
+    fn unlabeled_actions_are_hidden_but_still_enable_composite_operations() {
+        let mut config = scripts(serde_json::json!({"root":".","actions":[
+            {"id":"start_core","cmd":{"program":"tool","args":[]}},
+            {"id":"status_core","cmd":{"program":"tool","args":[]}},
+            {"id":"custom","label":"Visible","cmd":{"program":"tool","args":[]}},
+            {"id":"stop_core","cmd":{"program":"tool","args":[]}},
+            {"id":"helper","cmd":{"program":"tool","args":[]}}
+        ]}));
+        for core in CoreType::ALL {
+            let entries = menu(&config, core);
+            assert_eq!(
+                entries.iter().map(MenuEntry::key).collect::<Vec<_>>(),
+                ["custom", ":switch_core", ":stop_all"]
+            );
+            assert!(
+                entries
+                    .iter()
+                    .all(|entry| entry.unavailable_reason.is_none())
+            );
+            assert!(config.find(core, "status_core").is_some());
+            assert!(config.find(core, "helper").is_some());
+        }
+        config.actions[2].label = None;
+        let entries = menu(&config, CoreType::Mihomo);
+        assert_eq!(
+            entries.iter().map(MenuEntry::key).collect::<Vec<_>>(),
+            [":switch_core", ":stop_all"]
+        );
+        assert!(
+            entries
+                .iter()
+                .all(|entry| entry.unavailable_reason.is_none())
+        );
     }
 
     #[test]

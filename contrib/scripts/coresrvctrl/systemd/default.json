@@ -42,7 +42,6 @@
     },
     {
       "id": "status_core",
-      "label": "Core Status",
       "cmd": {
         "program": "/bin/sh",
         "args": [

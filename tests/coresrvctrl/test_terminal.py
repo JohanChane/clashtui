@@ -120,7 +120,7 @@ class TerminalTests(unittest.TestCase):
             "root": ".", "actions": [
                 {"id": "restart_core", "label": "Test action", "cmd": {
                     "program": program, "args": ["${root}/action.sh"]}},
-                {"id": "status_core", "label": "Status", "cmd": {
+                {"id": "status_core", "cmd": {
                     "program": "/bin/sh", "args": ["-c", "printf 'inactive\\n'"]}},
             ]}), encoding="utf-8")
 
@@ -232,7 +232,7 @@ class TerminalTests(unittest.TestCase):
         config["actions"][0]["cmd"]["args"].append("${core_type}")
         path.write_text(json.dumps(config))
         session = self.start()
-        session.send(b"jjj\r")
+        session.send(b"jj\r")
         session.expect(ENTER)
         self.assertEqual((self.root / "stopped").read_text().splitlines(), ["mihomo", "singbox"])
         session.send(b"\n")

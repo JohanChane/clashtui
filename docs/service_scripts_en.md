@@ -36,7 +36,6 @@ For manual installation, copy the chosen backend's script(s) from `contrib/scrip
     },
     {
       "id": "status_core",
-      "label": "Service status",
       "cmd": {
         "program": "/bin/sh",
         "args": ["${root}/systemd/service.sh", "status", "system", "${service_name}"]
@@ -46,11 +45,13 @@ For manual installation, copy the chosen backend's script(s) from `contrib/scrip
 }
 ```
 
-All shown fields are required. Unknown fields, empty labels and empty programs are rejected. IDs match `[a-z][a-z0-9_-]*`.
+`root`, `actions`, `id`, `cmd.program` and `cmd.args` are required. `label` is optional: omit it or use `null` to hide the action from the menu. A supplied label must be a nonblank string. Unknown fields and empty programs are rejected. IDs match `[a-z][a-z0-9_-]*`.
+
+Visibility does not affect execution or capabilities. Hidden actions still support background queries, shortcuts and composite operations. Default templates hide `status_core`; other actions can be hidden the same way. Built-in Switch Core and Stop All entries still use all configured actions to determine availability.
 
 Optional `"cores": ["mihomo"]` or `["singbox"]` limits an action. Omission means all cores. Use the machine ID `singbox`, not the display name `sing-box`. Explicit scopes must be nonempty and contain no duplicates. Repeated IDs may have disjoint scopes only; a targeted action cannot override a shared action.
 
-Filtering preserves array order. Custom IDs work without Rust changes. Entering the tab reloads the whole file and preserves the selected ID when applicable. Invalid edits disable actions instead of running stale commands. In-flight operations keep their original snapshot.
+Filtering by core and label preserves array order. Custom IDs work without Rust changes. Entering the tab reloads the whole file and preserves the selected ID when applicable. Invalid edits disable actions instead of running stale commands. In-flight operations keep their original snapshot.
 
 | Standard ID | Meaning |
 | --- | --- |
