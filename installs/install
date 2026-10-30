@@ -944,6 +944,8 @@ EOF
   fi
 
   log_info "Config written to: $CLASHTUI_CONFIG_DIR/config.yaml"
+  log_info "Service scripts initialize from the binary on first launch: $CLASHTUI_CONFIG_DIR/scripts.json"
+  log_info "Existing scripts.json and scripts/coresrvctrl files are preserved."
 
   # Generate per-core template_proxy_providers.yaml and directories
   if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then

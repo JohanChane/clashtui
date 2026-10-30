@@ -2,6 +2,8 @@
 
 本文档描述 Clashtui 的代码架构，供开发者了解项目结构。
 
+服务控制按[脚本协议](service_scripts_zh.md)执行。平台服务命令在 `contrib/scripts/coresrvctrl/`；Rust 仅保留通用配置、执行、终端与进程适配。
+
 
 ## 技术栈
 
@@ -25,12 +27,15 @@ src/
 │       └── utils.rs     # 版本信息、shell 补全生成
 ├── config.rs            # 配置模块入口，re-exports from config/
 │   └── config/
-│       ├── core.rs      # CoreType 枚举、ServiceController
+│       ├── core.rs      # CoreType 枚举、core 配置
+│       ├── scripts.rs   # scripts.json 协议；scripts/assets.rs 内嵌资源和迁移
 │       ├── database.rs  # ProfileManager（Profile 持久化结构）
 │       └── util.rs      # 配置目录解析、load_save! 宏、文件路径常量
 ├── functions.rs         # 业务逻辑入口，re-exports from functions/
 │   └── functions/
 │       ├── command.rs   # 系统操作（文件权限、服务启停、目录打开）
+│       ├── service.rs   # 目标命令计划、状态协议、组合动作
+│       ├── process.rs   # 通用子进程、输出限额、进程组/Job
 │       ├── file.rs      # 文件操作（Profile 导入/更新、Template 处理）
 │       └── restful.rs   # REST API 调用（config/mode/proxies/connections）
 ├── tui.rs               # TUI 模块入口，re-exports from tui/
@@ -47,7 +52,8 @@ src/
 │       │   ├── matcher.rs   # App 持有的组合键状态机
 │       │   └── notation.rs  # 按键记法解析和显示
 │       ├── signals.rs   # OS 信号处理
-│       ├── term.rs      # 终端 raw mode 进入/退出/挂起
+│       ├── input.rs     # 唯一输入线程；暂停后确认交接
+│       ├── term.rs      # 终端独占租约、恢复与挂起
 │       ├── theme.rs     # 主题加载
 │       ├── utils.rs     # 工具函数
 │       ├── popmsg.rs    # 弹窗定义（Confirm、Input 等）

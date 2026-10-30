@@ -353,6 +353,8 @@ sing-box 使用深度合并。你只需写要覆盖的部分，其他字段保�
 
 在 CoreSrvCtl 标签页（按 `7`）中，可以切换 Mihomo 和 sing-box 两种核心。切换后需要重启 Clashtui。
 
+服务动作由 `CONFIG_ROOT/scripts.json` 定义，支持分核命令、自定义菜单及自启设置。见[服务控制脚本](service_scripts_zh.md)。切核仅在目标启动成功后保存选择；失败会报告已完成的步骤。
+
 Clashtui 会自动检测当前运行的核心类型是否与设置匹配。如果不匹配，会弹窗提示并阻止显示错误数据。
 
 ### 文件权限（Linux）

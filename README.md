@@ -124,6 +124,8 @@ iex "& {$(irm https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/m
 
 3. Start clashtui, then use CoreSrvCtl to install and start core services:
 
+Service commands are configured in `CONFIG_ROOT/scripts.json`. See [service scripts](docs/service_scripts_en.md) ([中文](docs/service_scripts_zh.md)) for custom commands, per-core scopes and autostart.
+
 The install script does NOT register Windows Services. Launch clashtui and use the built-in CoreSrvCtl to manage services. Enable only one core service at boot (do not enable both simultaneously).
 
 ### Without root access (no TUN)

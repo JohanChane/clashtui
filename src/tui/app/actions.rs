@@ -74,8 +74,7 @@ impl GlobalAction {
                 command::open_dir(dir.parent().unwrap_or(dir))
             }
             Self::RestartCoreService => {
-                let output = command::restart_service()?;
-                anyhow::ensure!(!output.starts_with("Error"), "{output}");
+                command::restart_service()?;
                 Ok(())
             }
             Self::CloseAllConnections => Ok(connection::terminate_all_connections()?),
@@ -150,7 +149,7 @@ impl Document for AppAction {
             Self::Global(action) => match action {
                 GlobalAction::OpenCoreDataDir => "Open core data dir",
                 GlobalAction::OpenCoreInstallDir => "Open core install dir",
-                GlobalAction::RestartCoreService => "Start/restart core service",
+                GlobalAction::RestartCoreService => "Restart core service",
                 GlobalAction::CloseAllConnections => "Close all connections",
             },
         }

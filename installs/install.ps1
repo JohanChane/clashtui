@@ -647,6 +647,8 @@ function Main {
     Write-Info "Installed cores: $Core"
     Write-Info "Clashtui binary: $INSTALL_BIN/clashtui.exe"
     Write-Info "Clashtui config: $CLASHTUI_CONFIG_DIR"
+    Write-Info "Service scripts initialize from the binary on first launch: $CLASHTUI_CONFIG_DIR/scripts.json"
+    Write-Info "Existing scripts.json and scripts/coresrvctrl files are preserved."
     Write-Info "Core configs written to core config directories"
     Write-Info "Install directory: $InstallDir"
     Write-Info "Use ClashTui's CoreSrvCtl to manage core services (install/start/stop via nssm)."

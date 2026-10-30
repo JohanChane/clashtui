@@ -23,7 +23,8 @@ mod core;
 #[macro_use]
 mod util;
 
-pub use core::{CoreType, ServiceController};
+pub use core::CoreType;
+pub mod scripts;
 pub use util::check_startup_perms;
 pub mod database;
 
@@ -267,6 +268,11 @@ pub fn init(base_path: Option<PathBuf>) -> Result<()> {
 
     if _CONFIG.set(Config::load()?).is_err() {
         unreachable!("init twice")
+    }
+
+    // A broken service configuration must not prevent access to other tabs.
+    if let Err(error) = scripts::bootstrap(&config_dir_path(), &CONFIG.cfg_file) {
+        eprintln!("Service scripts: {error:#}");
     }
 
     Ok(())

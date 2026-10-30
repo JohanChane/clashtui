@@ -1,8 +1,9 @@
 use super::dev::*;
 use crate::config::CoreType;
-#[cfg(unix)]
-use ratatui::style::Color;
+use crate::config::scripts::ScriptConfig;
+use crate::functions::service::{self, CORES, ServiceState, StatusReport, core_index};
 use ratatui::widgets::ListItem;
+use std::{cell::Cell, path::PathBuf, sync::Arc};
 
 newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>), Srvctl);
 
@@ -39,170 +40,201 @@ impl Document for Action {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum SrvCtlOp {
-    Stop,
-    Restart,
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Operation {
+    Script {
+        id: String,
+        label: String,
+    },
     SwitchCore,
     StopAll,
-    #[cfg(windows)]
-    Install,
-    #[cfg(windows)]
-    Uninstall,
-    #[cfg(windows)]
-    ToggleSysProxy,
+    Unavailable {
+        id: &'static str,
+        label: String,
+        reason: String,
+    },
 }
 
-impl SrvCtlOp {
-    fn as_str(&self) -> &str {
+impl Operation {
+    fn key(&self) -> &str {
         match self {
-            Self::Stop => "Stop Service",
-            Self::Restart => "Start Service",
+            Self::Script { id, .. } => id,
+            Self::SwitchCore => ":switch_core",
+            Self::StopAll => ":stop_all",
+            Self::Unavailable { id, .. } => id,
+        }
+    }
+    fn label(&self) -> &str {
+        match self {
+            Self::Script { label, .. } => label,
             Self::SwitchCore => "Switch Core",
             Self::StopAll => "Stop All Services",
-            #[cfg(windows)]
-            Self::Install => "Install Srv",
-            #[cfg(windows)]
-            Self::Uninstall => "Uninstall Srv",
-            #[cfg(windows)]
-            Self::ToggleSysProxy => "Toggle SysProxy",
+            Self::Unavailable { label, .. } => label,
         }
     }
-    fn all() -> Vec<Self> {
-        #[cfg_attr(not(windows), allow(unused_mut))]
-        let mut ops = vec![Self::Stop, Self::Restart, Self::SwitchCore, Self::StopAll];
-        #[cfg(windows)]
-        {
-            ops.push(Self::Install);
-            ops.push(Self::Uninstall);
-            ops.push(Self::ToggleSysProxy);
+}
+
+fn menu(scripts: &ScriptConfig, core: CoreType) -> Vec<Operation> {
+    let mut ops: Vec<_> = scripts
+        .actions_for(core)
+        .map(|action| Operation::Script {
+            id: action.id.clone(),
+            label: action.label.clone(),
+        })
+        .collect();
+    if !ops.is_empty() {
+        let missing_stops: Vec<_> = CORES
+            .iter()
+            .filter(|core| scripts.find(**core, "stop_core").is_none())
+            .map(|core| format!("{core}/stop_core"))
+            .collect();
+        let other = match core {
+            CoreType::Mihomo => CoreType::Singbox,
+            CoreType::Singbox => CoreType::Mihomo,
+        };
+        let mut missing_switch = missing_stops.clone();
+        if scripts.find(other, "start_core").is_none() {
+            missing_switch.push(format!("{other}/start_core"));
         }
-        ops
+        let capability = |op: Operation, missing: Vec<String>| {
+            if missing.is_empty() {
+                op
+            } else {
+                Operation::Unavailable {
+                    id: if op == Operation::SwitchCore {
+                        ":switch_core"
+                    } else {
+                        ":stop_all"
+                    },
+                    label: format!("{} (unsupported: {})", op.label(), missing.join(", ")),
+                    reason: format!("Missing actions: {}", missing.join(", ")),
+                }
+            }
+        };
+        ops.push(capability(Operation::SwitchCore, missing_switch));
+        ops.push(capability(Operation::StopAll, missing_stops));
     }
+    ops
 }
 
 #[derive(Default)]
 struct SrvCtlContent {
-    ops: Vec<SrvCtlOp>,
-    service_name: String,
-    bin_path: String,
-    is_user: bool,
-    status: String,
-    core_label: String,
-    mihomo_status: String,
-    singbox_status: String,
-    mihomo_service_name: String,
-    singbox_service_name: String,
-    mihomo_is_user: bool,
-    singbox_is_user: bool,
-    #[cfg(windows)]
-    proxy_enabled: bool,
+    ops: Vec<Operation>,
+    scripts: Option<Arc<ScriptConfig>>,
+    root: PathBuf,
+    core: CoreType,
+    generation: u64,
+    statuses: [Option<StatusReport>; 2],
+    pending: [Cell<bool>; 2],
+    refresh: [Cell<bool>; 2],
+    error: Option<String>,
+    visible: bool,
+    busy: bool,
+    revision: u64,
+    watch_pending: Cell<bool>,
 }
 
 impl SrvCtlContent {
-    fn spawn_status_check(&self, task_set: &mut FutureSet<Self>, target: CoreType) {
-        let (service_name, is_user, csc) = match target {
-            CoreType::Mihomo => (
-                self.mihomo_service_name.clone(),
-                self.mihomo_is_user,
-                crate::config::CONFIG.cfg_file.mihomo.core_service.clone(),
-            ),
-            CoreType::Singbox => (
-                self.singbox_service_name.clone(),
-                self.singbox_is_user,
-                crate::config::CONFIG.cfg_file.singbox.core_service.clone(),
-            ),
+    fn reload(&mut self, core: CoreType, state: &mut ListState) {
+        let selected = (self.core == core)
+            .then(|| {
+                state
+                    .selected()
+                    .and_then(|index| self.ops.get(index))
+                    .map(|op| op.key().to_owned())
+            })
+            .flatten();
+        self.core = core;
+        self.generation = self.generation.wrapping_add(1);
+        self.revision = service::revision();
+        self.statuses = [None, None];
+        // Clear before parsing: invalid edits must never leave executable stale actions.
+        self.scripts = None;
+        self.ops.clear();
+        self.error = None;
+        match ScriptConfig::load(&self.root) {
+            Ok(scripts) => {
+                self.ops = menu(&scripts, core);
+                self.scripts = Some(Arc::new(scripts));
+            }
+            Err(error) => self.error = Some(format!("{error:#}")),
+        }
+        let index = selected
+            .and_then(|id| self.ops.iter().position(|op| op.key() == id))
+            .or_else(|| (!self.ops.is_empty()).then_some(0));
+        state.select(index);
+        for refresh in &self.refresh {
+            refresh.set(self.scripts.is_some());
+        }
+    }
+
+    fn spawn_status_checks(&self, tasks: &mut FutureSet<Self>) {
+        if !self.visible || self.busy {
+            return;
+        }
+        let Some(scripts) = &self.scripts else {
+            return;
         };
-        let controller = crate::config::ServiceController::from_config(&csc);
-        async move {
-            let status = match controller {
-                crate::config::ServiceController::Launchd => launchd_status(&service_name, is_user),
-                #[cfg(windows)]
-                crate::config::ServiceController::Nssm => {
-                    crate::functions::command::nssm_status(&service_name)
-                }
-                crate::config::ServiceController::OpenRc => {
-                    let args = vec![service_name.as_str(), "status"];
-                    let bin = controller.bin_name();
-                    let output = std::process::Command::new(bin).args(&args).output();
-                    match output {
-                        Ok(o) => {
-                            let stdout = String::from_utf8_lossy(&o.stdout);
-                            if stdout.contains("started") {
-                                "active".to_owned()
-                            } else if stdout.contains("stopped") {
-                                "inactive".to_owned()
-                            } else {
-                                stdout.trim().to_owned()
-                            }
-                        }
-                        Err(_) => "?".to_owned(),
+        for core in CORES {
+            let index = core_index(core);
+            if self.pending[index].get() || !self.refresh[index].get() {
+                continue;
+            }
+            self.pending[index].set(true);
+            self.refresh[index].set(false);
+            let scripts = Arc::clone(scripts);
+            let root = self.root.clone();
+            let generation = self.generation;
+            async move {
+                let report = tokio::task::spawn_blocking(move || {
+                    service::query_status(&scripts, &root, core)
+                })
+                .await
+                .unwrap_or_else(StatusReport::unknown);
+                wrapper(move |content: &mut Self| {
+                    content.pending[index].set(false);
+                    if content.generation == generation {
+                        content.statuses[index] = Some(report);
                     }
+                })
+            }
+            .spawn_at(tasks);
+        }
+    }
+
+    fn watch_operations(&self, tasks: &mut FutureSet<Self>) {
+        if !self.visible || self.watch_pending.replace(true) {
+            return;
+        }
+        async {
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            wrapper(|content: &mut Self| {
+                content.watch_pending.set(false);
+                if !content.visible {
+                    return;
                 }
-                _ => {
-                    let mut args = vec!["is-active"];
-                    if is_user {
-                        args.push("--user");
-                    }
-                    args.push(&service_name);
-                    let output = std::process::Command::new("systemctl").args(&args).output();
-                    match output {
-                        Ok(o) => String::from_utf8_lossy(&o.stdout).trim().to_owned(),
-                        Err(_) => "?".to_owned(),
-                    }
-                }
-            };
-            wrapper(move |c: &mut SrvCtlContent| match target {
-                CoreType::Mihomo => c.mihomo_status = status,
-                CoreType::Singbox => c.singbox_status = status,
+                content.refresh_after_operation(service::revision());
             })
         }
-        .spawn_at(task_set);
+        .spawn_at(tasks);
     }
-}
 
-#[cfg(not(unix))]
-fn launchd_status(_service_name: &str, _is_user: bool) -> String {
-    "?".to_owned()
-}
-
-#[cfg(unix)]
-fn launchd_status(service_name: &str, is_user: bool) -> String {
-    if is_user {
-        let uid = unsafe { libc::getuid() };
-        let output = std::process::Command::new("launchctl")
-            .args(["print", &format!("gui/{uid}/{service_name}")])
-            .output();
-        match output {
-            Ok(o) if o.status.success() => {
-                let stdout = String::from_utf8_lossy(&o.stdout);
-                if stdout.contains("state = running") {
-                    "active".to_owned()
-                } else {
-                    "loaded".to_owned()
-                }
+    fn refresh_after_operation(&mut self, revision: u64) {
+        if self.revision != revision {
+            self.revision = revision;
+            self.generation = self.generation.wrapping_add(1);
+            self.statuses = [None, None];
+            for refresh in &self.refresh {
+                refresh.set(true);
             }
-            _ => "not loaded".to_owned(),
         }
-    } else {
-        let output = std::process::Command::new("sudo")
-            .args([
-                "-n",
-                "launchctl",
-                "print",
-                &format!("system/{service_name}"),
-            ])
-            .output();
-        match output {
-            Ok(o) if o.status.success() => {
-                let stdout = String::from_utf8_lossy(&o.stdout);
-                if stdout.contains("state = running") {
-                    "active".to_owned()
-                } else {
-                    "loaded".to_owned()
-                }
+        for (index, status) in self.statuses.iter().enumerate() {
+            if status
+                .as_ref()
+                .is_some_and(|report| report.state == ServiceState::Checking)
+            {
+                self.refresh[index].set(true);
             }
-            _ => "not loaded".to_owned(),
         }
     }
 }
@@ -211,353 +243,282 @@ impl BasicTabContent for SrvCtlContent {
     type Action = Action;
 
     type State = ListState;
-
     const TITLE: &str = "CoreSrvCtl";
 
-    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.spawn_status_check(task_set, CoreType::Mihomo);
-        self.spawn_status_check(task_set, CoreType::Singbox);
+    fn on_enter(&mut self, tasks: &mut FutureSet<Self>, state: &mut Self::State) {
+        self.visible = true;
+        self.reload(crate::config::CONFIG.core_type(), state);
+        self.spawn_status_checks(tasks);
+        self.watch_operations(tasks);
+    }
+
+    fn on_leave(&mut self, _tasks: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.visible = false;
+    }
+
+    fn after_sync(&self, tasks: &mut FutureSet<Self>) {
+        self.spawn_status_checks(tasks);
+        self.watch_operations(tasks);
     }
 }
 
 impl TabContent for SrvCtlContent {
-    fn init(&mut self, task_set: &mut FutureSet<Self>, state: &mut Self::State) {
-        self.ops = SrvCtlOp::all();
-        let cfg = &crate::config::CONFIG.cfg_file;
-
-        self.mihomo_service_name = cfg.mihomo.core_service.service_name.clone();
-        if self.mihomo_service_name.is_empty() {
-            self.mihomo_service_name = "clashtui_mihomo".to_owned();
-        }
-        self.mihomo_is_user = cfg.mihomo.core_service.is_user;
-
-        self.singbox_service_name = cfg.singbox.core_service.service_name.clone();
-        if self.singbox_service_name.is_empty() {
-            self.singbox_service_name = "clashtui_singbox".to_owned();
-        }
-        self.singbox_is_user = cfg.singbox.core_service.is_user;
-
-        match crate::config::CONFIG.core_type() {
-            CoreType::Mihomo => {
-                self.service_name = self.mihomo_service_name.clone();
-                self.bin_path = cfg.mihomo.core.bin_path.clone();
-                if self.bin_path.is_empty() {
-                    self.bin_path = "/usr/bin/mihomo".to_owned();
-                }
-                self.is_user = self.mihomo_is_user;
-                self.core_label = "mihomo".to_owned();
-            }
-            CoreType::Singbox => {
-                self.service_name = self.singbox_service_name.clone();
-                self.bin_path = cfg.singbox.core.bin_path.clone();
-                if self.bin_path.is_empty() {
-                    self.bin_path = "/usr/bin/sing-box".to_owned();
-                }
-                self.is_user = self.singbox_is_user;
-                self.core_label = "sing-box".to_owned();
-            }
-        }
-        self.status = "...".to_owned();
-        self.mihomo_status = "...".to_owned();
-        self.singbox_status = "...".to_owned();
-        #[cfg(windows)]
-        {
-            self.proxy_enabled =
-                crate::functions::command::get_system_proxy_state().unwrap_or(false);
-        }
-        if !self.ops.is_empty() {
-            state.select(Some(0));
-        }
-        self.spawn_status_check(task_set, CoreType::Mihomo);
-        self.spawn_status_check(task_set, CoreType::Singbox);
+    fn init(&mut self, _tasks: &mut FutureSet<Self>, _state: &mut Self::State) {
+        self.root = crate::config::config_dir_path();
     }
 
     fn handle_action(
         &mut self,
         action: Action,
-        task_set: &mut FutureSet<Self>,
+        tasks: &mut FutureSet<Self>,
         state: &mut Self::State,
     ) {
-        // ---- main list routing ----
+        if self.busy {
+            return;
+        }
         match action {
             Action::Esc => {}
             Action::MoveUp => {
-                let i = state.selected().unwrap_or(0);
-                state.select(Some(i.saturating_sub(1)));
+                if !self.ops.is_empty() {
+                    state.select(Some(state.selected().unwrap_or(0).saturating_sub(1)));
+                }
             }
             Action::MoveDown => {
-                let i = state.selected().unwrap_or(0);
-                if i + 1 < self.ops.len() {
-                    state.select(Some(i + 1));
+                let index = state.selected().unwrap_or(0);
+                if index + 1 < self.ops.len() {
+                    state.select(Some(index + 1));
                 }
             }
             Action::Execute => {
-                let Some(idx) = state.selected() else { return };
-                let Some(op) = self.ops.get(idx) else { return };
-                let op = *op;
-
-                let _bin_path = self.bin_path.clone();
-
+                let Some(op) = state
+                    .selected()
+                    .and_then(|index| self.ops.get(index))
+                    .cloned()
+                else {
+                    return;
+                };
+                if let Operation::Unavailable { reason, .. } = &op {
+                    Confirm::err(reason);
+                    return;
+                }
+                let Some(scripts) = self.scripts.clone() else {
+                    return;
+                };
+                let root = self.root.clone();
+                let core = self.core;
+                self.busy = true;
+                let switching = op == Operation::SwitchCore;
                 async move {
-                    macro_rules! handle {
-                        ($result:expr, $new_status:expr) => {
-                            match $result {
-                                Ok(out) => {
-                                    if out.starts_with("Error") {
-                                        Confirm::err(out);
-                                        do_nothing()
-                                    } else {
-                                        Confirm::title("OK".to_owned())
-                                            .with_prompt(out)
-                                            .build_and_send();
-                                        wrapper(move |c: &mut SrvCtlContent| {
-                                            let s = $new_status.to_owned();
-                                            c.status = s.clone();
-                                            match crate::config::CONFIG.core_type() {
-                                                CoreType::Mihomo => c.mihomo_status = s,
-                                                CoreType::Singbox => c.singbox_status = s,
-                                            }
-                                        })
-                                    }
-                                }
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        };
-                        ($result:expr) => {
-                            match $result {
-                                Ok(out) => {
-                                    if out.starts_with("Error") {
-                                        Confirm::err(out);
-                                    } else {
-                                        Confirm::title("OK".to_owned())
-                                            .with_prompt(out)
-                                            .build_and_send();
-                                    }
-                                    do_nothing()
-                                }
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        };
-                    }
-
-                    match op {
-                        SrvCtlOp::Stop => {
-                            handle!(crate::functions::command::stop_service(), "inactive")
+                    let result = tokio::task::spawn_blocking(move || match op {
+                        Operation::Script { id, .. } => {
+                            service::execute(&scripts, &root, core, &id)
                         }
-                        SrvCtlOp::Restart => {
-                            handle!(crate::functions::command::restart_service(), "active")
-                        }
-                        SrvCtlOp::StopAll => {
-                            handle!(crate::functions::command::stop_all_services(), "inactive")
-                        }
-                        SrvCtlOp::SwitchCore => {
-                            let old_type = crate::config::CONFIG.core_type();
-                            let new_type = match old_type {
+                        Operation::StopAll => service::stop_all(&scripts, &root),
+                        Operation::Unavailable { .. } => unreachable!("disabled action"),
+                        Operation::SwitchCore => service::switch_core(
+                            &scripts,
+                            &root,
+                            match core {
                                 CoreType::Mihomo => CoreType::Singbox,
                                 CoreType::Singbox => CoreType::Mihomo,
-                            };
-                            let new_label = match new_type {
-                                CoreType::Mihomo => "mihomo",
-                                CoreType::Singbox => "sing-box",
-                            };
-
-                            // stop all core services first
-                            let stop_result = crate::functions::command::stop_all_services();
-
-                            let res = {
-                                crate::config::CONFIG.data.lock().unwrap().core_type = new_type;
-                                crate::config::CONFIG.save()
-                            };
-                            match res {
-                                Ok(()) => {
-                                    // start the target core
-                                    let start_result =
-                                        crate::functions::command::start_core_service(new_type);
-
-                                    let status_msg = format!(
-                                        "Core switched to {new_label}\n\n\
-                                         Stop all services: {stop}\n\
-                                         Start {new_label}: {start}",
-                                        stop = stop_result
-                                            .as_ref()
-                                            .map(|s| s.as_str())
-                                            .unwrap_or("?")
-                                            .trim(),
-                                        start = start_result
-                                            .as_ref()
-                                            .map(|s| s.as_str())
-                                            .unwrap_or("?")
-                                            .trim(),
-                                    );
-
-                                    let update_label = wrapper(move |c: &mut SrvCtlContent| {
-                                        c.core_label = new_label.to_owned();
-                                        if start_result.is_ok() {
-                                            match new_type {
-                                                CoreType::Mihomo => {
-                                                    c.mihomo_status = "active".to_owned();
-                                                    c.singbox_status = "inactive".to_owned();
-                                                }
-                                                CoreType::Singbox => {
-                                                    c.mihomo_status = "inactive".to_owned();
-                                                    c.singbox_status = "active".to_owned();
-                                                }
-                                            }
-                                        }
-                                        c.status = match new_type {
-                                            CoreType::Mihomo => c.mihomo_status.clone(),
-                                            CoreType::Singbox => c.singbox_status.clone(),
-                                        };
-                                    });
-
-                                    let _ = Confirm::dismiss_any("Core Switched".to_owned())
-                                        .with_prompt(status_msg)
-                                        .build_and_send()
-                                        .await;
-
-                                    crate::tui::app::QUIT
-                                        .store(true, std::sync::atomic::Ordering::Relaxed);
-                                    update_label
-                                }
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        }
-                        #[cfg(windows)]
-                        SrvCtlOp::Install => {
-                            handle!(
-                                crate::functions::command::install_core_service(
-                                    crate::config::CONFIG.core_type(),
-                                ),
-                                "installed"
-                            )
-                        }
-                        #[cfg(windows)]
-                        SrvCtlOp::Uninstall => {
-                            handle!(
-                                crate::functions::command::uninstall_core_service(
-                                    crate::config::CONFIG.core_type(),
-                                ),
-                                "uninstalled"
-                            )
-                        }
-                        #[cfg(windows)]
-                        SrvCtlOp::ToggleSysProxy => {
-                            let result = async {
-                                let enabled = crate::functions::command::get_system_proxy_state()?;
-                                if enabled {
-                                    crate::functions::command::disable_system_proxy()?;
-                                    Ok::<bool, anyhow::Error>(false)
-                                } else {
-                                    let port = crate::functions::command::get_mixed_port()?;
-                                    crate::functions::command::enable_system_proxy(port)?;
-                                    Ok::<bool, anyhow::Error>(true)
-                                }
-                            };
-                            match result.await {
-                                Ok(new_state) => {
-                                    let label = if new_state { "enabled" } else { "disabled" };
-                                    Confirm::title("OK".to_owned())
-                                        .with_prompt(format!("System proxy {label}"))
-                                        .build_and_send();
-                                    wrapper(move |c: &mut SrvCtlContent| {
-                                        c.proxy_enabled = new_state;
-                                    })
-                                }
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        }
+                            },
+                        ),
+                    })
+                    .await
+                    .unwrap_or_else(|error| Err(error.into()));
+                    if let Err(error) = &result {
+                        Confirm::err(format!("{error:#}"));
                     }
+                    if switching && result.is_ok() {
+                        crate::tui::app::QUIT.store(true, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    wrapper(move |content: &mut Self| {
+                        content.busy = false;
+                        content.revision = service::revision();
+                        content.generation = content.generation.wrapping_add(1);
+                        content.statuses = [None, None];
+                        for refresh in &content.refresh {
+                            refresh.set(true);
+                        }
+                    })
                 }
-                .spawn_at(task_set);
+                .spawn_at(tasks);
             }
         }
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State) {
-        let user_tag = if self.is_user { " (user)" } else { "" };
+    fn render(&self, frame: &mut Frame, area: Rect, state: &mut Self::State) {
+        use ratatui::{
+            layout::{Constraint, Layout},
+            widgets::Paragraph,
+        };
         let theme = Theme::get();
         let section = theme.section("srvctl");
-
-        let current_core_label = format!(
-            "► {}: {}",
-            match crate::config::CONFIG.core_type() {
-                CoreType::Mihomo => "mihomo",
-                CoreType::Singbox => "sing-box",
-            },
-            match crate::config::CONFIG.core_type() {
-                CoreType::Mihomo => &self.mihomo_status,
-                CoreType::Singbox => &self.singbox_status,
-            }
-        );
-        let other_core_label = format!(
-            "  {}: {}",
-            match crate::config::CONFIG.core_type() {
-                CoreType::Mihomo => "sing-box",
-                CoreType::Singbox => "mihomo",
-            },
-            match crate::config::CONFIG.core_type() {
-                CoreType::Mihomo => &self.singbox_status,
-                CoreType::Singbox => &self.mihomo_status,
-            }
-        );
-
-        #[cfg(windows)]
-        let proxy_label = format!("  Proxy: {}", if self.proxy_enabled { "ON" } else { "OFF" });
-
-        let title_line = format!(
-            "{} — {} (core: {}){}",
-            Self::TITLE,
-            self.service_name,
-            self.core_label,
-            user_tag
-        );
-
+        let status = CORES
+            .map(|core| {
+                let label = self.statuses[core_index(core)]
+                    .as_ref()
+                    .map_or("...", |report| report.state.as_str());
+                format!(
+                    "{}{}: {label}",
+                    if core == self.core { "► " } else { "" },
+                    core
+                )
+            })
+            .join("   ");
         let block = Block::bordered()
             .border_style(section.border)
-            .title(title_line)
-            .title_bottom({
-                #[cfg_attr(not(windows), allow(unused_mut))]
-                let mut spans = vec![
-                    ratatui::text::Span::styled(
-                        format!(" {} ", current_core_label),
-                        section.border,
-                    ),
-                    ratatui::text::Span::styled(
-                        format!(" {} ", other_core_label),
-                        section.border.fg(Color::Rgb(100, 100, 100)),
-                    ),
-                ];
-                #[cfg(windows)]
-                spans.push(ratatui::text::Span::styled(
-                    format!(" {} ", proxy_label),
-                    section.border.fg(Color::Rgb(100, 100, 100)),
-                ));
-                ratatui::text::Line::from(spans).right_aligned()
-            });
-
-        let items: Vec<ListItem> = self
+            .title(format!(
+                "{} — {}{}",
+                Self::TITLE,
+                self.core,
+                if self.busy { " (running)" } else { "" }
+            ))
+            .title_bottom(status);
+        if let Some(error) = &self.error {
+            frame.render_widget(
+                Paragraph::new(error.as_str())
+                    .wrap(ratatui::widgets::Wrap { trim: false })
+                    .block(block),
+                area,
+            );
+            return;
+        }
+        if self.ops.is_empty() {
+            frame.render_widget(
+                Paragraph::new("未配置服务动作 / No service actions configured").block(block),
+                area,
+            );
+            return;
+        }
+        let diagnostics = CORES
+            .iter()
+            .filter_map(|core| {
+                self.statuses[core_index(*core)]
+                    .as_ref()
+                    .and_then(|report| {
+                        report
+                            .diagnostic
+                            .as_ref()
+                            .map(|text| format!("{core}: {text}"))
+                    })
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+        let [list_area, info_area] = Layout::vertical([
+            Constraint::Min(0),
+            Constraint::Length(if diagnostics.is_empty() { 0 } else { 3 }),
+        ])
+        .areas(inner);
+        let items: Vec<_> = self
             .ops
             .iter()
-            .map(|op| ListItem::new(format!("  {}", op.as_str())))
+            .map(|op| {
+                let item = ListItem::new(format!("  {}", op.label()));
+                if matches!(op, Operation::Unavailable { .. }) {
+                    item.fg(Color::DarkGray)
+                } else {
+                    item
+                }
+            })
             .collect();
+        frame.render_stateful_widget(
+            List::new(items).highlight_style(section.highlight),
+            list_area,
+            state,
+        );
+        frame.render_widget(
+            Paragraph::new(diagnostics).wrap(ratatui::widgets::Wrap { trim: false }),
+            info_area,
+        );
+    }
+}
 
-        let highlight_style = section.highlight;
-        let list = List::new(items)
-            .block(block)
-            .highlight_style(highlight_style);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-        f.render_stateful_widget(list, area, state);
+    fn scripts(value: serde_json::Value) -> ScriptConfig {
+        let config: ScriptConfig = serde_json::from_value(value).unwrap();
+        config.validate().unwrap();
+        config
+    }
+
+    #[test]
+    fn menu_preserves_order_and_filters_core_commands() {
+        let config = scripts(serde_json::json!({"root":".","actions":[
+            {"id":"custom","label":"First","cores":["singbox"],"cmd":{"program":"tool","args":[]}},
+            {"id":"start_core","label":"Second","cmd":{"program":"tool","args":[]}},
+            {"id":"custom","label":"Third","cores":["mihomo"],"cmd":{"program":"tool","args":[]}}
+        ]}));
+        let labels: Vec<_> = menu(&config, CoreType::Mihomo)
+            .iter()
+            .map(|op| op.label().to_owned())
+            .collect();
+        assert_eq!(&labels[..2], ["Second", "Third"]);
+        assert!(labels[2].contains("unsupported: mihomo/stop_core, sing-box/stop_core"));
+        assert!(labels[3].contains("unsupported:"));
+        let empty = scripts(serde_json::json!({"root":".","actions":[]}));
+        assert!(menu(&empty, CoreType::Mihomo).is_empty());
+    }
+
+    #[test]
+    fn reload_keeps_identity_and_invalid_config_disables_old_commands() {
+        let root = std::env::temp_dir().join(format!(
+            "clashtui-reload-{}-{}",
+            std::process::id(),
+            fastrand::u64(..)
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("scripts.json");
+        let action =
+            |id: &str| serde_json::json!({"id":id,"label":id,"cmd":{"program":"tool","args":[]}});
+        let write = |actions| {
+            std::fs::write(
+                &path,
+                serde_json::json!({"root":".","actions":actions}).to_string(),
+            )
+            .unwrap()
+        };
+        write(vec![action("first"), action("second")]);
+        let mut content = SrvCtlContent {
+            root: root.clone(),
+            ..Default::default()
+        };
+        let mut state = ListState::default();
+        content.reload(CoreType::Mihomo, &mut state);
+        state.select(Some(1));
+        write(vec![action("second"), action("first")]);
+        content.reload(CoreType::Mihomo, &mut state);
+        assert_eq!(state.selected(), Some(0));
+        std::fs::write(&path, "bad json").unwrap();
+        content.reload(CoreType::Mihomo, &mut state);
+        assert!(content.scripts.is_none() && content.ops.is_empty() && content.error.is_some());
+        assert_eq!(state.selected(), None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn global_operation_invalidates_status_and_busy_query_gets_retried() {
+        let mut content = SrvCtlContent::default();
+        content.statuses[0] = Some(StatusReport {
+            state: ServiceState::Checking,
+            diagnostic: None,
+        });
+        content.refresh_after_operation(0);
+        assert!(content.refresh[0].get());
+        assert!(!content.refresh[1].get());
+        content.statuses[0] = Some(StatusReport {
+            state: ServiceState::Active,
+            diagnostic: None,
+        });
+        content.refresh[0].set(false);
+        let generation = content.generation;
+        content.refresh_after_operation(1);
+        assert!(content.statuses.iter().all(Option::is_none));
+        assert!(content.refresh.iter().all(Cell::get));
+        assert_ne!(content.generation, generation);
     }
 }

@@ -5,6 +5,8 @@ on:
     branches: [main, dev]
     paths:
       - "src/**"
+      - "contrib/scripts/coresrvctrl/**"
+      - "tests/coresrvctrl/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "build.rs"
@@ -14,6 +16,8 @@ on:
     branches: [main, dev]
     paths:
       - "src/**"
+      - "contrib/scripts/coresrvctrl/**"
+      - "tests/coresrvctrl/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "build.rs"

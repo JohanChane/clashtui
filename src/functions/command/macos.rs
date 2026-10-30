@@ -76,24 +76,6 @@ pub fn get_dir_group_name(dir: &Path) -> Option<String> {
         .map(|g| g.name)
 }
 
-pub fn check_file_permissions(dir: &Path) -> bool {
-    let metadata = match std::fs::metadata(dir) {
-        Ok(m) => m,
-        Err(_) => return true,
-    };
-
-    if metadata.permissions().mode() & 0o2000 == 0 {
-        return false;
-    }
-
-    let Some(group_name) = get_dir_group_name(dir) else {
-        return false;
-    };
-
-    find_files_not_in_group(dir, &group_name).is_empty()
-        && find_files_not_group_writable(dir).is_empty()
-}
-
 pub fn repair_file_permissions(dir: &Path, group_name: &str) -> Result<String> {
     let mut commands: Vec<String> = Vec::new();
     let dir_str = dir.display().to_string();
@@ -113,14 +95,7 @@ pub fn repair_file_permissions(dir: &Path, group_name: &str) -> Result<String> {
     }
 
     let script = commands.join(" && ");
-    crate::tui::hold(true)?;
-    let opt = std::process::Command::new("sudo")
-        .arg("sh")
-        .arg("-c")
-        .arg(&script)
-        .output()?;
-    crate::tui::hold(false)?;
-    Ok(stringify_output(opt))
+    exec_sudo("sh", vec!["-c", &script])
 }
 
 pub(super) fn stringify_output(output: std::process::Output) -> String {

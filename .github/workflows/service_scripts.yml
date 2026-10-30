@@ -1,0 +1,59 @@
+name: Service Scripts
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'contrib/scripts/coresrvctrl/**'
+      - 'tests/coresrvctrl/**'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/service_scripts.yml'
+  pull_request:
+    paths:
+      - 'contrib/scripts/coresrvctrl/**'
+      - 'tests/coresrvctrl/**'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/service_scripts.yml'
+  workflow_dispatch:
+
+jobs:
+  unix:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: POSIX syntax, backend contracts and resources
+        run: python3 tests/coresrvctrl/test_backends.py
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Windows PowerShell 5.1 contracts
+        shell: powershell
+        run: ./tests/coresrvctrl/windows.tests.ps1
+      - name: Resource contracts
+        run: python tests/coresrvctrl/test_backends.py
+      - name: Native Windows protocol and operation tests
+        run: |
+          cargo test --locked --all-features config::scripts::
+          cargo test --locked --all-features functions::service::
+          cargo test --locked --all-features functions::process::
+
+  terminal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          path: ~/.cargo
+          key: ci-service-terminal-${{ hashFiles('Cargo.lock') }}
+      - run: cargo build --locked --all-features
+      - name: PTY terminal handoff with fake commands
+        run: python3 tests/coresrvctrl/test_terminal.py target/debug/clashtui

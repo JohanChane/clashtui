@@ -1,6 +1,7 @@
 #[macro_use]
 mod key;
 mod app;
+mod input;
 mod popmsg;
 mod signals;
 mod tab;
@@ -12,7 +13,9 @@ mod widget;
 pub use app::App;
 use key::Key;
 pub use key::init as keymap_init;
-pub use term::hold;
+#[cfg(windows)]
+pub(crate) use term::is_external;
+pub use term::with_terminal;
 pub(crate) use theme::Theme;
 
 trait TuiWidget {
@@ -31,4 +34,8 @@ pub fn init() -> anyhow::Result<()> {
 pub fn restore() -> anyhow::Result<()> {
     term::teardown();
     Ok(())
+}
+
+pub(crate) fn request_quit() {
+    app::QUIT.store(true, std::sync::atomic::Ordering::SeqCst);
 }

@@ -31,12 +31,10 @@ pub struct CoreConfig {
 #[serde(default)]
 pub struct CoreServiceConfig {
     pub service_name: String,
-    /// Controls --user flag (systemd user service) and whether sudo prefix is needed.
-    /// When false, `sudo -n true` is used to detect NOPASSWD and skip password prompt.
+    /// Legacy scope, used only when scripts.json is first generated.
     pub is_user: bool,
-    /// Init system controller override. Supported values: `"systemd"`, `"openrc"`.
-    /// When absent or unrecognized, the compile-time platform default is used.
-    /// Non-Linux platforms ignore this field.
+    /// Legacy backend, used only when scripts.json is first generated.
+    /// Unknown backends fail migration; existing scripts.json takes precedence.
     pub service_controller: Option<String>,
 }
 
@@ -144,66 +142,6 @@ impl Default for ConfigFile {
 pub struct Extra {
     pub edit_cmd: Option<String>,
     pub open_dir_cmd: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-pub enum ServiceController {
-    Systemd,
-    Nssm,
-    OpenRc,
-    Launchd,
-}
-impl Default for ServiceController {
-    fn default() -> Self {
-        if cfg!(windows) {
-            ServiceController::Nssm
-        } else if cfg!(target_os = "macos") {
-            ServiceController::Launchd
-        } else {
-            ServiceController::Systemd
-        }
-    }
-}
-impl ServiceController {
-    pub fn from_config(csc: &CoreServiceConfig) -> Self {
-        match csc.service_controller.as_deref() {
-            Some("systemd") => ServiceController::Systemd,
-            Some("openrc") if cfg!(not(windows)) && cfg!(not(target_os = "macos")) => {
-                ServiceController::OpenRc
-            }
-            Some(v) => {
-                log::warn!("Unknown service_controller '{v}', falling back to platform default");
-                Self::default()
-            }
-            None => Self::default(),
-        }
-    }
-    pub fn args<'a>(
-        &self,
-        work_type: &'a str,
-        service_name: &'a str,
-        is_user: bool,
-    ) -> Vec<&'a str> {
-        match self {
-            ServiceController::Systemd if is_user => vec!["--user", work_type, service_name],
-            ServiceController::Systemd => vec![work_type, service_name],
-            ServiceController::OpenRc if is_user => {
-                vec!["--user", service_name, work_type]
-            }
-            ServiceController::OpenRc => vec![service_name, work_type],
-            ServiceController::Nssm => vec![work_type, service_name],
-            // Launchd args are constructed inline in svc_operation
-            ServiceController::Launchd => vec![],
-        }
-    }
-    pub fn bin_name(&self) -> &'static str {
-        match self {
-            ServiceController::Systemd => "systemctl",
-            ServiceController::Nssm => "nssm",
-            ServiceController::OpenRc => "rc-service",
-            ServiceController::Launchd => "launchctl",
-        }
-    }
 }
 
 #[derive(Debug, serde:: Deserialize)]
@@ -379,60 +317,6 @@ open_dir_cmd: ""
     }
 
     #[test]
-    fn service_controller_bin_name() {
-        assert_eq!(ServiceController::Launchd.bin_name(), "launchctl");
-        assert_eq!(ServiceController::Systemd.bin_name(), "systemctl");
-        assert_eq!(ServiceController::Nssm.bin_name(), "nssm");
-        assert_eq!(ServiceController::OpenRc.bin_name(), "rc-service");
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn service_controller_default_macos_is_launchd() {
-        assert_eq!(ServiceController::default(), ServiceController::Launchd);
-    }
-
-    #[test]
-    fn service_controller_args_nssm() {
-        let args = ServiceController::Nssm.args("start", "svc", false);
-        assert_eq!(args, vec!["start", "svc"]);
-    }
-
-    #[test]
-    fn service_controller_args_systemd_user() {
-        let args = ServiceController::Systemd.args("stop", "svc", true);
-        assert_eq!(args, vec!["--user", "stop", "svc"]);
-    }
-
-    #[test]
-    fn service_controller_args_systemd_system() {
-        let args = ServiceController::Systemd.args("stop", "svc", false);
-        assert_eq!(args, vec!["stop", "svc"]);
-    }
-
-    #[test]
-    fn service_controller_args_openrc_user() {
-        let args = ServiceController::OpenRc.args("restart", "svc", true);
-        assert_eq!(args, vec!["--user", "svc", "restart"]);
-    }
-
-    #[test]
-    fn service_controller_args_openrc_system() {
-        let args = ServiceController::OpenRc.args("restart", "svc", false);
-        assert_eq!(args, vec!["svc", "restart"]);
-    }
-
-    #[test]
-    fn service_controller_args_launchd_is_empty() {
-        let args = ServiceController::Launchd.args("start", "svc", false);
-        assert!(args.is_empty());
-        let args = ServiceController::Launchd.args("restart", "svc", true);
-        assert!(args.is_empty());
-    }
-
-    // --- Deserialization tests ---
-
-    #[test]
     fn core_service_config_deser_openrc() {
         let yaml = "service_name: svc\nis_user: false\nservice_controller: openrc";
         let csc: CoreServiceConfig = serde_yml::from_str(yaml).unwrap();
@@ -462,95 +346,6 @@ open_dir_cmd: ""
         assert_eq!(deser.service_name, csc.service_name);
         assert_eq!(deser.is_user, csc.is_user);
         assert_eq!(deser.service_controller.as_deref(), Some("openrc"));
-    }
-
-    // --- from_config tests ---
-
-    #[test]
-    fn service_controller_from_config_none_is_default() {
-        let csc = CoreServiceConfig {
-            service_controller: None,
-            ..Default::default()
-        };
-        assert_eq!(
-            ServiceController::from_config(&csc),
-            ServiceController::default()
-        );
-    }
-
-    #[test]
-    fn service_controller_from_config_systemd() {
-        let csc = CoreServiceConfig {
-            service_controller: Some("systemd".into()),
-            ..Default::default()
-        };
-        assert_eq!(
-            ServiceController::from_config(&csc),
-            ServiceController::Systemd
-        );
-    }
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    #[test]
-    fn service_controller_from_config_openrc_linux() {
-        let csc = CoreServiceConfig {
-            service_controller: Some("openrc".into()),
-            ..Default::default()
-        };
-        assert_eq!(
-            ServiceController::from_config(&csc),
-            ServiceController::OpenRc
-        );
-    }
-
-    #[cfg(any(windows, target_os = "macos"))]
-    #[test]
-    fn service_controller_from_config_openrc_non_linux() {
-        let csc = CoreServiceConfig {
-            service_controller: Some("openrc".into()),
-            ..Default::default()
-        };
-        assert_eq!(
-            ServiceController::from_config(&csc),
-            ServiceController::default()
-        );
-    }
-
-    #[test]
-    fn service_controller_from_config_unknown_fallback() {
-        let csc = CoreServiceConfig {
-            service_controller: Some("runit".into()),
-            ..Default::default()
-        };
-        assert_eq!(
-            ServiceController::from_config(&csc),
-            ServiceController::default()
-        );
-    }
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    #[test]
-    fn service_controller_from_config_openrc_generates_correct_commands() {
-        let csc = CoreServiceConfig {
-            service_name: "clashtui_test".into(),
-            is_user: false,
-            service_controller: Some("openrc".into()),
-        };
-        let ctrl = ServiceController::from_config(&csc);
-        assert_eq!(ctrl, ServiceController::OpenRc);
-        assert_eq!(ctrl.bin_name(), "rc-service");
-        assert_eq!(
-            ctrl.args("start", "clashtui_test", false),
-            vec!["clashtui_test", "start"]
-        );
-        assert_eq!(
-            ctrl.args("stop", "clashtui_test", false),
-            vec!["clashtui_test", "stop"]
-        );
-        assert_eq!(
-            ctrl.args("restart", "clashtui_test", true),
-            vec!["--user", "clashtui_test", "restart"]
-        );
     }
 
     fn fixture_path(name: &str) -> String {

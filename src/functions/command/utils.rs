@@ -1,47 +1,19 @@
-use super::platform::stringify_output;
 use anyhow::Result;
 use std::process::{Command, Stdio};
 
-pub fn exec(pgm: &str, args: Vec<&str>) -> Result<String> {
-    log::debug!("IPC: {} {:?}", pgm, args);
-    let output = Command::new(pgm).args(args).output()?;
-    Ok(stringify_output(output))
-}
-
 pub fn exec_sudo(pgm: &str, args: Vec<&str>) -> Result<String> {
-    use crate::tui;
-    log::debug!("IPC: sudo -S {:?}", args);
-    tui::hold(true)?;
-    let mut child = Command::new("sudo")
-        .arg(pgm)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    let mut childstderr = child.stderr.take().unwrap();
-    let mut stderr = std::io::stderr();
-    let mut output_copy = Vec::new();
-    let mut buffer = [0; 1024];
-
-    // Read in a loop until the pipe closes
-    loop {
-        use std::io::{Read, Write};
-        let n = childstderr.read(&mut buffer)?;
-        if n == 0 {
-            break; // EOF
-        }
-        // Save to memory (keep a copy)
-        output_copy.extend_from_slice(&buffer[..n]);
-        // Write to terminal
-        stderr.write_all(&buffer[..n])?;
-        stderr.flush()?;
-    }
-    eprintln!();
-    let mut output = child.wait_with_output()?;
-    output.stderr = output_copy;
-
-    tui::hold(false)?;
-    Ok(stringify_output(output))
+    let mut argv = vec!["--".into(), pgm.into()];
+    argv.extend(args.into_iter().map(Into::into));
+    let command = crate::config::scripts::ResolvedCommand {
+        program: "sudo".into(),
+        args: argv,
+        cwd: std::env::current_dir()?,
+    };
+    crate::tui::with_terminal(|| {
+        let outcome = crate::functions::process::run_foreground(&command)?;
+        anyhow::ensure!(outcome.status.success(), "sudo failed: {}", outcome.status);
+        Ok("OK".into())
+    })
 }
 
 // #[cfg(unix)]

@@ -45,9 +45,10 @@ impl App {
     }
     #[tokio::main]
     pub async fn serve() -> anyhow::Result<()> {
-        signals::Signals::start()?;
+        let _signals = signals::Signals::start()?;
+        let mut coordinator = term::Coordinator::register()?;
         let mut app = Self::new();
-        let mut events = crossterm::event::EventStream::new();
+        let mut events = input::InputReader::start();
         let mut invt = tokio::time::interval(TICK_RATE);
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
@@ -57,17 +58,21 @@ impl App {
             app.sync();
 
             let ev = {
-                use futures_lite::StreamExt as _;
                 // this tick here ensures that fps is stable
                 let mut tick = Box::pin(invt.tick());
                 let ev = tokio::select! {
-                    Some(ev) = events.next() => ev?,
+                    ev = events.next() => match ev {
+                        Some(ev) => ev?,
+                        None => anyhow::bail!("Terminal input reader stopped"),
+                    },
                     _ = &mut tick => continue,
+                    Some(request) = coordinator.next() => {
+                        coordinator.handoff(request, &mut events).await?;
+                        terminal.clear()?;
+                        continue;
+                    },
                     // if we switch between screens
                     _ = FULL_RENDER.notified() => {
-                        // first we hold tui for output
-                        FULL_RENDER.notified().await;
-                        // then we tell ratatui to re-render everything
                         terminal.clear()?;
                         continue
                     },

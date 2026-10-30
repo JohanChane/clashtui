@@ -43,9 +43,6 @@ pub(super) fn load_home_dir() -> Result<std::path::PathBuf> {
 
 #[cfg(target_family = "unix")]
 pub fn check_startup_perms() {
-    if crate::config::CONFIG.cfg_file.mihomo.core_service.is_user {
-        return;
-    }
     use std::io::Write;
 
     let dirs_to_check = [
@@ -61,7 +58,7 @@ pub fn check_startup_perms() {
         if !dir.exists() {
             continue;
         }
-        if crate::functions::command::check_file_permissions(dir) {
+        if has_write_access(dir) {
             continue;
         }
 
@@ -88,6 +85,41 @@ pub fn check_startup_perms() {
             let _ = std::io::stdout().flush();
             let _ = std::io::stdin().read(&mut [0u8]);
         }
+    }
+}
+
+/// Check the effective user's real access, independent of the service scope.
+#[cfg(target_family = "unix")]
+fn has_write_access(path: &std::path::Path) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+    let Ok(metadata) = std::fs::symlink_metadata(path) else {
+        return false;
+    };
+    let symlink = metadata.is_symlink();
+    let metadata = if symlink {
+        let Ok(target) = std::fs::metadata(path) else {
+            return false;
+        };
+        target
+    } else {
+        metadata
+    };
+    let Ok(name) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
+        return false;
+    };
+    let mode = libc::R_OK | libc::W_OK | if metadata.is_dir() { libc::X_OK } else { 0 };
+    if unsafe { libc::faccessat(libc::AT_FDCWD, name.as_ptr(), mode, libc::AT_EACCESS) } != 0 {
+        return false;
+    }
+    if metadata.is_dir() && !symlink {
+        let Ok(entries) = std::fs::read_dir(path) else {
+            return false;
+        };
+        entries
+            .into_iter()
+            .all(|entry| entry.is_ok_and(|entry| has_write_access(&entry.path())))
+    } else {
+        true
     }
 }
 #[cfg(not(target_family = "unix"))]

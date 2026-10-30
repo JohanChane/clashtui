@@ -353,6 +353,8 @@ Override rules:
 
 In the CoreSrvCtl tab (press `7`), you can switch between Mihomo and sing-box cores. After switching, restart Clashtui.
 
+Service actions now come from `CONFIG_ROOT/scripts.json`, with optional `cores` scopes, custom menu entries and autostart actions. See [service scripts](service_scripts_en.md). A switch saves the selection only after the target starts successfully; failures report completed steps.
+
 Clashtui automatically detects whether the currently running core type matches the configured one. If there's a mismatch, a popup will warn you and prevent displaying incorrect data.
 
 ### File Permissions (Linux)

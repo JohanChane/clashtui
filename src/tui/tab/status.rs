@@ -94,19 +94,23 @@ impl BasicTabContent for Status {
         self.paused = false;
 
         let was_unknown = self.detected_core_type.is_none();
-        if was_unknown {
-            match crate::functions::command::is_core_service_running() {
-                Some(false) => {
-                    self.error = Some("Core service is not running".to_owned());
-                    return;
-                }
-                _ => {
-                    self.error = Some("Detecting...".to_owned());
+        self.error = Some("Detecting...".to_owned());
+
+        async move {
+            if was_unknown {
+                let report = tokio::task::spawn_blocking(crate::functions::service::current_status)
+                    .await
+                    .unwrap_or_else(crate::functions::service::StatusReport::unknown);
+                if matches!(
+                    report.state,
+                    crate::functions::service::ServiceState::Inactive
+                        | crate::functions::service::ServiceState::Missing
+                ) {
+                    return wrapper(move |content: &mut Self| {
+                        content.error = Some(format!("Core service: {}", report.state.as_str()));
+                    });
                 }
             }
-        }
-
-        async {
             let detected = tri!(
                 tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
                     .await

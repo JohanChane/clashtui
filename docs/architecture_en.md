@@ -2,6 +2,8 @@
 
 This document describes the code architecture of Clashtui for developers to understand the project structure.
 
+Service control follows the [script protocol](service_scripts_en.md). Platform service commands live in `contrib/scripts/coresrvctrl/`; Rust handles generic configuration, execution, terminal ownership and process management.
+
 
 ## Tech Stack
 
@@ -25,12 +27,15 @@ src/
 │       └── utils.rs     # Version info, shell completion generation
 ├── config.rs            # Config module entry, re-exports from config/
 │   └── config/
-│       ├── core.rs      # CoreType enum, ServiceController
+│       ├── core.rs      # CoreType enum and core configuration
+│       ├── scripts.rs   # scripts.json protocol; scripts/assets.rs embeds and migrates resources
 │       ├── database.rs  # ProfileManager (Profile persistence structures)
 │       └── util.rs      # Config dir resolution, load_save! macro, file path constants
 ├── functions.rs         # Business logic entry, re-exports from functions/
 │   └── functions/
 │       ├── command.rs   # System operations (file permissions, service start/stop, directory opening)
+│       ├── service.rs   # Target command plans, status protocol, composed operations
+│       ├── process.rs   # Generic children, output limits, process groups/Jobs
 │       ├── file.rs      # File operations (Profile import/update, Template processing)
 │       └── restful.rs   # REST API calls (config/mode/proxies/connections)
 ├── tui.rs               # TUI module entry, re-exports from tui/
@@ -47,7 +52,8 @@ src/
 │       │   ├── matcher.rs   # Pending-chord state owned by App
 │       │   └── notation.rs  # Key notation parsing and formatting
 │       ├── signals.rs   # OS signal handling
-│       ├── term.rs      # Terminal raw mode enter/exit/suspend
+│       ├── input.rs     # Single reader with acknowledged pause
+│       ├── term.rs      # Exclusive terminal lease, restoration and suspension
 │       ├── theme.rs     # Theme loading
 │       ├── utils.rs     # Utility functions
 │       ├── popmsg.rs    # Popup definitions (Confirm, Input, etc.)
