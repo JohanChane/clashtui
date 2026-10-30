@@ -120,66 +120,122 @@ function Wait-CoreServiceState([string]$Name, [string]$Expected) {
     throw "Service did not become ${Expected}: $Name"
 }
 
-function Invoke-ServiceOperation {
+function Test-ServiceArguments {
     if ([string]::IsNullOrWhiteSpace($Operation)) { throw 'Operation is required' }
     if ([string]::IsNullOrWhiteSpace($ServiceName) -or $ServiceName -match '[/\\\x00-\x1f]' -or $ServiceName.StartsWith('-')) {
         throw 'Invalid service name'
     }
+}
+
+function Initialize-ServiceContext {
     if ($Elevated) {
         if (-not (Test-Administrator)) { throw 'Administrator privileges were not granted' }
         Join-ManagedJob $ManagedJob
     }
     $null = Get-Command nssm.exe -CommandType Application -ErrorAction Stop
-    $state = Get-CoreServiceState $ServiceName
-    if ($Operation -eq 'status') { [Console]::Out.WriteLine($state); return 0 }
-    if ($Operation -eq 'start' -and $state -eq 'active') { return 0 }
-    if ($Operation -eq 'stop' -and (($state -eq 'missing') -or ((Get-CoreServiceStatus $ServiceName) -eq 'Stopped'))) { return 0 }
-    if ($Operation -eq 'uninstall' -and $state -eq 'missing') { return 0 }
-    if ($Operation -eq 'install' -and $state -ne 'missing') { return 0 }
-    if ($Operation -ne 'install' -and $state -eq 'missing') { throw "Service is not installed: $ServiceName" }
+}
 
-    if (-not (Test-Administrator)) {
-        if ($Elevated) { throw 'Administrator privileges were not granted' }
-        $arguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$PSCommandPath,'-Operation',$Operation,'-ServiceName',$ServiceName,'-Elevated')
-        if ($Operation -eq 'install') {
-            $arguments += @('-CoreType',$CoreType,'-CoreBin',$CoreBin,'-ConfigDir',$ConfigDir,'-ConfigPath',$ConfigPath)
-        }
-        if (-not [string]::IsNullOrEmpty($ManagedJob)) { $arguments += @('-ManagedJob',$ManagedJob) }
-        $line = ($arguments | ForEach-Object { ConvertTo-NativeArgument $_ }) -join ' '
-        # Cancellation throws; only the elevated script's actual exit code succeeds.
-        $child = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $line -Verb RunAs -Wait -PassThru -ErrorAction Stop
-        try { return $child.ExitCode } finally { $child.Dispose() }
+function Test-OperationComplete([string]$State) {
+    switch ($Operation) {
+        'start' { return $State -eq 'active' }
+        'stop' { return ($State -eq 'missing') -or ((Get-CoreServiceStatus $ServiceName) -eq 'Stopped') }
+        'uninstall' { return $State -eq 'missing' }
+        'install' { return $State -ne 'missing' }
+        default { return $false }
+    }
+}
+
+function Invoke-ElevatedOperation {
+    if ($Elevated) { throw 'Administrator privileges were not granted' }
+    $arguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$PSCommandPath,'-Operation',$Operation,'-ServiceName',$ServiceName,'-Elevated')
+    if ($Operation -eq 'install') {
+        $arguments += @('-CoreType',$CoreType,'-CoreBin',$CoreBin,'-ConfigDir',$ConfigDir,'-ConfigPath',$ConfigPath)
+    }
+    if (-not [string]::IsNullOrEmpty($ManagedJob)) { $arguments += @('-ManagedJob',$ManagedJob) }
+    $line = ($arguments | ForEach-Object { ConvertTo-NativeArgument $_ }) -join ' '
+    # Cancellation throws; only the elevated script's actual exit code succeeds.
+    $child = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $line -Verb RunAs -Wait -PassThru -ErrorAction Stop
+    try { return $child.ExitCode } finally { $child.Dispose() }
+}
+
+function Start-CoreService {
+    Invoke-Nssm @('start',$ServiceName)
+    Wait-CoreServiceState $ServiceName 'active'
+}
+
+function Stop-CoreService {
+    Invoke-Nssm @('stop',$ServiceName)
+    Wait-CoreServiceState $ServiceName 'inactive'
+}
+
+function Restart-CoreService {
+    Invoke-Nssm @('restart',$ServiceName)
+    Wait-CoreServiceState $ServiceName 'active'
+}
+
+function Show-CoreServiceStatus {
+    [Console]::Out.WriteLine((Get-CoreServiceState $ServiceName))
+}
+
+function Enable-CoreAutostart {
+    Invoke-Nssm @('set',$ServiceName,'Start','SERVICE_AUTO_START')
+}
+
+function Disable-CoreAutostart {
+    Invoke-Nssm @('set',$ServiceName,'Start','SERVICE_DEMAND_START')
+}
+
+function Install-CoreService {
+    if ([string]::IsNullOrEmpty($CoreType) -or -not [IO.Path]::IsPathRooted($CoreBin) -or -not [IO.Path]::IsPathRooted($ConfigDir)) {
+        throw 'Install requires core type and absolute core/config paths'
+    }
+    if ($CoreType -eq 'mihomo') {
+        $launch = @('-d',$ConfigDir)
+    } else {
+        if (-not [IO.Path]::IsPathRooted($ConfigPath)) { throw 'singbox requires an absolute config path' }
+        $launch = @('-D',$ConfigDir,'-c',$ConfigPath,'run')
+    }
+    # Store one fully quoted command line: NSSM joins separate parameter
+    # values with spaces, which otherwise loses grouping in core paths.
+    $parameters = ($launch | ForEach-Object { ConvertTo-NativeArgument $_ }) -join ' '
+    Invoke-Nssm @('install',$ServiceName,$CoreBin)
+    Invoke-Nssm @('set',$ServiceName,'AppParameters',$parameters)
+    Invoke-Nssm @('set',$ServiceName,'AppDirectory',$ConfigDir)
+}
+
+function Uninstall-CoreService {
+    if ((Get-CoreServiceStatus $ServiceName) -ne 'Stopped') {
+        Stop-CoreService
+    }
+    Invoke-Nssm @('remove',$ServiceName,'confirm')
+}
+
+function Main {
+    Test-ServiceArguments
+    Initialize-ServiceContext
+    if ($Operation -eq 'status') {
+        Show-CoreServiceStatus
+        return 0
     }
 
+    $state = Get-CoreServiceState $ServiceName
+    if (Test-OperationComplete $state) { return 0 }
+    if ($Operation -ne 'install' -and $state -eq 'missing') { throw "Service is not installed: $ServiceName" }
+    if (-not (Test-Administrator)) { return Invoke-ElevatedOperation }
+
     switch ($Operation) {
-        'start' { Invoke-Nssm @('start',$ServiceName); Wait-CoreServiceState $ServiceName 'active' }
-        'stop' { Invoke-Nssm @('stop',$ServiceName); Wait-CoreServiceState $ServiceName 'inactive' }
-        'restart' { Invoke-Nssm @('restart',$ServiceName); Wait-CoreServiceState $ServiceName 'active' }
-        'enable-autostart' { Invoke-Nssm @('set',$ServiceName,'Start','SERVICE_AUTO_START') }
-        'disable-autostart' { Invoke-Nssm @('set',$ServiceName,'Start','SERVICE_DEMAND_START') }
-        'install' {
-            if ([string]::IsNullOrEmpty($CoreType) -or -not [IO.Path]::IsPathRooted($CoreBin) -or -not [IO.Path]::IsPathRooted($ConfigDir)) { throw 'Install requires core type and absolute core/config paths' }
-            if ($CoreType -eq 'mihomo') { $launch = @('-d',$ConfigDir) }
-            else {
-                if (-not [IO.Path]::IsPathRooted($ConfigPath)) { throw 'singbox requires an absolute config path' }
-                $launch = @('-D',$ConfigDir,'-c',$ConfigPath,'run')
-            }
-            # Store one fully quoted command line: NSSM joins separate parameter
-            # values with spaces, which otherwise loses grouping in core paths.
-            $parameters = ($launch | ForEach-Object { ConvertTo-NativeArgument $_ }) -join ' '
-            Invoke-Nssm @('install',$ServiceName,$CoreBin)
-            Invoke-Nssm @('set',$ServiceName,'AppParameters',$parameters)
-            Invoke-Nssm @('set',$ServiceName,'AppDirectory',$ConfigDir)
-        }
-        'uninstall' {
-            if ((Get-CoreServiceStatus $ServiceName) -ne 'Stopped') { Invoke-Nssm @('stop',$ServiceName); Wait-CoreServiceState $ServiceName 'inactive' }
-            Invoke-Nssm @('remove',$ServiceName,'confirm')
-        }
+        'start' { Start-CoreService }
+        'stop' { Stop-CoreService }
+        'restart' { Restart-CoreService }
+        'enable-autostart' { Enable-CoreAutostart }
+        'disable-autostart' { Disable-CoreAutostart }
+        'install' { Install-CoreService }
+        'uninstall' { Uninstall-CoreService }
     }
     return 0
 }
 
 if ($MyInvocation.InvocationName -ne '.') {
-    try { exit (Invoke-ServiceOperation) }
+    try { exit (Main) }
     catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
 }

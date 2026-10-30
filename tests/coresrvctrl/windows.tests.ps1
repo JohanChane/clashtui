@@ -120,24 +120,24 @@ public static class ClashTuiManagedJob {
     $Operation = 'status'; $NativeState = 'Stopped'; $IsAdmin = $false
     $capture = New-Object IO.StringWriter
     $original = [Console]::Out
-    try { [Console]::SetOut($capture); $code = Invoke-ServiceOperation } finally { [Console]::SetOut($original) }
+    try { [Console]::SetOut($capture); $code = Main } finally { [Console]::SetOut($original) }
     Assert-True ($code -eq 0 -and $capture.ToString() -eq "inactive`r`n") 'Status protocol includes extra output'
     Assert-True ($UacCount -eq 0) 'Status requested UAC'
     $QueryFailure = $true
-    Assert-Throws { Invoke-ServiceOperation }
+    Assert-Throws { Main }
     $QueryFailure = $false; $IsAdmin = $true
 
     $Operation = 'start'; $NativeState = 'Running'; $Calls.Clear()
-    Assert-True ((Invoke-ServiceOperation) -eq 0 -and $Calls.Count -eq 0) 'Start restarted a running service'
+    Assert-True ((Main) -eq 0 -and $Calls.Count -eq 0) 'Start restarted a running service'
     $Operation = 'stop'; $NativeState = 'missing'
-    Assert-True ((Invoke-ServiceOperation) -eq 0) 'Stop missing is not idempotent'
+    Assert-True ((Main) -eq 0) 'Stop missing is not idempotent'
     $Operation = 'start'
-    Assert-Throws { Invoke-ServiceOperation }
+    Assert-Throws { Main }
 
     $NativeState = 'Running'; $Calls.Clear()
     foreach ($operationName in 'enable-autostart','enable-autostart','disable-autostart','disable-autostart') {
         $Operation = $operationName
-        Assert-True ((Invoke-ServiceOperation) -eq 0) 'Autostart operation failed'
+        Assert-True ((Main) -eq 0) 'Autostart operation failed'
     }
     Assert-True ($Calls.Count -eq 4) 'Unexpected autostart calls'
     Assert-True ($Calls[0][3] -eq 'SERVICE_AUTO_START' -and $Calls[2][3] -eq 'SERVICE_DEMAND_START') 'Wrong startup types'
@@ -146,7 +146,7 @@ public static class ClashTuiManagedJob {
     $Operation = 'install'; $NativeState = 'missing'; $CoreType = 'singbox'
     $CoreBin = 'C:\path with space\sing-box.exe'; $ConfigDir = 'C:\中文 configs'; $ConfigPath = 'C:\中文 configs\config.json'
     $Calls.Clear()
-    Assert-True ((Invoke-ServiceOperation) -eq 0) 'Install failed'
+    Assert-True ((Main) -eq 0) 'Install failed'
     Assert-True ($Calls[0][2] -eq $CoreBin) 'Core binary changed'
     $parameters = '"-D" "C:\中文 configs" "-c" "C:\中文 configs\config.json" "run"'
     Assert-True ($Calls[1][2] -eq 'AppParameters' -and $Calls[1][3] -ceq $parameters) 'Stored core arguments lost quoting'
@@ -155,20 +155,20 @@ public static class ClashTuiManagedJob {
     $Operation = 'restart'; $IsAdmin = $false; $NativeState = 'Running'; $Calls.Clear()
     $ManagedJob = 'Local\ClashtuiProcess-test'
     $UacExit = 37
-    Assert-True ((Invoke-ServiceOperation) -eq 37 -and $Calls.Count -eq 0) 'Elevated failure did not propagate'
+    Assert-True ((Main) -eq 37 -and $Calls.Count -eq 0) 'Elevated failure did not propagate'
     Assert-True ($UacArguments.Contains('"-ManagedJob" "Local\ClashtuiProcess-test"')) 'RunAs did not forward its managed Job'
     $UacCancelled = $true
-    Assert-Throws { Invoke-ServiceOperation }
+    Assert-Throws { Main }
     Assert-True ($Calls.Count -eq 0) 'Cancelled UAC ran a service operation'
     $Elevated = $true; $IsAdmin = $true
     [ClashTuiManagedJob]::CanOpen = $false
-    Assert-Throws { Invoke-ServiceOperation }
+    Assert-Throws { Main }
     Assert-True ($Calls.Count -eq 0) 'Elevated process ran after its caller Job disappeared'
     [ClashTuiManagedJob]::CanOpen = $true; [ClashTuiManagedJob]::CanAssign = $false
-    Assert-Throws { Invoke-ServiceOperation }
+    Assert-Throws { Main }
     Assert-True ($Calls.Count -eq 0) 'Elevated process ran without Job assignment'
     [ClashTuiManagedJob]::CanAssign = $true
-    Assert-True ((Invoke-ServiceOperation) -eq 0 -and $Calls.Count -eq 1) 'Attached elevated operation did not run'
+    Assert-True ((Main) -eq 0 -and $Calls.Count -eq 1) 'Attached elevated operation did not run'
     $Elevated = $false; $ManagedJob = ''
 
     # Registry/broadcast mocks keep these tests independent of the user's proxy.
