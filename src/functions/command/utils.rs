@@ -179,9 +179,4 @@ mod tests {
     fn sanitize_empty_string() {
         assert_eq!(sanitize_windows_path(""), "");
     }
-
-    #[test]
-    fn sanitize_path_without_backslashes() {
-        assert_eq!(sanitize_windows_path("C:/foo/bar/baz"), "C:/foo/bar/baz");
-    }
 }

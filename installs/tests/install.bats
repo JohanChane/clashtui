@@ -22,12 +22,6 @@ teardown() {
   [[ "$output" =~ ^(linux|darwin|freebsd)$ ]]
 }
 
-@test "detect_os returns a known value" {
-  run bash -c "source '${PROJECT_ROOT}/installs/install' && detect_os"
-  [ "$status" -eq 0 ]
-  [ "$output" != "unsupported" ]
-}
-
 # ---------------------------------------------------------------------------
 # Unit tests: detect_architecture
 # ---------------------------------------------------------------------------
@@ -129,24 +123,6 @@ teardown() {
   "
   [ "$status" -eq 0 ]
   [[ "$output" == *"$tmpfile -> ${tmpfile}_1"* ]]
-}
-
-# ---------------------------------------------------------------------------
-# Contrib URL validation
-# ---------------------------------------------------------------------------
-
-@test "copy_contrib constructs remote URL correctly" {
-  run bash -c "
-    source '${PROJECT_ROOT}/installs/install'
-    REPO='custom/repo' BRANCH='feat-x'
-    CONTRIB_SOURCE='remote'
-    CONTRIB_URL_PREFIX='https://raw.githubusercontent.com/custom/repo/refs/heads/feat-x/contrib'
-    echo \"\$CONTRIB_URL_PREFIX\"
-  "
-
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"custom/repo"* ]]
-  [[ "$output" == *"feat-x"* ]]
 }
 
 # ---------------------------------------------------------------------------

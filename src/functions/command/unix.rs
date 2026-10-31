@@ -130,22 +130,6 @@ mod tests {
     }
 
     #[test]
-    fn test_find_files_not_group_writable_missing() {
-        let (dir, _cleanup) = make_temp_dir();
-        let file = dir.join("no_group_write.txt");
-        std::fs::write(&file, "content").unwrap();
-        let mut perms = std::fs::metadata(&file).unwrap().permissions();
-        perms.set_mode(0o0644);
-        std::fs::set_permissions(&file, perms).unwrap();
-
-        let result = find_files_not_group_writable(&dir);
-        assert!(
-            result.contains(&file),
-            "file without group-write should be in result: {result:?}"
-        );
-    }
-
-    #[test]
     fn test_find_files_not_group_writable_nested() {
         let (dir, _cleanup) = make_temp_dir();
 

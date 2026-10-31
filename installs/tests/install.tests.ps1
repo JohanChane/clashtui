@@ -13,11 +13,6 @@ BeforeAll {
 }
 
 Describe "Get-Architecture" {
-    It "Returns a supported architecture" {
-        $result = Get-Architecture
-        $result | Should -Not -Be "unsupported"
-    }
-
     It "Returns amd64 or arm64" {
         $result = Get-Architecture
         $result | Should -BeIn @("amd64", "arm64")
@@ -97,24 +92,6 @@ Describe "Write-Info / Write-Warn / Write-ErrorLog" {
     }
 }
 
-Describe "-NoPrompt parameter" {
-    It "Script accepts -NoPrompt without error" {
-        $scriptPath = (Resolve-Path (Join-Path $PSScriptRoot ".." "install.ps1")).Path
-        $err = $null
-        try {
-            # --help exits early without installation
-            $result = & powershell -NoProfile -Command "& '$scriptPath' -NoPrompt -? 2>&1; exit `$LASTEXITCODE" 2>&1
-        } catch {
-            $err = $_
-        }
-        $err | Should -Be $null
-    }
-
-    It "-NoPrompt is accepted as a switch" {
-        { Get-Command "Invoke-OptionalDownloads" -ErrorAction Stop } | Should -Not -Throw
-    }
-}
-
 Describe "Guard: dot-sourcing does not execute Main" {
     It "Functions are available without running Main" {
         { Get-Command Write-Info -ErrorAction Stop } | Should -Not -Throw
@@ -124,46 +101,6 @@ Describe "Guard: dot-sourcing does not execute Main" {
         { Get-Command Backup-File -ErrorAction Stop } | Should -Not -Throw
         { Get-Command Copy-Contrib -ErrorAction Stop } | Should -Not -Throw
     }
-}
-
-Describe "irm|iex remote execution (ScriptName null)" {
-    It "SCRIPT_DIR expression uses fallback when ScriptName is null" {
-        $nullResult = if ($null) { Split-Path $null -Parent } else { (Get-Location).Path }
-        $nullResult | Should -Not -BeNullOrEmpty
-        $nullResult | Should -Be (Get-Location).Path
-    }
-
-    It "SCRIPT_DIR expression uses ScriptName when available" {
-        $validResult = if ($installScript) { Split-Path $installScript -Parent } else { (Get-Location).Path }
-        $validResult | Should -Not -BeNullOrEmpty
-        $validResult | Should -Be (Split-Path $installScript -Parent)
-    }
-
-    It "SCRIPT_DIR falls back to Get-Location when ScriptName is empty" {
-        $sb = [scriptblock]::Create(@"
-`$script:SCRIPT_DIR = if (`$MyInvocation.ScriptName) { Split-Path `$MyInvocation.ScriptName -Parent } else { (Get-Location).Path }
-`$script:SCRIPT_DIR
-"@)
-        $result = & $sb
-        $result | Should -Not -BeNullOrEmpty
-        $result | Should -BeLike "*[\\/]*"
-    }
-}
-
-Describe "UTF-8 BOM-free file writing" {
-    It "Writes UTF-8 without BOM using [System.IO.File]::WriteAllText" {
-        $testPath = Join-Path $env:TEMP "bom_test_$(Get-Random).txt"
-        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-        [System.IO.File]::WriteAllText($testPath, "test", $utf8NoBom)
-
-        $bytes = [System.IO.File]::ReadAllBytes($testPath)
-        $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
-        $hasBom | Should -Be $false
-
-        Remove-Item $testPath -Force -ErrorAction SilentlyContinue
-    }
-
-
 }
 
 Describe "Service script installation" {

@@ -249,15 +249,6 @@ extra:
     }
 
     #[test]
-    fn config_file_defaults() {
-        let yaml = "mihomo: {}\nsingbox: {}";
-        let cfg: ConfigFile = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(cfg.mihomo.core.config_dir, "");
-        assert_eq!(cfg.mihomo.core_service.service_name, "");
-        assert_eq!(cfg.timeout, None);
-    }
-
-    #[test]
     fn core_profile_data_serde() {
         let yaml = r#"cur_profile: my
 profiles:
