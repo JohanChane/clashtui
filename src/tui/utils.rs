@@ -2,6 +2,9 @@ pub mod raw_mode {
     //! Provides functions for setting up and restoring the terminal.
 
     use crossterm::{
+        event::{
+            KeyboardEnhancementFlags, PopKeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+        },
         execute,
         terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     };
@@ -9,7 +12,11 @@ pub mod raw_mode {
     /// Enables raw mode and sets up the terminal for the application.
     pub fn setup() -> Result<(), std::io::Error> {
         enable_raw_mode()?;
-        execute!(std::io::stdout(), EnterAlternateScreen)
+        execute!(
+            std::io::stdout(),
+            EnterAlternateScreen,
+            PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+        )
     }
 
     /// Disables raw mode and restores the terminal to its original state.
@@ -17,6 +24,7 @@ pub mod raw_mode {
         disable_raw_mode()?;
         execute!(
             std::io::stdout(),
+            PopKeyboardEnhancementFlags,
             LeaveAlternateScreen,
             crossterm::cursor::Show
         )
