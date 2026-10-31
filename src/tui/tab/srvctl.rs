@@ -35,24 +35,6 @@ impl Document for Key {
     }
 }
 
-macro_rules! tri {
-    ($e:expr) => {
-        match $e {
-            Ok(v) => v,
-            Err(e) => {
-                crate::tui::widget::popmsg::Confirm::err(e);
-                return do_nothing();
-            }
-        }
-    };
-    ($e:expr, or_cancel) => {
-        match $e {
-            Ok(v) => v,
-            Err(_) => return do_nothing(),
-        }
-    };
-}
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum SrvCtlOp {
     Stop,

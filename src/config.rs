@@ -308,19 +308,19 @@ pub fn theme_path() -> PathBuf {
     DATA_DIR.get().unwrap().join(defs::THEME_FILE)
 }
 fn mihomo_dir() -> PathBuf {
-    DATA_DIR.get().unwrap().join("mihomo")
+    core_data_dir(CoreType::Mihomo)
 }
 fn singbox_dir() -> PathBuf {
-    DATA_DIR.get().unwrap().join("sing-box")
+    core_data_dir(CoreType::Singbox)
 }
 pub fn config_dir_path() -> PathBuf {
     DATA_DIR.get().unwrap().clone()
 }
 pub fn core_data_dir(core_type: CoreType) -> PathBuf {
-    match core_type {
-        CoreType::Mihomo => mihomo_dir(),
-        CoreType::Singbox => singbox_dir(),
-    }
+    DATA_DIR.get().unwrap().join(match core_type {
+        CoreType::Mihomo => "mihomo",
+        CoreType::Singbox => "sing-box",
+    })
 }
 pub fn template_path() -> PathBuf {
     mihomo_dir().join(defs::TEMPLATE_DIR)
