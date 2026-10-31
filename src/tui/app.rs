@@ -114,7 +114,6 @@ pub(in crate::tui) mod km {
                     .chain(APP_KEYS),
             )
             .with_submap(
-                "Global",
                 Key {
                     code: KeyCode::Char('g'),
                     modifiers: KeyModifiers::CONTROL,
@@ -296,7 +295,6 @@ impl App {
             self.tab_index,
             f,
             chunks[0],
-            hints.as_ref().map(|hints| hints.name.as_ref()),
         );
 
         self.tabs[self.tab_index as usize].render(f, chunks[1]);
@@ -383,7 +381,6 @@ fn render_tabbar(
     selected: u8,
     f: &mut ratatui::Frame,
     area: ratatui::layout::Rect,
-    pending_name: Option<&str>,
 ) {
     use crate::tui::theme::Theme;
     use ratatui::style::Styled;
@@ -391,11 +388,6 @@ fn render_tabbar(
 
     let theme = Theme::get();
     let block = Block::bordered().title(" Clashtui ");
-    let block = if let Some(submap_name) = pending_name {
-        block.title_bottom(submap_name)
-    } else {
-        block
-    };
     let titles = titles
         .into_iter()
         .map(|title| title.set_style(theme.tabbar.text));
@@ -737,7 +729,7 @@ mihomo:
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 3)).unwrap();
         terminal
-            .draw(|f| render_tabbar(titles, 0, f, f.area(), None))
+            .draw(|f| render_tabbar(titles, 0, f, f.area()))
             .unwrap();
         let screen: String = terminal
             .backend()

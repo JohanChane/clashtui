@@ -8,7 +8,7 @@ use crate::tui::{
 };
 use anyhow::{Context, Result, ensure};
 use serde_yml::{Mapping, Value};
-use std::{borrow::Cow, collections::HashMap, fmt::Write};
+use std::{collections::HashMap, fmt::Write};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Scope {
@@ -125,7 +125,6 @@ pub(in crate::tui) struct RuntimeBinding {
     pub on: KeySequence,
     pub action: Action,
     pub desc: String,
-    pub group: Option<String>,
     /// Format once; help and tab titles borrow this text every frame.
     pub key_text: String,
 }
@@ -167,11 +166,10 @@ impl<'a> BindingView<'a> {
 }
 
 /// A transient presentation of the exact branch used for matching.
-/// Only the reference list and an optional fallback title are allocated.
+/// Only the reference list is allocated.
 #[derive(Debug)]
 pub(in crate::tui) struct ChordView<'a> {
     pub prefix: Key,
-    pub name: Cow<'a, str>,
     bindings: Vec<&'a RuntimeBinding>,
 }
 
@@ -250,7 +248,6 @@ impl Keymaps {
                     on,
                     action: binding.action,
                     desc: binding.desc,
-                    group: binding.group,
                     key_text: notation::format_sequence(on.as_slice()),
                 });
             }
@@ -374,32 +371,21 @@ impl Keymaps {
         let mut bindings: Vec<_> = chord.submap.values().map(|id| self.binding(*id)).collect();
         // All candidates have the same prefix, so full key text orders second keys too.
         bindings.sort_by(|a, b| a.key_text.cmp(&b.key_text));
-        let title_binding = chord_title_binding(&bindings)?;
-        let name = title_binding
-            .group
-            .as_deref()
-            .map(Cow::Borrowed)
-            .unwrap_or_else(|| Cow::Owned(prefix.to_string()));
-        Some(ChordView {
-            prefix,
-            name,
-            bindings,
-        })
+        Some(ChordView { prefix, bindings })
     }
 
-    /// Expand IDs for inspection, keeping source groups distinct from effective titles.
+    /// Expand binding IDs and chord candidates for inspection.
     pub fn describe(&self, scope: Scope) -> String {
-        let mut output = String::from("ID\tScope\tKeys\tAction\tDescription\tGroup\n");
+        let mut output = String::from("ID\tScope\tKeys\tAction\tDescription\n");
         for (id, b) in self.effective_bindings(scope) {
             writeln!(
                 output,
-                "{}\t{}\t{}\t{:?}\t{}\t{}",
+                "{}\t{}\t{}\t{:?}\t{}",
                 id.0,
                 b.source_scope.name(),
                 b.key_text,
                 b.action,
-                b.desc,
-                b.group.as_deref().unwrap_or("—")
+                b.desc
             )
             .unwrap();
         }
@@ -421,26 +407,10 @@ impl Keymaps {
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            let title = chord_title_binding(&view.bindings).expect("nonempty chord");
-            let title_id = chord.submap[&title.on.as_slice()[1]];
-            writeln!(
-                output,
-                "Prefix {prefix}: {}; candidates [{candidates}]; title source {}",
-                view.name, title_id.0
-            )
-            .unwrap();
+            writeln!(output, "Prefix {prefix}: candidates [{candidates}]").unwrap();
         }
         output
     }
-}
-
-// Match the previous compiler's global-first insertion order, not display order.
-fn chord_title_binding<'a>(bindings: &[&'a RuntimeBinding]) -> Option<&'a RuntimeBinding> {
-    bindings
-        .iter()
-        .copied()
-        .find(|binding| binding.source_scope == Scope::App)
-        .or_else(|| bindings.first().copied())
 }
 
 impl KeyLookup {
@@ -557,7 +527,6 @@ mod tests {
                 on: keys.into_iter().map(|key| key.parse().unwrap()).collect(),
                 action: Action::Logs(tab::logs::Key::Clear),
                 desc: "Clear".into(),
-                group: None,
             };
             assert!(Keymaps::from_bindings([(Scope::Logs, vec![binding])].into()).is_err());
         }
@@ -565,38 +534,8 @@ mod tests {
             on: vec!["x".parse().unwrap()],
             action: Action::App(AppKey::Quit),
             desc: "Quit".into(),
-            group: None,
         };
         assert!(Keymaps::from_bindings([(Scope::Logs, vec![binding])].into()).is_err());
-    }
-
-    #[test]
-    fn dynamic_titles_keep_global_precedence_even_when_local_candidates_sort_first() {
-        let maps =
-            maps("app: [{on: [g, p], action: TabPrev}]\nlogs: [{on: [g, a], action: Clear}]");
-        let view = maps.chord_view(Scope::Logs, "g".parse().unwrap()).unwrap();
-        assert_eq!(
-            view.rows().map(|(key, _)| key).collect::<Vec<_>>(),
-            ["a", "g", "p"]
-        );
-        assert_eq!(
-            view.name, "g",
-            "an unnamed global binding must not inherit local Nav"
-        );
-        assert!(
-            view.bindings
-                .iter()
-                .any(|b| b.group.as_deref() == Some("Nav"))
-        );
-        let globals = maps.chord_view(Scope::App, "g".parse().unwrap()).unwrap();
-        assert_eq!(
-            globals.rows().map(|(key, _)| key).collect::<Vec<_>>(),
-            ["p"]
-        );
-        let named = maps
-            .chord_view(Scope::Logs, "<C-g>".parse().unwrap())
-            .unwrap();
-        assert_eq!(named.name, "Global");
     }
 
     #[test]
@@ -621,13 +560,12 @@ mod tests {
     }
 
     #[test]
-    fn inspection_expands_records_and_distinguishes_groups_from_effective_titles() {
+    fn inspection_expands_records_and_chord_candidates() {
         let maps = maps("app: [{on: [g, p], action: TabPrev, desc: Previous page}]");
         let text = maps.describe(Scope::Logs);
-        assert!(text.contains("app\tg p\tApp(TabPrev)\tPrevious page\t—"));
-        assert!(text.contains("logs\tg g\tLogs(GoTop)\tGo to top\tNav"));
-        assert!(text.contains("Prefix g: g; candidates [g="));
-        assert!(text.contains("title source "));
+        assert!(text.contains("app\tg p\tApp(TabPrev)\tPrevious page\n"));
+        assert!(text.contains("logs\tg g\tLogs(GoTop)\tGo to top\n"));
+        assert!(text.contains("Prefix g: candidates [g="));
         let keys: Vec<_> = maps
             .effective_bindings(Scope::Logs)
             .map(|(_, b)| b.key_text.as_str())

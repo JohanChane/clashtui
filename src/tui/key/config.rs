@@ -10,14 +10,12 @@ pub struct Binding<A> {
     pub on: Vec<Key>,
     pub action: Option<A>,
     pub desc: Option<String>,
-    pub group: Option<String>,
 }
 
 pub struct ResolvedBinding<A> {
     pub on: Vec<Key>,
     pub action: A,
     pub desc: String,
-    pub group: Option<String>,
 }
 
 impl<A> ResolvedBinding<A> {
@@ -26,7 +24,6 @@ impl<A> ResolvedBinding<A> {
             on: self.on,
             action: map(self.action),
             desc: self.desc,
-            group: self.group,
         }
     }
 }
@@ -79,7 +76,6 @@ fn parse_entries<A: DeserializeOwned>(value: Value) -> Result<Vec<Binding<A>>> {
                         on: parse_on(entry.on)?,
                         action: optional_action(entry.action).context("invalid action")?,
                         desc: entry.desc,
-                        group: None,
                     })
                 };
                 parse().with_context(|| format!("entry #{}", i + 1))
@@ -142,10 +138,6 @@ where
     // Duplicate user entries must not disappear when defaults are replaced.
     validate(&bindings)?;
     let replaced: HashSet<_> = bindings.iter().map(|b| b.on.clone()).collect();
-    let groups: HashMap<_, _> = defaults
-        .iter()
-        .filter_map(|b| b.group.as_ref().map(|name| (b.on[0], name.clone())))
-        .collect();
     bindings.extend(defaults.into_iter().filter(|b| !replaced.contains(&b.on)));
     bindings.retain(|b| b.action.is_some());
     validate(&bindings)?;
@@ -156,9 +148,6 @@ where
             let action = binding.action.expect("unbound keys have been removed");
             ResolvedBinding {
                 desc: binding.desc.unwrap_or_else(|| action.get_doc().to_owned()),
-                group: binding
-                    .group
-                    .or_else(|| groups.get(&binding.on[0]).cloned()),
                 on: binding.on,
                 action,
             }

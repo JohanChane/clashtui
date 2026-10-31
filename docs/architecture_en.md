@@ -127,7 +127,7 @@ Input handling:
 3. App's `Matcher` uses the effective map and returns `Pending`, `Execute(Action)`, `Cancelled`, or `Unmatched`.
 4. App executes global actions or passes typed page actions to `TuiTab::handle_action`.
 
-App owns the only mutable pending-chord state. Tab changes, focus changes, and popups do not inherit old candidates. Esc and unmatched second keys are consumed. Help and tab labels borrow the same binding store. Which borrows candidates from the original prefix branch, sorting them and selecting the title at display time without persistent copies of descriptions or candidate order. App displays the pending group name in the top bar; pages need no matching state.
+App owns the only mutable pending-chord state. Tab changes, focus changes, and popups do not inherit old candidates. Esc and unmatched second keys are consumed. Help and tab labels borrow the same binding store. Which borrows candidates from the original prefix branch and sorts them at display time without persistent copies of descriptions or candidate order. Its title shows the pending prefix; pages need no matching state.
 
 ### TuiWidget Trait
 

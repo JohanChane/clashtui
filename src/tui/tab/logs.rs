@@ -25,13 +25,8 @@ key_map!(
             (KeyCode::Char('f'), Key::FzfFind),
             (KeyCode::Char('c'), Key::Clear),
         ])
+        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Key::GoTop)])
         .with_submap(
-            "Nav",
-            KeyCode::Char('g'),
-            [(KeyCode::Char('g'), Key::GoTop)]
-        )
-        .with_submap(
-            "Toggle Level",
             KeyCode::Char('t'),
             [
                 (KeyCode::Char('d'), Key::ToggleDebug),

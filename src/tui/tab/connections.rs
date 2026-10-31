@@ -20,23 +20,13 @@ key_map!(
             (KeyCode::Char('p'), Key::TogglePause),
             (KeyCode::Char('f'), Key::FzfFind),
         ])
+        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Key::GoTop)])
+        .with_submap(KeyCode::Char('d'), [(KeyCode::Char('d'), Key::Terminate)])
         .with_submap(
-            "Nav",
-            KeyCode::Char('g'),
-            [(KeyCode::Char('g'), Key::GoTop)]
-        )
-        .with_submap(
-            "Terminate",
-            KeyCode::Char('d'),
-            [(KeyCode::Char('d'), Key::Terminate)]
-        )
-        .with_submap(
-            "All",
             KeyCode::Char('a'),
             [(KeyCode::Char('c'), Key::TerminateAll)]
         )
         .with_submap(
-            "Sort",
             KeyCode::Char('s'),
             [
                 (KeyCode::Char('h'), Key::SortBy(SortColumn::Host)),

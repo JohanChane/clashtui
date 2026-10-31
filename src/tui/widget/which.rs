@@ -83,7 +83,6 @@ mod tests {
                 on: vec!["g".parse().unwrap(), i.to_string().parse().unwrap()],
                 action: Action::Logs(logs::Key::Clear),
                 desc: format!("Custom action {i}"),
-                group: Some("Nav".into()),
             })
             .collect();
         let maps = Keymaps::from_bindings([(Scope::Logs, bindings)].into()).unwrap();

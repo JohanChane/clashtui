@@ -104,25 +104,21 @@ pub mod instancing {
                         on: vec![key.into().normalize()],
                         action: Some(action),
                         desc: None,
-                        group: None,
                     }));
                 self
             }
 
             pub fn with_submap(
                 mut self,
-                name: impl ToString,
                 key: impl Into<Key>,
                 map: impl IntoIterator<Item = (impl Into<Key>, A)>,
             ) -> Self {
-                let name = name.to_string();
                 let first = key.into().normalize();
                 self.bindings
                     .extend(map.into_iter().map(|(key, action)| Binding {
                         on: vec![first, key.into().normalize()],
                         action: Some(action),
                         desc: None,
-                        group: Some(name.clone()),
                     }));
                 self
             }

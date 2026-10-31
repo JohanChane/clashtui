@@ -27,13 +27,8 @@ key_map!(
             (KeyCode::Char('F'), Key::FzfFind),
             (KeyCode::Char('G'), Key::GoBottom),
         ])
+        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Key::GoTop)])
         .with_submap(
-            "Nav",
-            KeyCode::Char('g'),
-            [(KeyCode::Char('g'), Key::GoTop)]
-        )
-        .with_submap(
-            "Sort",
             KeyCode::Char('s'),
             [
                 (KeyCode::Char('n'), Key::Sort(Sort::ByName)),
@@ -42,7 +37,6 @@ key_map!(
             ]
         )
         .with_submap(
-            "Global Sort",
             KeyCode::Char('S'),
             [
                 (KeyCode::Char('n'), Key::Sort(Sort::GlobalByName)),
@@ -51,7 +45,6 @@ key_map!(
             ]
         )
         .with_submap(
-            "All",
             KeyCode::Char('a'),
             [
                 (KeyCode::Char('f'), Key::CollapseAll),

@@ -26,11 +26,7 @@ key_map!(
             (KeyCode::Char('G'), Key::GoEnd),
             (KeyCode::Char('/'), Key::Action(Action::Search)),
         ])
-        .with_submap(
-            "Nav",
-            KeyCode::Char('g'),
-            [(KeyCode::Char('g'), Key::GoTop)]
-        )
+        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Key::GoTop)])
 );
 
 #[derive_aliases::derive(..Key, Debug)]

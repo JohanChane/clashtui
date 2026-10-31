@@ -105,16 +105,11 @@ key_map!(
             ),
             (KeyCode::Char('n'), Key::Action(Action::Traffic)),
         ])
-        .with_submap(
-            "Nav",
-            KeyCode::Char('g'),
-            [(KeyCode::Char('g'), Key::GoTop)]
-        ) // God knows why, but this won't serlize (while deserlizing is fine)
-          // .with_submap(
-          //     "Copy Url",
-          //     KeyCode::Char('C'),
-          //     [(KeyCode::Char('u'), Key::Action(Action::CopyUrl))]
-          // )
+        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Key::GoTop)]) // God knows why, but this won't serlize (while deserlizing is fine)
+                                                                             // .with_submap(
+                                                                             //     KeyCode::Char('C'),
+                                                                             //     [(KeyCode::Char('u'), Key::Action(Action::CopyUrl))]
+                                                                             // )
 );
 
 #[derive_aliases::derive(..Key, Debug)]

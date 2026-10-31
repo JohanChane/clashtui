@@ -28,11 +28,7 @@ fn defaults() -> DefaultMap<Action> {
             (KeyCode::Char('j'), Action::MoveDown),
             (KeyCode::Char('k'), Action::MoveUp),
         ])
-        .with_submap(
-            "Nav",
-            KeyCode::Char('g'),
-            [(KeyCode::Char('g'), Action::GoTop)],
-        )
+        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
 }
 
 fn runtime_action(action: Action) -> super::Action {
@@ -390,12 +386,6 @@ mod matching {
         assert_eq!(resolve(&map, &["<C-j>"]), Some(Action::MoveDown));
         assert_eq!(resolve(&map, &["j"]), Some(Action::MoveDown));
         assert!(docs.contains(&("g e".into(), "Clear by chord".into())));
-        assert!(
-            map.chord_view(Scope::Logs, "g".parse().unwrap())
-                .unwrap()
-                .name
-                == "Nav"
-        );
     }
 
     #[test]
@@ -471,7 +461,6 @@ mod matching {
         );
         let hints = input.hints(Scope::Logs).unwrap();
         assert_eq!(hints.prefix, "g".parse().unwrap());
-        assert_eq!(hints.name, "Nav");
         assert_eq!(
             hint_rows(&hints),
             vec![("a".into(), "First".into()), ("z".into(), "Last".into())]
