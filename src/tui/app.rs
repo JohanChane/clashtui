@@ -261,10 +261,9 @@ impl App {
             return;
         }
         let scope = self.tabs[self.tab_index as usize].input_scope();
-        let maps = key::keymaps();
         let map_scope = if self.help.is_active() {
             self.cancel_pending();
-            if !maps.starts_chord(key::Scope::App, kv) {
+            if !self.input.starts_chord(key::Scope::App, kv) {
                 self.help.handle_key_event(kv);
                 return;
             }

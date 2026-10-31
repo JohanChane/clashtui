@@ -95,8 +95,9 @@ file:
 Keyboard limitations:
 
 - Bindings match the character and modifiers reported by the terminal. Shift is preserved on digits, punctuation, spaces, and non-ASCII letters. `<S-1>`, `1`, and `!` are separate bindings and do not override each other; clashtui does not translate keyboard layouts.
-- On a typical US layout, Shift+1 and Shift+/ usually send `!` and `?`; bind those characters. If the terminal also reports Shift, as can happen on Windows, bind `<S-!>` and `<S-?>` instead. Both forms can be bound to the same action.
-- Enhanced keyboard protocols are not actively enabled. `<S-Space>` and `<Space>` can be configured separately, but the terminal must report a distinction for them to trigger separately. Traditional terminals may also conflate Ctrl+i with Tab, Ctrl+m with Enter, and similar combinations.
+- Bind generated characters directly: Help uses `?`. With the native Windows input backend, a non-whitespace, non-control character reported with only Shift first matches its exact binding or chord prefix across the global and current page maps. Only if undefined does matching retry the same character without Shift. For example, `Char('?') + Shift` can match `?`; `Char('/') + Shift` can match `/`, never a guessed `?`. Explicit Shift bindings remain distinct and take priority. Ctrl/Alt/Super combinations, whitespace, and named keys do not use this fallback.
+- An explicit `action: null` also blocks fallback for that exact key or chord. A disabled chord with no active binding for its first key blocks fallback at that first key; it does not open a Which panel. Unbinding still lets you reuse the key for an active chord or in another scope, and active exact bindings take priority. Within a pending chord, only that branch is searched: the second key matches exactly before trying character fallback, and an unmatched second key cancels the chord.
+- macOS/Linux keep exact matching and request keyboard disambiguation from terminals supporting the Kitty protocol. `<S-Space>` and `<Space>` can be configured separately, but the terminal must report a distinction for them to trigger separately. Traditional terminals may also conflate Ctrl+i with Tab, Ctrl+m with Enter, and similar combinations.
 
 Use `action: null` to unbind a default sequence. For example, replace the default single key `j` with the chord `jj`:
 

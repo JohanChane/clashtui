@@ -1,7 +1,7 @@
 use std::fmt::Display;
 use std::io::Write;
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 pub struct Select<It> {
     start_prompts: Vec<String>,
     end_prompt: Option<String>,
@@ -20,7 +20,7 @@ impl<It: Display> Default for Select<It> {
 ///
 /// The `Select` struct provides methods for appending items to the list, setting prompts, and
 /// interacting with the user to select an item from the list.
-#[cfg_attr(not(test), allow(dead_code))]
+#[allow(dead_code)]
 impl<It: Display> Select<It> {
     pub fn append_items<I: Iterator<Item = It>>(mut self, items: I) -> Self {
         self.items.extend(items);
@@ -90,31 +90,5 @@ impl<It: Display> Select<It> {
                 }
             };
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    #[test]
-    #[ignore = "Manual only"]
-    fn select() -> std::io::Result<()> {
-        #[derive(Debug)]
-        struct D1 {
-            name: u8,
-        }
-        impl std::fmt::Display for D1 {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                write!(f, "{}", self.name)
-            }
-        }
-        let that = Select::default()
-            .append_start_prompt("p1:")
-            .append_start_prompt("p2")
-            .set_end_prompt("p3:")
-            .append_items([D1 { name: 1 }, D1 { name: 3 }].into_iter())
-            .interact()?;
-        println!("Select {:?}", that);
-        Ok(())
     }
 }

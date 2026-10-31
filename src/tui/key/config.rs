@@ -14,7 +14,8 @@ pub struct Binding<A> {
 
 pub struct ResolvedBinding<A> {
     pub on: Vec<Key>,
-    pub action: A,
+    // Keep explicit unbindings so input fallbacks cannot revive them.
+    pub action: Option<A>,
     pub desc: String,
 }
 
@@ -22,7 +23,7 @@ impl<A> ResolvedBinding<A> {
     pub fn map_action<B>(self, map: impl FnOnce(A) -> B) -> ResolvedBinding<B> {
         ResolvedBinding {
             on: self.on,
-            action: map(self.action),
+            action: self.action.map(map),
             desc: self.desc,
         }
     }
@@ -127,7 +128,7 @@ fn validate<A>(bindings: &[Binding<A>]) -> Result<()> {
     Ok(())
 }
 
-/// Apply overrides and remove unbound keys before composing input contexts.
+/// Apply overrides, retaining unbound keys as fallback guards.
 pub fn resolve<A>(defaults: DefaultMap<A>, overrides: Value) -> Result<Vec<ResolvedBinding<A>>>
 where
     A: DeserializeOwned + Document,
@@ -139,18 +140,20 @@ where
     validate(&bindings)?;
     let replaced: HashSet<_> = bindings.iter().map(|b| b.on.clone()).collect();
     bindings.extend(defaults.into_iter().filter(|b| !replaced.contains(&b.on)));
-    bindings.retain(|b| b.action.is_some());
     validate(&bindings)?;
 
     let mut bindings: Vec<_> = bindings
         .into_iter()
-        .map(|binding| {
-            let action = binding.action.expect("unbound keys have been removed");
-            ResolvedBinding {
-                desc: binding.desc.unwrap_or_else(|| action.get_doc().to_owned()),
-                on: binding.on,
-                action,
-            }
+        .map(|binding| ResolvedBinding {
+            desc: binding.desc.unwrap_or_else(|| {
+                binding
+                    .action
+                    .as_ref()
+                    .map_or("", Document::get_doc)
+                    .to_owned()
+            }),
+            on: binding.on,
+            action: binding.action,
         })
         .collect();
     bindings.sort_by_cached_key(|binding| super::notation::format_sequence(&binding.on));

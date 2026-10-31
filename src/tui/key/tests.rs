@@ -579,6 +579,301 @@ mod matching {
     }
 }
 
+mod windows_input {
+    use super::*;
+    use crate::tui::{app::AppKey, tab::logs};
+    use matcher::InputPolicy;
+
+    fn maps(yaml: &str) -> Keymaps {
+        Keymaps::from_config(serde_yml::from_str(yaml).unwrap(), "mihomo").unwrap()
+    }
+
+    fn press(input: &mut Matcher<'_>, key: &str) -> Match<super::super::Action> {
+        input.feed(&key.parse().unwrap(), Scope::Logs, Scope::Logs)
+    }
+
+    #[test]
+    fn generated_characters_fall_back_only_for_native_windows_input() {
+        for c in ['?', '!', '1', '/', 'é', '中'] {
+            let defaults = DefaultMap::new().with_common([(KeyCode::Char(c), Action::Clear)]);
+            let maps = runtime_maps(config::resolve(defaults, Value::Null).unwrap()).unwrap();
+            let event = KeyEvent::new(KeyCode::Char(c), KeyModifiers::SHIFT);
+            let key = Key::from(event);
+            for policy in [InputPolicy::Exact, InputPolicy::WindowsNative] {
+                let mut input = Matcher::with_policy(&maps, policy);
+                let expected = match policy {
+                    InputPolicy::Exact => Match::Unmatched,
+                    InputPolicy::WindowsNative => Match::Execute(runtime_action(Action::Clear)),
+                };
+                assert_eq!(input.feed(&key, Scope::Logs, Scope::Logs), expected, "{c}");
+                assert_eq!(key, Key::from(event), "fallback must not rewrite the event");
+                assert_eq!(
+                    input.feed(&Key::from_code(KeyCode::Char(c)), Scope::Logs, Scope::Logs),
+                    Match::Execute(runtime_action(Action::Clear))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn whitespace_controls_named_keys_and_modified_combinations_stay_exact() {
+        for code in [
+            KeyCode::Char(' '),
+            KeyCode::Char('\u{a0}'),
+            KeyCode::Char('\u{2003}'),
+            KeyCode::Char('\0'),
+            KeyCode::Char('\n'),
+            KeyCode::Char('\u{85}'),
+            KeyCode::Enter,
+            KeyCode::Tab,
+            KeyCode::F(1),
+            KeyCode::Left,
+            // Existing ASCII letter normalization must not turn Shift+a into a.
+            KeyCode::Char('a'),
+        ] {
+            let defaults = DefaultMap::new().with_common([(code, Action::Clear)]);
+            let maps = runtime_maps(config::resolve(defaults, Value::Null).unwrap()).unwrap();
+            let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+            assert_eq!(
+                input.feed(
+                    &KeyEvent::new(code, KeyModifiers::SHIFT).into(),
+                    Scope::Logs,
+                    Scope::Logs
+                ),
+                Match::Unmatched,
+                "{code:?}"
+            );
+        }
+        for extra in [
+            KeyModifiers::CONTROL,
+            KeyModifiers::ALT,
+            KeyModifiers::SUPER,
+        ] {
+            let base = Key::from(KeyEvent::new(KeyCode::Char('?'), extra));
+            let defaults = DefaultMap::new().with_common([(base, Action::Clear)]);
+            let maps = runtime_maps(config::resolve(defaults, Value::Null).unwrap()).unwrap();
+            let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+            assert_eq!(
+                input.feed(
+                    &KeyEvent::new(KeyCode::Char('?'), extra | KeyModifiers::SHIFT).into(),
+                    Scope::Logs,
+                    Scope::Logs
+                ),
+                Match::Unmatched
+            );
+            assert_eq!(
+                input.feed(&base, Scope::Logs, Scope::Logs),
+                Match::Execute(runtime_action(Action::Clear))
+            );
+        }
+    }
+
+    #[test]
+    fn default_help_accepts_windows_question_mark_without_a_second_binding() {
+        let maps = maps("{}");
+        let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+        for scope in Scope::ALL {
+            let key = KeyEvent::new(KeyCode::Char('?'), KeyModifiers::SHIFT).into();
+            assert_eq!(
+                input.feed(&key, scope, scope),
+                Match::Execute(super::super::Action::App(AppKey::Help))
+            );
+        }
+        assert_eq!(
+            maps.global_bindings()
+                .iter()
+                .filter(|b| b.action == super::super::Action::App(AppKey::Help))
+                .map(|b| b.key_text.as_str())
+                .collect::<Vec<_>>(),
+            vec!["?"]
+        );
+        // A layout reporting '/' with Shift produces '/', never a guessed '?'.
+        assert_eq!(
+            press(&mut input, "<S-/>"),
+            Match::Execute(super::super::Action::Logs(logs::Key::Search))
+        );
+        let expected = if cfg!(windows) {
+            Match::Execute(super::super::Action::App(AppKey::Help))
+        } else {
+            Match::Unmatched
+        };
+        assert_eq!(press(&mut Matcher::new(&maps), "<S-?>"), expected);
+    }
+
+    #[test]
+    fn exact_bindings_win_across_the_whole_effective_context() {
+        for (yaml, expected) in [
+            (
+                "app: [{on: '!', action: TabPrev}]\nlogs: [{on: '<S-!>', action: Clear}]",
+                super::super::Action::Logs(logs::Key::Clear),
+            ),
+            (
+                "app: [{on: '<S-!>', action: TabPrev}]\nlogs: [{on: '!', action: Clear}]",
+                super::super::Action::App(AppKey::TabPrev),
+            ),
+            (
+                "app: [{on: '<S-!>', action: null}]\nlogs: [{on: '<S-!>', action: Clear}]",
+                super::super::Action::Logs(logs::Key::Clear),
+            ),
+            (
+                "app: [{on: '<S-!>', action: TabPrev}]\nlogs: [{on: '<S-!>', action: null}]",
+                super::super::Action::App(AppKey::TabPrev),
+            ),
+        ] {
+            let maps = maps(yaml);
+            let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+            assert_eq!(
+                press(&mut input, "<S-!>"),
+                Match::Execute(expected),
+                "{yaml}"
+            );
+        }
+    }
+
+    #[test]
+    fn explicit_unbindings_block_fallback_without_becoming_help_rows() {
+        for yaml in [
+            "app: [{on: '<S-?>', action: null}]",
+            "logs: [{on: '<S-?>', action: null}]",
+        ] {
+            let maps = maps(yaml);
+            let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+            assert_eq!(press(&mut input, "<S-?>"), Match::Unmatched);
+            assert_eq!(
+                press(&mut input, "?"),
+                Match::Execute(super::super::Action::App(AppKey::Help))
+            );
+            assert!(
+                maps.effective_bindings(Scope::Logs)
+                    .all(|(_, b)| b.key_text != "<S-?>")
+            );
+            assert!(input.hints(Scope::Logs).is_none());
+            if yaml.starts_with("logs:") {
+                assert_eq!(
+                    input.feed(&"<S-?>".parse().unwrap(), Scope::App, Scope::App),
+                    Match::Execute(super::super::Action::App(AppKey::Help))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn exact_single_key_prevents_starting_a_fallback_chord() {
+        let maps = maps("app: [{on: ['!', x], action: TabPrev}, {on: '<S-!>', action: Help}]");
+        let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+        let key = "<S-!>".parse().unwrap();
+        assert!(!input.starts_chord(Scope::App, &key));
+        assert_eq!(
+            press(&mut input, "<S-!>"),
+            Match::Execute(super::super::Action::App(AppKey::Help))
+        );
+        assert!(input.hints(Scope::Logs).is_none());
+    }
+
+    #[test]
+    fn exact_chord_prefix_owns_the_sequence_before_any_fallback() {
+        let maps =
+            maps("app: [{on: '!', action: TabPrev}]\nlogs: [{on: ['<S-!>', x], action: Clear}]");
+        let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+        for second in ["?", "<S-?>", "!", "<Esc>", "x"] {
+            assert_eq!(press(&mut input, "<S-!>"), Match::Pending);
+            assert_eq!(
+                input.hints(Scope::Logs).unwrap().prefix,
+                "<S-!>".parse().unwrap()
+            );
+            assert_eq!(
+                press(&mut input, second),
+                if second == "x" {
+                    Match::Execute(runtime_action(Action::Clear))
+                } else {
+                    Match::Cancelled
+                }
+            );
+            assert!(input.hints(Scope::Logs).is_none());
+        }
+    }
+
+    #[test]
+    fn fallback_chords_keep_the_matched_prefix_and_exact_second_key_priority() {
+        let maps = maps(
+            "logs: [{on: ['!', '?'], action: Clear}, {on: ['!', '<S-?>'], action: MoveUp}, {on: ['!', '/'], action: MoveDown}]",
+        );
+        let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+        for (second, action) in [
+            ("<S-?>", Action::MoveUp),
+            ("?", Action::Clear),
+            ("<S-/>", Action::MoveDown),
+        ] {
+            assert_eq!(press(&mut input, "<S-!>"), Match::Pending);
+            let hints = input.hints(Scope::Logs).unwrap();
+            assert_eq!(hints.prefix, "!".parse().unwrap());
+            assert_eq!(hints.bindings().len(), 3);
+            assert_eq!(
+                press(&mut input, second),
+                Match::Execute(runtime_action(action))
+            );
+        }
+    }
+
+    #[test]
+    fn disabled_chords_block_fallback_but_do_not_hide_active_rebindings() {
+        let maps = maps(
+            "app: [{on: ['!', '<S-?>'], action: null}]\nlogs: [{on: ['!', '?'], action: Clear}, {on: ['!', x], action: MoveUp}, {on: '<S-!>', action: null}]",
+        );
+        let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+        assert_eq!(press(&mut input, "<S-!>"), Match::Unmatched);
+        for (second, expected) in [
+            ("<S-?>", Match::Cancelled),
+            ("?", Match::Execute(runtime_action(Action::Clear))),
+        ] {
+            assert_eq!(press(&mut input, "!"), Match::Pending);
+            assert_eq!(input.hints(Scope::Logs).unwrap().bindings().len(), 2);
+            assert_eq!(press(&mut input, second), expected);
+        }
+
+        let maps =
+            self::maps("app: [{on: ['<S-!>', x], action: null}, {on: ['!', x], action: TabPrev}]");
+        let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+        assert_eq!(press(&mut input, "<S-!>"), Match::Unmatched);
+        assert!(!input.starts_chord(Scope::Logs, &"<S-!>".parse().unwrap()));
+        assert!(input.hints(Scope::Logs).is_none());
+
+        let maps = self::maps(
+            "app: [{on: ['!', '<S-?>'], action: null}]\nlogs: [{on: ['!', '<S-?>'], action: Clear}, {on: '!', action: null}]",
+        );
+        let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+        assert_eq!(press(&mut input, "<S-!>"), Match::Pending);
+        assert_eq!(
+            press(&mut input, "<S-?>"),
+            Match::Execute(runtime_action(Action::Clear))
+        );
+    }
+
+    #[test]
+    fn chords_started_from_help_use_fallback_without_gaining_page_candidates() {
+        let maps = maps(
+            "app: [{on: ['!', '?'], action: TabPrev}]\nlogs: [{on: ['!', '/'], action: Clear}]",
+        );
+        let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
+        let prefix = "<S-!>".parse().unwrap();
+        assert!(input.starts_chord(Scope::App, &prefix));
+        for second in ["<S-/>", "<S-?>"] {
+            assert_eq!(input.feed(&prefix, Scope::Logs, Scope::App), Match::Pending);
+            let hints = input.hints(Scope::Logs).unwrap();
+            assert_eq!(hints.prefix, "!".parse().unwrap());
+            assert_eq!(hints.bindings().len(), 1);
+            assert_eq!(
+                press(&mut input, second),
+                if second == "<S-?>" {
+                    Match::Execute(super::super::Action::App(AppKey::TabPrev))
+                } else {
+                    Match::Cancelled
+                }
+            );
+        }
+    }
+}
+
 mod contexts {
     use super::{docs, hint_rows};
     use crate::tui::key::*;

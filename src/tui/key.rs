@@ -151,6 +151,7 @@ macro_rules! key_map {
                 bindings(map).map(|bindings| {
                     bindings
                         .into_iter()
+                        .filter(|binding| binding.action.is_some())
                         .map(|binding| {
                             (
                                 crate::tui::key::notation::format_sequence(&binding.on),

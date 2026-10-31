@@ -8,7 +8,10 @@ use crate::tui::{
 };
 use anyhow::{Context, Result, ensure};
 use serde_yml::{Mapping, Value};
-use std::{collections::HashMap, fmt::Write};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Write,
+};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Scope {
@@ -102,7 +105,7 @@ impl Action {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(in crate::tui) struct BindingId(usize);
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(in crate::tui) enum KeySequence {
     Single(Key),
     Chord([Key; 2]),
@@ -132,6 +135,8 @@ pub(in crate::tui) struct RuntimeBinding {
 #[derive(Default)]
 struct KeyLookup {
     dispatch: HashMap<Key, DispatchEntry>,
+    // Guards only: these never become executable bindings or help rows.
+    disabled: HashSet<KeySequence>,
 }
 
 pub(super) enum DispatchEntry {
@@ -224,35 +229,43 @@ impl Keymaps {
     pub fn from_bindings(mut scopes: HashMap<Scope, Vec<ResolvedBinding<Action>>>) -> Result<Self> {
         let mut bindings = Vec::new();
         let mut scope_bindings = HashMap::new();
+        let mut scope_disabled = HashMap::new();
         for scope in Scope::ALL {
             let mut ids = Vec::new();
+            let mut disabled = HashSet::new();
             for binding in scopes.remove(&scope).unwrap_or_default() {
-                ensure!(
-                    binding.action.scope() == scope,
-                    "binding action belongs to another scope"
-                );
                 let on = match binding.on.as_slice() {
                     [key] => KeySequence::Single(*key),
                     [first, second] => {
                         ensure!(
-                            *second != Key::from_code(super::KeyCode::Esc),
+                            binding.action.is_none()
+                                || *second != Key::from_code(super::KeyCode::Esc),
                             "Esc is reserved for cancelling a pending chord; choose another second key"
                         );
                         KeySequence::Chord([*first, *second])
                     }
                     _ => anyhow::bail!("binding must contain 1 or 2 keys"),
                 };
+                let Some(action) = binding.action else {
+                    disabled.insert(on);
+                    continue;
+                };
+                ensure!(
+                    action.scope() == scope,
+                    "binding action belongs to another scope"
+                );
                 ids.push(BindingId(bindings.len()));
                 bindings.push(RuntimeBinding {
                     source_scope: scope,
                     on,
-                    action: binding.action,
+                    action,
                     desc: binding.desc,
                     key_text: notation::format_sequence(on.as_slice()),
                 });
             }
             ids.sort_by(|a, b| bindings[a.0].key_text.cmp(&bindings[b.0].key_text));
             scope_bindings.insert(scope, ids.into_boxed_slice());
+            scope_disabled.insert(scope, disabled);
         }
         let mut maps = Self {
             bindings: bindings.into_boxed_slice(),
@@ -266,7 +279,9 @@ impl Keymaps {
                 .iter()
                 .chain(maps.page_ids(scope))
                 .copied();
-            let lookup = KeyLookup::compile(ids, &maps.bindings)?;
+            let mut lookup = KeyLookup::compile(ids, &maps.bindings)?;
+            lookup.disabled.extend(&scope_disabled[&Scope::App]);
+            lookup.disabled.extend(&scope_disabled[&scope]);
             maps.key_lookup.insert(scope, lookup);
         }
         let mut tabs: [Vec<BindingId>; TabTarget::ALL.len()] = std::array::from_fn(|_| Vec::new());
@@ -347,10 +362,6 @@ impl Keymaps {
             .map(|id| (id, self.binding(id)))
     }
 
-    pub fn starts_chord(&self, scope: Scope, key: &Key) -> bool {
-        self.chord(scope, key).is_some()
-    }
-
     fn chord(&self, scope: Scope, prefix: &Key) -> Option<&ChordIndex> {
         match self.lookup(scope, prefix) {
             Some(DispatchEntry::Chord(chord)) => Some(chord),
@@ -364,6 +375,17 @@ impl Keymaps {
 
     pub(super) fn second(&self, scope: Scope, prefix: &Key, key: &Key) -> Option<BindingId> {
         self.chord(scope, prefix)?.submap.get(key).copied()
+    }
+
+    pub(super) fn has_disabled_prefix(&self, scope: Scope, key: Key) -> bool {
+        self.key_lookup[&scope]
+            .disabled
+            .iter()
+            .any(|sequence| sequence.as_slice()[0] == key)
+    }
+
+    pub(super) fn is_disabled(&self, scope: Scope, sequence: KeySequence) -> bool {
+        self.key_lookup[&scope].disabled.contains(&sequence)
     }
 
     pub fn chord_view(&self, scope: Scope, prefix: Key) -> Option<ChordView<'_>> {
@@ -525,14 +547,14 @@ mod tests {
         for keys in [vec![], vec!["g", "g", "g"], vec!["g", "<Esc>"]] {
             let binding = ResolvedBinding {
                 on: keys.into_iter().map(|key| key.parse().unwrap()).collect(),
-                action: Action::Logs(tab::logs::Key::Clear),
+                action: Some(Action::Logs(tab::logs::Key::Clear)),
                 desc: "Clear".into(),
             };
             assert!(Keymaps::from_bindings([(Scope::Logs, vec![binding])].into()).is_err());
         }
         let binding = ResolvedBinding {
             on: vec!["x".parse().unwrap()],
-            action: Action::App(AppKey::Quit),
+            action: Some(Action::App(AppKey::Quit)),
             desc: "Quit".into(),
         };
         assert!(Keymaps::from_bindings([(Scope::Logs, vec![binding])].into()).is_err());

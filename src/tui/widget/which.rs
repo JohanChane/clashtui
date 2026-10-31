@@ -81,7 +81,7 @@ mod tests {
         let bindings = (0..count)
             .map(|i| ResolvedBinding {
                 on: vec!["g".parse().unwrap(), i.to_string().parse().unwrap()],
-                action: Action::Logs(logs::Key::Clear),
+                action: Some(Action::Logs(logs::Key::Clear)),
                 desc: format!("Custom action {i}"),
             })
             .collect();
