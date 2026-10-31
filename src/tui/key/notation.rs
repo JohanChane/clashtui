@@ -59,7 +59,7 @@ impl FromStr for Key {
 impl fmt::Display for Key {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut modifiers = self.modifiers;
-        if matches!(self.code, KeyCode::Char(_)) {
+        if matches!(self.code, KeyCode::Char(c) if c.is_ascii_uppercase()) {
             modifiers.remove(KeyModifiers::SHIFT);
         }
         if let KeyCode::Char(c) = self.code

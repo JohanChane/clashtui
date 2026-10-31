@@ -41,11 +41,7 @@ impl Key {
             // SHIFT + 小写字母 → 转为大写字母
             self.code = KeyCode::Char(c.to_ascii_uppercase())
         }
-        // Character events already contain shifted punctuation on both platforms.
-        // Windows may additionally report SHIFT; Unix terminals usually do not.
-        if matches!(self.code, KeyCode::Char(c) if !c.is_ascii_uppercase()) {
-            self.modifiers.remove(KeyModifiers::SHIFT);
-        }
+        // Preserve Shift on other characters; do not infer a keyboard layout.
         self
     }
     pub fn from_code(code: KeyCode) -> Self {

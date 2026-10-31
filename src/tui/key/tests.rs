@@ -395,15 +395,20 @@ mod matching {
     }
 
     #[test]
-    fn notation_matches_crossterm_events_across_shift_conventions() {
-        for c in ['G', '?', '!', '~', ':', ' '] {
-            let unix = Key::from(KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE));
-            let windows = Key::from(KeyEvent::new(KeyCode::Char(c), KeyModifiers::SHIFT));
-            assert_eq!(unix, windows);
-            assert_eq!(c.to_string().parse::<Key>().unwrap(), unix);
+    fn ascii_letters_and_backtab_keep_their_normalized_forms() {
+        let uppercase = "G".parse::<Key>().unwrap();
+        for (c, modifiers) in [
+            ('G', KeyModifiers::NONE),
+            ('G', KeyModifiers::SHIFT),
+            ('g', KeyModifiers::SHIFT),
+        ] {
+            assert_eq!(
+                Key::from(KeyEvent::new(KeyCode::Char(c), modifiers)),
+                uppercase
+            );
         }
-        assert_eq!("<S-g>".parse::<Key>().unwrap(), "G".parse().unwrap());
-        assert_eq!("<S-?>".parse::<Key>().unwrap(), "?".parse().unwrap());
+        assert_eq!("<S-g>".parse::<Key>().unwrap(), uppercase);
+        assert_eq!(uppercase.to_string(), "G");
         assert_eq!(
             Key::from(KeyEvent::new(
                 KeyCode::BackTab,
@@ -411,6 +416,50 @@ mod matching {
             )),
             "<C-S-Tab>".parse().unwrap()
         );
+    }
+
+    #[test]
+    fn shifted_characters_do_not_replace_or_unbind_plain_defaults() {
+        for (c, plain, shifted) in [
+            ('1', "1", "<S-1>"),
+            ('/', "/", "<S-/>"),
+            ('!', "!", "<S-!>"),
+            ('?', "?", "<S-?>"),
+            (' ', "<Space>", "<S-Space>"),
+            ('é', "é", "<S-é>"),
+        ] {
+            for action in ["Clear", "null"] {
+                let defaults =
+                    DefaultMap::new().with_common([(KeyCode::Char(c), Action::MoveDown)]);
+                let config =
+                    serde_yml::from_str(&format!("- {{on: '{shifted}', action: {action}}}"))
+                        .unwrap();
+                let map = runtime_maps(config::resolve(defaults, config).unwrap()).unwrap();
+                let mut input = Matcher::new(&map);
+                let plain_event = KeyEvent::new(KeyCode::Char(c), KeyModifiers::NONE);
+                let shifted_event = KeyEvent::new(KeyCode::Char(c), KeyModifiers::SHIFT);
+                assert_eq!(
+                    input.feed(&plain_event.into(), Scope::Logs, Scope::Logs),
+                    Match::Execute(runtime_action(Action::MoveDown)),
+                    "{shifted}: {action} must not change {plain}"
+                );
+                let expected = if action == "Clear" {
+                    Match::Execute(runtime_action(Action::Clear))
+                } else {
+                    Match::Unmatched
+                };
+                assert_eq!(
+                    input.feed(&shifted_event.into(), Scope::Logs, Scope::Logs),
+                    expected,
+                    "{shifted}: {action}"
+                );
+                let descriptions = docs(map.page_bindings(Scope::Logs));
+                assert!(descriptions.contains(&(plain.into(), "Move down".into())));
+                if action == "Clear" {
+                    assert!(descriptions.contains(&(shifted.into(), "Clear logs".into())));
+                }
+            }
+        }
     }
 
     #[test]
@@ -427,6 +476,15 @@ mod matching {
             "<A-x>",
             "<D-x>",
             "<C-S-a>",
+            "<S-1>",
+            "<S-/>",
+            "<S-!>",
+            "<S-?>",
+            "<S-Space>",
+            "<S-é>",
+            "<C-S-1>",
+            "<A-S-/>",
+            "<D-S-Space>",
             "<S-Up>",
             "<BackTab>",
             "<C-->",

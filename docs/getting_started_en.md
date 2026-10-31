@@ -87,9 +87,15 @@ file:
 ```
 
 - `on`: a single key string or a list of two keys. A modified key counts as one key, as in `["<C-g>", "c"]`. Write `gg` as `["g", "g"]`, not `"gg"`.
-- Key notation includes `"j"`, `"G"`, `"<Enter>"`, `"<Up>"`, and `"<F1>"`. Prefixes `C-`, `A-`, `S-`, and `D-` mean Ctrl, Alt, Shift, and Super. Uppercase letters imply Shift; `"<S-g>"` and `"G"` are equivalent.
+- Key notation includes `"j"`, `"G"`, `"<Enter>"`, `"<Up>"`, and `"<F1>"`. Prefixes `C-`, `A-`, `S-`, and `D-` mean Ctrl, Alt, Shift, and Super. ASCII uppercase letters imply Shift; `"<S-g>"` and `"G"` are equivalent.
 - `action`: an action for that page. Use a plain name, such as `Edit` on a file page or `SortByDelay` on the proxies page; `action: null` unbinds a key. Optional `desc` appears in the `?` help panel; omit it to use the action's default description.
 - An identical complete key sequence replaces its default binding. Adding a new key for an action does not automatically remove the original key.
+
+Keyboard limitations:
+
+- Bindings match the character and modifiers reported by the terminal. Shift is preserved on digits, punctuation, spaces, and non-ASCII letters. `<S-1>`, `1`, and `!` are separate bindings and do not override each other; clashtui does not translate keyboard layouts.
+- On a typical US layout, Shift+1 and Shift+/ usually send `!` and `?`; bind those characters. If the terminal also reports Shift, as can happen on Windows, bind `<S-!>` and `<S-?>` instead. Both forms can be bound to the same action.
+- Enhanced keyboard protocols are not actively enabled. `<S-Space>` and `<Space>` can be configured separately, but the terminal must report a distinction for them to trigger separately. Traditional terminals may also conflate Ctrl+i with Tab, Ctrl+m with Enter, and similar combinations.
 
 Use `action: null` to unbind a default sequence. For example, replace the default single key `j` with the chord `jj`:
 
