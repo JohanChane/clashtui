@@ -60,7 +60,10 @@ pub fn spawn(pgm: &str, args: Vec<&str>) -> Result<()> {
     Ok(())
 }
 
-fn sanitize_windows_path(path: &str) -> String {
+pub(crate) fn sanitize_windows_path(path: &str) -> String {
+    if let Some(path) = path.strip_prefix(r"\\?\UNC\") {
+        return format!("//{}", path.replace('\\', "/"));
+    }
     let path = path.strip_prefix(r"\\?\").unwrap_or(path);
     path.replace('\\', "/")
 }
@@ -173,6 +176,16 @@ mod tests {
             sanitize_windows_path(r"\\?\C:\foo/bar\baz"),
             "C:/foo/bar/baz"
         );
+    }
+
+    #[test]
+    fn sanitize_network_share_preserves_unc_root() {
+        for path in [
+            r"\\?\UNC\server\share\中文 file",
+            r"\\server\share\中文 file",
+        ] {
+            assert_eq!(sanitize_windows_path(path), "//server/share/中文 file");
+        }
     }
 
     #[test]

@@ -9,6 +9,7 @@ use std::{path::Path, process::Command};
 
 #[cfg(unix)]
 pub use unix::*;
+pub(crate) use utils::sanitize_windows_path;
 use utils::*;
 
 pub fn test_config(profile_path: Option<&Path>, enable_geodata_mode: bool) -> String {

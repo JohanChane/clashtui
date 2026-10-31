@@ -1,6 +1,7 @@
 //! The single, platform-independent service command configuration.
 
 use super::CoreType;
+use crate::functions::command::sanitize_windows_path;
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -218,6 +219,16 @@ impl ScriptConfig {
             };
             ensure!(!value.is_empty(), "${{{name}}}: required value is empty");
             ensure!(!value.contains('\0'), "${{{name}}}: NUL is not allowed");
+            // Convert typed paths before embedding them in arguments for external tools.
+            let value = if cfg!(windows)
+                && matches!(
+                    name,
+                    "root" | "config_root" | "core_bin" | "core_config_dir" | "core_config_path"
+                ) {
+                sanitize_windows_path(&value)
+            } else {
+                value
+            };
             values.insert(name.to_owned(), value.clone());
             Ok(value)
         };
@@ -253,7 +264,11 @@ impl ScriptConfig {
         Ok(ResolvedCommand {
             program,
             args,
-            cwd: root,
+            cwd: if cfg!(windows) {
+                sanitize_windows_path(root.to_str().context("root is not valid UTF-8")?).into()
+            } else {
+                root
+            },
         })
     }
 }
@@ -526,13 +541,13 @@ mod tests {
         assert_eq!(plan.args[1], "--name=a b ' \" $(touch nope) ${core_type}");
         assert_eq!(plan.args[2], "${unknown}");
         assert_eq!(plan.args[3], "");
-        assert_eq!(
-            plan.args[4],
-            OsString::from(format!(
-                "{}/中文 file.sh",
-                base.join(&config.root).display()
-            ))
-        );
+        let root = base.join(&config.root).display().to_string();
+        let root = if cfg!(windows) {
+            sanitize_windows_path(&root)
+        } else {
+            root
+        };
+        assert_eq!(plan.args[4], OsString::from(format!("{root}/中文 file.sh")));
     }
 
     #[test]
@@ -575,5 +590,51 @@ mod tests {
         ] {
             validate_windows_path(valid).unwrap();
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_paths_are_sanitized_without_changing_other_arguments() {
+        let base = Path::new(r"\\?\C:\Users\中文 user\clashtui");
+        let mut action = action("test", None);
+        action.cmd.args = vec![
+            "${root}/windows/service.ps1".into(),
+            "${config_root}".into(),
+            "${core_bin}".into(),
+            "${core_config_dir}".into(),
+            "${core_config_path}".into(),
+            "${service_name}".into(),
+            r"literal=\\?\C:\unchanged".into(),
+        ];
+        let config = config(vec![action]);
+        let command = config
+            .resolve(base, &config.actions[0], |name| {
+                Ok(match name {
+                    "core_bin" => r"\\?\C:\core\mihomo.exe",
+                    "core_config_dir" => r"\\?\C:\core\data",
+                    "core_config_path" => r"\\?\C:\core\data\config.yaml",
+                    "service_name" => r"\\?\C:\unchanged",
+                    _ => unreachable!(),
+                }
+                .into())
+            })
+            .unwrap();
+        assert_eq!(
+            command.args,
+            [
+                "C:/Users/中文 user/clashtui/scripts/coresrvctrl/windows/service.ps1",
+                "C:/Users/中文 user/clashtui",
+                "C:/core/mihomo.exe",
+                "C:/core/data",
+                "C:/core/data/config.yaml",
+                r"\\?\C:\unchanged",
+                r"literal=\\?\C:\unchanged",
+            ]
+            .map(OsString::from)
+        );
+        assert_eq!(
+            command.cwd,
+            Path::new("C:/Users/中文 user/clashtui/scripts/coresrvctrl")
+        );
     }
 }

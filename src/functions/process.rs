@@ -350,6 +350,7 @@ mod tests {
 #[cfg(all(test, windows))]
 mod windows_tests {
     use super::*;
+    use crate::config::{CoreType, scripts::ScriptConfig};
 
     fn powershell(script: &str) -> ResolvedCommand {
         ResolvedCommand {
@@ -360,6 +361,50 @@ mod windows_tests {
                 .collect(),
             cwd: std::env::temp_dir(),
         }
+    }
+
+    #[test]
+    fn bundled_status_command_runs_from_canonicalized_unicode_path() {
+        let root = std::env::temp_dir().join(format!(
+            "clashtui script 中文-{}-{}",
+            std::process::id(),
+            fastrand::u64(..)
+        ));
+        let script_dir = root.join("scripts/coresrvctrl/windows");
+        std::fs::create_dir_all(&script_dir).unwrap();
+        std::fs::write(
+            root.join(crate::config::scripts::FILE_NAME),
+            include_bytes!("../../contrib/scripts/coresrvctrl/windows/system.json"),
+        )
+        .unwrap();
+        // Exercise the bundled argv with a harmless script instead of the SCM.
+        std::fs::write(
+            script_dir.join("service.ps1"),
+            "\u{feff}param([string]$Operation, [string]$ServiceName)\n\
+             if ($Operation -ne 'status' -or $ServiceName -ne 'path test 中文') { exit 3 }\n\
+             [Console]::Out.Write('inactive')\n",
+        )
+        .unwrap();
+        let config_root = root.canonicalize().unwrap();
+        let config = ScriptConfig::load(&config_root).unwrap();
+        let action = config.find(CoreType::Mihomo, "status_core").unwrap();
+        let command = config
+            .resolve(&config_root, action, |name| {
+                assert_eq!(name, "service_name");
+                Ok("path test 中文".into())
+            })
+            .unwrap();
+        let result = run_capture(&command);
+        std::fs::remove_dir_all(root).unwrap();
+
+        let output = result.unwrap();
+        assert!(
+            output.status.success(),
+            "{}: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert_eq!(output.stdout, b"inactive");
     }
 
     #[test]
