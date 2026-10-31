@@ -1,7 +1,5 @@
-#[cfg_attr(target_os = "linux", path = "command/linux.rs")]
-#[cfg_attr(target_os = "macos", path = "command/macos.rs")]
-#[cfg_attr(target_os = "windows", path = "command/windows.rs")]
-mod platform;
+#[cfg(unix)]
+mod unix;
 mod utils;
 
 use crate::config::CONFIG;
@@ -9,7 +7,8 @@ use crate::config::CoreType;
 use anyhow::Result;
 use std::{path::Path, process::Command};
 
-pub use platform::*;
+#[cfg(unix)]
+pub use unix::*;
 use utils::*;
 
 pub fn test_config(profile_path: Option<&Path>, enable_geodata_mode: bool) -> String {

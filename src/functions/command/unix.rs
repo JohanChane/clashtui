@@ -3,13 +3,6 @@ use nix::unistd::{Gid, Group};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::PathBuf;
 
-#[allow(dead_code)]
-pub fn correct_cap_for_tun() -> Result<String> {
-    // macOS TUN works via utun devices; no setcap needed.
-    // The core binary just needs to run as root for TUN access.
-    Ok("No setcap on macOS (use sudo for TUN)".into())
-}
-
 pub fn find_files_not_group_writable(dir: &Path) -> Vec<PathBuf> {
     let mut result = Vec::new();
 
@@ -98,42 +91,17 @@ pub fn repair_file_permissions(dir: &Path, group_name: &str) -> Result<String> {
     exec_sudo("sh", vec!["-c", &script])
 }
 
-pub(super) fn stringify_output(output: std::process::Output) -> String {
-    let stdout_str = String::from_utf8_lossy(&output.stdout);
-    let stderr_str = String::from_utf8_lossy(&output.stderr);
-
-    let result_str = format!(
-        r#"{}
-        Stdout:
-        {}
-
-        Stderr:
-        {}
-        "#,
-        if output.status.success() {
-            "OK".to_owned()
-        } else {
-            format!("Error({})", output.status)
-        },
-        stdout_str,
-        stderr_str
-    );
-
-    result_str
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
-    use std::os::unix::process::ExitStatusExt;
 
     fn make_temp_dir() -> (PathBuf, impl Drop) {
-        let uuid = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let path = std::env::temp_dir().join(format!("clashtui_test_{uuid}"));
+        let path = std::env::temp_dir().join(format!(
+            "clashtui_test_{}_{}",
+            std::process::id(),
+            fastrand::u64(..)
+        ));
         std::fs::create_dir(&path).unwrap();
         struct Cleanup(PathBuf);
         impl Drop for Cleanup {
@@ -142,54 +110,6 @@ mod tests {
             }
         }
         (path.clone(), Cleanup(path))
-    }
-
-    #[test]
-    fn test_correct_cap_for_tun() {
-        let result = correct_cap_for_tun().unwrap();
-        assert!(result.contains("No setcap on macOS"));
-        assert!(result.contains("sudo"));
-    }
-
-    #[test]
-    fn test_stringify_output_success() {
-        let output = std::process::Output {
-            status: std::process::ExitStatus::from_raw(0),
-            stdout: b"hello stdout\n"[..].into(),
-            stderr: b"hello stderr\n"[..].into(),
-        };
-        let result = stringify_output(output);
-        assert!(
-            result.contains("OK"),
-            "should contain OK for success: {result}"
-        );
-        assert!(result.contains("hello stdout"));
-        assert!(result.contains("hello stderr"));
-    }
-
-    #[test]
-    fn test_stringify_output_failure() {
-        let output = std::process::Output {
-            status: std::process::ExitStatus::from_raw(1 << 8),
-            stdout: b""[..].into(),
-            stderr: b"something went wrong\n"[..].into(),
-        };
-        let result = stringify_output(output);
-        assert!(result.contains("Error("), "should contain Error: {result}");
-        assert!(result.contains("something went wrong"));
-    }
-
-    #[test]
-    fn test_stringify_output_empty() {
-        let output = std::process::Output {
-            status: std::process::ExitStatus::from_raw(0),
-            stdout: Vec::new(),
-            stderr: Vec::new(),
-        };
-        let result = stringify_output(output);
-        assert!(result.contains("OK"));
-        assert!(result.contains("Stdout:"));
-        assert!(result.contains("Stderr:"));
     }
 
     #[test]

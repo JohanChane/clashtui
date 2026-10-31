@@ -1,6 +1,29 @@
 use anyhow::Result;
 use std::process::{Command, Stdio};
 
+pub(super) fn stringify_output(output: std::process::Output) -> String {
+    let stdout_str = String::from_utf8_lossy(&output.stdout);
+    let stderr_str = String::from_utf8_lossy(&output.stderr);
+
+    format!(
+        r#"{}
+        Stdout:
+        {}
+
+        Stderr:
+        {}
+        "#,
+        if output.status.success() {
+            "OK".to_owned()
+        } else {
+            format!("Error({})", output.status)
+        },
+        stdout_str,
+        stderr_str
+    )
+}
+
+#[cfg(unix)]
 pub fn exec_sudo(pgm: &str, args: Vec<&str>) -> Result<String> {
     let mut argv = vec!["--".into(), pgm.into()];
     argv.extend(args.into_iter().map(Into::into));
@@ -78,6 +101,51 @@ pub fn shell_spawn(cmd_template: &str, path: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    use std::os::unix::process::ExitStatusExt;
+    #[cfg(windows)]
+    use std::os::windows::process::ExitStatusExt;
+
+    #[test]
+    fn test_stringify_output_success() {
+        let output = std::process::Output {
+            status: std::process::ExitStatus::from_raw(0),
+            stdout: b"hello stdout\n"[..].into(),
+            stderr: b"hello stderr\n"[..].into(),
+        };
+        let result = stringify_output(output);
+        assert!(
+            result.contains("OK"),
+            "should contain OK for success: {result}"
+        );
+        assert!(result.contains("hello stdout"));
+        assert!(result.contains("hello stderr"));
+    }
+
+    #[test]
+    fn test_stringify_output_failure() {
+        let output = std::process::Output {
+            status: std::process::ExitStatus::from_raw(1 << 8),
+            stdout: b""[..].into(),
+            stderr: b"something went wrong\n"[..].into(),
+        };
+        let result = stringify_output(output);
+        assert!(result.contains("Error("), "should contain Error: {result}");
+        assert!(result.contains("something went wrong"));
+    }
+
+    #[test]
+    fn test_stringify_output_empty() {
+        let output = std::process::Output {
+            status: std::process::ExitStatus::from_raw(0),
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        };
+        let result = stringify_output(output);
+        assert!(result.contains("OK"));
+        assert!(result.contains("Stdout:"));
+        assert!(result.contains("Stderr:"));
+    }
 
     #[test]
     fn sanitize_unc_prefix_stripped() {
