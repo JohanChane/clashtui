@@ -62,6 +62,8 @@ clashtui --config-dir /my/config/path
 
 > 其他页面内的快捷键在各标签页中按 `?` 查看。
 
+日志页的 `p` 用于暂停或恢复记录。暂停时 WebSocket 保持连接，但新日志会被丢弃，恢复后不会补发。暂停前已排队的消息仍可能显示。
+
 ### 自定义按键
 
 在配置目录的 `keymap.yaml` 中使用 `on / action / desc` 列表格式。Linux 默认路径为 `~/.config/clashtui/keymap.yaml`。只需写需要修改的绑定，未配置的页面和按键继续使用内置默认值。

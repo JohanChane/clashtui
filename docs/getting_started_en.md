@@ -62,6 +62,8 @@ After entering the TUI, a row of tabs appears at the top, with a hint bar at the
 
 > For page-specific shortcuts, press `?` in each tab.
 
+In Logs, `p` pauses or resumes log capture. The WebSocket stays connected while paused, but new messages are discarded and are not replayed on resume. Messages queued before pausing may still appear.
+
 ### Custom Key Bindings
 
 Use the `on / action / desc` list format in `keymap.yaml` in your config directory. The default Linux path is `~/.config/clashtui/keymap.yaml`. Configure only the bindings you want to change; omitted pages and bindings keep their built-in defaults.

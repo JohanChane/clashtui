@@ -33,7 +33,6 @@ key_map!(
                 (KeyCode::Char('i'), Key::ToggleInfo),
                 (KeyCode::Char('w'), Key::ToggleWarning),
                 (KeyCode::Char('e'), Key::ToggleError),
-                (KeyCode::Char('s'), Key::ToggleSilent),
             ]
         )
 );
@@ -52,7 +51,6 @@ pub(in crate::tui) enum Key {
     ToggleInfo,
     ToggleWarning,
     ToggleError,
-    ToggleSilent,
 }
 
 impl Document for Key {
@@ -71,7 +69,6 @@ impl Document for Key {
             Self::ToggleInfo => "Toggle Info",
             Self::ToggleWarning => "Toggle Warning",
             Self::ToggleError => "Toggle Error",
-            Self::ToggleSilent => "You really know what this means?",
         }
     }
 }
@@ -136,7 +133,7 @@ impl Default for Logs {
             scroll: 0,
             error: None,
             filter: None,
-            paused: true,
+            paused: Arc::new(AtomicBool::new(true)),
             current_log_level: String::new(),
             ws_pending: None,
             ws_level: Arc::new(Mutex::new(String::new())),
@@ -150,11 +147,35 @@ struct Logs {
     scroll: usize,
     error: Option<String>,
     filter: Option<String>,
-    paused: bool,
+    paused: Arc<AtomicBool>,
     current_log_level: String,
     ws_pending: Option<Arc<Mutex<Vec<LogEntry>>>>,
     ws_level: Arc<Mutex<String>>,
     ws_reconnect: Arc<AtomicBool>,
+}
+
+fn queue_log_message(text: &str, pending: &Mutex<Vec<LogEntry>>, paused: &AtomicBool) {
+    // Keep receiving while paused, but do not retain new messages for later replay.
+    if paused.load(Ordering::Relaxed) {
+        return;
+    }
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(text) {
+        let type_ = v
+            .get("type")
+            .and_then(|t| t.as_str())
+            .unwrap_or("unknown")
+            .to_owned();
+        let payload = v
+            .get("payload")
+            .and_then(|p| p.as_str())
+            .unwrap_or("")
+            .to_owned();
+        pending.lock().unwrap().push(LogEntry {
+            type_,
+            payload,
+            time: api_log::timestamp(),
+        });
+    }
 }
 
 fn spawn_ws_logs(
@@ -163,6 +184,7 @@ fn spawn_ws_logs(
     pending: Arc<Mutex<Vec<LogEntry>>>,
     level: Arc<Mutex<String>>,
     reconnect: Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
 ) {
     std::thread::spawn(move || {
         let ws_scheme = if controller.starts_with("https") {
@@ -197,23 +219,7 @@ fn spawn_ws_logs(
                     loop {
                         match ws.read() {
                             Ok(tungstenite::Message::Text(text)) => {
-                                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&text) {
-                                    let type_ = v
-                                        .get("type")
-                                        .and_then(|t| t.as_str())
-                                        .unwrap_or("unknown")
-                                        .to_owned();
-                                    let payload = v
-                                        .get("payload")
-                                        .and_then(|p| p.as_str())
-                                        .unwrap_or("")
-                                        .to_owned();
-                                    pending.lock().unwrap().push(LogEntry {
-                                        type_,
-                                        payload,
-                                        time: api_log::timestamp(),
-                                    });
-                                }
+                                queue_log_message(&text, &pending, &paused);
                             }
                             Ok(tungstenite::Message::Close(_)) => break,
                             Err(tungstenite::Error::Io(ref e))
@@ -252,7 +258,7 @@ impl BasicTabContent for Logs {
         if crate::config::is_core_mismatch() {
             self.buffer.clear();
             self.error = Some("API data mismatch with configured core".to_owned());
-            self.paused = true;
+            self.paused.store(true, Ordering::Relaxed);
             return;
         }
         // Refresh log level from core on every re-entry
@@ -278,7 +284,7 @@ impl BasicTabContent for Logs {
     }
 
     fn after_sync(&self, task_set: &mut FutureSet<Self>) {
-        if self.paused {
+        if self.paused.load(Ordering::Relaxed) {
             return;
         }
         if crate::config::is_core_mismatch() {
@@ -313,7 +319,8 @@ impl TabContent for Logs {
         let secret = CONFIG.secret_for_core().map(|s| s.to_owned());
         let level = Arc::clone(&self.ws_level);
         let reconnect = Arc::clone(&self.ws_reconnect);
-        spawn_ws_logs(controller, secret, pending, level, reconnect);
+        let paused = Arc::clone(&self.paused);
+        spawn_ws_logs(controller, secret, pending, level, reconnect, paused);
 
         self.error = Some("Press p to start capturing logs".to_owned());
         // Fetch initial log level
@@ -378,14 +385,14 @@ impl TabContent for Logs {
                 .spawn_at(task_set);
             }
             Key::TogglePause => {
-                self.paused = !self.paused;
-                if !self.paused {
+                let was_paused = self.paused.fetch_xor(true, Ordering::Relaxed);
+                if was_paused {
                     // Kickstart the after_sync poll chain
                     async { wrapper(|_content: &mut Logs| {}) }.spawn_at(task_set);
                 }
             }
             Key::FzfFind => {
-                self.paused = true;
+                self.paused.store(true, Ordering::Relaxed);
                 let names: Vec<String> = self
                     .buffer
                     .iter_from_head()
@@ -414,7 +421,6 @@ impl TabContent for Logs {
             Key::ToggleInfo => self.toggle_log_level("info", task_set),
             Key::ToggleWarning => self.toggle_log_level("warning", task_set),
             Key::ToggleError => self.toggle_log_level("error", task_set),
-            Key::ToggleSilent => self.toggle_log_level("silent", task_set),
         }
     }
 
@@ -428,7 +434,7 @@ impl TabContent for Logs {
         if let Some(ref filter) = self.filter {
             title_parts.push(format!(" / {filter} "));
         }
-        if self.paused {
+        if self.paused.load(Ordering::Relaxed) {
             title_parts.push(" [PAUSED]".to_owned());
         }
         let block = if title_parts.len() > 1 {
@@ -472,5 +478,75 @@ impl Logs {
         self.current_log_level = level.clone();
         *self.ws_level.lock().unwrap() = level;
         self.ws_reconnect.store(true, Ordering::Relaxed);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn queue(payload: &str, pending: &Mutex<Vec<LogEntry>>, paused: &AtomicBool) {
+        let text = serde_json::json!({"type": "info", "payload": payload}).to_string();
+        queue_log_message(&text, pending, paused);
+    }
+
+    #[test]
+    fn paused_messages_are_discarded_without_replay() {
+        let logs = Logs::default();
+        let pending = Mutex::new(Vec::new());
+
+        queue("initially paused", &pending, &logs.paused);
+        assert!(pending.lock().unwrap().is_empty());
+
+        logs.paused.store(false, Ordering::Relaxed);
+        queue("before pause", &pending, &logs.paused);
+        logs.paused.store(true, Ordering::Relaxed);
+        for _ in 0..1000 {
+            queue("during pause", &pending, &logs.paused);
+        }
+        let entries = std::mem::take(&mut *pending.lock().unwrap());
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].payload, "before pause");
+
+        logs.paused.store(false, Ordering::Relaxed);
+        queue("after resume", &pending, &logs.paused);
+        let entries = pending.lock().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].payload, "after resume");
+    }
+
+    #[tokio::test]
+    async fn pause_key_keeps_the_batch_already_scheduled_for_display() {
+        let pending = Arc::new(Mutex::new(Vec::new()));
+        let mut logs = Logs {
+            ws_pending: Some(Arc::clone(&pending)),
+            ..Logs::default()
+        };
+        let receiver_paused = Arc::clone(&logs.paused);
+        let mut tasks = FutureSet::new();
+
+        logs.handle_key_event(Key::TogglePause, &mut tasks, &mut ());
+        let kickstart = tasks.join_next().await.unwrap().unwrap();
+        kickstart(&mut logs);
+        assert!(!receiver_paused.load(Ordering::Relaxed));
+        queue("before pause", &pending, &receiver_paused);
+        logs.after_sync(&mut tasks);
+        let callback = tokio::time::timeout(Duration::from_secs(3), tasks.join_next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+
+        logs.handle_key_event(Key::TogglePause, &mut tasks, &mut ());
+        assert!(receiver_paused.load(Ordering::Relaxed));
+        queue("during pause", &pending, &receiver_paused);
+        callback(&mut logs);
+
+        assert!(pending.lock().unwrap().is_empty());
+        assert_eq!(logs.buffer.count(), 1);
+        assert_eq!(
+            logs.buffer.iter_from_head().next().unwrap().payload,
+            "before pause"
+        );
     }
 }
