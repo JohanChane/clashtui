@@ -467,6 +467,14 @@ mod matching {
         for text in [
             "j",
             "G",
+            "S",
+            "C",
+            "A",
+            "D",
+            "1",
+            "!",
+            "-",
+            "é",
             "?",
             "中",
             " ",
@@ -476,6 +484,8 @@ mod matching {
             "<A-x>",
             "<D-x>",
             "<C-S-a>",
+            "<S-g>",
+            "<S-s>",
             "<S-1>",
             "<S-/>",
             "<S-!>",
@@ -488,6 +498,9 @@ mod matching {
             "<S-Up>",
             "<BackTab>",
             "<C-->",
+            "<C-<>",
+            "<C->>",
+            "<Space>",
             "<F12>",
             "<PageDown>",
         ] {
@@ -505,6 +518,22 @@ mod matching {
             "C-j>",
         ] {
             assert!(text.parse::<Key>().is_err(), "accepted {text}");
+        }
+    }
+
+    #[test]
+    fn bare_characters_in_angle_brackets_report_how_to_write_them() {
+        for character in [
+            'S', 'C', 'A', 'D', 'g', '1', '!', '-', '<', '>', ' ', 'é', '中',
+        ] {
+            let text = format!("<{character}>");
+            let error = text.parse::<Key>().unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("write `{character}` without angle brackets")),
+                "{text}: {error}"
+            );
         }
     }
 

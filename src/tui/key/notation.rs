@@ -12,7 +12,7 @@ impl FromStr for Key {
             let mut name = text
                 .strip_prefix('<')
                 .and_then(|s| s.strip_suffix('>'))
-                .ok_or_else(|| anyhow::anyhow!("invalid key `{text}`; use one character or <Key>; write chords as [\"g\", \"g\"]"))?;
+                .ok_or_else(|| anyhow::anyhow!("invalid key `{text}`; write characters directly, use <Enter> or <C-x> for named or modified keys; write chords as [\"g\", \"g\"]"))?;
             while let Some((prefix, rest)) = name.split_once('-') {
                 let modifier = match prefix.to_ascii_lowercase().as_str() {
                     "c" => KeyModifiers::CONTROL,
@@ -41,7 +41,13 @@ impl FromStr for Key {
                 "delete" => KeyCode::Delete,
                 "insert" => KeyCode::Insert,
                 "esc" => KeyCode::Esc,
-                _ if name.chars().count() == 1 => KeyCode::Char(name.chars().next().unwrap()),
+                _ if name.chars().count() == 1 => {
+                    anyhow::ensure!(
+                        !modifiers.is_empty(),
+                        "invalid key `{text}`; write `{name}` without angle brackets"
+                    );
+                    KeyCode::Char(name.chars().next().unwrap())
+                }
                 _ => {
                     let number = name.strip_prefix('F').or_else(|| name.strip_prefix('f'));
                     let number = number.and_then(|s| s.parse::<u8>().ok());

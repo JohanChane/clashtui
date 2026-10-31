@@ -88,6 +88,7 @@ file:
 
 - `on`: a single key string or a list of two keys. A modified key counts as one key, as in `["<C-g>", "c"]`. Write `gg` as `["g", "g"]`, not `"gg"`.
 - Key notation includes `"j"`, `"G"`, `"<Enter>"`, `"<Up>"`, and `"<F1>"`. Prefixes `C-`, `A-`, `S-`, and `D-` mean Ctrl, Alt, Shift, and Super. ASCII uppercase letters imply Shift; `"<S-g>"` and `"G"` are equivalent.
+- Write ordinary characters directly. Angle brackets are for named keys or modifier combinations: `<S>` is invalid; use `S` or `<S-s>` for uppercase S. Pressing Shift alone cannot be bound.
 - `action`: an action for that page. Use a plain name, such as `Edit` on a file page or `SortByDelay` on the proxies page; `action: null` unbinds a key. Optional `desc` appears in the `?` help panel; omit it to use the action's default description.
 - An identical complete key sequence replaces its default binding. Adding a new key for an action does not automatically remove the original key.
 
