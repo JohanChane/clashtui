@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     ffi::OsString,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 pub const FILE_NAME: &str = "scripts.json";
@@ -80,6 +80,11 @@ fn reject_symlinks(path: &Path) -> Result<()> {
     let mut current = PathBuf::new();
     for component in path.components() {
         current.push(component.as_os_str());
+        // A Windows prefix such as \\?\C: is not a complete filesystem path.
+        // Inspect it after the root or next component has been appended.
+        if matches!(component, Component::Prefix(_)) {
+            continue;
+        }
         match std::fs::symlink_metadata(&current) {
             Ok(metadata) => ensure!(
                 !metadata.file_type().is_symlink(),
@@ -326,6 +331,25 @@ mod tests {
             root: "scripts/coresrvctrl".into(),
             actions,
         }
+    }
+
+    #[test]
+    fn load_from_canonicalized_config_root() {
+        let root = std::env::temp_dir().join(format!(
+            "clashtui-scripts-{}-{}",
+            std::process::id(),
+            fastrand::u64(..)
+        ));
+        std::fs::create_dir(&root).unwrap();
+        let expected = config(vec![action("start_core", None)]);
+        std::fs::write(root.join(FILE_NAME), serde_json::to_vec(&expected).unwrap()).unwrap();
+
+        // Match config::init, including the verbatim path prefix on Windows.
+        let config_root = root.canonicalize().unwrap();
+        let loaded = ScriptConfig::load(&config_root);
+
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(loaded.unwrap(), expected);
     }
 
     #[test]
