@@ -39,7 +39,7 @@ src/
 │       ├── key.rs       # Keys, default-binding macro, and loading entry point
 │       ├── key/
 │       │   ├── config.rs    # Parsing, overrides, unbinding, scope validation
-│       │   ├── effective.rs # Page/focus maps and global conflict validation
+│       │   ├── runtime.rs # Binding store, ID lookup tables, and global conflict validation
 │       │   ├── matcher.rs   # Pending-chord state owned by App
 │       │   └── notation.rs  # Key notation parsing and formatting
 │       ├── signals.rs   # OS signal handling
@@ -118,7 +118,7 @@ Per-frame flow:
 
 `key_map!` declares typed defaults and configuration parsers. `Keymaps::from_config` applies core-specific scopes, default overrides, and unbindings, then checks each page against global bindings. Identical complete sequences and single-key/chord prefix overlaps stop startup with an error; `gp` and `gg` can share a prefix.
 
-Each page/focus context has an immutable `EffectiveKeymap`. Profile and Template get separate maps; Status uses the global map. The maps are installed in a read-only `OnceLock` only after every context passes validation.
+`Keymaps` owns each `RuntimeBinding` once. `scope_bindings` indexes IDs by source, `key_lookup` compiles global and page IDs for each focus context, and `tab_shortcuts` caches tab-binding IDs. Profile and Template have separate lookup tables; Status uses the global table. The store is installed in a read-only `OnceLock` only after all validation succeeds.
 
 Input handling:
 
@@ -127,7 +127,7 @@ Input handling:
 3. App's `Matcher` uses the effective map and returns `Pending`, `Execute(Action)`, `Cancelled`, or `Unmatched`.
 4. App executes global actions or passes typed page actions to `TuiTab::handle_action`.
 
-App owns the only mutable pending-chord state. Tab changes, focus changes, and popups do not inherit old candidates. Esc and unmatched second keys are consumed. Which, help, and tab labels read the same effective map. App displays the pending group name in the top bar; pages need no matching state.
+App owns the only mutable pending-chord state. Tab changes, focus changes, and popups do not inherit old candidates. Esc and unmatched second keys are consumed. Help and tab labels borrow the same binding store. Which borrows candidates from the original prefix branch, sorting them and selecting the title at display time without persistent copies of descriptions or candidate order. App displays the pending group name in the top bar; pages need no matching state.
 
 ### TuiWidget Trait
 
@@ -225,7 +225,7 @@ The `functions/` directory contains all business logic, divided into three modul
 ## Adding a Tab
 
 1. Define content implementing `BasicTabContent` and `TabContent` (or the dual-panel traits).
-2. Add `Scope`, `Action`, and a configuration loader in `key/effective.rs`; register the configuration scope in `key/config.rs`.
+2. Add `Scope`, `Action`, and a configuration loader in `key/runtime.rs`; register the configuration scope in `key/config.rs`.
 3. Declare defaults with `key_map!`, generate the wrapper with `newtype_tab!(MyTab(Tab<MyContent>), MyScope)`, and register it in `tab/mod.rs`'s `enum_dispatch!`.
 4. Add the tab to `App::new()` and update `TabTarget` and default navigation bindings. Keep their order consistent with the tab list.
 5. Dual panels expose separate actions and scopes; `input_scope` selects the effective map by focus.

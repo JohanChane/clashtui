@@ -35,16 +35,60 @@ fn defaults() -> DefaultMap<Action> {
         )
 }
 
-fn compile(yaml: &str) -> anyhow::Result<(KeyMap<Action>, KeyDesc)> {
-    config::merge(defaults(), serde_yml::from_str(yaml)?)
+fn runtime_action(action: Action) -> super::Action {
+    use crate::tui::tab::logs;
+    super::Action::Logs(match action {
+        Action::MoveUp => logs::Key::MoveUp,
+        Action::MoveDown => logs::Key::MoveDown,
+        Action::GoTop => logs::Key::GoTop,
+        Action::Clear => logs::Key::Clear,
+    })
 }
 
-fn resolve(map: &KeyMap<Action>, keys: &[&str]) -> Option<Action> {
-    let mut input = Matcher::default();
+fn runtime_maps(bindings: Vec<config::ResolvedBinding<Action>>) -> anyhow::Result<Keymaps> {
+    Keymaps::from_bindings(
+        [(
+            Scope::Logs,
+            bindings
+                .into_iter()
+                .map(|b| b.map_action(runtime_action))
+                .collect(),
+        )]
+        .into(),
+    )
+}
+
+fn docs(view: BindingView<'_>) -> Vec<(String, String)> {
+    view.iter()
+        .map(|b| (b.key_text.clone(), b.desc.clone()))
+        .collect()
+}
+
+fn hint_rows(view: &ChordView<'_>) -> Vec<(String, String)> {
+    view.rows()
+        .map(|(key, desc)| (key, desc.to_owned()))
+        .collect()
+}
+
+fn compile(yaml: &str) -> anyhow::Result<(Keymaps, Vec<(String, String)>)> {
+    let maps = runtime_maps(config::resolve(defaults(), serde_yml::from_str(yaml)?)?)?;
+    let descriptions = docs(maps.page_bindings(Scope::Logs));
+    Ok((maps, descriptions))
+}
+
+fn resolve(map: &Keymaps, keys: &[&str]) -> Option<Action> {
+    let mut input = Matcher::new(map);
     let mut result = None;
     for key in keys {
-        result = match input.feed(&key.parse().unwrap(), Scope::Logs, map) {
-            Match::Execute(action) => Some(action),
+        result = match input.feed(&key.parse().unwrap(), Scope::Logs, Scope::Logs) {
+            Match::Execute(action) => [
+                Action::MoveUp,
+                Action::MoveDown,
+                Action::GoTop,
+                Action::Clear,
+            ]
+            .into_iter()
+            .find(|candidate| runtime_action(*candidate) == action),
             _ => None,
         };
     }
@@ -154,7 +198,8 @@ mod configuration {
         let map = config::sections(input, "mihomo").unwrap();
         assert!(map.contains_key("files/profile"));
         assert!(map.contains_key("files/template"));
-        let (compiled, _) = config::merge(defaults(), map["logs"].clone()).unwrap();
+        let compiled =
+            runtime_maps(config::resolve(defaults(), map["logs"].clone()).unwrap()).unwrap();
         assert_eq!(resolve(&compiled, &["y"]), Some(Action::Clear));
         assert_eq!(resolve(&compiled, &["x"]), None);
         assert_eq!(resolve(&compiled, &["z"]), None);
@@ -346,7 +391,10 @@ mod matching {
         assert_eq!(resolve(&map, &["j"]), Some(Action::MoveDown));
         assert!(docs.contains(&("g e".into(), "Clear by chord".into())));
         assert!(
-            matches!(&map[&"g".parse().unwrap()], MaybeMap::SubMap(submap) if submap.hints.name == "Nav")
+            map.chord_view(Scope::Logs, "g".parse().unwrap())
+                .unwrap()
+                .name
+                == "Nav"
         );
     }
 
@@ -416,21 +464,21 @@ mod matching {
     #[test]
     fn pending_hints_follow_overrides_unbinding_and_stable_key_order() {
         let (map, _) = compile("- {on: [g, z], action: Clear, desc: Last}\n- {on: [g, a], action: MoveUp, desc: First}\n- {on: [g, g], action: null}").unwrap();
-        let mut input = Matcher::default();
+        let mut input = Matcher::new(&map);
         assert_eq!(
-            input.feed(&"g".parse().unwrap(), Scope::Logs, &map),
+            input.feed(&"g".parse().unwrap(), Scope::Logs, Scope::Logs),
             Match::Pending
         );
         let hints = input.hints(Scope::Logs).unwrap();
         assert_eq!(hints.prefix, "g".parse().unwrap());
         assert_eq!(hints.name, "Nav");
         assert_eq!(
-            hints.keys,
+            hint_rows(&hints),
             vec![("a".into(), "First".into()), ("z".into(), "Last".into())]
         );
         assert_eq!(
-            input.feed(&"a".parse().unwrap(), Scope::Logs, &map),
-            Match::Execute(Action::MoveUp)
+            input.feed(&"a".parse().unwrap(), Scope::Logs, Scope::Logs),
+            Match::Execute(runtime_action(Action::MoveUp))
         );
         assert!(input.hints(Scope::Logs).is_none());
     }
@@ -440,10 +488,10 @@ mod matching {
         let (map, _) =
             compile("- {on: '<Esc>', action: Clear}\n- {on: [g, '<C-Esc>'], action: MoveDown}")
                 .unwrap();
-        let mut input = Matcher::default();
-        input.feed(&"g".parse().unwrap(), Scope::Logs, &map);
+        let mut input = Matcher::new(&map);
+        input.feed(&"g".parse().unwrap(), Scope::Logs, Scope::Logs);
         assert_eq!(
-            input.feed(&"<Esc>".parse().unwrap(), Scope::Logs, &map),
+            input.feed(&"<Esc>".parse().unwrap(), Scope::Logs, Scope::Logs),
             Match::Cancelled
         );
         assert!(input.hints(Scope::Logs).is_none());
@@ -457,6 +505,7 @@ mod matching {
 }
 
 mod contexts {
+    use super::{docs, hint_rows};
     use crate::tui::key::*;
     use crate::tui::{
         app::{AppKey, TabTarget},
@@ -467,13 +516,8 @@ mod contexts {
         Keymaps::from_config(serde_yml::from_str(yaml)?, "mihomo")
     }
 
-    fn press<'a>(
-        input: &mut Matcher<'a, Action>,
-        maps: &'a Keymaps,
-        scope: Scope,
-        key: &str,
-    ) -> Match<Action> {
-        input.feed(&key.parse().unwrap(), scope, &maps.get(scope).map)
+    fn press(input: &mut Matcher<'_>, scope: Scope, key: &str) -> Match<Action> {
+        input.feed(&key.parse().unwrap(), scope, scope)
     }
 
     #[test]
@@ -556,31 +600,24 @@ mod contexts {
     #[test]
     fn shared_prefix_uses_one_candidate_set_for_matching_help_and_hints() {
         let maps = maps("app: [{on: [g, p], action: TabPrev, desc: Previous page}]\nlogs: [{on: [g, g], action: GoTop, desc: First log}]").unwrap();
-        let bindings = maps.get(Scope::Logs);
         assert!(
-            bindings
-                .page_docs()
-                .contains(&("g g".into(), "First log".into()))
+            docs(maps.page_bindings(Scope::Logs)).contains(&("g g".into(), "First log".into()))
         );
-        assert!(
-            bindings
-                .global_docs()
-                .contains(&("g p".into(), "Previous page".into()))
-        );
-        let mut input = Matcher::default();
+        assert!(docs(maps.global_bindings()).contains(&("g p".into(), "Previous page".into())));
+        let mut input = Matcher::new(&maps);
         for second in ["g", "p"] {
             assert!(matches!(
-                press(&mut input, &maps, Scope::Logs, "g"),
+                press(&mut input, Scope::Logs, "g"),
                 Match::Pending
             ));
             assert_eq!(
-                input.hints(Scope::Logs).unwrap().keys,
+                hint_rows(&input.hints(Scope::Logs).unwrap()),
                 vec![
                     ("g".into(), "First log".into()),
                     ("p".into(), "Previous page".into())
                 ]
             );
-            let action = press(&mut input, &maps, Scope::Logs, second);
+            let action = press(&mut input, Scope::Logs, second);
             if second == "g" {
                 assert!(matches!(
                     action,
@@ -599,24 +636,22 @@ mod contexts {
     #[test]
     fn unbinding_and_rebinding_remove_conflicts_before_contexts_are_compiled() {
         let maps = maps("app: [{on: q, action: null}, {on: x, action: Quit}, {on: ['<C-g>', c], action: null}]\nlogs: [{on: q, action: Clear}, {on: ['<C-g>', c], action: Clear}]").unwrap();
-        let mut input = Matcher::default();
+        let mut input = Matcher::new(&maps);
         assert!(matches!(
-            press(&mut input, &maps, Scope::Logs, "q"),
+            press(&mut input, Scope::Logs, "q"),
             Match::Execute(Action::Logs(logs::Key::Clear))
         ));
         assert!(matches!(
-            press(&mut input, &maps, Scope::Logs, "x"),
+            press(&mut input, Scope::Logs, "x"),
             Match::Execute(Action::App(AppKey::Quit))
         ));
-        press(&mut input, &maps, Scope::Logs, "<C-g>");
+        press(&mut input, Scope::Logs, "<C-g>");
         assert!(matches!(
-            press(&mut input, &maps, Scope::Logs, "c"),
+            press(&mut input, Scope::Logs, "c"),
             Match::Execute(Action::Logs(logs::Key::Clear))
         ));
         assert!(
-            !maps
-                .get(Scope::Logs)
-                .global_docs()
+            !docs(maps.global_bindings())
                 .iter()
                 .any(|(key, _)| key == "q" || key == "<C-g> c")
         );
@@ -632,31 +667,29 @@ mod contexts {
     #[test]
     fn separate_pages_and_file_panes_can_reuse_the_same_sequence() {
         let maps = maps("logs: [{on: x, action: Clear}]\nfile:\n  profile: [{on: x, action: Preview, desc: Preview profile}]\n  template: [{on: x, action: Preview, desc: Preview template}]").unwrap();
-        let mut input = Matcher::default();
+        let mut input = Matcher::new(&maps);
         assert!(matches!(
-            press(&mut input, &maps, Scope::Logs, "x"),
+            press(&mut input, Scope::Logs, "x"),
             Match::Execute(Action::Logs(logs::Key::Clear))
         ));
         assert!(matches!(
-            press(&mut input, &maps, Scope::Profile, "x"),
+            press(&mut input, Scope::Profile, "x"),
             Match::Execute(Action::Profile(files::profile::Key::Action(
                 files::profile::Action::Preview
             )))
         ));
         assert!(matches!(
-            press(&mut input, &maps, Scope::Template, "x"),
+            press(&mut input, Scope::Template, "x"),
             Match::Execute(Action::Template(files::template::Key::Action(
                 files::template::Action::Preview
             )))
         ));
         assert!(
-            maps.get(Scope::Profile)
-                .page_docs()
+            docs(maps.page_bindings(Scope::Profile))
                 .contains(&("x".into(), "Preview profile".into()))
         );
         assert!(
-            maps.get(Scope::Template)
-                .page_docs()
+            docs(maps.page_bindings(Scope::Template))
                 .contains(&("x".into(), "Preview template".into()))
         );
     }
@@ -664,18 +697,18 @@ mod contexts {
     #[test]
     fn pending_context_is_cancelled_on_focus_change_or_explicit_cancellation() {
         let maps = maps("file: {template: [{on: x, action: Preview}]}").unwrap();
-        let mut input = Matcher::default();
-        press(&mut input, &maps, Scope::Profile, "g");
+        let mut input = Matcher::new(&maps);
+        press(&mut input, Scope::Profile, "g");
         assert!(input.hints(Scope::Template).is_none());
         assert!(matches!(
-            press(&mut input, &maps, Scope::Template, "x"),
+            press(&mut input, Scope::Template, "x"),
             Match::Execute(Action::Template(_))
         ));
-        press(&mut input, &maps, Scope::Template, "g");
+        press(&mut input, Scope::Template, "g");
         input.cancel();
         assert!(input.hints(Scope::Template).is_none());
         assert!(matches!(
-            press(&mut input, &maps, Scope::Template, "q"),
+            press(&mut input, Scope::Template, "q"),
             Match::Execute(Action::App(AppKey::Quit))
         ));
     }
@@ -683,17 +716,17 @@ mod contexts {
     #[test]
     fn cancelled_chords_consume_the_second_key_without_falling_through() {
         let maps = maps("app: [{on: [g, p], action: TabPrev}]").unwrap();
-        let mut input = Matcher::default();
+        let mut input = Matcher::new(&maps);
         for second in ["<Esc>", "q", "?", "<Tab>", "1", "<C-g>"] {
-            press(&mut input, &maps, Scope::Logs, "g");
+            press(&mut input, Scope::Logs, "g");
             assert!(matches!(
-                press(&mut input, &maps, Scope::Logs, second),
+                press(&mut input, Scope::Logs, second),
                 Match::Cancelled
             ));
             assert!(input.hints(Scope::Logs).is_none());
         }
         assert!(matches!(
-            press(&mut input, &maps, Scope::Logs, "q"),
+            press(&mut input, Scope::Logs, "q"),
             Match::Execute(Action::App(AppKey::Quit))
         ));
     }
@@ -701,10 +734,10 @@ mod contexts {
     #[test]
     fn a_second_key_can_also_be_a_global_single_key() {
         let maps = maps("logs: [{on: [g, q], action: Clear}]").unwrap();
-        let mut input = Matcher::default();
-        press(&mut input, &maps, Scope::Logs, "g");
+        let mut input = Matcher::new(&maps);
+        press(&mut input, Scope::Logs, "g");
         assert!(matches!(
-            press(&mut input, &maps, Scope::Logs, "q"),
+            press(&mut input, Scope::Logs, "q"),
             Match::Execute(Action::Logs(logs::Key::Clear))
         ));
     }
@@ -712,16 +745,15 @@ mod contexts {
     #[test]
     fn chords_started_from_help_keep_only_global_candidates() {
         let maps = maps("app: [{on: [g, p], action: TabPrev}]").unwrap();
-        let mut input = Matcher::default();
-        let globals = &maps.get(Scope::App).map;
+        let mut input = Matcher::new(&maps);
         for second in ["g", "p"] {
-            input.feed(&"g".parse().unwrap(), Scope::Logs, globals);
+            input.feed(&"g".parse().unwrap(), Scope::Logs, Scope::App);
             assert_eq!(
-                input.hints(Scope::Logs).unwrap().keys,
+                hint_rows(&input.hints(Scope::Logs).unwrap()),
                 vec![("p".into(), "Tab Previous".into())]
             );
             // Help has closed, but this sequence retains the map where it began.
-            let result = press(&mut input, &maps, Scope::Logs, second);
+            let result = press(&mut input, Scope::Logs, second);
             if second == "g" {
                 assert!(matches!(result, Match::Cancelled));
             } else {
@@ -746,31 +778,29 @@ mod contexts {
             Scope::Profile,
             Scope::Template,
         ] {
-            let bindings = maps.get(scope);
             assert_eq!(
-                bindings.page_docs().len() + bindings.global_docs().len(),
-                bindings.bindings.len()
+                maps.page_bindings(scope).len() + maps.global_bindings().len(),
+                maps.effective_bindings(scope).len(),
             );
-            for binding in &bindings.bindings {
-                let docs = if matches!(binding.action, Action::App(_)) {
-                    bindings.global_docs()
+            for (_, binding) in maps.effective_bindings(scope) {
+                let descriptions = if matches!(binding.action, Action::App(_)) {
+                    docs(maps.global_bindings())
                 } else {
-                    bindings.page_docs()
+                    docs(maps.page_bindings(scope))
                 };
-                assert!(
-                    docs.contains(&(notation::format_sequence(&binding.on), binding.desc.clone()))
-                );
-                let mut input = Matcher::default();
+                assert!(descriptions.contains(&(binding.key_text.clone(), binding.desc.clone())));
+                let mut input = Matcher::new(&maps);
                 let mut result = Match::Unmatched;
-                for key in &binding.on {
-                    result = input.feed(key, scope, &bindings.map);
+                for key in binding.on.as_slice() {
+                    result = input.feed(key, scope, scope);
                     if matches!(result, Match::Pending) {
                         assert!(
                             input
                                 .hints(scope)
                                 .unwrap()
-                                .keys
-                                .contains(&(binding.on[1].to_string(), binding.desc.clone()))
+                                .bindings()
+                                .iter()
+                                .any(|candidate| std::ptr::eq(*candidate, binding))
                         );
                     }
                 }
@@ -778,10 +808,9 @@ mod contexts {
                 assert!(input.hints(scope).is_none());
             }
             assert!(
-                bindings
-                    .bindings
-                    .iter()
-                    .any(|binding| binding.action == Action::App(AppKey::Tab(TabTarget::Status)))
+                maps.effective_bindings(scope)
+                    .any(|(_, binding)| binding.action
+                        == Action::App(AppKey::Tab(TabTarget::Status)))
             );
         }
     }

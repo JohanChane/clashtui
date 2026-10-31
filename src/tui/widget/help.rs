@@ -1,5 +1,4 @@
-use crate::tui::key::EffectiveKeymap;
-use crate::tui::key::{Key, KeyDescRef};
+use crate::tui::key::{BindingView, Key, Keymaps, Scope};
 use crossterm::event::KeyCode;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Style, Stylize};
@@ -48,16 +47,16 @@ impl HelpPanel {
         self.scroll = self.scroll.min(self.max_scroll);
     }
 
-    pub fn render(&mut self, f: &mut ratatui::Frame, title: &str, bindings: &EffectiveKeymap) {
-        self.render_content(f, title, bindings.page_docs(), bindings.global_docs());
+    pub fn render(&mut self, f: &mut ratatui::Frame, title: &str, maps: &Keymaps, scope: Scope) {
+        self.render_content(f, title, maps.page_bindings(scope), maps.global_bindings());
     }
 
     fn render_content(
         &mut self,
         f: &mut ratatui::Frame,
         tab_title: &str,
-        shortcuts: KeyDescRef,
-        global_shortcuts: KeyDescRef,
+        shortcuts: BindingView<'_>,
+        global_shortcuts: BindingView<'_>,
     ) {
         let area = f.area();
         let width = area.width.min(HELP_WIDTH);
@@ -125,7 +124,7 @@ fn render_shortcut_section(
     f: &mut ratatui::Frame,
     area: Rect,
     title: &str,
-    shortcuts: KeyDescRef,
+    shortcuts: BindingView<'_>,
     cols: usize,
     first_row: isize,
 ) {
@@ -170,12 +169,12 @@ fn render_shortcut_section(
             .iter()
             .skip(col_idx * items_per_col + first_visible)
             .take(last_visible - first_visible)
-            .map(|(key_str, desc)| {
+            .map(|binding| {
                 Line::from(vec![
                     Span::raw(" "),
-                    Span::styled(key_str, Style::new().dim()),
+                    Span::styled(binding.key_text.as_str(), Style::new().dim()),
                     Span::raw("  "),
-                    Span::styled(desc.as_str(), accent),
+                    Span::styled(binding.desc.as_str(), accent),
                 ])
             })
             .collect();
@@ -187,24 +186,18 @@ fn render_shortcut_section(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tui::key::{KeyDesc, Keymaps, Scope};
     use ratatui::{Terminal, backend::TestBackend};
 
-    fn defaults() -> (KeyDesc, KeyDesc) {
-        let maps = Keymaps::from_config(serde_yml::Mapping::new(), "mihomo").unwrap();
-        let bindings = maps.get(Scope::Proxies);
-        (
-            bindings.page_docs().to_vec(),
-            bindings.global_docs().to_vec(),
-        )
+    fn defaults() -> Keymaps {
+        Keymaps::from_config(serde_yml::Mapping::new(), "mihomo").unwrap()
     }
 
     fn screen(
         panel: &mut HelpPanel,
         width: u16,
         height: u16,
-        page: KeyDescRef,
-        globals: KeyDescRef,
+        page: BindingView<'_>,
+        globals: BindingView<'_>,
     ) -> String {
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
         terminal
@@ -221,17 +214,21 @@ mod tests {
 
     #[test]
     fn default_help_can_reveal_every_binding_in_an_80_by_24_terminal() {
-        let (page, globals) = defaults();
+        let maps = defaults();
+        let page = maps.page_bindings(Scope::Proxies);
+        let globals = maps.global_bindings();
         let mut panel = HelpPanel::default();
         panel.toggle();
-        let mut seen = screen(&mut panel, 80, 24, &page, &globals);
+        let mut seen = screen(&mut panel, 80, 24, page, globals);
         assert!(panel.max_scroll > 0);
         assert!(seen.contains("scroll"));
         while panel.scroll < panel.max_scroll {
             panel.handle_key_event(&"<Down>".parse().unwrap());
-            seen.push_str(&screen(&mut panel, 80, 24, &page, &globals));
+            seen.push_str(&screen(&mut panel, 80, 24, page, globals));
         }
-        for (key, desc) in page.iter().chain(&globals) {
+        for binding in page.iter().chain(globals.iter()) {
+            let key = &binding.key_text;
+            let desc = &binding.desc;
             assert!(
                 seen.contains(&format!(" {key}  {desc}")),
                 "missing {key}: {desc}"
@@ -246,15 +243,19 @@ mod tests {
 
     #[test]
     fn narrow_help_scrolls_both_sections_and_clamps_after_resize() {
-        let (page, globals) = defaults();
+        let maps = defaults();
+        let page = maps.page_bindings(Scope::Proxies);
+        let globals = maps.global_bindings();
         let mut panel = HelpPanel::default();
         panel.toggle();
-        let mut seen = screen(&mut panel, 40, 8, &page, &globals);
+        let mut seen = screen(&mut panel, 40, 8, page, globals);
         while panel.scroll < panel.max_scroll {
             panel.handle_key_event(&"j".parse().unwrap());
-            seen.push_str(&screen(&mut panel, 40, 8, &page, &globals));
+            seen.push_str(&screen(&mut panel, 40, 8, page, globals));
         }
-        for (key, desc) in page.iter().chain(&globals) {
+        for binding in page.iter().chain(globals.iter()) {
+            let key = &binding.key_text;
+            let desc = &binding.desc;
             assert!(
                 seen.contains(&format!(" {key}  {desc}")),
                 "missing {key}: {desc}"
@@ -268,11 +269,11 @@ mod tests {
         assert_eq!(panel.scroll, 0);
         panel.handle_key_event(&"<End>".parse().unwrap());
         assert_eq!(panel.scroll, panel.max_scroll);
-        screen(&mut panel, 100, 100, &page, &globals);
+        screen(&mut panel, 100, 100, page, globals);
         assert_eq!(panel.scroll, 0);
         assert_eq!(panel.max_scroll, 0);
         for (width, height) in [(0, 0), (1, 1), (2, 2), (3, 3), (10, 4)] {
-            screen(&mut panel, width, height, &page, &globals);
+            screen(&mut panel, width, height, page, globals);
         }
     }
 }

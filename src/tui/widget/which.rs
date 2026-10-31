@@ -1,4 +1,4 @@
-use crate::tui::{key::WhichHints, theme::Theme};
+use crate::tui::{key::ChordView, theme::Theme};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
@@ -8,22 +8,22 @@ use ratatui::{
 };
 
 /// Choices come from the same immutable context map used by App's matcher.
-pub fn render(f: &mut Frame, hints: &WhichHints) {
+pub fn render(f: &mut Frame, hints: &ChordView<'_>) {
     render_panel(f, f.area(), hints, Theme::get().popup.text);
 }
 
-fn render_panel(f: &mut Frame, area: Rect, hints: &WhichHints, accent: Style) {
-    if hints.keys.is_empty() || area.width < 3 || area.height < 3 {
+fn render_panel(f: &mut Frame, area: Rect, hints: &ChordView<'_>, accent: Style) {
+    if hints.bindings().is_empty() || area.width < 3 || area.height < 3 {
         return;
     }
 
-    let cols = if hints.keys.len() > 4 && area.width >= 70 {
+    let cols = if hints.bindings().len() > 4 && area.width >= 70 {
         2
     } else {
         1
     };
     let rows = hints
-        .keys
+        .bindings()
         .len()
         .div_ceil(cols)
         .min(usize::from(area.height - 2));
@@ -36,7 +36,7 @@ fn render_panel(f: &mut Frame, area: Rect, hints: &WhichHints, accent: Style) {
         width,
         height,
     };
-    let hidden = hints.keys.len().saturating_sub(rows * cols);
+    let hidden = hints.bindings().len().saturating_sub(rows * cols);
     let footer = if hidden == 0 {
         " Esc cancel ".to_owned()
     } else {
@@ -52,16 +52,15 @@ fn render_panel(f: &mut Frame, area: Rect, hints: &WhichHints, accent: Style) {
     let columns = Layout::horizontal(vec![Constraint::Ratio(1, cols as u32); cols]).split(inner);
     for (column, area) in columns.iter().enumerate() {
         let lines: Vec<_> = hints
-            .keys
-            .iter()
+            .rows()
             .skip(column * rows)
             .take(rows)
             .map(|(key, desc)| {
                 Line::from(vec![
                     Span::raw(" "),
-                    Span::styled(key.as_str(), accent),
+                    Span::styled(key, accent),
                     Span::raw("  "),
-                    Span::styled(desc.as_str(), Style::new().dim()),
+                    Span::styled(desc, Style::new().dim()),
                 ])
             })
             .collect();
@@ -75,16 +74,27 @@ mod tests {
     use ratatui::{Terminal, backend::TestBackend};
 
     fn screen(width: u16, height: u16, area: Option<Rect>, count: usize) -> String {
-        let hints = WhichHints {
-            prefix: "g".parse().unwrap(),
-            name: "Nav".into(),
-            keys: (0..count)
-                .map(|i| (i.to_string(), format!("Custom action {i}")))
-                .collect(),
+        use crate::tui::{
+            key::{Action, Keymaps, Scope, config::ResolvedBinding},
+            tab::logs,
         };
+        let bindings = (0..count)
+            .map(|i| ResolvedBinding {
+                on: vec!["g".parse().unwrap(), i.to_string().parse().unwrap()],
+                action: Action::Logs(logs::Key::Clear),
+                desc: format!("Custom action {i}"),
+                group: Some("Nav".into()),
+            })
+            .collect();
+        let maps = Keymaps::from_bindings([(Scope::Logs, bindings)].into()).unwrap();
+        let hints = maps.chord_view(Scope::Logs, "g".parse().unwrap());
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
         terminal
-            .draw(|f| render_panel(f, area.unwrap_or(f.area()), &hints, Style::default()))
+            .draw(|f| {
+                if let Some(hints) = &hints {
+                    render_panel(f, area.unwrap_or(f.area()), hints, Style::default());
+                }
+            })
             .unwrap();
         terminal
             .backend()

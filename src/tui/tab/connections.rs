@@ -51,7 +51,7 @@ key_map!(
         )
 );
 
-#[derive_aliases::derive(..Key)]
+#[derive_aliases::derive(..Key, Debug)]
 pub(in crate::tui) enum Key {
     MoveUp,
     MoveDown,
@@ -122,7 +122,7 @@ macro_rules! tri {
     };
 }
 
-#[derive_aliases::derive(..Key)]
+#[derive_aliases::derive(..Key, Debug)]
 pub(in crate::tui) enum SortColumn {
     #[serde(rename = "SortByHost")]
     Host,

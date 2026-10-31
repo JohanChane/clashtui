@@ -61,7 +61,7 @@ key_map!(
         )
 );
 
-#[derive_aliases::derive(..Key)]
+#[derive_aliases::derive(..Key, Debug)]
 pub(in crate::tui) enum Key {
     MoveUp,
     MoveDown,
@@ -82,7 +82,7 @@ pub(in crate::tui) enum Key {
     Sort(Sort),
 }
 
-#[derive_aliases::derive(..Action)]
+#[derive_aliases::derive(..Action, Debug)]
 pub(in crate::tui) enum Sort {
     #[serde(rename = "ResetSort")]
     Reset,

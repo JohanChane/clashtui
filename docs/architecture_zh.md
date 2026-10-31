@@ -39,7 +39,7 @@ src/
 │       ├── key.rs       # 按键、默认绑定宏和统一加载入口
 │       ├── key/
 │       │   ├── config.rs    # 解析、覆盖、解绑、作用域内校验
-│       │   ├── effective.rs # 合成页面/焦点绑定表、全局冲突校验
+│       │   ├── runtime.rs # 统一绑定存储、ID 索引、全局冲突校验
 │       │   ├── matcher.rs   # App 持有的组合键状态机
 │       │   └── notation.rs  # 按键记法解析和显示
 │       ├── signals.rs   # OS 信号处理
@@ -118,7 +118,7 @@ src/
 
 `key_map!` 只声明类型化默认动作和配置解析器。`Keymaps::from_config` 先应用核心专属配置、默认覆盖和解绑，再检查全局与每个页面的冲突。完整序列相同、或单键与双键前缀重叠时，报错并阻止启动；`gp` 与 `gg` 可以共享前缀。
 
-每个页面/焦点对应一份不可变 `EffectiveKeymap`。Files 的 Profile 和 Template 分别合成。Status 使用全局表。全部通过校验后，才将这些表安装到只读 `OnceLock`。
+`Keymaps` 统一拥有每条 `RuntimeBinding`。`scope_bindings` 按来源保存 ID，`key_lookup` 为各页面/焦点编译全局和本页的 ID 查找表，`tab_shortcuts` 缓存切页绑定 ID。Profile 和 Template 分别合成，Status 使用全局表。全部通过校验后，才安装到只读 `OnceLock`。
 
 输入顺序：
 
@@ -127,7 +127,7 @@ src/
 3. App 的 `Matcher` 使用当前有效表，返回 `Pending`、`Execute(Action)`、`Cancelled` 或 `Unmatched`。
 4. App 执行全局动作，或将类型化动作交给 `TuiTab::handle_action`。
 
-唯一可变的组合键状态属于 App。切页、焦点变化和弹窗不会继承旧候选；Esc 或错误的第二键会被消费。Which、帮助和标签栏从同一份有效表读取数据。组合键分组名由 App 显示在顶部栏，各页面无需维护等待状态。
+唯一可变的组合键状态属于 App。切页、焦点变化和弹窗不会继承旧候选；Esc 或错误的第二键会被消费。帮助和标签栏借用同一绑定存储。Which 从原前缀分支借用候选，显示时排序和选择标题；不持久复制描述或候选顺序。组合键分组名由 App 显示在顶部栏，各页面无需维护等待状态。
 
 ### TuiWidget Trait
 
@@ -225,7 +225,7 @@ src/
 ## 添加标签页
 
 1. 定义内容类型，实现 `BasicTabContent` 和 `TabContent`（或双面板 traits）。
-2. 在 `key/effective.rs` 添加 `Scope`、`Action` 变体和配置加载器，并在 `key/config.rs` 注册配置作用域。
+2. 在 `key/runtime.rs` 添加 `Scope`、`Action` 变体和配置加载器，并在 `key/config.rs` 注册配置作用域。
 3. 用 `key_map!` 声明默认绑定，用 `newtype_tab!(MyTab(Tab<MyContent>), MyScope)` 生成包装器；在 `tab/mod.rs` 的 `enum_dispatch!` 注册。
 4. 在 `App::new()` 添加标签实例，并更新 `TabTarget` 及默认切页绑定；两者顺序必须与标签列表一致。
 5. 双面板分别提供动作类型和作用域，由 `input_scope` 根据焦点选择有效表。

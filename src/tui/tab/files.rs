@@ -81,19 +81,16 @@ mod tests {
         ).unwrap(), "mihomo").unwrap();
         // No await: background file loading is cancelled when this tab is dropped.
         let mut tab = FileTab::default();
-        let mut input = Matcher::default();
+        let mut input = Matcher::new(&maps);
         assert_eq!(tab.input_scope(), Scope::Profile);
         for scope in [Scope::Template, Scope::Profile] {
             let current = tab.input_scope();
-            let Match::Execute(action) =
-                input.feed(&"l".parse().unwrap(), current, &maps.get(current).map)
-            else {
+            let Match::Execute(action) = input.feed(&"l".parse().unwrap(), current, current) else {
                 panic!("the pane switch must resolve to an action");
             };
             tab.handle_action(action);
             assert_eq!(tab.input_scope(), scope);
-            let bindings = maps.get(scope);
-            let result = input.feed(&"x".parse().unwrap(), scope, &bindings.map);
+            let result = input.feed(&"x".parse().unwrap(), scope, scope);
             if scope == Scope::Template {
                 assert!(matches!(
                     result,
@@ -102,9 +99,9 @@ mod tests {
                     )))
                 ));
                 assert!(
-                    bindings
-                        .page_docs()
-                        .contains(&("x".into(), "Generate profile".into()))
+                    maps.page_bindings(scope)
+                        .iter()
+                        .any(|b| b.key_text == "x" && b.desc == "Generate profile")
                 );
             } else {
                 assert!(matches!(
@@ -114,9 +111,9 @@ mod tests {
                     )))
                 ));
                 assert!(
-                    bindings
-                        .page_docs()
-                        .contains(&("x".into(), "Preview profile".into()))
+                    maps.page_bindings(scope)
+                        .iter()
+                        .any(|b| b.key_text == "x" && b.desc == "Preview profile")
                 );
             }
         }

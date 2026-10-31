@@ -117,7 +117,7 @@ key_map!(
           // )
 );
 
-#[derive_aliases::derive(..Key)]
+#[derive_aliases::derive(..Key, Debug)]
 pub(in crate::tui) enum Key {
     Switch,
     MoveUp,
@@ -159,7 +159,7 @@ impl Document for Key {
     }
 }
 
-#[derive_aliases::derive(..Action)]
+#[derive_aliases::derive(..Action, Debug)]
 pub(in crate::tui) enum Action {
     Add,
     Delete,

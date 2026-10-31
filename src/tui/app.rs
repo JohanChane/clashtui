@@ -11,7 +11,7 @@ pub(super) static FULL_RENDER: Notify = Notify::const_new();
 pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
 
-#[derive_aliases::derive(..Key)]
+#[derive_aliases::derive(..Key, Debug)]
 pub enum AppKey {
     TabNext,
     TabPrev,
@@ -40,6 +40,18 @@ pub enum TabTarget {
     Settings,
     #[serde(rename = "TabCoreSrvCtl")]
     CoreSrvCtl,
+}
+
+impl TabTarget {
+    pub(super) const ALL: [Self; 7] = [
+        Self::Status,
+        Self::File,
+        Self::Proxies,
+        Self::Connections,
+        Self::Logs,
+        Self::Settings,
+        Self::CoreSrvCtl,
+    ];
 }
 
 #[derive_aliases::derive(..Action, Debug)]
@@ -90,24 +102,16 @@ pub(in crate::tui) mod km {
     pub(super) fn defaults() -> DefaultMap<AppKey> {
         DefaultMap::new()
             .with_common(
-                [
-                    TabTarget::Status,
-                    TabTarget::File,
-                    TabTarget::Proxies,
-                    TabTarget::Connections,
-                    TabTarget::Logs,
-                    TabTarget::Settings,
-                    TabTarget::CoreSrvCtl,
-                ]
-                .into_iter()
-                .enumerate()
-                .map(|(index, tab)| {
-                    (
-                        KeyCode::Char((b'1' + index as u8) as char),
-                        AppKey::Tab(tab),
-                    )
-                })
-                .chain(APP_KEYS),
+                TabTarget::ALL
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, tab)| {
+                        (
+                            KeyCode::Char((b'1' + index as u8) as char),
+                            AppKey::Tab(tab),
+                        )
+                    })
+                    .chain(APP_KEYS),
             )
             .with_submap(
                 "Global",
@@ -173,7 +177,7 @@ pub struct App {
     tabs: Vec<Tab>,
     popup: PopUp,
     help: HelpPanel,
-    input: key::Matcher<'static, key::Action>,
+    input: key::Matcher<'static>,
 
     tab_index: u8,
 }
@@ -192,7 +196,7 @@ impl App {
             ],
             popup: PopUp::default(),
             help: HelpPanel::default(),
-            input: key::Matcher::default(),
+            input: key::Matcher::new(key::keymaps()),
             tab_index: 0,
         };
         app.tabs[0].on_enter();
@@ -259,19 +263,18 @@ impl App {
         }
         let scope = self.tabs[self.tab_index as usize].input_scope();
         let maps = key::keymaps();
-        let bindings = if self.help.is_active() {
+        let map_scope = if self.help.is_active() {
             self.cancel_pending();
-            let globals = maps.get(key::Scope::App);
-            if !globals.starts_chord(kv) {
+            if !maps.starts_chord(key::Scope::App, kv) {
                 self.help.handle_key_event(kv);
                 return;
             }
             self.help.dismiss();
-            globals
+            key::Scope::App
         } else {
-            maps.get(scope)
+            scope
         };
-        if let key::Match::Execute(action) = self.input.feed(kv, scope, &bindings.map) {
+        if let key::Match::Execute(action) = self.input.feed(kv, scope, map_scope) {
             match action {
                 key::Action::App(action) => self.handle_action(action),
                 action => self.tabs[self.tab_index as usize].handle_action(action),
@@ -286,24 +289,24 @@ impl App {
             .split(f.area());
 
         let scope = self.tabs[self.tab_index as usize].input_scope();
-        let bindings = key::keymaps().get(scope);
+        let maps = key::keymaps();
         let hints = self.input.hints(scope);
         render_tabbar(
-            tab_titles(self.tabs.iter().map(|tab| tab.title()), bindings),
+            tab_titles(self.tabs.iter().map(|tab| tab.title()), maps),
             self.tab_index,
             f,
             chunks[0],
-            hints.map(|hints| hints.name.as_str()),
+            hints.as_ref().map(|hints| hints.name.as_ref()),
         );
 
         self.tabs[self.tab_index as usize].render(f, chunks[1]);
 
         if let Some(hints) = hints {
-            widget::which::render(f, hints);
+            widget::which::render(f, &hints);
         }
         if self.help.is_active() {
             self.help
-                .render(f, self.tabs[self.tab_index as usize].title(), bindings);
+                .render(f, self.tabs[self.tab_index as usize].title(), maps, scope);
         }
 
         if self.popup.check() {
@@ -355,28 +358,20 @@ impl App {
     }
 }
 
-fn tab_titles(
-    titles: impl IntoIterator<Item = &'static str>,
-    bindings: &key::EffectiveKeymap,
-) -> Vec<String> {
-    let mut shortcuts: std::collections::HashMap<usize, Vec<String>> = Default::default();
-    for binding in &bindings.bindings {
-        if let key::Action::App(AppKey::Tab(target)) = binding.action {
-            shortcuts
-                .entry(target as usize)
-                .or_default()
-                .push(key::notation::format_sequence(&binding.on));
-        }
-    }
-    titles
+fn tab_titles(titles: impl IntoIterator<Item = &'static str>, maps: &key::Keymaps) -> Vec<String> {
+    TabTarget::ALL
         .into_iter()
-        .enumerate()
-        .map(|(index, title)| {
-            if let Some(keys) = shortcuts.get_mut(&index) {
-                keys.sort();
-                format!("{} {title}", keys.join("/"))
-            } else {
+        .zip(titles)
+        .map(|(target, title)| {
+            let keys: Vec<_> = maps
+                .tab_bindings(target)
+                .iter()
+                .map(|binding| binding.key_text.as_str())
+                .collect();
+            if keys.is_empty() {
                 title.to_owned()
+            } else {
+                format!("{} {title}", keys.join("/"))
             }
         })
         .collect()
@@ -438,12 +433,12 @@ fn the_egg(key: crossterm::event::KeyCode) {
 #[cfg(test)]
 mod which_tests {
     use super::*;
-    use crate::tui::key::{self, KeyDesc, KeyMap, Match, Matcher, Scope};
+    use crate::tui::key::{self, Keymaps, Match, Matcher, Scope};
 
     #[test]
     fn global_chords_match_dev_bindings_and_clear_pending_state() {
         let (map, docs) = compile_globals("[]").unwrap();
-        let mut input = Matcher::default();
+        let mut input = Matcher::new(&map);
         let prefix = "<C-g>".parse().unwrap();
         for (key, expected, description) in [
             ("c", GlobalAction::OpenCoreDataDir, "Open core data dir"),
@@ -460,51 +455,75 @@ mod which_tests {
             ),
         ] {
             assert!(matches!(
-                input.feed(&prefix, Scope::App, &map),
+                input.feed(&prefix, Scope::App, Scope::App),
                 Match::Pending
             ));
             let hints = input.hints(Scope::App).unwrap();
             assert_eq!(hints.prefix, prefix);
-            assert_eq!(hints.keys.len(), 4);
-            assert!(hints.keys.contains(&(key.into(), description.into())));
+            assert_eq!(hints.bindings().len(), 4);
             assert!(
-                matches!(input.feed(&key.parse().unwrap(), Scope::App, &map),
-                Match::Execute(AppKey::Global(action)) if action == expected)
+                hints
+                    .rows()
+                    .any(|(candidate, desc)| candidate == key && desc == description)
+            );
+            assert!(
+                matches!(input.feed(&key.parse().unwrap(), Scope::App, Scope::App),
+                Match::Execute(key::Action::App(AppKey::Global(action))) if action == expected)
             );
             assert!(input.hints(Scope::App).is_none());
             assert!(docs.contains(&(format!("<C-g> {key}"), description.into())));
         }
         for key in ["<Esc>", "q", "?", "<Tab>", "1", "x"] {
-            input.feed(&prefix, Scope::App, &map);
+            input.feed(&prefix, Scope::App, Scope::App);
             assert!(matches!(
-                input.feed(&key.parse().unwrap(), Scope::App, &map),
+                input.feed(&key.parse().unwrap(), Scope::App, Scope::App),
                 Match::Cancelled
             ));
             assert!(input.hints(Scope::App).is_none());
         }
-        input.feed(&prefix, Scope::App, &map);
+        input.feed(&prefix, Scope::App, Scope::App);
         input.cancel();
         assert!(input.hints(Scope::App).is_none());
         assert!(matches!(
-            input.feed(&"q".parse().unwrap(), Scope::App, &map),
-            Match::Execute(AppKey::Quit)
+            input.feed(&"q".parse().unwrap(), Scope::App, Scope::App),
+            Match::Execute(key::Action::App(AppKey::Quit))
         ));
         assert!(matches!(
-            input.feed(&"?".parse().unwrap(), Scope::App, &map),
-            Match::Execute(AppKey::Help)
+            input.feed(&"?".parse().unwrap(), Scope::App, Scope::App),
+            Match::Execute(key::Action::App(AppKey::Help))
         ));
     }
 
-    fn compile_globals(yaml: &str) -> anyhow::Result<(KeyMap<AppKey>, KeyDesc)> {
-        key::config::merge(km::defaults(), serde_yml::from_str(yaml)?)
+    fn global_maps(value: serde_yml::Value) -> anyhow::Result<Keymaps> {
+        let bindings = key::config::resolve(km::defaults(), value)?;
+        Keymaps::from_bindings(
+            [(
+                Scope::App,
+                bindings
+                    .into_iter()
+                    .map(|b| b.map_action(key::Action::App))
+                    .collect(),
+            )]
+            .into(),
+        )
     }
 
-    fn resolve_global(map: &KeyMap<AppKey>, keys: &[&str]) -> Option<AppKey> {
-        let mut input = Matcher::default();
+    fn compile_globals(yaml: &str) -> anyhow::Result<(Keymaps, Vec<(String, String)>)> {
+        let maps = global_maps(serde_yml::from_str(yaml)?)?;
+        let docs = maps
+            .global_bindings()
+            .iter()
+            .map(|b| (b.key_text.clone(), b.desc.clone()))
+            .collect();
+        Ok((maps, docs))
+    }
+
+    fn resolve_global(map: &Keymaps, keys: &[&str]) -> Option<AppKey> {
+        let mut input = Matcher::new(map);
         let mut action = None;
         for text in keys {
-            action = match input.feed(&text.parse().unwrap(), Scope::App, map) {
-                Match::Execute(action) => Some(action),
+            action = match input.feed(&text.parse().unwrap(), Scope::App, Scope::App) {
+                Match::Execute(key::Action::App(action)) => Some(action),
                 _ => None,
             };
         }
@@ -522,8 +541,8 @@ mod which_tests {
             KeyEvent::new(KeyCode::Tab, KeyModifiers::SHIFT),
         ] {
             assert!(matches!(
-                Matcher::default().feed(&event.into(), Scope::App, &map),
-                Match::Execute(AppKey::TabPrev)
+                Matcher::new(&map).feed(&event.into(), Scope::App, Scope::App),
+                Match::Execute(key::Action::App(AppKey::TabPrev))
             ));
         }
         assert!(matches!(
@@ -590,17 +609,20 @@ mod which_tests {
                 .iter()
                 .any(|(key, _)| ["1", "1~7", "q", "<C-g> f"].contains(&key.as_str()))
         );
-        let key::MaybeMap::SubMap(submap) = &map[&"<C-g>".parse().unwrap()] else {
-            panic!("expected chord")
-        };
-        assert!(submap.hints.keys.contains(&("r".into(), "重启核心".into())));
+        let hints = map
+            .chord_view(Scope::App, "<C-g>".parse().unwrap())
+            .unwrap();
         assert!(
-            submap
-                .hints
-                .keys
-                .contains(&("c".into(), "Close instead".into()))
+            hints
+                .rows()
+                .any(|(key, desc)| key == "r" && desc == "重启核心")
         );
-        assert!(!submap.hints.keys.iter().any(|(key, _)| key == "f"));
+        assert!(
+            hints
+                .rows()
+                .any(|(key, desc)| key == "c" && desc == "Close instead")
+        );
+        assert!(!hints.rows().any(|(key, _)| key == "f"));
     }
 
     #[test]
@@ -666,7 +688,7 @@ mihomo:
         )
         .unwrap();
         let mut scopes = key::config::sections(input, "mihomo").unwrap();
-        let (map, _) = key::config::merge(km::defaults(), scopes.remove("app").unwrap()).unwrap();
+        let map = global_maps(scopes.remove("app").unwrap()).unwrap();
         assert!(resolve_global(&map, &["x"]).is_none());
         assert!(matches!(resolve_global(&map, &["y"]), Some(AppKey::Quit)));
         assert!(matches!(resolve_global(&map, &["q"]), Some(AppKey::Quit)));
@@ -688,7 +710,6 @@ mihomo:
         let mut config = serde_yml::Mapping::new();
         config.insert("app".into(), app);
         let maps = key::Keymaps::from_config(config, "mihomo").unwrap();
-        let bindings = maps.get(Scope::Logs);
         let titles = tab_titles(
             [
                 "Status",
@@ -699,7 +720,7 @@ mihomo:
                 "Settings",
                 "CoreSrvCtl",
             ],
-            bindings,
+            &maps,
         );
         assert_eq!(
             titles,

@@ -1,8 +1,6 @@
-//! Parse user configuration once, then compile it into the two-level runtime map.
+//! Parse, validate and resolve configuration before building runtime lookup tables.
 
-use super::{
-    Document, Key, KeyDesc, KeyMap, MaybeMap, SubMap, WhichHints, instancing::defaults::DefaultMap,
-};
+use super::{Document, Key, instancing::defaults::DefaultMap};
 use anyhow::{Context, Result, bail, ensure};
 use serde::de::DeserializeOwned;
 use serde_yml::{Mapping, Value};
@@ -15,7 +13,6 @@ pub struct Binding<A> {
     pub group: Option<String>,
 }
 
-#[derive(Clone)]
 pub struct ResolvedBinding<A> {
     pub on: Vec<Key>,
     pub action: A,
@@ -169,60 +166,6 @@ where
         .collect();
     bindings.sort_by_cached_key(|binding| super::notation::format_sequence(&binding.on));
     Ok(bindings)
-}
-
-/// Generate `[(key, description 'about the key's action')]` at runtime,
-/// alongside the dispatch map, so user descriptions need no leaked strings.
-pub fn compile<A>(bindings: impl IntoIterator<Item = ResolvedBinding<A>>) -> (KeyMap<A>, KeyDesc) {
-    let mut map = KeyMap::new();
-    let mut docs = Vec::new();
-    for binding in bindings {
-        let action = binding.action;
-        let description = binding.desc;
-        docs.push((
-            super::notation::format_sequence(&binding.on),
-            description.clone(),
-        ));
-        match binding.on.as_slice() {
-            [key] => {
-                map.insert(*key, MaybeMap::Action(action));
-            }
-            [first, second] => {
-                let entry = map.entry(*first).or_insert_with(|| {
-                    MaybeMap::SubMap(SubMap {
-                        hints: WhichHints {
-                            prefix: *first,
-                            name: binding.group.unwrap_or_else(|| first.to_string()),
-                            keys: Vec::new(),
-                        },
-                        inner: HashMap::new(),
-                    })
-                });
-                if let MaybeMap::SubMap(submap) = entry {
-                    submap.inner.insert(*second, action);
-                    submap.hints.keys.push((second.to_string(), description));
-                } else {
-                    unreachable!("prefix conflicts have been validated");
-                }
-            }
-            _ => unreachable!("sequence lengths have been validated"),
-        }
-    }
-    for entry in map.values_mut() {
-        if let MaybeMap::SubMap(submap) = entry {
-            submap.hints.keys.sort_by(|a, b| a.0.cmp(&b.0));
-        }
-    }
-    docs.sort_by(|a, b| a.0.cmp(&b.0));
-    (map, docs)
-}
-
-#[cfg(test)]
-pub fn merge<A>(defaults: DefaultMap<A>, overrides: Value) -> Result<(KeyMap<A>, KeyDesc)>
-where
-    A: DeserializeOwned + Document,
-{
-    resolve(defaults, overrides).map(compile)
 }
 
 /// Normalize dev's nested file scopes and optional core-specific sections.

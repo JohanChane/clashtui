@@ -1,40 +1,18 @@
 use crossterm::event::{KeyCode, KeyEvent as _KeyEvent, KeyModifiers};
 
 pub(super) mod config;
-mod effective;
 mod matcher;
 pub(super) mod notation;
+mod runtime;
 
-pub(in crate::tui) use effective::{Action, EffectiveKeymap, Keymaps, Scope};
-pub use matcher::{Match, Matcher};
+pub(in crate::tui) use matcher::{Match, Matcher};
+pub(in crate::tui) use runtime::{Action, BindingView, ChordView, Keymaps, Scope};
 
 #[cfg(test)]
 mod tests;
 
-pub type KeyDesc = Vec<(String, String)>;
-pub type KeyDescRef<'a> = &'a [(String, String)];
-pub type KeyMap<A> = std::collections::HashMap<Key, MaybeMap<A>>;
-
 pub trait Document {
     fn get_doc(&self) -> &'static str;
-}
-
-pub enum MaybeMap<A> {
-    SubMap(SubMap<A>),
-    Action(A),
-}
-
-pub struct SubMap<A> {
-    pub inner: std::collections::HashMap<Key, A>,
-    pub hints: WhichHints,
-}
-
-/// Presentation data compiled once from the same bindings as the dispatch map.
-#[derive(Clone)]
-pub struct WhichHints {
-    pub prefix: Key,
-    pub name: String,
-    pub keys: KeyDesc,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
@@ -177,10 +155,18 @@ macro_rules! key_map {
             }
 
             #[cfg(test)]
-            pub fn validate_config(
-                map: serde_yml::Value,
-            ) -> anyhow::Result<crate::tui::key::KeyDesc> {
-                bindings(map).map(|bindings| crate::tui::key::config::compile(bindings).1)
+            pub fn validate_config(map: serde_yml::Value) -> anyhow::Result<Vec<(String, String)>> {
+                bindings(map).map(|bindings| {
+                    bindings
+                        .into_iter()
+                        .map(|binding| {
+                            (
+                                crate::tui::key::notation::format_sequence(&binding.on),
+                                binding.desc,
+                            )
+                        })
+                        .collect()
+                })
             }
         }
     };
@@ -203,6 +189,9 @@ pub fn load() -> anyhow::Result<()> {
     };
     let maps = Keymaps::from_config(read_keymap(&path)?, core)
         .with_context(|| format!("failed to load keymap at {}", path.display()))?;
+    for scope in Scope::ALL {
+        log::debug!("keymap {}:\n{}", scope.name(), maps.describe(scope));
+    }
     KEYMAPS
         .set(maps)
         .map_err(|_| anyhow::anyhow!("keymaps initialized twice"))
