@@ -105,11 +105,7 @@ key_map!(
             ),
             (KeyCode::Char('n'), Key::Action(Action::Traffic)),
         ])
-        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Key::GoTop)]) // God knows why, but this won't serlize (while deserlizing is fine)
-                                                                             // .with_submap(
-                                                                             //     KeyCode::Char('C'),
-                                                                             //     [(KeyCode::Char('u'), Key::Action(Action::CopyUrl))]
-                                                                             // )
+        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Key::GoTop)])
 );
 
 #[derive_aliases::derive(..Key, Debug)]
@@ -145,7 +141,6 @@ impl Document for Key {
             Self::Action(Action::Search) => FILTER,
             Self::Action(Action::Test) => "Test",
             Self::Action(Action::Check) => "Check config",
-            Self::Action(Action::CopyUrl) => "Copy URL",
             Self::Action(Action::FzfFind) => "Find profile",
             Self::Action(Action::ToggleNoPp) => "Toggle no proxy-provider",
             Self::Action(Action::ToggleUpdateWithProxy) => "Toggle update with proxy",
@@ -165,7 +160,6 @@ pub(in crate::tui) enum Action {
     Search,
     Test,
     Check,
-    CopyUrl,
     FzfFind,
     ToggleNoPp,
     ToggleUpdateWithProxy,
@@ -338,7 +332,6 @@ mod actions {
                 Self::Update => update(name).await,
                 Self::Test => test(name).await,
                 Self::Check => check(name).await,
-                Self::CopyUrl => copy_url(name).await,
                 Self::ToggleNoPp => toggle_no_pp(name).await,
                 Self::ToggleUpdateWithProxy => toggle_update_with_proxy(name).await,
                 Self::Traffic => {
@@ -759,46 +752,6 @@ mod actions {
                     .build_and_send();
             }
             Err(e) => Confirm::err(e),
-        }
-
-        do_nothing()
-    }
-
-    async fn copy_url(name: String) -> CB {
-        use crate::config::database::ProfileType;
-
-        let url = match db::get(&name) {
-            Some(pf) => match &pf.dtype {
-                ProfileType::Url(url) => url.clone(),
-                _ => {
-                    Confirm::title("Not a URL profile".to_owned())
-                        .with_prompt(format!("'{name}' is not a URL profile."))
-                        .build_and_send();
-                    return do_nothing();
-                }
-            },
-            None => {
-                Confirm::title("Profile not found".to_owned())
-                    .with_prompt(format!("Profile '{name}' not found."))
-                    .build_and_send();
-                return do_nothing();
-            }
-        };
-
-        let result = std::process::Command::new("sh")
-            .arg("-c")
-            .arg(format!("echo -n '{}' | xclip -selection clipboard 2>/dev/null || echo -n '{}' | wl-copy 2>/dev/null", url, url))
-            .output();
-
-        match result {
-            Ok(out) if out.status.success() => {
-                Confirm::title("Copied".to_owned())
-                    .with_prompt(format!("URL copied to clipboard: {url}"))
-                    .build_and_send();
-            }
-            _ => Confirm::err(anyhow::anyhow!(
-                "Failed to copy to clipboard. Install xclip or wl-copy."
-            )),
         }
 
         do_nothing()

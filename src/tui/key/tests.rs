@@ -288,7 +288,6 @@ mod configuration {
             ("Search", "Search/Filter"),
             ("Test", "Test"),
             ("Check", "Check config"),
-            ("CopyUrl", "Copy URL"),
             ("FzfFind", "Find profile"),
             ("ToggleNoPp", "Toggle no proxy-provider"),
             ("ToggleUpdateWithProxy", "Toggle update with proxy"),

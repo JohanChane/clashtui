@@ -137,9 +137,6 @@ file:
     - on: "c"
       action: Check
       desc: Check config
-    - on: ["C", "u"]
-      action: CopyUrl
-      desc: Copy URL
     - on: "f"
       action: FzfFind
       desc: Find profile
