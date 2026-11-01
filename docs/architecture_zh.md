@@ -134,7 +134,7 @@ src/
 
 `Key` 表示规范化终端输入；页面 `Action` 枚举表示命令。`KeySequence` 在配置和运行时统一区分单键与双键。`key_map!` 声明类型化默认动作和配置解析器。`Keymaps::from_config` 先应用核心专属配置、默认覆盖和解绑，再检查全局与每个页面的冲突。完整序列相同、或单键与双键前缀重叠时，报错并阻止启动；`gp` 与 `gg` 可以共享前缀。
 
-`Keymaps` 统一拥有每条 `RuntimeBinding`。`scope_bindings` 按来源保存 ID，`key_lookup` 为各页面/焦点编译全局和本页的 ID 查找表，`tab_shortcuts` 缓存切页绑定 ID。Profile 和 Template 分别合成，Status 使用全局表。全部通过校验后，才安装到只读 `OnceLock`。
+`Keymaps` 统一拥有每条 `RuntimeBinding`。`scope_bindings` 按来源保存 ID，`key_lookup` 为各页面/焦点编译全局和本页的 ID 查找表。Profile 和 Template 分别合成，Status 使用全局表。全部通过校验后，才安装到只读 `OnceLock`。
 
 输入顺序：
 
@@ -143,7 +143,7 @@ src/
 3. App 的 `Matcher` 使用当前有效表，返回 `Pending`、`Execute(Action)`、`Cancelled` 或 `Unmatched`。
 4. App 执行全局动作，或将类型化动作交给 `TuiTab::handle_action`。
 
-唯一可变的组合键状态属于 App。切页、焦点变化和弹窗不会继承旧候选；Esc 或错误的第二键会被消费。帮助和标签栏借用同一绑定存储。Which 从原前缀分支借用候选，显示时排序；不持久复制描述或候选顺序。Which 标题显示当前前缀，各页面无需维护等待状态。
+唯一可变的组合键状态属于 App。切页、焦点变化和弹窗不会继承旧候选；Esc 或错误的第二键会被消费。帮助借用绑定存储。标签栏显示从 1 开始的固定位置序号，不受按键绑定影响。Which 从原前缀分支借用候选，显示时排序；不持久复制描述或候选顺序。Which 标题显示当前前缀，各页面无需维护等待状态。
 
 ### TuiWidget Trait
 

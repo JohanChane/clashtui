@@ -694,7 +694,7 @@ Startup applies the active core configuration, default overrides, and unbindings
 - `gp` and `gg` can share their prefix. Separate pages and file panes can reuse complete sequences.
 - User configuration overrides built-in bindings by complete sequence. `action: null` removes a binding before conflict validation.
 
-App owns the single pending-chord state. Dispatch, Which, help, and tab labels read the same effective map so their behavior stays consistent.
+App owns the single pending-chord state. Dispatch, Which, and help read the same effective map so their behavior stays consistent. Tab labels show fixed one-based positions, independent of key bindings.
 
 ## When API Data Doesn't Match the Current Core
 
