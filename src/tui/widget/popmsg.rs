@@ -23,14 +23,25 @@ pub enum Route {
     Drop,
 }
 
+#[derive(Clone, Copy)]
+pub enum PopupLayout {
+    Centered,
+    Fullscreen,
+}
+
 pub trait Msg {
     type Result;
 
     fn match_key_event(&mut self, kv: &Key) -> Route;
     fn send(self, tx: Sender<Self::Result>);
-    fn render(&self, f: &mut Frame, area: Rect, block: Block, is_focused: bool);
-    /// (Width, Height)
-    fn size(&self) -> (u16, u16);
+    fn render(&mut self, f: &mut Frame, area: Rect, block: Block, is_focused: bool);
+    fn layout(&self) -> PopupLayout {
+        PopupLayout::Centered
+    }
+    /// (Width, Height) preferred by centered popups; fullscreen content uses the frame area.
+    fn size(&self) -> (u16, u16) {
+        (0, 0)
+    }
 }
 
 #[derive(Default)]

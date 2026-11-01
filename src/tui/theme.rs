@@ -61,6 +61,7 @@ pub(crate) struct PopupDef {
 pub(crate) struct ThemeFile {
     pub tabbar: TabbarDef,
     pub popup: PopupDef,
+    pub finder: SectionPaletteDef,
     pub default: SectionPaletteDef,
     pub connections: Option<SectionPaletteDef>,
     pub proxies: Option<SectionPaletteDef>,
@@ -144,6 +145,7 @@ impl From<PopupDef> for Popup {
 pub(crate) struct Theme {
     pub tabbar: Tabbar,
     pub popup: Popup,
+    pub finder: ComputedSectionTheme,
     sections: HashMap<String, ComputedSectionTheme>,
 }
 
@@ -216,6 +218,31 @@ fn make_default_palette() -> SectionPaletteDef {
     }
 }
 
+// Finder has its own fallback so existing dialog and tab palettes do not change its appearance.
+fn make_finder_palette() -> SectionPaletteDef {
+    SectionPaletteDef {
+        text: Some(StyleDef {
+            fg: Some(Color::Rgb(198, 204, 213)),
+            bg: Some(Color::Reset),
+            ..Default::default()
+        }),
+        highlight: Some(StyleDef {
+            fg: Some(Color::Rgb(230, 233, 239)),
+            bg: Some(Color::Rgb(59, 65, 77)),
+            ..Default::default()
+        }),
+        border: Some(StyleDef {
+            fg: Some(Color::Rgb(96, 103, 115)),
+            ..Default::default()
+        }),
+        muted: Some(StyleDef {
+            fg: Some(Color::Rgb(139, 146, 158)),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
 const SECTION_NAMES: &[&str] = &[
     "connections",
     "proxies",
@@ -245,6 +272,7 @@ fn build_default_theme() -> Theme {
             border: Style::new().fg(Color::Rgb(0, 102, 102)),
             text: Style::new().fg(Color::Rgb(46, 204, 113)),
         },
+        finder: ComputedSectionTheme::from_palette(&empty, &make_finder_palette()),
         sections,
     }
 }
@@ -297,6 +325,7 @@ impl TryFrom<ThemeFile> for Theme {
         Ok(Self {
             tabbar: Tabbar::from(file.tabbar),
             popup: Popup::from(file.popup),
+            finder: ComputedSectionTheme::from_palette(&file.finder, &make_finder_palette()),
             sections,
         })
     }

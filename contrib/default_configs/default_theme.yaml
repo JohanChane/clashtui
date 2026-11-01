@@ -12,6 +12,14 @@ popup:
   border: { fg: "#006666" }
   text: { fg: "#2ecc71" }
 
+# ---- Finder (independent palette; omitted styles use built-in Finder defaults) ----
+# The base background follows the terminal; opacity is controlled by the terminal.
+finder:
+  text: { fg: "#c6ccd5", bg: "reset" }
+  highlight: { fg: "#e6e9ef", bg: "#3b414d" }
+  border: { fg: "#606773" }
+  muted: { fg: "#8b929e" }
+
 # ---- Default palette (fallback for all sections) ----
 default:
   border: { fg: "#00cc99" }
