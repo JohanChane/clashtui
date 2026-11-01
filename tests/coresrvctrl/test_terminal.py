@@ -239,6 +239,110 @@ class TerminalTests(unittest.TestCase):
             session.drain(0.15)
         self.assertNotIn(ENTER, session.output)
 
+    def configure_file_actions(self, body, interactive=False):
+        self.root = self.root / "中文 space 'quote' $(literal)"
+        self.root.mkdir()
+        (self.root / "config.yaml").write_text(json.dumps({
+            "mihomo": {"core": {"config_dir": str(self.root / "core/config")}},
+            "singbox": {}}))
+        self.configure("exit 0\n")
+        (self.root / "clashtui.db").write_text(
+            "core_type: mihomo\nmihomo:\n  profiles:\n    subscription: !Url https://example.invalid/sub\n")
+        profile = self.root / "mihomo/profiles/subscription.yaml"
+        template = self.root / "mihomo/templates/template.yaml"
+        for path in (profile, template):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("proxies: []\n")
+        (self.root / "file-action.sh").write_text(body)
+        config = json.loads((self.root / "scripts.json").read_text())
+        for action in ("edit_file", "open_dir"):
+            config["actions"].append({"id": action, "cmd": {
+                "program": "/bin/sh", "args": ["${root}/file-action.sh", "${path}"],
+                "interactive": interactive, "output": "silent"}})
+        (self.root / "scripts.json").write_text(json.dumps(config))
+        return profile, template
+
+    def test_file_actions_pass_paths_without_terminal_handoff_and_reload_config(self):
+        profile, template = self.configure_file_actions(
+            'printf "%s" "$1" > .opened; mv .opened opened\n')
+        session = self.start()
+        session.send(b"2")
+        session.expect(b"subscription")
+        marker = self.root / "opened"
+        for keys, expected in (
+            (b"e", profile),
+            (b"le", template),
+            (b"E", self.root / "mihomo/template_proxy_providers.yaml"),
+            (b"\x07c", self.root / "mihomo"),
+            (b"\x07m", self.root / "core"),
+        ):
+            marker.unlink(missing_ok=True)
+            session.send(keys)
+            deadline = time.monotonic() + 5
+            while not marker.exists():
+                self.assertLess(time.monotonic(), deadline, "File action did not finish")
+                session.drain(0.02)
+            actual = Path(marker.read_text())
+            self.assertTrue(actual.is_absolute())
+            self.assertEqual(actual.resolve(), expected.resolve())
+            session.drain(0.15)
+        self.assertNotIn(ENTER, session.output)
+        # The next invocation must use the updated command and route its error.
+        path = self.root / "scripts.json"
+        config = json.loads(path.read_text())
+        action = next(a for a in config["actions"] if a["id"] == "edit_file")
+        action["cmd"].update(args=["-c", "echo FILE_EDIT_FAILURE >&2; exit 7"], output="popup")
+        path.write_text(json.dumps(config))
+        session.send(b"e")
+        session.expect(b"FILE_EDIT_FAILURE")
+        self.assertNotIn(ENTER, session.output)
+
+    def test_quit_cancels_a_running_file_command_without_a_timeout(self):
+        self.configure_file_actions('printf "%s" "$$" > file-pid; exec sleep 30\n')
+        session = self.start()
+        session.send(b"2")
+        session.expect(b"subscription")
+        session.send(b"e")
+        marker = self.root / "file-pid"
+        deadline = time.monotonic() + 5
+        while not marker.exists() or not marker.read_text():
+            self.assertLess(time.monotonic(), deadline, "File command did not start")
+            session.drain(0.02)
+        child = int(marker.read_text())
+        session.send(b"q")
+        deadline = time.monotonic() + 5
+        while True:
+            pid, status = os.waitpid(session.pid, os.WNOHANG)
+            if pid:
+                session.pid = None
+                modes = termios.tcgetattr(session.master)
+                os.close(session.master)
+                self.assertEqual(os.waitstatus_to_exitcode(status), 0)
+                self.assertTrue(modes[3] & termios.ECHO)
+                self.assertTrue(modes[3] & termios.ICANON)
+                break
+            self.assertLess(time.monotonic(), deadline, "Normal quit hung waiting for the file command")
+            session.drain(0.02)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(child, 0)
+
+    def test_terminal_editor_owns_input_and_restores_tui(self):
+        profile, _ = self.configure_file_actions(
+            'printf "EDITOR_READY\\n"; IFS= read -r value; '
+            'printf "%s" "$value" > edit-input; printf "%s" "$1" > edit-path\n',
+            interactive=True)
+        session = self.start()
+        session.send(b"2")
+        session.expect(b"subscription")
+        session.send(b"e")
+        session.expect(b"EDITOR_READY")
+        session.send(b"saved value\n")
+        session.expect(ENTER)
+        session.send(b"\n")
+        session.expect(RESTORED)
+        self.assertEqual((self.root / "edit-input").read_text(), "saved value")
+        self.assertEqual((self.root / "edit-path").read_text(), str(profile.resolve()))
+
     def test_child_owns_stdin_and_repeated_actions_restore_terminal(self):
         self.configure("printf 'INPUT_READY\\n'\nIFS= read -r value\nprintf '%s\\n' \"$value\" >> received\n")
         session = self.start()

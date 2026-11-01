@@ -51,7 +51,8 @@
           "${service_name}"
         ],
         "interactive": false,
-        "output": "silent"
+        "output": "silent",
+        "timeout_secs": 5
       }
     },
     {
@@ -90,6 +91,33 @@
         ],
         "interactive": false,
         "output": "terminal",
+        "keep_children_on_success": true,
+        "timeout_secs": 5
+      }
+    },
+    {
+      "id": "edit_file",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${config_root}/scripts/files/open.sh",
+          "${path}"
+        ],
+        "interactive": false,
+        "output": "silent",
+        "keep_children_on_success": true
+      }
+    },
+    {
+      "id": "open_dir",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${config_root}/scripts/files/open.sh",
+          "${path}"
+        ],
+        "interactive": false,
+        "output": "silent",
         "keep_children_on_success": true
       }
     }

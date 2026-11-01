@@ -98,9 +98,7 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra:
-  edit_cmd: ghostty -e nvim "%s"
-  open_dir_cmd: ghostty -e yazi "%s"
+extra: {}
 ```
 
 设计原则: Mihomo 和 sing-box 不能共同使用的, 分别放在 mihomo 和 sing-box section。

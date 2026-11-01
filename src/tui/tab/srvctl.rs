@@ -77,7 +77,7 @@ impl MenuEntry {
 fn menu(scripts: &ScriptConfig, core: CoreType) -> Vec<MenuEntry> {
     let mut entries: Vec<_> = scripts
         .actions_for(core)
-        .filter(|action| action.id != "copy")
+        .filter(|action| !action.is_file_action())
         .filter_map(|action| {
             let label = action.label.as_ref()?;
             Some(MenuEntry {
@@ -90,7 +90,10 @@ fn menu(scripts: &ScriptConfig, core: CoreType) -> Vec<MenuEntry> {
             })
         })
         .collect();
-    if scripts.actions_for(core).any(|action| action.id != "copy") {
+    if scripts
+        .actions_for(core)
+        .any(|action| !action.is_file_action())
+    {
         entries.push(MenuEntry::new(
             Operation::SwitchCore(core.other()),
             "Switch Core",
@@ -431,10 +434,12 @@ mod tests {
     }
 
     #[test]
-    fn copy_is_not_a_service_menu_entry_or_capability() {
+    fn file_actions_are_not_service_menu_entries_or_capabilities() {
         let scripts = ScriptConfig::parse(
             r#"{"root":".","actions":[
-            {"id":"copy","label":"Copy","cmd":{"program":"tool","args":[]}}
+            {"id":"copy","label":"Copy","cmd":{"program":"tool","args":[]}},
+            {"id":"edit_file","label":"Edit","cmd":{"program":"tool","args":["${path}"]}},
+            {"id":"open_dir","label":"Open","cmd":{"program":"tool","args":["${path}"]}}
         ]}"#,
         )
         .unwrap();

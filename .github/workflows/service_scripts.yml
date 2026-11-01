@@ -7,6 +7,7 @@ on:
       - 'contrib/scripts/**'
       - 'tests/coresrvctrl/**'
       - 'tests/clipboard/**'
+      - 'tests/files/**'
       - 'installs/**'
       - 'src/**'
       - 'Cargo.toml'
@@ -17,6 +18,7 @@ on:
       - 'contrib/scripts/**'
       - 'tests/coresrvctrl/**'
       - 'tests/clipboard/**'
+      - 'tests/files/**'
       - 'installs/**'
       - 'src/**'
       - 'Cargo.toml'
@@ -37,6 +39,7 @@ jobs:
           python3 tests/coresrvctrl/test_backends.py
           python3 tests/coresrvctrl/test_install.py
           python3 tests/clipboard/test_copy.py
+          python3 tests/files/test_open.py
 
   windows:
     runs-on: windows-latest
@@ -49,6 +52,7 @@ jobs:
         run: |
           python tests/coresrvctrl/test_backends.py
           python tests/clipboard/test_copy.py
+          python tests/files/test_open.py
       - name: Native Windows protocol and operation tests
         run: |
           cargo test --locked --all-features config::scripts::

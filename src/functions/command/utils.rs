@@ -1,5 +1,4 @@
 use anyhow::Result;
-use std::process::{Command, Stdio};
 
 pub(super) fn stringify_output(output: std::process::Output) -> String {
     let stdout_str = String::from_utf8_lossy(&output.stdout);
@@ -51,55 +50,12 @@ pub fn exec_sudo(pgm: &str, args: Vec<&str>) -> Result<String> {
 //         .map_err(|e| e.into())
 // }
 
-pub fn spawn(pgm: &str, args: Vec<&str>) -> Result<()> {
-    log::debug!("SPW: {} {:?}", pgm, args);
-    Command::new(pgm)
-        .stderr(Stdio::null())
-        .stdout(Stdio::null())
-        .args(args)
-        .spawn()?;
-    Ok(())
-}
-
 pub(crate) fn sanitize_windows_path(path: &str) -> String {
     if let Some(path) = path.strip_prefix(r"\\?\UNC\") {
         return format!("//{}", path.replace('\\', "/"));
     }
     let path = path.strip_prefix(r"\\?\").unwrap_or(path);
     path.replace('\\', "/")
-}
-
-pub fn shell_spawn(cmd_template: &str, path: &str) -> Result<()> {
-    if cmd_template.is_empty() {
-        if cfg!(windows) {
-            let path = sanitize_windows_path(path);
-            spawn("cmd", vec!["/c", "start", "", &path])
-        } else if cfg!(target_os = "macos") {
-            spawn("sh", vec!["-c", &format!("open \"{}\"", path)])
-        } else {
-            spawn("sh", vec!["-c", &format!("xdg-open \"{}\"", path)])
-        }
-    } else {
-        if cfg!(windows) {
-            let path = sanitize_windows_path(path);
-            let cmd = cmd_template.replace("%s", &path);
-            log::debug!("SPW: cmd {} {}", "cmd", cmd);
-            #[cfg(windows)]
-            {
-                use std::os::windows::process::CommandExt;
-                Command::new("cmd")
-                    .stderr(Stdio::null())
-                    .stdout(Stdio::null())
-                    .raw_arg("/c")
-                    .raw_arg(&cmd)
-                    .spawn()?;
-            }
-            Ok(())
-        } else {
-            let cmd = cmd_template.replace("%s", path);
-            spawn("sh", vec!["-c", &cmd])
-        }
-    }
 }
 
 #[cfg(test)]

@@ -276,7 +276,7 @@ mod actions {
     async fn _edit(name: String) -> CB {
         let path = crate::functions::file::TEMPLATE_PATH.join(&name);
         log::debug!("template::_edit: path={}", path.display());
-        tri!(edit(path.to_str().unwrap()));
+        tri!(tri!(tokio::task::spawn_blocking(move || edit(&path)).await));
         do_nothing()
     }
 
@@ -289,7 +289,7 @@ mod actions {
             .join(subdir)
             .join("template_proxy_providers.yaml");
         log::debug!("template::_edit_providers: path={}", path.display());
-        tri!(edit(path.to_str().unwrap()));
+        tri!(tri!(tokio::task::spawn_blocking(move || edit(&path)).await));
         do_nothing()
     }
 

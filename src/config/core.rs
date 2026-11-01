@@ -154,14 +154,47 @@ impl Default for ConfigFile {
 #[serde(default)]
 #[derive(Default)]
 pub struct Extra {
-    pub edit_cmd: Option<String>,
-    pub open_dir_cmd: Option<String>,
+    #[serde(
+        rename = "edit_cmd",
+        skip_serializing,
+        deserialize_with = "reject_edit_cmd"
+    )]
+    _legacy_edit_cmd: (),
+    #[serde(
+        rename = "open_dir_cmd",
+        skip_serializing,
+        deserialize_with = "reject_open_dir_cmd"
+    )]
+    _legacy_open_dir_cmd: (),
     #[serde(
         rename = "copy_cmd",
         skip_serializing,
         deserialize_with = "reject_copy_cmd"
     )]
     _legacy_copy_cmd: (),
+}
+
+// Empty legacy settings selected platform defaults and need no command migration.
+fn reject_legacy_file_command<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+    field: &str,
+    action: &str,
+) -> Result<(), D::Error> {
+    let value = Option::<String>::deserialize(deserializer)?;
+    if value.as_deref().is_none_or(str::is_empty) {
+        return Ok(());
+    }
+    Err(serde::de::Error::custom(format!(
+        "extra.{field} has moved to the {action} action in scripts.json; use program/args with ${{path}} instead of %s; see docs/service_scripts_en.md"
+    )))
+}
+
+fn reject_edit_cmd<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<(), D::Error> {
+    reject_legacy_file_command(deserializer, "edit_cmd", "edit_file")
+}
+
+fn reject_open_dir_cmd<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<(), D::Error> {
+    reject_legacy_file_command(deserializer, "open_dir_cmd", "open_dir")
 }
 
 fn reject_copy_cmd<'de, D: serde::Deserializer<'de>>(_deserializer: D) -> Result<(), D::Error> {
@@ -236,9 +269,7 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: 5
-extra:
-  edit_cmd: kitty -e nvim "%s"
-  open_dir_cmd: kitty -e yazi "%s"
+extra: {}
 "#;
         let cfg: ConfigFile = serde_yml::from_str(yaml).unwrap();
         assert_eq!(cfg.mihomo.core.config_dir, "/opt/clashtui/mihomo/config");
@@ -256,11 +287,6 @@ extra:
         );
         assert_eq!(cfg.singbox.core_service.service_name, "clashtui_singbox");
         assert_eq!(cfg.timeout, Some(5));
-        assert_eq!(cfg.extra.edit_cmd.as_deref(), Some(r#"kitty -e nvim "%s""#));
-        assert_eq!(
-            cfg.extra.open_dir_cmd.as_deref(),
-            Some(r#"kitty -e yazi "%s""#)
-        );
 
         let serialized = serde_yml::to_string(&cfg).unwrap();
         let deser: ConfigFile = serde_yml::from_str(&serialized).unwrap();
@@ -286,57 +312,19 @@ profiles:
     }
 
     #[test]
-    fn extra_default_is_none() {
-        let extra = Extra::default();
-        assert_eq!(extra.edit_cmd, None);
-        assert_eq!(extra.open_dir_cmd, None);
-    }
-
-    #[test]
-    fn extra_empty_template_stays_empty() {
-        // Serde: explicit empty strings in config MUST NOT trigger platform defaults
-        // (shell_spawn handles the empty-case fallback at runtime)
-        let yaml = r#"
-edit_cmd: ""
-open_dir_cmd: ""
-"#;
-        let extra: Extra = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(extra.edit_cmd.as_deref(), Some(""));
-        assert_eq!(extra.open_dir_cmd.as_deref(), Some(""));
-    }
-
-    #[test]
-    fn extra_missing_fields_deserialize_to_none() {
-        let yaml = "{}";
-        let extra: Extra = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(extra.edit_cmd, None);
-        assert_eq!(extra.open_dir_cmd, None);
-    }
-
-    #[test]
-    fn extra_serde_roundtrip_with_none() {
-        let extra = Extra {
-            edit_cmd: None,
-            open_dir_cmd: None,
-            _legacy_copy_cmd: (),
-        };
-        let serialized = serde_yml::to_string(&extra).unwrap();
-        let deser: Extra = serde_yml::from_str(&serialized).unwrap();
-        assert_eq!(deser.edit_cmd, None);
-        assert_eq!(deser.open_dir_cmd, None);
-    }
-
-    #[test]
-    fn extra_serde_roundtrip_with_some() {
-        let extra = Extra {
-            edit_cmd: Some(r#"notepad.exe "%s""#.into()),
-            open_dir_cmd: Some(r#"explorer "%s""#.into()),
-            _legacy_copy_cmd: (),
-        };
-        let serialized = serde_yml::to_string(&extra).unwrap();
-        let deser: Extra = serde_yml::from_str(&serialized).unwrap();
-        assert_eq!(deser.edit_cmd.as_deref(), Some(r#"notepad.exe "%s""#));
-        assert_eq!(deser.open_dir_cmd.as_deref(), Some(r#"explorer "%s""#));
+    fn legacy_file_commands_require_migration_but_empty_settings_are_accepted() {
+        for (field, action) in [("edit_cmd", "edit_file"), ("open_dir_cmd", "open_dir")] {
+            for value in ["null", "\"\""] {
+                let extra: Extra = serde_yml::from_str(&format!("{field}: {value}")).unwrap();
+                assert!(!serde_yml::to_string(&extra).unwrap().contains(field));
+            }
+            let error = serde_yml::from_str::<Extra>(&format!("{field}: tool %s")).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains(&format!("{action} action in scripts.json"))
+            );
+        }
     }
 
     #[test]
@@ -381,8 +369,6 @@ open_dir_cmd: ""
         );
         assert_eq!(cfg.mihomo.core_service.service_name, "clashtui_mihomo");
         assert_eq!(cfg.timeout, Some(5));
-        assert_eq!(cfg.extra.edit_cmd.as_deref(), Some(r#"vim "%s""#));
-        assert_eq!(cfg.extra.open_dir_cmd.as_deref(), Some(r#"yazi "%s""#));
     }
 
     #[test]
@@ -394,7 +380,6 @@ open_dir_cmd: ""
         assert_eq!(deser.mihomo.core.bin_path, cfg.mihomo.core.bin_path);
         assert_eq!(deser.singbox.core.bin_path, cfg.singbox.core.bin_path);
         assert_eq!(deser.timeout, cfg.timeout);
-        assert_eq!(deser.extra.edit_cmd, cfg.extra.edit_cmd);
     }
 
     #[test]
@@ -409,8 +394,6 @@ open_dir_cmd: ""
         assert_eq!(cfg.singbox.core.config_path, "");
         assert_eq!(cfg.singbox.core_service.service_name, "");
         assert_eq!(cfg.timeout, None);
-        assert_eq!(cfg.extra.edit_cmd, None);
-        assert_eq!(cfg.extra.open_dir_cmd, None);
     }
 
     #[test]
@@ -419,8 +402,6 @@ open_dir_cmd: ""
         assert_eq!(cfg.mihomo.core.config_dir, "/opt/mihomo");
         assert_eq!(cfg.mihomo.core_service.service_name, "mihomo_svc");
         assert_eq!(cfg.timeout, None);
-        assert_eq!(cfg.extra.edit_cmd, None);
-        assert_eq!(cfg.extra.open_dir_cmd, None);
     }
 
     #[test]
@@ -434,8 +415,6 @@ open_dir_cmd: ""
         );
         assert_eq!(cfg.singbox.core_service.service_name, "clashtui_singbox");
         assert_eq!(cfg.timeout, Some(30));
-        assert_eq!(cfg.extra.edit_cmd.as_deref(), Some(r#"nvim "%s""#));
-        assert_eq!(cfg.extra.open_dir_cmd.as_deref(), Some(r#"lf "%s""#));
     }
 
     #[test]
@@ -450,7 +429,5 @@ open_dir_cmd: ""
         assert_eq!(cfg.singbox.core.config_path, "");
         assert_eq!(cfg.singbox.core_service.service_name, "");
         assert_eq!(cfg.timeout, None);
-        assert_eq!(cfg.extra.edit_cmd, None);
-        assert_eq!(cfg.extra.open_dir_cmd, None);
     }
 }

@@ -11,7 +11,7 @@ use std::{
 };
 
 pub const FILE_NAME: &str = "scripts.json";
-const VARIABLES: [&str; 8] = [
+const VARIABLES: [&str; 9] = [
     "root",
     "config_root",
     "core_type",
@@ -20,6 +20,7 @@ const VARIABLES: [&str; 8] = [
     "core_config_dir",
     "core_config_path",
     "proxy_port",
+    "path",
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
@@ -55,6 +56,8 @@ pub struct ScriptCommand {
     pub output: CommandOutput,
     #[serde(default)]
     pub keep_children_on_success: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_secs: Option<u64>,
 }
 
 const fn default_interactive() -> bool {
@@ -78,6 +81,7 @@ impl Default for ScriptCommand {
             interactive: true,
             output: CommandOutput::Popup,
             keep_children_on_success: false,
+            timeout_secs: None,
         }
     }
 }
@@ -90,6 +94,7 @@ pub struct ResolvedCommand {
     pub interactive: bool,
     pub output: CommandOutput,
     pub keep_children_on_success: bool,
+    pub timeout_secs: Option<u64>,
 }
 
 impl Default for ResolvedCommand {
@@ -101,6 +106,7 @@ impl Default for ResolvedCommand {
             interactive: true,
             output: CommandOutput::Popup,
             keep_children_on_success: false,
+            timeout_secs: None,
         }
     }
 }
@@ -116,6 +122,10 @@ where
 }
 
 impl ScriptAction {
+    pub fn is_file_action(&self) -> bool {
+        matches!(self.id.as_str(), "copy" | "edit_file" | "open_dir")
+    }
+
     pub fn applies_to(&self, core: CoreType) -> bool {
         self.cores
             .as_ref()
@@ -204,6 +214,10 @@ impl ScriptConfig {
                 !action.cmd.program.trim().is_empty(),
                 "{field}.cmd.program: must not be empty"
             );
+            ensure!(
+                action.cmd.timeout_secs != Some(0),
+                "{field}.cmd.timeout_secs: must be positive; omit for no timeout"
+            );
             validate_template(&action.cmd.program)
                 .with_context(|| format!("{field}.cmd.program"))?;
             for (i, arg) in action.cmd.args.iter().enumerate() {
@@ -270,7 +284,12 @@ impl ScriptConfig {
             let value = if cfg!(windows)
                 && matches!(
                     name,
-                    "root" | "config_root" | "core_bin" | "core_config_dir" | "core_config_path"
+                    "root"
+                        | "config_root"
+                        | "core_bin"
+                        | "core_config_dir"
+                        | "core_config_path"
+                        | "path"
                 ) {
                 sanitize_windows_path(&value)
             } else {
@@ -314,6 +333,7 @@ impl ScriptConfig {
             interactive: action.cmd.interactive,
             output: action.cmd.output,
             keep_children_on_success: action.cmd.keep_children_on_success,
+            timeout_secs: action.cmd.timeout_secs,
             cwd: if cfg!(windows) {
                 sanitize_windows_path(root.to_str().context("root is not valid UTF-8")?).into()
             } else {
@@ -397,6 +417,53 @@ mod tests {
             root: "scripts/coresrvctrl".into(),
             actions,
         }
+    }
+
+    #[test]
+    fn file_paths_expand_once_as_one_argument_and_require_call_context() {
+        let mut config = config(vec![action("edit_file", None)]);
+        config.actions[0].cmd.args = vec!["${path}".into()];
+        let path = "/tmp/中文 'quote' $(command) ${root}.yaml";
+        let resolved = config
+            .resolve(&std::env::temp_dir(), &config.actions[0], |name| {
+                assert_eq!(name, "path");
+                Ok(path.into())
+            })
+            .unwrap();
+        assert_eq!(resolved.args, vec![OsString::from(path)]);
+        let error = config
+            .resolve(&std::env::temp_dir(), &config.actions[0], |_| {
+                bail!("This action has no target path")
+            })
+            .unwrap_err();
+        assert!(format!("{error:#}").contains("no target path"));
+    }
+
+    #[test]
+    fn timeout_is_optional_positive_and_independent_of_interactivity() {
+        let mut config = config(vec![action("edit_file", None)]);
+        for interactive in [false, true] {
+            config.actions[0].cmd.interactive = interactive;
+            for timeout in [None, Some(1), Some(30)] {
+                config.actions[0].cmd.timeout_secs = timeout;
+                let resolved = config
+                    .resolve(
+                        &std::env::temp_dir(),
+                        &config.actions[0],
+                        |_| unreachable!(),
+                    )
+                    .unwrap();
+                assert_eq!(resolved.timeout_secs, timeout);
+            }
+        }
+        config.actions[0].cmd.timeout_secs = Some(0);
+        assert!(
+            config
+                .validate()
+                .unwrap_err()
+                .to_string()
+                .contains("timeout_secs")
+        );
     }
 
     #[test]

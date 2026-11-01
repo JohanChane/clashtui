@@ -228,14 +228,23 @@ pub(crate) fn resolve_current(
     scripts: &ScriptConfig,
     root: &Path,
     id: &str,
+    path: Option<&Path>,
 ) -> Result<ResolvedCommand> {
-    Ok(plan(
-        scripts,
-        root,
-        &TargetContext::snapshot(CONFIG.core_type()),
-        id,
-    )?
-    .command)
+    let target = TargetContext::snapshot(CONFIG.core_type());
+    let action = scripts
+        .find(target.core, id)
+        .with_context(|| format!("{} does not support {id} in scripts.json", target.core.id()))?;
+    scripts.resolve(root, action, |name| {
+        if name == "path" {
+            return Ok(
+                std::path::absolute(path.context("This action has no target path")?)?
+                    .to_str()
+                    .context("Target path is not valid UTF-8")?
+                    .to_owned(),
+            );
+        }
+        target.value(name, root)
+    })
 }
 
 pub fn execute_current(id: &str) -> Result<String> {

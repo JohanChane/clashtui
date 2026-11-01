@@ -13,6 +13,4 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: 5
-extra:
-  edit_cmd: vim "%s"
-  open_dir_cmd: yazi "%s"
+extra: {}

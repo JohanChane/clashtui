@@ -165,6 +165,8 @@ teardown() {
     "scripts/coresrvctrl/openrc/service.sh"
     "scripts/coresrvctrl/launchd/default.json"
     "scripts/coresrvctrl/launchd/service.sh"
+    "scripts/clipboard/copy.sh"
+    "scripts/files/open.sh"
     "default_configs/default_keymap.yaml"
     "default_configs/default_theme.yaml"
     "default_configs/mihomo/core_override_config.yaml"

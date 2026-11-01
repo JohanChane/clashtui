@@ -269,13 +269,20 @@ pub fn run(
         input,
         env,
         !command.interactive,
-        (!command.interactive).then_some(CAPTURE_TIMEOUT),
+        command.timeout_secs.map(Duration::from_secs),
         terminal_session,
     )
 }
 
 pub fn run_foreground(command: &ResolvedCommand) -> Result<CommandOutcome> {
-    let outcome = run_with_options(command, None, &[], false, None, true)?;
+    let outcome = run_with_options(
+        command,
+        None,
+        &[],
+        false,
+        command.timeout_secs.map(Duration::from_secs),
+        true,
+    )?;
     Ok(CommandOutcome {
         status: outcome.status,
     })
@@ -303,7 +310,13 @@ fn run_with_options(
     let cancelled =
         || SHUTDOWN.load(Ordering::SeqCst) || (terminal_session && foreground_cancelled());
     ensure!(!cancelled(), "Command cancelled");
-    let deadline = timeout.map(|timeout| Instant::now() + timeout);
+    let deadline = timeout
+        .map(|timeout| {
+            Instant::now()
+                .checked_add(timeout)
+                .context("Command timeout is too large")
+        })
+        .transpose()?;
     let mut child = ManagedChild::spawn(command, capture, input.is_some(), env)?;
     let limit = if command.output == CommandOutput::Terminal {
         TERMINAL_OUTPUT_LIMIT
@@ -445,6 +458,30 @@ mod tests {
             cwd: std::env::temp_dir(),
             interactive: false,
             ..Default::default()
+        }
+    }
+
+    #[test]
+    fn noninteractive_commands_can_outlive_the_old_five_second_deadline() {
+        let output = run(&shell("sleep 5.2; printf complete"), None, &[], false).unwrap();
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"complete");
+    }
+
+    #[test]
+    fn configured_timeout_applies_with_and_without_terminal_input() {
+        for interactive in [false, true] {
+            let mut command = shell("exec sleep 30");
+            command.interactive = interactive;
+            command.keep_children_on_success = true;
+            command.timeout_secs = Some(1);
+            let result = run(&command, None, &[], false);
+            assert!(
+                result
+                    .unwrap_err()
+                    .to_string()
+                    .contains("timed out after 1000 ms")
+            );
         }
     }
 

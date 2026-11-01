@@ -62,6 +62,8 @@ class UnixInstallTests(unittest.TestCase):
                                      (source / "service.sh").read_bytes())
                     self.assertEqual((self.config / "scripts/clipboard/copy.sh").read_bytes(),
                                      (ROOT / "contrib/scripts/clipboard/copy.sh").read_bytes())
+                    self.assertEqual((self.config / "scripts/files/open.sh").read_bytes(),
+                                     (ROOT / "contrib/scripts/files/open.sh").read_bytes())
                     self.assertFalse(list(self.config.glob(".service-scripts.*")))
 
     def test_config_generation_backs_up_and_refreshes_defaults(self):
@@ -69,6 +71,8 @@ class UnixInstallTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.config / "scripts/clipboard/copy.sh").read_bytes(),
                          (ROOT / "contrib/scripts/clipboard/copy.sh").read_bytes())
+        self.assertEqual((self.config / "scripts/files/open.sh").read_bytes(),
+                         (ROOT / "contrib/scripts/files/open.sh").read_bytes())
         (self.config / "scripts.json").write_text("custom config")
         script = self.config / "scripts/coresrvctrl/systemd/service.sh"
         script.write_text("custom script")
@@ -87,10 +91,10 @@ class UnixInstallTests(unittest.TestCase):
     def test_failed_download_keeps_published_files(self):
         self.assertEqual(self.run_helper().returncode, 0)
         before = {path: path.read_bytes() for path in self.config.rglob("*") if path.is_file()}
-        # First resource succeeds; second input fails before anything is published.
+        # Earlier resources succeed; the last script fails before publishing.
         command = r'''copy_contrib() {
   case "$1" in
-    */default.json) return 23 ;;
+    */files/open.sh) return 23 ;;
     *) cp "$CONTRIB_DIR/$1" "$2" ;;
   esac
 }

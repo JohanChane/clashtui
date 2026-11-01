@@ -95,16 +95,15 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra:
-  edit_cmd:
-  open_dir_cmd:
+extra: {}
 ```
 
 Install the service command script and materialize its template:
 
 ```sh
-mkdir -p ~/.config/clashtui/scripts/coresrvctrl/systemd ~/.config/clashtui/scripts/clipboard
+mkdir -p ~/.config/clashtui/scripts/coresrvctrl/systemd ~/.config/clashtui/scripts/clipboard ~/.config/clashtui/scripts/files
 curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/clipboard/copy.sh -o ~/.config/clashtui/scripts/clipboard/copy.sh
+curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/files/open.sh -o ~/.config/clashtui/scripts/files/open.sh
 curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/service.sh -o ~/.config/clashtui/scripts/coresrvctrl/systemd/service.sh
 curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/default.json -o /tmp/clashtui-scripts-template.json
 sed 's/"${scope}"/"system"/g' /tmp/clashtui-scripts-template.json > ~/.config/clashtui/scripts.json
@@ -367,9 +366,7 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra:
-  edit_cmd:
-  open_dir_cmd:
+extra: {}
 ```
 
 > Replace `<HOME_REPLACE>` with your home directory path, e.g. `/home/johan`. Do not use `~` or `$HOME`.
@@ -377,8 +374,9 @@ extra:
 Install the service command script and materialize its template:
 
 ```sh
-mkdir -p ~/.config/clashtui/scripts/coresrvctrl/systemd ~/.config/clashtui/scripts/clipboard
+mkdir -p ~/.config/clashtui/scripts/coresrvctrl/systemd ~/.config/clashtui/scripts/clipboard ~/.config/clashtui/scripts/files
 curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/clipboard/copy.sh -o ~/.config/clashtui/scripts/clipboard/copy.sh
+curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/files/open.sh -o ~/.config/clashtui/scripts/files/open.sh
 curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/service.sh -o ~/.config/clashtui/scripts/coresrvctrl/systemd/service.sh
 curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/default.json -o /tmp/clashtui-scripts-template.json
 sed 's/"${scope}"/"user"/g' /tmp/clashtui-scripts-template.json > ~/.config/clashtui/scripts.json

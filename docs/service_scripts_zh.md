@@ -1,6 +1,6 @@
-# 服务控制脚本
+# 脚本
 
-CoreSrvCtl 与剪贴板共用 `CONFIG_ROOT/scripts.json` 的 action 结构，CoreSrvCtl 从中生成菜单。CLI 服务命令、全局重启、状态页和切核使用同一配置。
+CoreSrvCtl、剪贴板、编辑文件和打开目录共用 `CONFIG_ROOT/scripts.json` 的 action 结构，CoreSrvCtl 从中生成菜单。CLI 服务命令、全局重启、状态页和切核使用同一配置。
 
 ```text
 CONFIG_ROOT/
@@ -15,6 +15,9 @@ CONFIG_ROOT/
   scripts/clipboard/
     copy.sh                 # Unix
     copy.ps1                # Windows
+  scripts/files/
+    open.sh                 # Unix
+    open.ps1                # Windows
 ```
 
 安装器根据平台和选项选择后端（Linux：systemd/OpenRC；macOS：launchd；Windows：NSSM），只安装对应脚本并生成 `scripts.json`。Unix 的 `--is-user` 选择 `user`，否则为 `system`。重装先按编号后缀备份配置目录，再替换所选默认脚本和配置；其他自定义文件保留。
@@ -43,7 +46,8 @@ CONFIG_ROOT/
         "program": "/bin/sh",
         "args": ["${root}/systemd/service.sh", "status", "system", "${service_name}"],
         "interactive": false,
-        "output": "silent"
+        "output": "silent",
+        "timeout_secs": 5
       }
     }
   ]
@@ -61,12 +65,13 @@ CONFIG_ROOT/
 | `interactive` | `true` | 交接终端并允许键盘输入；`false` 时保持 TUI，捕获输出 |
 | `output` | `"popup"` | 非交互输出去向：`popup`、`silent`、`terminal` |
 | `keep_children_on_success` | `false` | 仅在命令成功后允许后台子进程继续存活 |
+| `timeout_secs` | `null` | 正整数秒数；省略或 `null` 表示不限时，与 `interactive` 独立 |
 
 交互执行时忽略 `output`。popup 将 stdout/stderr 作为文字弹窗；silent 隐藏两路输出，失败仍报告退出状态；terminal 将成功命令的 stdout 原样交主线程写入终端，stderr 单独显示。控制序列由脚本构造，clashtui 不识别 OSC52。所有模式的捕获结果仍可供内部调用方读取。
 
-非交互执行等待主命令完成，总超时 5 秒，包含 stdin 写入；交互命令没有此超时。两路捕获各限 64 KiB，超限标注截断；terminal 的 stdout 上限为 2 MiB，超限失败且不发送部分序列。失败、超时、取消始终清理受管理子进程。成功后收集主命令的剩余输出并关闭捕获管道，不等待后台子进程关闭管道；保留的后台进程应脱离标准流并自行管理生命周期。Unix 和 Windows 使用相同规则。
+执行器等待主命令完成。可选 `timeout_secs` 限制整个命令，包含 stdin 写入，交互和非交互模式均适用；不接受 0。默认 copy、status 动作设为 5，文件动作省略，允许 GUI 程序持续运行。自动状态查询另有固定 5 秒限制。此字段与 `config.yaml` 的网络 `timeout` 无关。两路捕获各限 64 KiB，超限标注截断；terminal 的 stdout 上限为 2 MiB，超限失败且不发送部分序列。失败、超时、取消始终清理受管理子进程。成功后收集主命令的剩余输出并关闭捕获管道，不等待后台子进程关闭管道；保留的后台进程应脱离标准流并自行管理生命周期。Unix 和 Windows 使用相同规则。
 
-保留的 `copy` action 用于[剪贴板复制](clipboard_zh.md)，不出现在 CoreSrvCtl，也不会单独生成服务组合项；其 stdin 协议另行定义。手动安装还需将 `contrib/scripts/clipboard/copy.sh` 或 `copy.ps1` 复制到 `CONFIG_ROOT/scripts/clipboard/`。
+保留的 `copy`、`edit_file`、`open_dir` 即使有 label 也不出现在 CoreSrvCtl，不会单独生成服务组合项。见[剪贴板复制](clipboard_zh.md)的 stdin 协议及[文件动作](#文件动作)的路径协议。手动安装还需将 `contrib/scripts/clipboard/copy.sh` 或 `copy.ps1` 复制到 `CONFIG_ROOT/scripts/clipboard/`，将 `contrib/scripts/files/open.sh` 或 `open.ps1` 复制到 `CONFIG_ROOT/scripts/files/`。
 
 可选 `"cores": ["mihomo"]` 或 `["singbox"]`；省略表示全部 core。使用机器名 `singbox`，不是显示名 `sing-box`。数组不可为空或重复。同 ID 可分核定义不同命令，但作用域不可重叠；共用动作不能再用同 ID 定向覆盖。
 
@@ -82,6 +87,41 @@ CONFIG_ROOT/
 | `disable_autostart_core` | 关闭持久自启；不立即停止 |
 
 自启动作要求已安装，重复设置成功。缺少标准 ID 时对应功能报告不支持。Windows 默认另有 `install_core`、`uninstall_core`、`enable_system_proxy`、`disable_system_proxy`。
+
+## 文件动作
+
+文件页的编辑操作（Profile、Template、providers）调用 `edit_file`；全局目录快捷键调用 `open_dir`，传入原有目录目标。每次调用重新读取 `scripts.json`；动作缺失或无效时报告错误。返回后不会自动重读、校验编辑内容。
+
+Unix 默认动作：
+
+```json
+{
+  "id": "edit_file",
+  "cmd": {
+    "program": "/bin/sh",
+    "args": ["${config_root}/scripts/files/open.sh", "${path}"],
+    "interactive": false,
+    "output": "silent",
+    "keep_children_on_success": true
+  }
+}
+```
+
+再添加一项 `id: "open_dir"`，命令相同。Windows 默认通过 PowerShell 执行 `scripts/files/open.ps1`，完整命令见 [Windows 模板](../contrib/scripts/coresrvctrl/windows/system.json)。脚本使用 [`Invoke-Item -LiteralPath`](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/invoke-item?view=powershell-5.1) 打开关联程序。Unix 在 macOS 调用 `open`，其他桌面调用 `xdg-open`。Linux 没有桌面会话时报告错误，不自动回退到终端工具；需要诊断输出时将 `output` 改为 `popup`。
+
+在当前终端运行编辑器，可将 cmd 改为：
+
+```json
+{"program": "nvim", "args": ["${path}"], "interactive": true}
+```
+
+`open_dir` 可同样配置 `yazi`。GUI 或另开终端窗口的工具使用 `interactive: false`。固定程序可以直接配置，无需包装脚本。非交互脚本不应自动切换到需要当前终端输入的工具。
+
+`${path}` 应作为独立参数，仅替换一次，不经过 shell 求值；Windows 沿用扩展路径前缀清理。Shell 脚本中使用 `"$1"`，不要把路径拼入 `sh -c` 命令文本。SSH 下命令运行在远端；没有桌面时可配置终端编辑器。
+
+启动器成功退出只代表启动完成，不代表编辑已保存。若使用 GUI 编辑器的等待选项，命令持续运行直到编辑器返回。clashtui 退出时取消尚未结束的命令；已经成功保留的子进程自行管理生命周期。`keep_children_on_success` 不豁免超时，也不保留尚未结束的主命令。
+
+**迁移：** 将 `config.yaml` 的自定义 `extra.edit_cmd`、`extra.open_dir_cmd` 移到对应动作，把 `%s` 模板拆成 `program` 和使用 `${path}` 的独立 `args`。非空旧命令会报告迁移错误；旧 `null`、空字符串仍可读取，保存时移除。安装平台对应的打开脚本，把两个动作合并进已有 `scripts.json`，保留自定义服务动作。旧安装的 copy/status 动作可加 `timeout_secs: 5`，保留原来的手动执行超时。
 
 ## 路径与参数
 
@@ -100,6 +140,7 @@ CONFIG_ROOT/
 | `${service_name}` | 目标 core 的实际服务名 |
 | `${core_bin}`、`${core_config_dir}`、`${core_config_path}` | 目标 core 的绝对路径 |
 | `${proxy_port}` | 目标 API `/configs` 的有效 mixed-port，否则 port |
+| `${path}` | 文件编辑或打开目录动作的绝对目标路径；其他调用上下文不提供 |
 
 `${core_bin}` 的裸程序名先按 PATH 查到绝对路径；带分隔符的相对路径基于 `CONFIG_ROOT`。
 

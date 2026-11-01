@@ -893,10 +893,12 @@ create_service_scripts() {
   if ! copy_contrib "scripts/coresrvctrl/$backend/service.sh" "$stage/service.sh" ||
      ! copy_contrib "scripts/coresrvctrl/$backend/default.json" "$stage/default.json" ||
      ! copy_contrib "scripts/clipboard/copy.sh" "$stage/copy.sh" ||
+     ! copy_contrib "scripts/files/open.sh" "$stage/open.sh" ||
      ! sed 's/"${scope}"/"'"$scope"'"/g' "$stage/default.json" > "$stage/scripts.json" ||
-     ! mkdir -p "$target" "$CLASHTUI_CONFIG_DIR/scripts/clipboard" ||
+     ! mkdir -p "$target" "$CLASHTUI_CONFIG_DIR/scripts/clipboard" "$CLASHTUI_CONFIG_DIR/scripts/files" ||
      ! mv -f "$stage/service.sh" "$target/service.sh" ||
      ! mv -f "$stage/copy.sh" "$CLASHTUI_CONFIG_DIR/scripts/clipboard/copy.sh" ||
+     ! mv -f "$stage/open.sh" "$CLASHTUI_CONFIG_DIR/scripts/files/open.sh" ||
      ! mv -f "$stage/scripts.json" "$CLASHTUI_CONFIG_DIR/scripts.json"; then
     rm -rf "$stage"
     log_error "Failed to install service scripts ($backend/$scope)"
@@ -936,9 +938,7 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout:
-extra:
-  edit_cmd:
-  open_dir_cmd:
+extra: {}
 EOF
 
   log_info "Config written to: $CLASHTUI_CONFIG_DIR/config.yaml"

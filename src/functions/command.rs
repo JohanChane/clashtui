@@ -108,17 +108,30 @@ pub fn stop_service() -> Result<String> {
     super::service::execute_current("stop_core")
 }
 
-pub fn edit(path: &str) -> Result<()> {
-    let tpl = CONFIG.cfg_file.extra.edit_cmd.as_deref().unwrap_or("");
-    log::debug!("edit: path={path} template={tpl}");
-    shell_spawn(tpl, path)
+pub fn edit(path: &Path) -> Result<()> {
+    run_file_action("edit_file", path)
 }
 
 pub fn open_dir(path: &Path) -> Result<()> {
-    let tpl = CONFIG.cfg_file.extra.open_dir_cmd.as_deref().unwrap_or("");
-    let path = path
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("directory path is not valid UTF-8"))?;
-    log::debug!("open_dir: path={path} template={tpl}");
-    shell_spawn(tpl, path)
+    run_file_action("open_dir", path)
+}
+
+fn run_file_action(id: &str, path: &Path) -> Result<()> {
+    let root = crate::config::config_dir_path();
+    let scripts = crate::config::scripts::ScriptConfig::load(&root)?;
+    let command = super::service::resolve_current(&scripts, &root, id, Some(path))?;
+    let terminal_session = command.interactive || !crate::tui::is_running();
+    let execute = || {
+        let outcome = super::process::run(&command, None, &[], terminal_session)?;
+        if command.interactive {
+            outcome.ensure_success()
+        } else {
+            crate::tui::script_output::submit(id.into(), command.output, outcome)
+        }
+    };
+    if terminal_session {
+        crate::tui::with_terminal(execute)
+    } else {
+        execute()
+    }
 }

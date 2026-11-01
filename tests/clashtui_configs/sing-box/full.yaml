@@ -13,6 +13,4 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: 30
-extra:
-  edit_cmd: nvim "%s"
-  open_dir_cmd: lf "%s"
+extra: {}

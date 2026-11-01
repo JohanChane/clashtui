@@ -52,7 +52,8 @@ pub(super) fn copy(text: Option<String>, source: &'static str, format: &'static 
         let result = (|| {
             let root = crate::config::config_dir_path();
             let scripts = ScriptConfig::load(&root)?;
-            let command = crate::functions::service::resolve_current(&scripts, &root, "copy")?;
+            let command =
+                crate::functions::service::resolve_current(&scripts, &root, "copy", None)?;
             let interactive = command.interactive;
             let execute = || {
                 let outcome = crate::functions::process::run(

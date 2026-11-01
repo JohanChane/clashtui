@@ -124,7 +124,7 @@ The default global `<C-g>` shortcuts work on every page. Press Ctrl+g to show th
 | `f` | Start/restart the active core service |
 | `t` | Close all connections on the active core |
 
-Directory actions use `extra.open_dir_cmd`, or the system default application when unset. Global and page chords can share a first key: for example, `gp` in `app` and `gg` on a page both remain available. The Which panel combines their candidates, and the second key selects the action. An effective binding map is compiled for each page and file pane. Dispatch, Which, help, and tab labels all use that map. Conflicting configurations are rejected at startup instead of silently shadowing a binding. A pending second key cannot start another chord. Esc or an unmatched key cancels both scopes and consumes that input. Input and confirmation popups retain priority.
+File editing and directory actions use `edit_file` and `open_dir` in `scripts.json`; the shipped actions open the system default application. See [file actions](service_scripts_en.md#file-actions). Global and page chords can share a first key: for example, `gp` in `app` and `gg` on a page both remain available. The Which panel combines their candidates, and the second key selects the action. An effective binding map is compiled for each page and file pane. Dispatch, Which, help, and tab labels all use that map. Conflicting configurations are rejected at startup instead of silently shadowing a binding. A pending second key cannot start another chord. Esc or an unmatched key cancels both scopes and consumes that input. Input and confirmation popups retain priority.
 
 Global chords also work from the help panel, using only global candidates in that context. When help exceeds the screen height, scroll with Up/Down or `j`/`k`, use PageUp/PageDown to move a page, or Home/End to reach the beginning or end. Esc or another non-scrolling key closes help. Narrow terminals use a single column.
 
@@ -275,9 +275,7 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra:
-  edit_cmd: kitty -e nvim "%s"      # Command for editing files, %s is replaced by file path
-  open_dir_cmd: kitty -e yazi "%s"  # Command for opening directories
+extra: {}
 ```
 
 ### core_override_config.yaml

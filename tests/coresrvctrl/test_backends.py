@@ -398,7 +398,7 @@ class ResourceTests(unittest.TestCase):
             actions = {action["id"]: action for action in template["actions"]}
             self.assertTrue(ids <= actions.keys())
             self.assertNotIn("label", actions["status_core"])
-            self.assertTrue(all(action.get("label") for action_id, action in actions.items() if action_id not in ("status_core", "copy")))
+            self.assertTrue(all(action.get("label") for action_id, action in actions.items() if action_id not in ("status_core", "copy", "edit_file", "open_dir")))
             self.assertTrue(all("cores" not in action for action in actions.values()))
             self.assertFalse(actions["status_core"]["cmd"]["interactive"])
             self.assertEqual(actions["status_core"]["cmd"]["output"], "silent")
@@ -407,8 +407,21 @@ class ResourceTests(unittest.TestCase):
             self.assertFalse(copy["cmd"]["interactive"])
             self.assertEqual(copy["cmd"]["output"], "terminal")
             self.assertTrue(copy["cmd"]["keep_children_on_success"])
+            self.assertEqual(copy["cmd"]["timeout_secs"], 5)
+            self.assertEqual(actions["status_core"]["cmd"]["timeout_secs"], 5)
+            for action_id in ("edit_file", "open_dir"):
+                action = actions[action_id]
+                self.assertNotIn("label", action)
+                command = action["cmd"]
+                self.assertFalse(command["interactive"])
+                self.assertEqual(command["output"], "silent")
+                self.assertTrue(command["keep_children_on_success"])
+                self.assertNotIn("timeout_secs", command)
+                self.assertEqual(command["args"][-1], "${path}")
+                resource = next(a for a in command["args"] if a.startswith("${config_root}/scripts/files/"))
+                self.assertTrue((ROOT.parents[1] / resource.removeprefix("${config_root}/")).is_file())
             if backend != "windows":
-                for action in (a for a in actions.values() if a["id"] != "copy"):
+                for action in (a for a in actions.values() if a["id"] not in ("copy", "edit_file", "open_dir")):
                     self.assertEqual(action["cmd"]["program"], "/bin/sh")
                     args = action["cmd"]["args"]
                     self.assertEqual(args[2], "${scope}")

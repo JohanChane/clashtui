@@ -13,6 +13,4 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout:
-extra:
-  edit_cmd:
-  open_dir_cmd:
+extra: {}

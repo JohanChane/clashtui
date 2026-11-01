@@ -48,6 +48,15 @@ impl App {
     }
     #[tokio::main]
     pub async fn serve() -> anyhow::Result<()> {
+        // Blocking command workers must finish before Tokio drops its runtime,
+        // including on normal quit and early errors, not only on OS signals.
+        struct StopCommands;
+        impl Drop for StopCommands {
+            fn drop(&mut self) {
+                crate::functions::process::request_shutdown();
+            }
+        }
+        let _stop_commands = StopCommands;
         let _signals = signals::Signals::start()?;
         let mut coordinator = term::Coordinator::register()?;
         let mut app = Self::new();

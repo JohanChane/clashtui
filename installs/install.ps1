@@ -443,12 +443,16 @@ function New-ServiceScripts {
         Copy-Contrib "scripts/coresrvctrl/windows/sysproxy.ps1" (Join-Path $stage "sysproxy.ps1")
         Copy-Contrib "scripts/coresrvctrl/windows/system.json" (Join-Path $stage "scripts.json")
         Copy-Contrib "scripts/clipboard/copy.ps1" (Join-Path $stage "copy.ps1")
+        Copy-Contrib "scripts/files/open.ps1" (Join-Path $stage "open.ps1")
         New-Item -ItemType Directory -Path $target -Force | Out-Null
+        $filesDir = Join-Path $CLASHTUI_CONFIG_DIR "scripts/files"
+        New-Item -ItemType Directory -Path $filesDir -Force | Out-Null
         $clipboardDir = Join-Path $CLASHTUI_CONFIG_DIR "scripts/clipboard"
         New-Item -ItemType Directory -Path $clipboardDir -Force | Out-Null
         Move-Item (Join-Path $stage "service.ps1") (Join-Path $target "service.ps1") -Force
         Move-Item (Join-Path $stage "sysproxy.ps1") (Join-Path $target "sysproxy.ps1") -Force
         Move-Item (Join-Path $stage "copy.ps1") (Join-Path $clipboardDir "copy.ps1") -Force
+        Move-Item (Join-Path $stage "open.ps1") (Join-Path $filesDir "open.ps1") -Force
         Move-Item (Join-Path $stage "scripts.json") (Join-Path $CLASHTUI_CONFIG_DIR "scripts.json") -Force
     } finally {
         Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
@@ -493,9 +497,7 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout:
-extra:
-  edit_cmd:
-  open_dir_cmd:
+extra: {}
 "@
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false

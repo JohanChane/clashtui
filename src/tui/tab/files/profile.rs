@@ -492,7 +492,9 @@ mod actions {
 
     async fn _edit(name: String) -> CB {
         let pf = tri!(db::get(name).unwrap().load_local_profile());
-        tri!(edit(pf.path.to_str().unwrap()));
+        tri!(tri!(
+            tokio::task::spawn_blocking(move || edit(&pf.path)).await
+        ));
 
         do_nothing()
     }

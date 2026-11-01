@@ -35,7 +35,8 @@ Add this object to the existing `actions` array; keep the other actions and `roo
     "args": ["${config_root}/scripts/clipboard/copy.sh", "auto"],
     "interactive": false,
     "output": "terminal",
-    "keep_children_on_success": true
+    "keep_children_on_success": true,
+    "timeout_secs": 5
   }
 }
 ```
@@ -48,11 +49,12 @@ Windows uses this `cmd` instead:
   "args": ["-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass", "-File", "${config_root}/scripts/clipboard/copy.ps1", "auto"],
   "interactive": false,
   "output": "terminal",
-  "keep_children_on_success": true
+  "keep_children_on_success": true,
+  "timeout_secs": 5
 }
 ```
 
-The three execution options are shared with every script action. Their defaults are `interactive: true`, `output: "popup"`, and `keep_children_on_success: false`. The clipboard defaults explicitly override them. See [script configuration](service_scripts_en.md).
+Execution options are shared with every script action. The shipped copy action also sets `timeout_secs: 5`. Their defaults are `interactive: true`, `output: "popup"`, and `keep_children_on_success: false`. The clipboard defaults explicitly override them. See [script configuration](service_scripts_en.md).
 
 `copy` is reserved for the file copy actions and is excluded from CoreSrvCtl even if it has a label. Optional `cores` scopes work as for other actions. Each copy reloads `scripts.json`, so changes need no restart. Invalid configuration fails rather than executing an old command.
 
@@ -66,7 +68,7 @@ The three execution options are shared with every script action. Their defaults 
 - **Exit:** zero means success. Spawn/input errors, nonzero exit, timeout and cancellation report failure.
 - **stdout:** native copy leaves it empty; terminal copying writes the complete control sequence. With `output: "terminal"`, clashtui forwards successful output verbatim on the render thread. It neither constructs nor recognizes OSC52.
 - **stderr:** diagnostics. Terminal mode displays these separately instead of forwarding them as control sequences. `popup` displays both streams as text; `silent` suppresses both streams (a failed exit still reports its status).
-- **Limits:** text at most 1 MiB; noninteractive commands at most five seconds, including stdin writes. Terminal stdout is limited to 2 MiB, enough for base64 expansion; overflow fails without forwarding a partial sequence. Other captured streams are limited to 64 KiB with truncation indicated.
+- **Limits:** text at most 1 MiB; the shipped `timeout_secs: 5` limits the whole command, including stdin writes (omit or set to `null` for no timeout). Terminal stdout is limited to 2 MiB, enough for base64 expansion; overflow fails without forwarding a partial sequence. Other captured streams are limited to 64 KiB with truncation indicated.
 
 The UI remains responsive during noninteractive execution. Repeated copy requests are ignored until the previous result is delivered. A nonempty terminal output produces `Copy output sent to terminal`; this does not acknowledge acceptance by the terminal.
 

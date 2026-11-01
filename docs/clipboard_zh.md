@@ -35,7 +35,8 @@ file:
     "args": ["${config_root}/scripts/clipboard/copy.sh", "auto"],
     "interactive": false,
     "output": "terminal",
-    "keep_children_on_success": true
+    "keep_children_on_success": true,
+    "timeout_secs": 5
   }
 }
 ```
@@ -48,11 +49,12 @@ Windows 使用以下 `cmd`：
   "args": ["-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass", "-File", "${config_root}/scripts/clipboard/copy.ps1", "auto"],
   "interactive": false,
   "output": "terminal",
-  "keep_children_on_success": true
+  "keep_children_on_success": true,
+  "timeout_secs": 5
 }
 ```
 
-三个执行字段适用于所有脚本动作，默认分别是 `interactive: true`、`output: "popup"`、`keep_children_on_success: false`。剪贴板配置明确覆盖它们。完整规则见[脚本配置](service_scripts_zh.md)。
+执行字段适用于所有脚本动作；默认 copy 动作另设 `timeout_secs: 5`。其余默认值是 `interactive: true`、`output: "popup"`、`keep_children_on_success: false`。剪贴板配置明确覆盖它们。完整规则见[脚本配置](service_scripts_zh.md)。
 
 `copy` 保留给文件页的复制动作，即使有 label 也不会出现在 CoreSrvCtl 菜单。可用 `cores` 限定核心。每次复制重新读取 `scripts.json`，修改无需重启；配置无效时报告错误，不执行旧命令。
 
@@ -66,7 +68,7 @@ Windows 使用以下 `cmd`：
 - **退出码**：`0` 成功；启动、输入、非零退出、超时、取消均报告失败。
 - **stdout**：本地复制保持为空；终端复制输出完整控制序列。`output: "terminal"` 将成功命令的 stdout 原样交主线程写入终端，clashtui 不构造或识别 OSC52。
 - **stderr**：诊断信息。terminal 模式单独显示，不混入控制序列。popup 将两路输出作为文字弹窗；silent 隐藏两路输出，非零退出仍报告退出状态。
-- **限制**：文本最多 1 MiB；非交互命令包括 stdin 写入最多 5 秒。terminal stdout 最多 2 MiB，容纳 base64 膨胀，超限时失败且不发送截断序列；其他捕获流各最多 64 KiB，超限标注截断。
+- **限制**：文本最多 1 MiB；默认 `timeout_secs: 5` 限制整个命令，包括 stdin 写入；省略或设为 `null` 表示不限时。terminal stdout 最多 2 MiB，容纳 base64 膨胀，超限时失败且不发送截断序列；其他捕获流各最多 64 KiB，超限标注截断。
 
 非交互执行时界面保持响应；前一次结果送达前忽略重复复制。非空终端输出提示 `Copy output sent to terminal`，并不表示终端已经接受复制。
 
