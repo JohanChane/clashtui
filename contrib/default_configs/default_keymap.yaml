@@ -1,4 +1,5 @@
 # Default keymap for clashtui (yazi-style list format)
+# Complete reference of the built-in bindings and their help descriptions.
 # Uses the list-based YAML format. Unlisted bindings keep their defaults.
 # Entries with the same on sequence replace defaults; action: null unbinds a sequence.
 # Single key:    on: "j"
@@ -28,16 +29,16 @@ app:
 connections:
   - on: "<Up>"
     action: MoveUp
-    desc: Move up
+    desc: Move Up
   - on: "<Down>"
     action: MoveDown
-    desc: Move down
+    desc: Move Down
   - on: "k"
     action: MoveUp
-    desc: Move up
+    desc: Move Up
   - on: "j"
     action: MoveDown
-    desc: Move down
+    desc: Move Down
   - on: "G"
     action: GoBottom
     desc: Go to bottom
@@ -67,13 +68,13 @@ connections:
     desc: Sort by Upload
   - on: ["s", "d"]
     action: SortByDlSpeed
-    desc: Sort by DL Speed
+    desc: Sort by Dl Speed
   - on: ["s", "s"]
     action: SortByUlSpeed
-    desc: Sort by UL Speed
+    desc: Sort by Ul Speed
   - on: ["s", "r"]
     action: SortReset
-    desc: Reset sort
+    desc: Reset Sort
   - on: "/"
     action: Search
     desc: Search/Filter
@@ -88,37 +89,37 @@ file:
   profile:
     - on: "<Left>"
       action: Switch
-      desc: Switch pane
+      desc: Switch panel
     - on: "<Right>"
       action: Switch
-      desc: Switch pane
+      desc: Switch panel
     - on: "h"
       action: Switch
-      desc: Switch pane
+      desc: Switch panel
     - on: "l"
       action: Switch
-      desc: Switch pane
+      desc: Switch panel
     - on: "<Down>"
       action: MoveDown
-      desc: Move down
+      desc: Move Down
     - on: "<Up>"
       action: MoveUp
-      desc: Move up
+      desc: Move Up
     - on: "j"
       action: MoveDown
-      desc: Move down
+      desc: Move Down
     - on: "k"
       action: MoveUp
-      desc: Move up
+      desc: Move Up
     - on: "<Enter>"
       action: Select
       desc: Select
     - on: "i"
       action: Add
       desc: Import (URL or file)
-    - on: ["d", "d"]
+    - on: "D"
       action: Delete
-      desc: Delete profile
+      desc: Delete
     - on: "e"
       action: Edit
       desc: Edit
@@ -145,10 +146,13 @@ file:
       desc: Go to top
     - on: "G"
       action: GoEnd
-      desc: Go to end
+      desc: Go to bottom
     - on: "P"
       action: ToggleNoPp
       desc: Toggle no proxy-provider
+    - on: "O"
+      action: ToggleUpdateWithProxy
+      desc: Toggle update with proxy
     - on: "n"
       action: Traffic
       desc: Show traffic
@@ -156,31 +160,31 @@ file:
   template:
     - on: "<Left>"
       action: Switch
-      desc: Switch pane
+      desc: Switch panel
     - on: "<Right>"
       action: Switch
-      desc: Switch pane
+      desc: Switch panel
     - on: "h"
       action: Switch
-      desc: Switch pane
+      desc: Switch panel
     - on: "l"
       action: Switch
-      desc: Switch pane
+      desc: Switch panel
     - on: "<Down>"
       action: MoveDown
-      desc: Move down
+      desc: Move Down
     - on: "<Up>"
       action: MoveUp
-      desc: Move up
+      desc: Move Up
     - on: "j"
       action: MoveDown
-      desc: Move down
+      desc: Move Down
     - on: "k"
       action: MoveUp
-      desc: Move up
-    - on: ["d", "d"]
+      desc: Move Up
+    - on: "D"
       action: Delete
-      desc: Delete template
+      desc: Delete
     - on: "e"
       action: Edit
       desc: Edit
@@ -201,7 +205,7 @@ file:
       desc: Go to top
     - on: "G"
       action: GoEnd
-      desc: Go to end
+      desc: Go to bottom
     - on: "/"
       action: Search
       desc: Search/Filter
@@ -209,22 +213,22 @@ file:
 proxies:
   - on: "<Up>"
     action: MoveUp
-    desc: Move up
+    desc: Move Up
   - on: "<Down>"
     action: MoveDown
-    desc: Move down
+    desc: Move Down
   - on: "k"
     action: MoveUp
-    desc: Move up
+    desc: Move Up
   - on: "j"
     action: MoveDown
-    desc: Move down
+    desc: Move Down
   - on: "h"
     action: Parent
     desc: Go to parent
   - on: "l"
     action: Expand
-    desc: Expand
+    desc: Expand/Jump to group
   - on: "<Enter>"
     action: Select
     desc: Select
@@ -271,10 +275,30 @@ proxies:
     action: Refresh
     desc: Refresh
   - on: "f"
+    action: GroupSelect
+    desc: Group select
+  - on: "F"
     action: FzfFind
     desc: Find proxy
 
 srvctl:
+  - on: "<Enter>"
+    action: Execute
+    desc: Execute
+  - on: "<Up>"
+    action: MoveUp
+    desc: Move Up
+  - on: "<Down>"
+    action: MoveDown
+    desc: Move Down
+  - on: "k"
+    action: MoveUp
+    desc: Move Up
+  - on: "j"
+    action: MoveDown
+    desc: Move Down
+
+settings:
   - on: "<Enter>"
     action: Execute
     desc: Execute
@@ -283,50 +307,30 @@ srvctl:
     desc: Back
   - on: "<Up>"
     action: MoveUp
-    desc: Move up
+    desc: Move Up
   - on: "<Down>"
     action: MoveDown
-    desc: Move down
+    desc: Move Down
   - on: "k"
     action: MoveUp
-    desc: Move up
+    desc: Move Up
   - on: "j"
     action: MoveDown
-    desc: Move down
-
-settings:
-  - on: "<Enter>"
-    action: Execute
-    desc: Apply
-  - on: "<Esc>"
-    action: Esc
-    desc: Back
-  - on: "<Up>"
-    action: MoveUp
-    desc: Move up
-  - on: "<Down>"
-    action: MoveDown
-    desc: Move down
-  - on: "k"
-    action: MoveUp
-    desc: Move up
-  - on: "j"
-    action: MoveDown
-    desc: Move down
+    desc: Move Down
 
 logs:
   - on: "<Up>"
     action: MoveUp
-    desc: Move up
+    desc: Move Up
   - on: "<Down>"
     action: MoveDown
-    desc: Move down
+    desc: Move Down
   - on: "k"
     action: MoveUp
-    desc: Move up
+    desc: Move Up
   - on: "j"
     action: MoveDown
-    desc: Move down
+    desc: Move Down
   - on: "G"
     action: GoBottom
     desc: Go to bottom
@@ -347,13 +351,13 @@ logs:
     desc: Clear logs
   - on: ["t", "d"]
     action: ToggleDebug
-    desc: Toggle debug
+    desc: Toggle Debug
   - on: ["t", "i"]
     action: ToggleInfo
-    desc: Toggle info
+    desc: Toggle Info
   - on: ["t", "w"]
     action: ToggleWarning
-    desc: Toggle warning
+    desc: Toggle Warning
   - on: ["t", "e"]
     action: ToggleError
-    desc: Toggle error
+    desc: Toggle Error

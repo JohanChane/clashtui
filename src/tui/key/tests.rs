@@ -867,17 +867,37 @@ mod contexts {
     }
 
     #[test]
-    fn defaults_and_reference_configuration_have_no_cross_scope_conflicts() {
+    fn reference_configuration_matches_all_builtin_bindings() {
+        fn bindings(maps: &Keymaps, scope: Scope) -> Vec<(KeySequence, Action, &str)> {
+            maps.effective_bindings(scope)
+                .map(|(_, binding)| (binding.on, binding.action, binding.desc.as_str()))
+                .collect()
+        }
+
+        let reference: serde_yml::Mapping = serde_yml::from_str(include_str!(
+            "../../../contrib/default_configs/default_keymap.yaml"
+        ))
+        .unwrap();
         for core in ["mihomo", "sing-box"] {
-            Keymaps::from_config(serde_yml::Mapping::new(), core).unwrap();
-            Keymaps::from_config(
-                serde_yml::from_str(include_str!(
-                    "../../../contrib/default_configs/default_keymap.yaml"
-                ))
-                .unwrap(),
-                core,
-            )
-            .unwrap();
+            let defaults = Keymaps::from_config(serde_yml::Mapping::new(), core).unwrap();
+            let maps = Keymaps::from_config(reference.clone(), core).unwrap();
+            let sections = config::sections(reference.clone(), core).unwrap();
+            for scope in Scope::ALL {
+                let entries = sections[&scope].as_sequence().unwrap();
+                let expected = if scope == Scope::App {
+                    defaults.global_bindings()
+                } else {
+                    defaults.page_bindings(scope)
+                };
+                // Inherited defaults must not hide missing reference entries.
+                assert_eq!(entries.len(), expected.len(), "{core}: {scope:?}");
+                assert!(entries.iter().all(|entry| !entry["action"].is_null()));
+                assert_eq!(
+                    bindings(&maps, scope),
+                    bindings(&defaults, scope),
+                    "{core}: {scope:?}"
+                );
+            }
         }
     }
 
