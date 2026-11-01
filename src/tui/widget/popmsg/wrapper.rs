@@ -31,17 +31,17 @@ impl<C: Msg> Wrapper for Instance<C> {
 
     fn render(&mut self, f: &mut Frame) {
         use ratatui::symbols::merge::MergeStrategy;
-        let base_block = Block::bordered()
-            .border_style(Theme::get().popup.border)
-            .merge_borders(MergeStrategy::Exact)
-            .title(self.title.as_str());
+        let layout = self.content.layout();
+        let content_block = match layout {
+            PopupLayout::Centered => Block::bordered(),
+            PopupLayout::Fullscreen => Block::default(),
+        }
+        .border_style(Theme::get().popup.border)
+        .merge_borders(MergeStrategy::Exact);
+        let base_block = content_block.clone().title(self.title.as_str());
 
         if let Some(prompt) = self.prompt.as_mut() {
             use ratatui::layout::Spacing::Overlap;
-            let content_block = Block::bordered()
-                .border_style(Theme::get().popup.border)
-                .merge_borders(MergeStrategy::Exact);
-
             let areas: [Rect; 2] = {
                 let (content_width, content_height) = self.content.size();
                 let (_prompt_width, prompt_height) = prompt.size();
@@ -54,15 +54,24 @@ impl<C: Msg> Wrapper for Instance<C> {
                 let title_w = self.title.len() as u16;
                 let w = content_width.max(prompt_text_w).max(title_w).max(20);
                 let h = content_height + prompt_height + 1;
-                let area = calc_area_from(w, h, f.area());
+                let area = match layout {
+                    PopupLayout::Centered => calc_area_from(w, h, f.area()),
+                    PopupLayout::Fullscreen => f.area(),
+                };
                 f.render_widget(Clear, area);
 
-                Layout::vertical([
-                    Constraint::Fill(1),
-                    Constraint::Length(1 + 1 + content_height),
-                ])
-                .spacing(Overlap(1))
-                .areas(area)
+                let constraints = match layout {
+                    PopupLayout::Centered => [
+                        Constraint::Fill(1),
+                        Constraint::Length(1 + 1 + content_height),
+                    ],
+                    PopupLayout::Fullscreen => {
+                        [Constraint::Length(prompt_height + 2), Constraint::Fill(1)]
+                    }
+                };
+                Layout::vertical(constraints)
+                    .spacing(Overlap(1))
+                    .areas(area)
             };
 
             prompt.render(f, areas[0], base_block);
@@ -73,7 +82,10 @@ impl<C: Msg> Wrapper for Instance<C> {
                 let (width, height) = self.content.size();
                 let title_w = self.title.len() as u16;
                 let w = width.max(title_w).max(20);
-                calc_area_from(w, height, f.area())
+                match layout {
+                    PopupLayout::Centered => calc_area_from(w, height, f.area()),
+                    PopupLayout::Fullscreen => f.area(),
+                }
             };
             f.render_widget(Clear, area);
             self.content.render(f, area, base_block, true);
@@ -133,4 +145,99 @@ fn calc_area_from(dialog_width: u16, dialog_height: u16, area: Rect) -> Rect {
 
     let tmp = Layout::vertical([Constraint::Min(0), height, Constraint::Min(0)]).split(area);
     Layout::horizontal([Constraint::Min(0), width, Constraint::Min(0)]).split(tmp[1])[1]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tui::popmsg::prelude::{FzfFinder, Input};
+    use ratatui::{Terminal, backend::TestBackend};
+    use tokio::sync::oneshot;
+
+    fn instance<C: Msg>(content: C) -> Instance<C> {
+        let (tx, _rx) = oneshot::channel();
+        Instance {
+            content,
+            title: "Find Proxy".into(),
+            prompt: None,
+            is_focus_prompt: false,
+            tx,
+        }
+    }
+
+    fn draw<C: Msg>(popup: &mut Instance<C>, width: u16, height: u16) -> Vec<String> {
+        let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+        terminal
+            .draw(|frame| {
+                let area = frame.area();
+                for y in area.y..area.bottom() {
+                    frame.render_widget(
+                        Paragraph::new("X".repeat(width as usize)),
+                        Rect::new(0, y, width, 1),
+                    );
+                }
+                popup.render(frame);
+            })
+            .unwrap();
+        (0..height)
+            .map(|y| {
+                (0..width)
+                    .map(|x| terminal.backend().buffer()[(x, y)].symbol())
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn finder_covers_the_frame_and_anchors_results_above_the_input() {
+        let mut popup = instance(FzfFinder::new(vec!["alpha".into(), "beta".into()]));
+        let rows = draw(&mut popup, 40, 10);
+        assert!(!rows.join("\n").contains('X'));
+        assert_eq!(rows[6].trim(), "beta");
+        assert_eq!(rows[7].trim(), "> alpha");
+        assert!(rows[8].contains("Find Proxy"));
+        assert!(rows[8].contains("2/2"));
+        assert_eq!(rows[9].trim(), ">");
+
+        let rows = draw(&mut popup, 24, 5);
+        assert_eq!(rows[1].trim(), "beta");
+        assert_eq!(rows[2].trim(), "> alpha");
+        assert_eq!(rows[4].trim(), ">");
+
+        popup.handle_key_event(&KeyCode::Char('0').into());
+        let rows = draw(&mut popup, 40, 10);
+        assert_eq!(rows[7].trim(), "No matches");
+        assert!(rows[8].contains("0/2"));
+        assert_eq!(rows[9].trim(), "> 0");
+        assert!(!rows.join("\n").contains("alpha"));
+    }
+
+    #[test]
+    fn finder_keeps_the_selection_visible_when_scrolling_and_resizing() {
+        let mut popup = instance(FzfFinder::new(
+            (0..20).map(|i| format!("node-{i:02}")).collect(),
+        ));
+        for _ in 0..15 {
+            popup.handle_key_event(&KeyCode::Up.into());
+        }
+        for (width, height) in [(40, 10), (24, 5), (60, 20)] {
+            let rows = draw(&mut popup, width, height);
+            assert!(rows.iter().any(|row| row.trim() == "> node-15"));
+            assert_eq!(rows.last().unwrap().trim(), ">");
+        }
+        for (width, height) in [(1, 1), (2, 2), (0, 0)] {
+            draw(&mut popup, width, height);
+        }
+    }
+
+    #[test]
+    fn ordinary_input_stays_centered_with_its_prompt() {
+        let mut popup = instance(Input::new());
+        popup.prompt = Some(Prompt::new("Enter a value".into()));
+        let rows = draw(&mut popup, 60, 20);
+        assert!(rows[0].chars().all(|ch| ch == 'X'));
+        assert!(rows[19].chars().all(|ch| ch == 'X'));
+        assert!(rows.iter().any(|row| row.contains("Enter a value")));
+        assert!(rows.iter().any(|row| row.contains("Find Proxy")));
+    }
 }
