@@ -10,52 +10,52 @@ newtype_tab!(ProxiesTab(Tab<Proxies>), Proxies);
 
 key_map!(
     Proxies,
-    Key,
-    DefaultMap::new()
-        .with_common([
-            (KeyCode::Up, Key::MoveUp),
-            (KeyCode::Down, Key::MoveDown),
-            (KeyCode::Char('k'), Key::MoveUp),
-            (KeyCode::Char('j'), Key::MoveDown),
-            (KeyCode::Char('h'), Key::Parent),
-            (KeyCode::Char('l'), Key::Expand),
-            (KeyCode::Enter, Key::Select),
-            (KeyCode::Char('/'), Key::Search),
-            (KeyCode::Char('t'), Key::TestDelay),
-            (KeyCode::Char('r'), Key::Refresh),
-            (KeyCode::Char('f'), Key::GroupSelect),
-            (KeyCode::Char('F'), Key::FzfFind),
-            (KeyCode::Char('G'), Key::GoBottom),
+    Action,
+    DefaultBindings::new()
+        .with_keys([
+            (KeyCode::Up, Action::MoveUp),
+            (KeyCode::Down, Action::MoveDown),
+            (KeyCode::Char('k'), Action::MoveUp),
+            (KeyCode::Char('j'), Action::MoveDown),
+            (KeyCode::Char('h'), Action::Parent),
+            (KeyCode::Char('l'), Action::Expand),
+            (KeyCode::Enter, Action::Select),
+            (KeyCode::Char('/'), Action::Search),
+            (KeyCode::Char('t'), Action::TestDelay),
+            (KeyCode::Char('r'), Action::Refresh),
+            (KeyCode::Char('f'), Action::GroupSelect),
+            (KeyCode::Char('F'), Action::FzfFind),
+            (KeyCode::Char('G'), Action::GoBottom),
         ])
-        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Key::GoTop)])
-        .with_submap(
+        .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
+        .with_chords(
             KeyCode::Char('s'),
             [
-                (KeyCode::Char('n'), Key::Sort(Sort::ByName)),
-                (KeyCode::Char('d'), Key::Sort(Sort::ByDelay)),
-                (KeyCode::Char('r'), Key::Sort(Sort::Reset)),
+                (KeyCode::Char('n'), Action::Sort(Sort::ByName)),
+                (KeyCode::Char('d'), Action::Sort(Sort::ByDelay)),
+                (KeyCode::Char('r'), Action::Sort(Sort::Reset)),
             ]
         )
-        .with_submap(
+        .with_chords(
             KeyCode::Char('S'),
             [
-                (KeyCode::Char('n'), Key::Sort(Sort::GlobalByName)),
-                (KeyCode::Char('d'), Key::Sort(Sort::GlobalByDelay)),
-                (KeyCode::Char('r'), Key::Sort(Sort::GlobalReset)),
+                (KeyCode::Char('n'), Action::Sort(Sort::GlobalByName)),
+                (KeyCode::Char('d'), Action::Sort(Sort::GlobalByDelay)),
+                (KeyCode::Char('r'), Action::Sort(Sort::GlobalReset)),
             ]
         )
-        .with_submap(
+        .with_chords(
             KeyCode::Char('a'),
             [
-                (KeyCode::Char('f'), Key::CollapseAll),
-                (KeyCode::Char('e'), Key::ExpandAll),
-                (KeyCode::Char('t'), Key::TestAllDelay),
+                (KeyCode::Char('f'), Action::CollapseAll),
+                (KeyCode::Char('e'), Action::ExpandAll),
+                (KeyCode::Char('t'), Action::TestAllDelay),
             ]
         )
 );
 
-#[derive_aliases::derive(..Key, Debug)]
-pub(in crate::tui) enum Key {
+#[derive_aliases::derive(..Action, Debug)]
+pub(in crate::tui) enum Action {
     MoveUp,
     MoveDown,
     Parent,
@@ -91,7 +91,7 @@ pub(in crate::tui) enum Sort {
     GlobalByDelay,
 }
 
-impl Document for Key {
+impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {

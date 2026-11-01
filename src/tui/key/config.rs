@@ -1,19 +1,19 @@
 //! Parse, validate and resolve configuration before building runtime lookup tables.
 
-use super::{Document, Key, instancing::defaults::DefaultMap};
-use anyhow::{Context, Result, bail, ensure};
+use super::{DefaultBindings, Document, KeySequence, Scope};
+use anyhow::{Context, Result, bail};
 use serde::de::DeserializeOwned;
 use serde_yml::{Mapping, Value};
 use std::collections::{HashMap, HashSet};
 
-pub struct Binding<A> {
-    pub on: Vec<Key>,
-    pub action: Option<A>,
-    pub desc: Option<String>,
+struct Binding<A> {
+    on: KeySequence,
+    action: Option<A>,
+    desc: Option<String>,
 }
 
 pub struct ResolvedBinding<A> {
-    pub on: Vec<Key>,
+    pub on: KeySequence,
     // Keep explicit unbindings so input fallbacks cannot revive them.
     pub action: Option<A>,
     pub desc: String,
@@ -38,7 +38,7 @@ struct Entry {
     desc: Option<String>,
 }
 
-fn parse_on(value: Value) -> Result<Vec<Key>> {
+fn parse_on(value: Value) -> Result<KeySequence> {
     let keys = match value {
         Value::String(s) => vec![s],
         Value::Sequence(seq) => seq
@@ -47,11 +47,11 @@ fn parse_on(value: Value) -> Result<Vec<Key>> {
             .collect::<Result<Vec<_>, _>>()?,
         _ => bail!("`on` must be a key string or a list of key strings"),
     };
-    ensure!(
-        (1..=2).contains(&keys.len()),
-        "`on` must contain 1 or 2 keys; modifiers count as part of one key"
-    );
-    keys.iter().map(|s| s.parse()).collect()
+    match keys.as_slice() {
+        [key] => Ok(KeySequence::Single(key.parse()?)),
+        [first, second] => Ok(KeySequence::Chord([first.parse()?, second.parse()?])),
+        _ => bail!("`on` must contain 1 or 2 keys; modifiers count as part of one key"),
+    }
 }
 
 fn optional_action<A: DeserializeOwned>(value: Value) -> Result<Option<A>> {
@@ -91,37 +91,27 @@ fn parse_entries<A: DeserializeOwned>(value: Value) -> Result<Vec<Binding<A>>> {
 fn validate<A>(bindings: &[Binding<A>]) -> Result<()> {
     let mut seen = HashMap::new();
     for (i, binding) in bindings.iter().enumerate() {
-        ensure!(
-            (1..=2).contains(&binding.on.len()),
-            "entry #{} must contain 1 or 2 keys",
-            i + 1
-        );
-        ensure!(
-            binding.action.is_none()
-                || binding.on.len() != 2
-                || binding.on[1] != Key::from_code(super::KeyCode::Esc),
-            "Esc is reserved for cancelling a pending chord; choose another second key"
-        );
-        if let Some(previous) = seen.insert(binding.on.as_slice(), i) {
+        if binding.action.is_some() {
+            binding.on.validate_action()?;
+        }
+        if let Some(previous) = seen.insert(binding.on, i) {
             bail!(
                 "duplicate key binding `{}` in entries #{} and #{}",
-                super::notation::format_sequence(&binding.on),
+                super::notation::format_sequence(binding.on.as_slice()),
                 previous + 1,
                 i + 1
             );
         }
     }
-    for binding in bindings
-        .iter()
-        .filter(|b| b.on.len() == 2 && b.action.is_some())
-    {
-        if let Some(index) = seen.get(&binding.on[..1])
+    for binding in bindings.iter().filter(|b| b.action.is_some()) {
+        if let KeySequence::Chord([first, _]) = binding.on
+            && let Some(index) = seen.get(&KeySequence::Single(first))
             && bindings[*index].action.is_some()
         {
             bail!(
                 "prefix conflict: `{}` is both a single-key binding and the first key of `{}`",
-                binding.on[0],
-                super::notation::format_sequence(&binding.on)
+                first,
+                super::notation::format_sequence(binding.on.as_slice())
             );
         }
     }
@@ -129,20 +119,28 @@ fn validate<A>(bindings: &[Binding<A>]) -> Result<()> {
 }
 
 /// Apply overrides, retaining unbound keys as fallback guards.
-pub fn resolve<A>(defaults: DefaultMap<A>, overrides: Value) -> Result<Vec<ResolvedBinding<A>>>
+pub fn resolve<A>(defaults: DefaultBindings<A>, overrides: Value) -> Result<Vec<ResolvedBinding<A>>>
 where
     A: DeserializeOwned + Document,
 {
-    let defaults = defaults.into_bindings();
+    let defaults: Vec<_> = defaults
+        .bindings
+        .into_iter()
+        .map(|(on, action)| Binding {
+            on,
+            action: Some(action),
+            desc: None,
+        })
+        .collect();
     validate(&defaults).context("invalid built-in defaults")?;
     let mut bindings = parse_entries(overrides)?;
     // Duplicate user entries must not disappear when defaults are replaced.
     validate(&bindings)?;
-    let replaced: HashSet<_> = bindings.iter().map(|b| b.on.clone()).collect();
+    let replaced: HashSet<_> = bindings.iter().map(|b| b.on).collect();
     bindings.extend(defaults.into_iter().filter(|b| !replaced.contains(&b.on)));
     validate(&bindings)?;
 
-    let mut bindings: Vec<_> = bindings
+    Ok(bindings
         .into_iter()
         .map(|binding| ResolvedBinding {
             desc: binding.desc.unwrap_or_else(|| {
@@ -155,13 +153,11 @@ where
             on: binding.on,
             action: binding.action,
         })
-        .collect();
-    bindings.sort_by_cached_key(|binding| super::notation::format_sequence(&binding.on));
-    Ok(bindings)
+        .collect())
 }
 
-/// Normalize dev's nested file scopes and optional core-specific sections.
-pub fn sections(mut map: Mapping, core: &str) -> Result<Mapping> {
+/// Select core-specific overrides and resolve nested file scopes to typed scopes.
+pub fn sections(mut map: Mapping, core: &str) -> Result<HashMap<Scope, Value>> {
     let mut selected = None;
     for name in ["mihomo", "sing-box"] {
         if let Some(value) = map.remove(name) {
@@ -173,42 +169,43 @@ pub fn sections(mut map: Mapping, core: &str) -> Result<Mapping> {
             }
         }
     }
-    fn flatten(mut map: Mapping) -> Result<Mapping> {
-        for key in map.keys() {
-            let key = key.as_str().context("scope name must be a string")?;
-            ensure!(
-                [
-                    "app",
-                    "connections",
-                    "proxies",
-                    "srvctl",
-                    "settings",
-                    "logs",
-                    "file"
-                ]
-                .contains(&key),
-                "unknown keymap scope `{key}`"
-            );
-        }
-        if let Some(file) = map.remove("file") {
-            let Value::Mapping(file) = file else {
-                bail!("`file` must contain profile/template sections")
-            };
-            for (name, value) in file {
-                let name = name.as_str().context("file scope must be a string")?;
-                ensure!(
-                    ["profile", "template"].contains(&name),
-                    "unknown file scope `{name}`"
-                );
-                map.insert(format!("files/{name}").into(), value);
-            }
-        }
-        Ok(map)
-    }
-    let mut common = flatten(map)?;
+    let mut common = parse_sections(map)?;
     if let Some(selected) = selected {
-        // As in dev, a core-specific scope replaces the common scope.
-        common.extend(flatten(selected)?);
+        // A core-specific scope replaces the common scope before defaults are merged.
+        common.extend(parse_sections(selected)?);
     }
     Ok(common)
+}
+
+fn parse_sections(map: Mapping) -> Result<HashMap<Scope, Value>> {
+    let mut sections = HashMap::new();
+    for (name, value) in map {
+        let name = name.as_str().context("scope name must be a string")?;
+        let scope = match name {
+            "app" => Scope::App,
+            "connections" => Scope::Connections,
+            "proxies" => Scope::Proxies,
+            "srvctl" => Scope::Srvctl,
+            "settings" => Scope::Settings,
+            "logs" => Scope::Logs,
+            "file" => {
+                let Value::Mapping(file) = value else {
+                    bail!("`file` must contain profile/template sections")
+                };
+                for (name, value) in file {
+                    let name = name.as_str().context("file scope must be a string")?;
+                    let scope = match name {
+                        "profile" => Scope::Profile,
+                        "template" => Scope::Template,
+                        _ => bail!("unknown file scope `{name}`"),
+                    };
+                    sections.insert(scope, value);
+                }
+                continue;
+            }
+            _ => bail!("unknown keymap scope `{name}`"),
+        };
+        sections.insert(scope, value);
+    }
+    Ok(sections)
 }

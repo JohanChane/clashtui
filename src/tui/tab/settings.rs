@@ -11,25 +11,25 @@ newtype_tab!(SettingsTab(Tab<SettingsContent>), Settings);
 
 key_map!(
     Settings,
-    Key,
-    DefaultMap::new().with_common([
-        (KeyCode::Enter, Key::Execute),
-        (KeyCode::Esc, Key::Esc),
-        (KeyCode::Up, Key::MoveUp),
-        (KeyCode::Down, Key::MoveDown),
-        (KeyCode::Char('k'), Key::MoveUp),
-        (KeyCode::Char('j'), Key::MoveDown),
+    Action,
+    DefaultBindings::new().with_keys([
+        (KeyCode::Enter, Action::Execute),
+        (KeyCode::Esc, Action::Esc),
+        (KeyCode::Up, Action::MoveUp),
+        (KeyCode::Down, Action::MoveDown),
+        (KeyCode::Char('k'), Action::MoveUp),
+        (KeyCode::Char('j'), Action::MoveDown),
     ])
 );
 
-#[derive_aliases::derive(..Key, Debug)]
-pub(in crate::tui) enum Key {
+#[derive_aliases::derive(..Action, Debug)]
+pub(in crate::tui) enum Action {
     Execute,
     MoveUp,
     MoveDown,
     Esc,
 }
-impl Document for Key {
+impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
@@ -85,7 +85,7 @@ struct SettingsContent {
 }
 
 impl BasicTabContent for SettingsContent {
-    type Key = Key;
+    type Action = Action;
 
     type State = ListState;
 
@@ -149,28 +149,28 @@ impl TabContent for SettingsContent {
         .spawn_at(task_set);
     }
 
-    fn handle_key_event(
+    fn handle_action(
         &mut self,
-        key: Key,
+        action: Action,
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
     ) {
         if self.mode_selector_visible {
-            match key {
-                Key::MoveUp => {
+            match action {
+                Action::MoveUp => {
                     let i = self.mode_selector_state.selected().unwrap_or(0);
                     self.mode_selector_state.select(Some(i.saturating_sub(1)));
                 }
-                Key::MoveDown => {
+                Action::MoveDown => {
                     let i = self.mode_selector_state.selected().unwrap_or(0);
                     if i + 1 < self.modes.len() {
                         self.mode_selector_state.select(Some(i + 1));
                     }
                 }
-                Key::Esc => {
+                Action::Esc => {
                     self.mode_selector_visible = false;
                 }
-                Key::Execute => {
+                Action::Execute => {
                     let idx = self.mode_selector_state.selected().unwrap_or(0);
                     if let Some(mode) = self.modes.get(idx) {
                         let mode = *mode;
@@ -206,21 +206,21 @@ impl TabContent for SettingsContent {
         }
 
         if self.tun_selector_visible {
-            match key {
-                Key::MoveUp => {
+            match action {
+                Action::MoveUp => {
                     let i = self.tun_selector_state.selected().unwrap_or(0);
                     self.tun_selector_state.select(Some(i.saturating_sub(1)));
                 }
-                Key::MoveDown => {
+                Action::MoveDown => {
                     let i = self.tun_selector_state.selected().unwrap_or(0);
                     if i + 1 < self.tun_stacks.len() {
                         self.tun_selector_state.select(Some(i + 1));
                     }
                 }
-                Key::Esc => {
+                Action::Esc => {
                     self.tun_selector_visible = false;
                 }
-                Key::Execute => {
+                Action::Execute => {
                     let idx = self.tun_selector_state.selected().unwrap_or(0);
                     if let Some(stack) = self.tun_stacks.get(idx) {
                         let stack = *stack;
@@ -256,18 +256,18 @@ impl TabContent for SettingsContent {
             return;
         }
 
-        match key {
-            Key::MoveUp => {
+        match action {
+            Action::MoveUp => {
                 let i = state.selected().unwrap_or(0);
                 state.select(Some(i.saturating_sub(1)));
             }
-            Key::MoveDown => {
+            Action::MoveDown => {
                 let i = state.selected().unwrap_or(0);
                 if i + 1 < self.ops.len() {
                     state.select(Some(i + 1));
                 }
             }
-            Key::Execute => {
+            Action::Execute => {
                 let Some(idx) = state.selected() else { return };
                 let Some(op) = self.ops.get(idx) else { return };
                 match op {

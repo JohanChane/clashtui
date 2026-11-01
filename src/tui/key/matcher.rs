@@ -1,5 +1,5 @@
-use super::runtime::{DispatchEntry, KeySequence};
-use super::{Action, ChordView, Key, KeyCode, KeyModifiers, Keymaps, Scope};
+use super::runtime::DispatchEntry;
+use super::{Action, ChordView, Key, KeyCode, KeyModifiers, KeySequence, Keymaps, Scope};
 
 #[derive(Clone, Copy)]
 pub(super) enum InputPolicy {
@@ -28,9 +28,9 @@ impl InputPolicy {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum Match<A> {
+pub enum Match {
     Pending,
-    Execute(A),
+    Execute(Action),
     Cancelled,
     Unmatched,
 }
@@ -87,7 +87,7 @@ impl<'a> Matcher<'a> {
         matches!(self.first(scope, *key), Some((_, DispatchEntry::Chord(_))))
     }
 
-    pub fn feed(&mut self, key: &Key, input_scope: Scope, map_scope: Scope) -> Match<Action> {
+    pub fn feed(&mut self, key: &Key, input_scope: Scope, map_scope: Scope) -> Match {
         if let Some(pending) = self.pending.take()
             && pending.input_scope == input_scope
         {

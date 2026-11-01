@@ -1,6 +1,6 @@
 mod dev {
+    pub(in crate::tui) use crate::tui::key::DefaultBindings;
     pub use crate::tui::key::Document;
-    pub use crate::tui::key::instancing::defaults::DefaultMap;
     pub use crate::tui::widget::dualtab::*;
     pub use crate::tui::widget::tab::*;
     pub use crossterm::event::KeyCode;
@@ -61,7 +61,7 @@ macro_rules! newtype_tab {
             }
         }
     };
-    (@no_key $(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>)) => {
+    (@no_action $(#[$m:meta])* $tab:ident($ty:ident<$inner:ident>)) => {
         $(#[$m])*
         #[derive(Default)]
         pub struct $tab($ty<$inner>);

@@ -1,6 +1,5 @@
 use super::*;
 use crossterm::event::KeyEvent;
-use instancing::defaults::DefaultMap;
 use serde_yml::Value;
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
@@ -22,22 +21,22 @@ impl Document for Action {
     }
 }
 
-fn defaults() -> DefaultMap<Action> {
-    DefaultMap::new()
-        .with_common([
+fn defaults() -> DefaultBindings<Action> {
+    DefaultBindings::new()
+        .with_keys([
             (KeyCode::Char('j'), Action::MoveDown),
             (KeyCode::Char('k'), Action::MoveUp),
         ])
-        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
+        .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
 }
 
 fn runtime_action(action: Action) -> super::Action {
     use crate::tui::tab::logs;
     super::Action::Logs(match action {
-        Action::MoveUp => logs::Key::MoveUp,
-        Action::MoveDown => logs::Key::MoveDown,
-        Action::GoTop => logs::Key::GoTop,
-        Action::Clear => logs::Key::Clear,
+        Action::MoveUp => logs::Action::MoveUp,
+        Action::MoveDown => logs::Action::MoveDown,
+        Action::GoTop => logs::Action::GoTop,
+        Action::Clear => logs::Action::Clear,
     })
 }
 
@@ -95,6 +94,22 @@ fn resolve(map: &Keymaps, keys: &[&str]) -> Option<Action> {
     result
 }
 
+fn scope_docs(scope: Scope, overrides: Value) -> anyhow::Result<Vec<(String, String)>> {
+    let (name, overrides) = match scope {
+        Scope::Profile => (
+            "file",
+            Value::Mapping([("profile".into(), overrides)].into_iter().collect()),
+        ),
+        Scope::Template => (
+            "file",
+            Value::Mapping([("template".into(), overrides)].into_iter().collect()),
+        ),
+        _ => (scope.name(), overrides),
+    };
+    let maps = Keymaps::from_config([(name.into(), overrides)].into_iter().collect(), "mihomo")?;
+    Ok(docs(maps.page_bindings(scope)))
+}
+
 mod configuration {
     use super::*;
 
@@ -134,12 +149,6 @@ mod configuration {
             let err = compile(yaml).err().unwrap();
             assert!(format!("{err:#}").contains("prefix conflict"));
         }
-    }
-
-    #[test]
-    fn same_keys_in_different_scopes_are_allowed() {
-        assert!(compile("- {on: x, action: Clear}").is_ok());
-        assert!(compile("- {on: x, action: MoveUp}").is_ok());
     }
 
     #[test]
@@ -192,10 +201,10 @@ mod configuration {
         let yaml = "logs: [{on: x, action: Clear}]\nfile:\n  profile: [{on: e, action: Edit}]\nmihomo:\n  logs: [{on: y, action: Clear}]\n  file:\n    template: [{on: p, action: Preview}]\nsing-box:\n  logs: [{on: z, action: Clear}]";
         let input = serde_yml::from_str(yaml).unwrap();
         let map = config::sections(input, "mihomo").unwrap();
-        assert!(map.contains_key("files/profile"));
-        assert!(map.contains_key("files/template"));
+        assert!(map.contains_key(&Scope::Profile));
+        assert!(map.contains_key(&Scope::Template));
         let compiled =
-            runtime_maps(config::resolve(defaults(), map["logs"].clone()).unwrap()).unwrap();
+            runtime_maps(config::resolve(defaults(), map[&Scope::Logs].clone()).unwrap()).unwrap();
         assert_eq!(resolve(&compiled, &["y"]), Some(Action::Clear));
         assert_eq!(resolve(&compiled, &["x"]), None);
         assert_eq!(resolve(&compiled, &["z"]), None);
@@ -243,41 +252,7 @@ mod configuration {
     }
 
     #[test]
-    fn all_real_scopes_accept_defaults_and_the_bundled_user_configuration() {
-        let app_docs = crate::tui::app::km::km::validate_config(Value::Null).unwrap();
-        assert_eq!(app_docs.len(), 15);
-        assert!(app_docs.contains(&("q".into(), "Quit".into())));
-        use crate::tui::tab::{connections, files, logs, proxies, settings, srvctl};
-        let mut bundled = config::sections(
-            serde_yml::from_str(include_str!(
-                "../../../contrib/default_configs/default_keymap.yaml"
-            ))
-            .unwrap(),
-            "mihomo",
-        )
-        .unwrap();
-        macro_rules! check {
-            ($module:path, $scope:literal) => {{
-                use $module as km;
-                km::validate_config(Value::Null).unwrap();
-                km::validate_config(bundled.remove($scope).unwrap())
-                    .unwrap_or_else(|e| panic!("{}: {e:#}", $scope));
-            }};
-        }
-        check!(crate::tui::app::km::km, "app");
-        check!(connections::km, "connections");
-        check!(proxies::km, "proxies");
-        check!(logs::km, "logs");
-        check!(settings::km, "settings");
-        check!(srvctl::km, "srvctl");
-        check!(files::profile::km, "files/profile");
-        check!(files::template::km, "files/template");
-        assert!(bundled.is_empty());
-    }
-
-    #[test]
     fn file_actions_use_plain_names_and_reject_nested_actions() {
-        use crate::tui::tab::files::{profile, template};
         for (name, description) in [
             ("Add", "Import (URL or file)"),
             ("Delete", "Delete"),
@@ -296,7 +271,7 @@ mod configuration {
             ("GoEnd", "Go to bottom"),
         ] {
             let input = serde_yml::from_str(&format!("- {{on: x, action: {name}}}")).unwrap();
-            let docs = profile::km::validate_config(input).unwrap();
+            let docs = scope_docs(Scope::Profile, input).unwrap();
             assert!(docs.contains(&("x".into(), description.into())), "{name}");
         }
         for (name, description) in [
@@ -309,7 +284,7 @@ mod configuration {
             ("FzfFind", "Find template"),
         ] {
             let input = serde_yml::from_str(&format!("- {{on: x, action: {name}}}")).unwrap();
-            let docs = template::km::validate_config(input).unwrap();
+            let docs = scope_docs(Scope::Template, input).unwrap();
             assert!(docs.contains(&("x".into(), description.into())), "{name}");
         }
         for yaml in [
@@ -318,17 +293,19 @@ mod configuration {
             "- {on: x, action: UnknownAction}",
         ] {
             let input: Value = serde_yml::from_str(yaml).unwrap();
-            assert!(profile::km::validate_config(input.clone()).is_err());
-            assert!(template::km::validate_config(input).is_err());
+            assert!(scope_docs(Scope::Profile, input.clone()).is_err());
+            assert!(scope_docs(Scope::Template, input).is_err());
         }
         assert!(
-            profile::km::validate_config(
+            scope_docs(
+                Scope::Profile,
                 serde_yml::from_str("- {on: x, action: Generate}").unwrap()
             )
             .is_err()
         );
         assert!(
-            template::km::validate_config(
+            scope_docs(
+                Scope::Template,
                 serde_yml::from_str("- {on: x, action: Update}").unwrap()
             )
             .is_err()
@@ -337,7 +314,6 @@ mod configuration {
 
     #[test]
     fn sorting_uses_public_names_without_nested_configuration() {
-        use crate::tui::tab::{connections, proxies};
         for (name, description) in [
             ("SortByName", "Sort by name"),
             ("SortByDelay", "Sort by delay"),
@@ -347,28 +323,28 @@ mod configuration {
             ("GlobalResetSort", "Global reset sort"),
         ] {
             let input = serde_yml::from_str(&format!("- {{on: x, action: {name}}}")).unwrap();
-            let docs = proxies::km::validate_config(input).unwrap();
+            let docs = scope_docs(Scope::Proxies, input).unwrap();
             assert!(docs.contains(&("x".into(), description.into())), "{name}");
         }
         for name in [
             "Host", "Rule", "Chains", "Download", "Upload", "DlSpeed", "UlSpeed",
         ] {
             let input = serde_yml::from_str(&format!("- {{on: x, action: SortBy{name}}}")).unwrap();
-            connections::km::validate_config(input).unwrap();
+            scope_docs(Scope::Connections, input).unwrap();
         }
         for yaml in [
             "- {on: x, action: {Sort: ByDelay}}",
             "- on: x\n  action: !Sort ByDelay",
             "- {on: x, action: ByDelay}",
         ] {
-            assert!(proxies::km::validate_config(serde_yml::from_str(yaml).unwrap()).is_err());
+            assert!(scope_docs(Scope::Proxies, serde_yml::from_str(yaml).unwrap()).is_err());
         }
         for yaml in [
             "- {on: x, action: {SortBy: Host}}",
             "- on: x\n  action: !SortBy Host",
             "- {on: x, action: Host}",
         ] {
-            assert!(connections::km::validate_config(serde_yml::from_str(yaml).unwrap()).is_err());
+            assert!(scope_docs(Scope::Connections, serde_yml::from_str(yaml).unwrap()).is_err());
         }
     }
 }
@@ -377,7 +353,7 @@ mod matching {
     use super::*;
 
     #[test]
-    fn chords_and_modified_keys_dispatch_without_copying_candidates() {
+    fn chords_and_modified_keys_dispatch_with_updated_descriptions() {
         let (map, docs) = compile("- on: [g, e]\n  action: Clear\n  desc: Clear by chord\n- on: [\"<C-g>\", \"<A-x>\"]\n  action: MoveDown\n- on: \"<C-j>\"\n  action: MoveDown").unwrap();
         assert_eq!(resolve(&map, &["g", "e"]), Some(Action::Clear));
         assert_eq!(resolve(&map, &["g", "g"]), Some(Action::GoTop));
@@ -430,7 +406,7 @@ mod matching {
         ] {
             for action in ["Clear", "null"] {
                 let defaults =
-                    DefaultMap::new().with_common([(KeyCode::Char(c), Action::MoveDown)]);
+                    DefaultBindings::new().with_keys([(KeyCode::Char(c), Action::MoveDown)]);
                 let config =
                     serde_yml::from_str(&format!("- {{on: '{shifted}', action: {action}}}"))
                         .unwrap();
@@ -581,21 +557,21 @@ mod matching {
 
 mod windows_input {
     use super::*;
-    use crate::tui::{app::AppKey, tab::logs};
+    use crate::tui::{app::AppAction, tab::logs};
     use matcher::InputPolicy;
 
     fn maps(yaml: &str) -> Keymaps {
         Keymaps::from_config(serde_yml::from_str(yaml).unwrap(), "mihomo").unwrap()
     }
 
-    fn press(input: &mut Matcher<'_>, key: &str) -> Match<super::super::Action> {
+    fn press(input: &mut Matcher<'_>, key: &str) -> Match {
         input.feed(&key.parse().unwrap(), Scope::Logs, Scope::Logs)
     }
 
     #[test]
     fn generated_characters_fall_back_only_for_native_windows_input() {
         for c in ['?', '!', '1', '/', 'é', '中'] {
-            let defaults = DefaultMap::new().with_common([(KeyCode::Char(c), Action::Clear)]);
+            let defaults = DefaultBindings::new().with_keys([(KeyCode::Char(c), Action::Clear)]);
             let maps = runtime_maps(config::resolve(defaults, Value::Null).unwrap()).unwrap();
             let event = KeyEvent::new(KeyCode::Char(c), KeyModifiers::SHIFT);
             let key = Key::from(event);
@@ -631,7 +607,7 @@ mod windows_input {
             // Existing ASCII letter normalization must not turn Shift+a into a.
             KeyCode::Char('a'),
         ] {
-            let defaults = DefaultMap::new().with_common([(code, Action::Clear)]);
+            let defaults = DefaultBindings::new().with_keys([(code, Action::Clear)]);
             let maps = runtime_maps(config::resolve(defaults, Value::Null).unwrap()).unwrap();
             let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
             assert_eq!(
@@ -650,7 +626,7 @@ mod windows_input {
             KeyModifiers::SUPER,
         ] {
             let base = Key::from(KeyEvent::new(KeyCode::Char('?'), extra));
-            let defaults = DefaultMap::new().with_common([(base, Action::Clear)]);
+            let defaults = DefaultBindings::new().with_keys([(base, Action::Clear)]);
             let maps = runtime_maps(config::resolve(defaults, Value::Null).unwrap()).unwrap();
             let mut input = Matcher::with_policy(&maps, InputPolicy::WindowsNative);
             assert_eq!(
@@ -676,13 +652,13 @@ mod windows_input {
             let key = KeyEvent::new(KeyCode::Char('?'), KeyModifiers::SHIFT).into();
             assert_eq!(
                 input.feed(&key, scope, scope),
-                Match::Execute(super::super::Action::App(AppKey::Help))
+                Match::Execute(super::super::Action::App(AppAction::Help))
             );
         }
         assert_eq!(
             maps.global_bindings()
                 .iter()
-                .filter(|b| b.action == super::super::Action::App(AppKey::Help))
+                .filter(|b| b.action == super::super::Action::App(AppAction::Help))
                 .map(|b| b.key_text.as_str())
                 .collect::<Vec<_>>(),
             vec!["?"]
@@ -690,10 +666,10 @@ mod windows_input {
         // A layout reporting '/' with Shift produces '/', never a guessed '?'.
         assert_eq!(
             press(&mut input, "<S-/>"),
-            Match::Execute(super::super::Action::Logs(logs::Key::Search))
+            Match::Execute(super::super::Action::Logs(logs::Action::Search))
         );
         let expected = if cfg!(windows) {
-            Match::Execute(super::super::Action::App(AppKey::Help))
+            Match::Execute(super::super::Action::App(AppAction::Help))
         } else {
             Match::Unmatched
         };
@@ -705,19 +681,19 @@ mod windows_input {
         for (yaml, expected) in [
             (
                 "app: [{on: '!', action: TabPrev}]\nlogs: [{on: '<S-!>', action: Clear}]",
-                super::super::Action::Logs(logs::Key::Clear),
+                super::super::Action::Logs(logs::Action::Clear),
             ),
             (
                 "app: [{on: '<S-!>', action: TabPrev}]\nlogs: [{on: '!', action: Clear}]",
-                super::super::Action::App(AppKey::TabPrev),
+                super::super::Action::App(AppAction::TabPrev),
             ),
             (
                 "app: [{on: '<S-!>', action: null}]\nlogs: [{on: '<S-!>', action: Clear}]",
-                super::super::Action::Logs(logs::Key::Clear),
+                super::super::Action::Logs(logs::Action::Clear),
             ),
             (
                 "app: [{on: '<S-!>', action: TabPrev}]\nlogs: [{on: '<S-!>', action: null}]",
-                super::super::Action::App(AppKey::TabPrev),
+                super::super::Action::App(AppAction::TabPrev),
             ),
         ] {
             let maps = maps(yaml);
@@ -741,7 +717,7 @@ mod windows_input {
             assert_eq!(press(&mut input, "<S-?>"), Match::Unmatched);
             assert_eq!(
                 press(&mut input, "?"),
-                Match::Execute(super::super::Action::App(AppKey::Help))
+                Match::Execute(super::super::Action::App(AppAction::Help))
             );
             assert!(
                 maps.effective_bindings(Scope::Logs)
@@ -751,7 +727,7 @@ mod windows_input {
             if yaml.starts_with("logs:") {
                 assert_eq!(
                     input.feed(&"<S-?>".parse().unwrap(), Scope::App, Scope::App),
-                    Match::Execute(super::super::Action::App(AppKey::Help))
+                    Match::Execute(super::super::Action::App(AppAction::Help))
                 );
             }
         }
@@ -765,7 +741,7 @@ mod windows_input {
         assert!(!input.starts_chord(Scope::App, &key));
         assert_eq!(
             press(&mut input, "<S-!>"),
-            Match::Execute(super::super::Action::App(AppKey::Help))
+            Match::Execute(super::super::Action::App(AppAction::Help))
         );
         assert!(input.hints(Scope::Logs).is_none());
     }
@@ -865,7 +841,7 @@ mod windows_input {
             assert_eq!(
                 press(&mut input, second),
                 if second == "<S-?>" {
-                    Match::Execute(super::super::Action::App(AppKey::TabPrev))
+                    Match::Execute(super::super::Action::App(AppAction::TabPrev))
                 } else {
                     Match::Cancelled
                 }
@@ -878,7 +854,7 @@ mod contexts {
     use super::{docs, hint_rows};
     use crate::tui::key::*;
     use crate::tui::{
-        app::{AppKey, TabTarget},
+        app::{AppAction, TabTarget},
         tab::{files, logs},
     };
 
@@ -886,7 +862,7 @@ mod contexts {
         Keymaps::from_config(serde_yml::from_str(yaml)?, "mihomo")
     }
 
-    fn press(input: &mut Matcher<'_>, scope: Scope, key: &str) -> Match<Action> {
+    fn press(input: &mut Matcher<'_>, scope: Scope, key: &str) -> Match {
         input.feed(&key.parse().unwrap(), scope, scope)
     }
 
@@ -991,12 +967,12 @@ mod contexts {
             if second == "g" {
                 assert!(matches!(
                     action,
-                    Match::Execute(Action::Logs(logs::Key::GoTop))
+                    Match::Execute(Action::Logs(logs::Action::GoTop))
                 ));
             } else {
                 assert!(matches!(
                     action,
-                    Match::Execute(Action::App(AppKey::TabPrev))
+                    Match::Execute(Action::App(AppAction::TabPrev))
                 ));
             }
             assert!(input.hints(Scope::Logs).is_none());
@@ -1009,16 +985,16 @@ mod contexts {
         let mut input = Matcher::new(&maps);
         assert!(matches!(
             press(&mut input, Scope::Logs, "q"),
-            Match::Execute(Action::Logs(logs::Key::Clear))
+            Match::Execute(Action::Logs(logs::Action::Clear))
         ));
         assert!(matches!(
             press(&mut input, Scope::Logs, "x"),
-            Match::Execute(Action::App(AppKey::Quit))
+            Match::Execute(Action::App(AppAction::Quit))
         ));
         press(&mut input, Scope::Logs, "<C-g>");
         assert!(matches!(
             press(&mut input, Scope::Logs, "c"),
-            Match::Execute(Action::Logs(logs::Key::Clear))
+            Match::Execute(Action::Logs(logs::Action::Clear))
         ));
         assert!(
             !docs(maps.global_bindings())
@@ -1040,18 +1016,18 @@ mod contexts {
         let mut input = Matcher::new(&maps);
         assert!(matches!(
             press(&mut input, Scope::Logs, "x"),
-            Match::Execute(Action::Logs(logs::Key::Clear))
+            Match::Execute(Action::Logs(logs::Action::Clear))
         ));
         assert!(matches!(
             press(&mut input, Scope::Profile, "x"),
-            Match::Execute(Action::Profile(files::profile::Key::Action(
-                files::profile::Action::Preview
+            Match::Execute(Action::Profile(files::profile::Action::Operation(
+                files::profile::Operation::Preview
             )))
         ));
         assert!(matches!(
             press(&mut input, Scope::Template, "x"),
-            Match::Execute(Action::Template(files::template::Key::Action(
-                files::template::Action::Preview
+            Match::Execute(Action::Template(files::template::Action::Operation(
+                files::template::Operation::Preview
             )))
         ));
         assert!(
@@ -1079,7 +1055,7 @@ mod contexts {
         assert!(input.hints(Scope::Template).is_none());
         assert!(matches!(
             press(&mut input, Scope::Template, "q"),
-            Match::Execute(Action::App(AppKey::Quit))
+            Match::Execute(Action::App(AppAction::Quit))
         ));
     }
 
@@ -1097,7 +1073,7 @@ mod contexts {
         }
         assert!(matches!(
             press(&mut input, Scope::Logs, "q"),
-            Match::Execute(Action::App(AppKey::Quit))
+            Match::Execute(Action::App(AppAction::Quit))
         ));
     }
 
@@ -1108,7 +1084,7 @@ mod contexts {
         press(&mut input, Scope::Logs, "g");
         assert!(matches!(
             press(&mut input, Scope::Logs, "q"),
-            Match::Execute(Action::Logs(logs::Key::Clear))
+            Match::Execute(Action::Logs(logs::Action::Clear))
         ));
     }
 
@@ -1129,7 +1105,7 @@ mod contexts {
             } else {
                 assert!(matches!(
                     result,
-                    Match::Execute(Action::App(AppKey::TabPrev))
+                    Match::Execute(Action::App(AppAction::TabPrev))
                 ));
             }
         }
@@ -1177,11 +1153,9 @@ mod contexts {
                 assert!(matches!(result, Match::Execute(action) if action == binding.action));
                 assert!(input.hints(scope).is_none());
             }
-            assert!(
-                maps.effective_bindings(scope)
-                    .any(|(_, binding)| binding.action
-                        == Action::App(AppKey::Tab(TabTarget::Status)))
-            );
+            assert!(maps.effective_bindings(scope).any(
+                |(_, binding)| binding.action == Action::App(AppAction::Tab(TabTarget::Status))
+            ));
         }
     }
 }

@@ -6,31 +6,34 @@ use std::cell::Cell;
 
 key_map!(
     Template,
-    Key,
-    DefaultMap::new()
-        .with_common([
-            (KeyCode::Left, Key::Switch),
-            (KeyCode::Right, Key::Switch),
-            (KeyCode::Char('h'), Key::Switch),
-            (KeyCode::Char('l'), Key::Switch),
-            (KeyCode::Down, Key::MoveDown),
-            (KeyCode::Up, Key::MoveUp),
-            (KeyCode::Char('j'), Key::MoveDown),
-            (KeyCode::Char('k'), Key::MoveUp),
-            (KeyCode::Char('D'), Key::Action(Action::Delete)),
-            (KeyCode::Char('e'), Key::Action(Action::Edit)),
-            (KeyCode::Char('E'), Key::Action(Action::EditProviders)),
-            (KeyCode::Char('p'), Key::Action(Action::Preview)),
-            (KeyCode::Enter, Key::Action(Action::Generate)),
-            (KeyCode::Char('f'), Key::Action(Action::FzfFind)),
-            (KeyCode::Char('G'), Key::GoEnd),
-            (KeyCode::Char('/'), Key::Action(Action::Search)),
+    Action,
+    DefaultBindings::new()
+        .with_keys([
+            (KeyCode::Left, Action::Switch),
+            (KeyCode::Right, Action::Switch),
+            (KeyCode::Char('h'), Action::Switch),
+            (KeyCode::Char('l'), Action::Switch),
+            (KeyCode::Down, Action::MoveDown),
+            (KeyCode::Up, Action::MoveUp),
+            (KeyCode::Char('j'), Action::MoveDown),
+            (KeyCode::Char('k'), Action::MoveUp),
+            (KeyCode::Char('D'), Action::Operation(Operation::Delete)),
+            (KeyCode::Char('e'), Action::Operation(Operation::Edit)),
+            (
+                KeyCode::Char('E'),
+                Action::Operation(Operation::EditProviders)
+            ),
+            (KeyCode::Char('p'), Action::Operation(Operation::Preview)),
+            (KeyCode::Enter, Action::Operation(Operation::Generate)),
+            (KeyCode::Char('f'), Action::Operation(Operation::FzfFind)),
+            (KeyCode::Char('G'), Action::GoEnd),
+            (KeyCode::Char('/'), Action::Operation(Operation::Search)),
         ])
-        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Key::GoTop)])
+        .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
 );
 
-#[derive_aliases::derive(..Key, Debug)]
-pub(in crate::tui) enum Key {
+#[derive_aliases::derive(..Action, Debug)]
+pub(in crate::tui) enum Action {
     Switch,
     MoveUp,
     MoveDown,
@@ -40,9 +43,9 @@ pub(in crate::tui) enum Key {
 
     // Expose file operations as plain action names in user configuration.
     #[serde(untagged)]
-    Action(Action),
+    Operation(Operation),
 }
-impl Document for Key {
+impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
@@ -52,19 +55,19 @@ impl Document for Key {
             Self::Select => "Select",
             Self::GoTop => GO_TOP,
             Self::GoEnd => GO_BOTTOM,
-            Self::Action(Action::Generate) => "Generate",
-            Self::Action(Action::Delete) => "Delete",
-            Self::Action(Action::Edit) => "Edit",
-            Self::Action(Action::EditProviders) => "Edit proxy providers",
-            Self::Action(Action::Preview) => "Preview",
-            Self::Action(Action::Search) => FILTER,
-            Self::Action(Action::FzfFind) => "Find template",
+            Self::Operation(Operation::Generate) => "Generate",
+            Self::Operation(Operation::Delete) => "Delete",
+            Self::Operation(Operation::Edit) => "Edit",
+            Self::Operation(Operation::EditProviders) => "Edit proxy providers",
+            Self::Operation(Operation::Preview) => "Preview",
+            Self::Operation(Operation::Search) => FILTER,
+            Self::Operation(Operation::FzfFind) => "Find template",
         }
     }
 }
 
 #[derive_aliases::derive(..Action, Debug)]
-pub(in crate::tui) enum Action {
+pub(in crate::tui) enum Operation {
     Generate,
     Delete,
     Edit,
@@ -82,7 +85,7 @@ pub(super) struct Template {
 }
 
 impl BasicTabContent for Template {
-    type Key = Key;
+    type Action = Action;
     type State = ListState;
 
     const TITLE: &str = "Template";
@@ -99,40 +102,40 @@ impl DualTabContentMate for Template {
         .spawn_at(task_set);
     }
 
-    fn handle_key_event(
+    fn handle_action(
         &mut self,
-        key: Self::Key,
+        action: Self::Action,
         task_set: &mut FutureSet<(Self::Mate, Self)>,
         state: &mut Self::State,
     ) -> bool {
         log::debug!(
-            "Template::handle_key_event: key={key:?} items.len={}",
+            "Template::handle_action: action={action:?} items.len={}",
             self.items.len()
         );
-        match key {
-            Key::Switch => return true,
-            Key::MoveDown => state.select_next(),
-            Key::MoveUp => state.select_previous(),
-            Key::GoTop => state.select_first(),
-            Key::GoEnd => state.select_last(),
+        match action {
+            Action::Switch => return true,
+            Action::MoveDown => state.select_next(),
+            Action::MoveUp => state.select_previous(),
+            Action::GoTop => state.select_first(),
+            Action::GoEnd => state.select_last(),
 
-            Key::Select => todo!(),
+            Action::Select => todo!(),
 
-            Key::Action(action) => {
-                log::debug!("Template::Action: {action:?}");
+            Action::Operation(action) => {
+                log::debug!("Template::Operation: {action:?}");
                 match action {
-                    Action::FzfFind => {
+                    Operation::FzfFind => {
                         let items = self.items.clone();
                         actions::fzf_find(items).spawn_at(task_set);
                         return false;
                     }
-                    Action::EditProviders => {
+                    Operation::EditProviders => {
                         action.act(String::new()).spawn_at(task_set);
                         return false;
                     }
                     _ => {
                         let name = get_name!(self, state);
-                        log::debug!("Template::Action name={name}");
+                        log::debug!("Template::Operation name={name}");
                         action.act(name).spawn_at(task_set);
                         return false;
                     }
@@ -201,7 +204,7 @@ impl DualTabContentMate for Template {
 mod actions {
     use super::*;
 
-    impl Action {
+    impl Operation {
         pub(super) async fn act(self, name: String) -> CB {
             match self {
                 Self::Generate => generate(name).await,

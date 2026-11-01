@@ -76,40 +76,40 @@ fn traffic_percentage(used: u64, total: u64) -> f64 {
 
 key_map!(
     Profile,
-    Key,
-    DefaultMap::new()
-        .with_common([
-            (KeyCode::Left, Key::Switch),
-            (KeyCode::Right, Key::Switch),
-            (KeyCode::Char('h'), Key::Switch),
-            (KeyCode::Char('l'), Key::Switch),
-            (KeyCode::Down, Key::MoveDown),
-            (KeyCode::Up, Key::MoveUp),
-            (KeyCode::Char('j'), Key::MoveDown),
-            (KeyCode::Char('k'), Key::MoveUp),
-            (KeyCode::Enter, Key::Select),
-            (KeyCode::Char('i'), Key::Action(Action::Add)),
-            (KeyCode::Char('D'), Key::Action(Action::Delete)),
-            (KeyCode::Char('e'), Key::Action(Action::Edit)),
-            (KeyCode::Char('p'), Key::Action(Action::Preview)),
-            (KeyCode::Char('u'), Key::Action(Action::Update)),
-            (KeyCode::Char('/'), Key::Action(Action::Search)),
-            (KeyCode::Char('t'), Key::Action(Action::Test)),
-            (KeyCode::Char('c'), Key::Action(Action::Check)),
-            (KeyCode::Char('f'), Key::Action(Action::FzfFind)),
-            (KeyCode::Char('G'), Key::GoEnd),
-            (KeyCode::Char('P'), Key::Action(Action::ToggleNoPp)),
+    Action,
+    DefaultBindings::new()
+        .with_keys([
+            (KeyCode::Left, Action::Switch),
+            (KeyCode::Right, Action::Switch),
+            (KeyCode::Char('h'), Action::Switch),
+            (KeyCode::Char('l'), Action::Switch),
+            (KeyCode::Down, Action::MoveDown),
+            (KeyCode::Up, Action::MoveUp),
+            (KeyCode::Char('j'), Action::MoveDown),
+            (KeyCode::Char('k'), Action::MoveUp),
+            (KeyCode::Enter, Action::Select),
+            (KeyCode::Char('i'), Action::Operation(Operation::Add)),
+            (KeyCode::Char('D'), Action::Operation(Operation::Delete)),
+            (KeyCode::Char('e'), Action::Operation(Operation::Edit)),
+            (KeyCode::Char('p'), Action::Operation(Operation::Preview)),
+            (KeyCode::Char('u'), Action::Operation(Operation::Update)),
+            (KeyCode::Char('/'), Action::Operation(Operation::Search)),
+            (KeyCode::Char('t'), Action::Operation(Operation::Test)),
+            (KeyCode::Char('c'), Action::Operation(Operation::Check)),
+            (KeyCode::Char('f'), Action::Operation(Operation::FzfFind)),
+            (KeyCode::Char('G'), Action::GoEnd),
+            (KeyCode::Char('P'), Action::Operation(Operation::ToggleNoPp)),
             (
                 KeyCode::Char('O'),
-                Key::Action(Action::ToggleUpdateWithProxy)
+                Action::Operation(Operation::ToggleUpdateWithProxy)
             ),
-            (KeyCode::Char('n'), Key::Action(Action::Traffic)),
+            (KeyCode::Char('n'), Action::Operation(Operation::Traffic)),
         ])
-        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Key::GoTop)])
+        .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
 );
 
-#[derive_aliases::derive(..Key, Debug)]
-pub(in crate::tui) enum Key {
+#[derive_aliases::derive(..Action, Debug)]
+pub(in crate::tui) enum Action {
     Switch,
     MoveUp,
     MoveDown,
@@ -119,10 +119,10 @@ pub(in crate::tui) enum Key {
 
     // Expose file operations as plain action names in user configuration.
     #[serde(untagged)]
-    Action(Action),
+    Operation(Operation),
 }
 
-impl Document for Key {
+impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
@@ -132,25 +132,25 @@ impl Document for Key {
             Self::Select => "Select",
             Self::GoTop => GO_TOP,
             Self::GoEnd => GO_BOTTOM,
-            Self::Action(Action::Add) => "Import (URL or file)",
-            Self::Action(Action::Delete) => "Delete",
-            Self::Action(Action::Edit) => "Edit",
-            Self::Action(Action::Preview) => "Preview",
-            Self::Action(Action::Update) => "Update",
-            Self::Action(Action::UpdateAll) => "Update all",
-            Self::Action(Action::Search) => FILTER,
-            Self::Action(Action::Test) => "Test",
-            Self::Action(Action::Check) => "Check config",
-            Self::Action(Action::FzfFind) => "Find profile",
-            Self::Action(Action::ToggleNoPp) => "Toggle no proxy-provider",
-            Self::Action(Action::ToggleUpdateWithProxy) => "Toggle update with proxy",
-            Self::Action(Action::Traffic) => "Show traffic",
+            Self::Operation(Operation::Add) => "Import (URL or file)",
+            Self::Operation(Operation::Delete) => "Delete",
+            Self::Operation(Operation::Edit) => "Edit",
+            Self::Operation(Operation::Preview) => "Preview",
+            Self::Operation(Operation::Update) => "Update",
+            Self::Operation(Operation::UpdateAll) => "Update all",
+            Self::Operation(Operation::Search) => FILTER,
+            Self::Operation(Operation::Test) => "Test",
+            Self::Operation(Operation::Check) => "Check config",
+            Self::Operation(Operation::FzfFind) => "Find profile",
+            Self::Operation(Operation::ToggleNoPp) => "Toggle no proxy-provider",
+            Self::Operation(Operation::ToggleUpdateWithProxy) => "Toggle update with proxy",
+            Self::Operation(Operation::Traffic) => "Show traffic",
         }
     }
 }
 
 #[derive_aliases::derive(..Action, Debug)]
-pub(in crate::tui) enum Action {
+pub(in crate::tui) enum Operation {
     Add,
     Delete,
     Edit,
@@ -176,7 +176,7 @@ pub(super) struct Profile {
 }
 
 impl BasicTabContent for Profile {
-    type Key = Key;
+    type Action = Action;
     type State = ListState;
 
     const TITLE: &str = "Profile";
@@ -189,18 +189,18 @@ impl DualTabContent for Profile {
         async { sync!((Self, Self::Mate)) }.spawn_at(task_set);
     }
 
-    fn handle_key_event(
+    fn handle_action(
         &mut self,
-        key: Self::Key,
+        action: Self::Action,
         task_set: &mut FutureSet<(Self, Self::Mate)>,
         state: &mut Self::State,
     ) -> bool {
-        match key {
-            Key::Switch => return true,
-            Key::MoveUp => state.select_previous(),
-            Key::MoveDown => state.select_next(),
+        match action {
+            Action::Switch => return true,
+            Action::MoveUp => state.select_previous(),
+            Action::MoveDown => state.select_next(),
 
-            Key::Select => {
+            Action::Select => {
                 let name = get_name!(self, state);
                 async move {
                     let pf = tri!(db::get(&name).unwrap().load_local_profile());
@@ -210,19 +210,19 @@ impl DualTabContent for Profile {
                 }
                 .spawn_at(task_set);
             }
-            Key::GoTop => state.select_first(),
-            Key::GoEnd => state.select_last(),
-            Key::Action(action) => match action {
-                Action::Traffic => {
+            Action::GoTop => state.select_first(),
+            Action::GoEnd => state.select_last(),
+            Action::Operation(action) => match action {
+                Operation::Traffic => {
                     let name = get_name!(self, state);
                     actions::show_traffic(name).spawn_at(task_set);
                 }
-                Action::FzfFind => {
+                Operation::FzfFind => {
                     let items = self.items.clone();
                     actions::fzf_find(items).spawn_at(task_set)
                 }
-                Action::Add => action.act(String::new()).spawn_at(task_set),
-                Action::UpdateAll => {
+                Operation::Add => action.act(String::new()).spawn_at(task_set),
+                Operation::UpdateAll => {
                     for name in &self.items {
                         self.updating.insert(name.clone());
                     }
@@ -230,7 +230,7 @@ impl DualTabContent for Profile {
                 }
                 _ => {
                     let name = get_name!(self, state);
-                    if matches!(action, Action::Update) {
+                    if matches!(action, Operation::Update) {
                         self.updating.insert(name.clone());
                     }
                     action.act(name).spawn_at(task_set)
@@ -321,7 +321,7 @@ impl DualTabContent for Profile {
 mod actions {
     use super::*;
 
-    impl Action {
+    impl Operation {
         pub(super) async fn act(self, name: String) -> CB {
             match self {
                 Self::Search => search().await,
@@ -335,10 +335,10 @@ mod actions {
                 Self::ToggleNoPp => toggle_no_pp(name).await,
                 Self::ToggleUpdateWithProxy => toggle_update_with_proxy(name).await,
                 Self::Traffic => {
-                    unreachable!("traffic handled in handle_key_event directly")
+                    unreachable!("traffic handled in handle_action directly")
                 }
                 Self::FzfFind => unreachable!("FzfFind handled directly"),
-                Self::UpdateAll => unreachable!("UpdateAll handled directly in handle_key_event"),
+                Self::UpdateAll => unreachable!("UpdateAll handled directly in handle_action"),
             }
         }
     }

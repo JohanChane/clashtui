@@ -36,8 +36,12 @@ src/
 ├── tui.rs               # TUI 模块入口，re-exports from tui/
 │   └── tui/
 │       ├── app.rs       # App 结构体、事件循环（~50fps）、按键路由
-│       ├── key.rs       # 按键、默认绑定宏和统一加载入口
+│       ├── app/
+│       │   ├── actions.rs   # 全局动作、标签目标和默认绑定
+│       │   └── tests.rs     # 全局快捷键和标签标题回归测试
+│       ├── key.rs       # 按键、类型化序列、默认绑定宏和统一加载入口
 │       ├── key/
+│       │   ├── defaults.rs  # 类型化单键和双键声明
 │       │   ├── config.rs    # 解析、覆盖、解绑、作用域内校验
 │       │   ├── runtime.rs # 统一绑定存储、ID 索引、全局冲突校验
 │       │   ├── matcher.rs   # App 持有的组合键状态机
@@ -116,7 +120,7 @@ src/
 
 ### 有效绑定表与输入状态
 
-`key_map!` 只声明类型化默认动作和配置解析器。`Keymaps::from_config` 先应用核心专属配置、默认覆盖和解绑，再检查全局与每个页面的冲突。完整序列相同、或单键与双键前缀重叠时，报错并阻止启动；`gp` 与 `gg` 可以共享前缀。
+`Key` 表示规范化终端输入；页面 `Action` 枚举表示命令。`KeySequence` 在配置和运行时统一区分单键与双键。`key_map!` 声明类型化默认动作和配置解析器。`Keymaps::from_config` 先应用核心专属配置、默认覆盖和解绑，再检查全局与每个页面的冲突。完整序列相同、或单键与双键前缀重叠时，报错并阻止启动；`gp` 与 `gg` 可以共享前缀。
 
 `Keymaps` 统一拥有每条 `RuntimeBinding`。`scope_bindings` 按来源保存 ID，`key_lookup` 为各页面/焦点编译全局和本页的 ID 查找表，`tab_shortcuts` 缓存切页绑定 ID。Profile 和 Template 分别合成，Status 使用全局表。全部通过校验后，才安装到只读 `OnceLock`。
 
@@ -145,8 +149,8 @@ src/
 
 `Tab<C>` 是泛型容器，`C` 需实现两个 trait：
 
-- `BasicTabContent` — 定义类型化动作 `Key` 枚举、`State` 类型、标题
-- `TabContent` — 定义 `init`、`handle_key_event`、`render`
+- `BasicTabContent` — 定义 `Action`、`State` 类型和标题
+- `TabContent` — 定义 `init`、`handle_action`、`render`
 
 #### 双面板（DualTab）
 
@@ -160,7 +164,7 @@ src/
 
 异步 I/O 操作通过 `FutureSet<C>`（即 `tokio::task::JoinSet`）管理：
 
-- 在 `handle_key_event` 或 `init` 中通过 `task_set.spawn(async { ... })` 生成异步任务
+- 在 `handle_action` 或 `init` 中通过 `task_set.spawn(async { ... })` 生成异步任务
 - 任务完成后产生 `Callback<C>`（即 `Box<dyn FnOnce(&mut C)>`）
 - `sync()` 会在每帧推进已完成的回调，状态变更统一在此发生
 
@@ -188,7 +192,7 @@ src/
 
 ### key_map! 宏
 
-`key_map!(Logs, Key, DefaultMap::new()...)` 声明 scope 对应的动作变体和默认绑定。生成的 `km::bindings` 应用覆盖，返回统一的类型化 `Action` 绑定供有效表合成。
+`key_map!(Logs, Action, DefaultBindings::new()...)` 声明 scope 对应的动作变体和默认绑定。`DefaultBindings::with_keys` 和 `with_chords` 分别声明单键与双键。配置中的嵌套页面直接解析为 `Scope`，无需中间路径字符串。生成的 `km::bindings` 应用覆盖，返回统一的类型化 `Action` 绑定供有效表合成。
 
 `keymap.yaml` 使用 `[{on: j, action: MoveDown, desc: "下移"}]` 列表；`on` 支持单键或双键序列，`action: null` 用于解绑。配置格式和详细行为见 [入门文档](getting_started_zh.md)。
 

@@ -2,10 +2,7 @@ use ratatui::{text::Text, widgets::Paragraph};
 
 use super::dev::*;
 
-newtype_tab!(@no_key StatusTab(Tab<Status>));
-
-#[derive(Clone, Copy)]
-struct Key;
+newtype_tab!(@no_action StatusTab(Tab<Status>));
 
 use crate::config::CONFIG;
 use crate::config::CoreType;
@@ -43,7 +40,7 @@ struct Status {
 }
 
 impl BasicTabContent for Status {
-    type Key = Key;
+    type Action = std::convert::Infallible;
 
     type State = ();
 
@@ -159,12 +156,13 @@ impl TabContent for Status {
         self.error = Some("Waiting".to_owned());
     }
 
-    fn handle_key_event(
+    fn handle_action(
         &mut self,
-        _key: Self::Key,
+        action: Self::Action,
         _task_set: &mut FutureSet<Self>,
         _state: &mut Self::State,
     ) {
+        match action {}
     }
 
     fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State) {

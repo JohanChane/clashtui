@@ -12,33 +12,33 @@ newtype_tab!(LogsTab(Tab<Logs>), Logs);
 
 key_map!(
     Logs,
-    Key,
-    DefaultMap::new()
-        .with_common([
-            (KeyCode::Up, Key::MoveUp),
-            (KeyCode::Down, Key::MoveDown),
-            (KeyCode::Char('k'), Key::MoveUp),
-            (KeyCode::Char('j'), Key::MoveDown),
-            (KeyCode::Char('G'), Key::GoBottom),
-            (KeyCode::Char('/'), Key::Search),
-            (KeyCode::Char('p'), Key::TogglePause),
-            (KeyCode::Char('f'), Key::FzfFind),
-            (KeyCode::Char('c'), Key::Clear),
+    Action,
+    DefaultBindings::new()
+        .with_keys([
+            (KeyCode::Up, Action::MoveUp),
+            (KeyCode::Down, Action::MoveDown),
+            (KeyCode::Char('k'), Action::MoveUp),
+            (KeyCode::Char('j'), Action::MoveDown),
+            (KeyCode::Char('G'), Action::GoBottom),
+            (KeyCode::Char('/'), Action::Search),
+            (KeyCode::Char('p'), Action::TogglePause),
+            (KeyCode::Char('f'), Action::FzfFind),
+            (KeyCode::Char('c'), Action::Clear),
         ])
-        .with_submap(KeyCode::Char('g'), [(KeyCode::Char('g'), Key::GoTop)])
-        .with_submap(
+        .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
+        .with_chords(
             KeyCode::Char('t'),
             [
-                (KeyCode::Char('d'), Key::ToggleDebug),
-                (KeyCode::Char('i'), Key::ToggleInfo),
-                (KeyCode::Char('w'), Key::ToggleWarning),
-                (KeyCode::Char('e'), Key::ToggleError),
+                (KeyCode::Char('d'), Action::ToggleDebug),
+                (KeyCode::Char('i'), Action::ToggleInfo),
+                (KeyCode::Char('w'), Action::ToggleWarning),
+                (KeyCode::Char('e'), Action::ToggleError),
             ]
         )
 );
 
-#[derive_aliases::derive(..Key, Debug)]
-pub(in crate::tui) enum Key {
+#[derive_aliases::derive(..Action, Debug)]
+pub(in crate::tui) enum Action {
     MoveUp,
     MoveDown,
     GoTop,
@@ -53,7 +53,7 @@ pub(in crate::tui) enum Key {
     ToggleError,
 }
 
-impl Document for Key {
+impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
@@ -249,7 +249,7 @@ fn spawn_ws_logs(
 }
 
 impl BasicTabContent for Logs {
-    type Key = Key;
+    type Action = Action;
     type State = ();
 
     const TITLE: &str = "Logs";
@@ -322,7 +322,7 @@ impl TabContent for Logs {
         let paused = Arc::clone(&self.paused);
         spawn_ws_logs(controller, secret, pending, level, reconnect, paused);
 
-        self.error = Some("Press p to start capturing logs".to_owned());
+        self.error = Some("Log capture is paused".to_owned());
         // Fetch initial log level
         async {
             let cfg = tri!(
@@ -346,30 +346,30 @@ impl TabContent for Logs {
         .spawn_at(task_set);
     }
 
-    fn handle_key_event(
+    fn handle_action(
         &mut self,
-        key: Key,
+        action: Action,
         task_set: &mut FutureSet<Self>,
         _state: &mut Self::State,
     ) {
-        match key {
-            Key::MoveUp => {
+        match action {
+            Action::MoveUp => {
                 self.scroll = self.scroll.saturating_sub(1);
             }
-            Key::MoveDown => {
+            Action::MoveDown => {
                 if self.scroll + 1 < self.buffer.count() {
                     self.scroll += 1;
                 }
             }
-            Key::GoTop => {
+            Action::GoTop => {
                 self.scroll = 0;
             }
-            Key::GoBottom => {
+            Action::GoBottom => {
                 if !self.buffer.is_empty() {
                     self.scroll = self.buffer.count().saturating_sub(1);
                 }
             }
-            Key::Search => {
+            Action::Search => {
                 async move {
                     let filter = tri!(
                         Input::new()
@@ -384,14 +384,14 @@ impl TabContent for Logs {
                 }
                 .spawn_at(task_set);
             }
-            Key::TogglePause => {
+            Action::TogglePause => {
                 let was_paused = self.paused.fetch_xor(true, Ordering::Relaxed);
                 if was_paused {
                     // Kickstart the after_sync poll chain
                     async { wrapper(|_content: &mut Logs| {}) }.spawn_at(task_set);
                 }
             }
-            Key::FzfFind => {
+            Action::FzfFind => {
                 self.paused.store(true, Ordering::Relaxed);
                 let names: Vec<String> = self
                     .buffer
@@ -412,15 +412,15 @@ impl TabContent for Logs {
                 }
                 .spawn_at(task_set);
             }
-            Key::Clear => {
+            Action::Clear => {
                 self.buffer.clear();
                 self.scroll = 0;
                 self.filter = None;
             }
-            Key::ToggleDebug => self.toggle_log_level("debug", task_set),
-            Key::ToggleInfo => self.toggle_log_level("info", task_set),
-            Key::ToggleWarning => self.toggle_log_level("warning", task_set),
-            Key::ToggleError => self.toggle_log_level("error", task_set),
+            Action::ToggleDebug => self.toggle_log_level("debug", task_set),
+            Action::ToggleInfo => self.toggle_log_level("info", task_set),
+            Action::ToggleWarning => self.toggle_log_level("warning", task_set),
+            Action::ToggleError => self.toggle_log_level("error", task_set),
         }
     }
 
@@ -525,7 +525,7 @@ mod tests {
         let receiver_paused = Arc::clone(&logs.paused);
         let mut tasks = FutureSet::new();
 
-        logs.handle_key_event(Key::TogglePause, &mut tasks, &mut ());
+        logs.handle_action(Action::TogglePause, &mut tasks, &mut ());
         let kickstart = tasks.join_next().await.unwrap().unwrap();
         kickstart(&mut logs);
         assert!(!receiver_paused.load(Ordering::Relaxed));
@@ -537,7 +537,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        logs.handle_key_event(Key::TogglePause, &mut tasks, &mut ());
+        logs.handle_action(Action::TogglePause, &mut tasks, &mut ());
         assert!(receiver_paused.load(Ordering::Relaxed));
         queue("during pause", &pending, &receiver_paused);
         callback(&mut logs);

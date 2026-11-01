@@ -8,18 +8,18 @@ newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>), Srvctl);
 
 key_map!(
     Srvctl,
-    Key,
-    DefaultMap::new().with_common([
-        (KeyCode::Enter, Key::Execute),
-        (KeyCode::Up, Key::MoveUp),
-        (KeyCode::Down, Key::MoveDown),
-        (KeyCode::Char('k'), Key::MoveUp),
-        (KeyCode::Char('j'), Key::MoveDown),
+    Action,
+    DefaultBindings::new().with_keys([
+        (KeyCode::Enter, Action::Execute),
+        (KeyCode::Up, Action::MoveUp),
+        (KeyCode::Down, Action::MoveDown),
+        (KeyCode::Char('k'), Action::MoveUp),
+        (KeyCode::Char('j'), Action::MoveDown),
     ])
 );
 
-#[derive_aliases::derive(..Key, Debug)]
-pub(in crate::tui) enum Key {
+#[derive_aliases::derive(..Action, Debug)]
+pub(in crate::tui) enum Action {
     Execute,
     MoveUp,
     MoveDown,
@@ -27,7 +27,7 @@ pub(in crate::tui) enum Key {
     Esc,
 }
 
-impl Document for Key {
+impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
@@ -208,7 +208,7 @@ fn launchd_status(service_name: &str, is_user: bool) -> String {
 }
 
 impl BasicTabContent for SrvCtlContent {
-    type Key = Key;
+    type Action = Action;
 
     type State = ListState;
 
@@ -272,26 +272,26 @@ impl TabContent for SrvCtlContent {
         self.spawn_status_check(task_set, CoreType::Singbox);
     }
 
-    fn handle_key_event(
+    fn handle_action(
         &mut self,
-        key: Key,
+        action: Action,
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
     ) {
         // ---- main list routing ----
-        match key {
-            Key::Esc => {}
-            Key::MoveUp => {
+        match action {
+            Action::Esc => {}
+            Action::MoveUp => {
                 let i = state.selected().unwrap_or(0);
                 state.select(Some(i.saturating_sub(1)));
             }
-            Key::MoveDown => {
+            Action::MoveDown => {
                 let i = state.selected().unwrap_or(0);
                 if i + 1 < self.ops.len() {
                     state.select(Some(i + 1));
                 }
             }
-            Key::Execute => {
+            Action::Execute => {
                 let Some(idx) = state.selected() else { return };
                 let Some(op) = self.ops.get(idx) else { return };
                 let op = *op;

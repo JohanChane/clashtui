@@ -1,10 +1,12 @@
 use crossterm::event::{KeyCode, KeyEvent as _KeyEvent, KeyModifiers};
 
 pub(super) mod config;
+mod defaults;
 mod matcher;
 pub(super) mod notation;
 mod runtime;
 
+pub(in crate::tui) use defaults::DefaultBindings;
 pub(in crate::tui) use matcher::{Match, Matcher};
 pub(in crate::tui) use runtime::{Action, BindingView, ChordView, Keymaps, Scope};
 
@@ -51,9 +53,6 @@ impl Key {
         }
         .normalize()
     }
-    // pub fn with_modifiers(code: KeyCode, modifiers: KeyModifiers) -> Self {
-    //     Self { code, modifiers }
-    // }
 }
 
 impl From<_KeyEvent> for Key {
@@ -72,57 +71,27 @@ impl From<KeyCode> for Key {
     }
 }
 
-pub mod instancing {
-    use super::Key;
+/// A shortcut is one key or a two-key chord in every stage of keymap loading.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(in crate::tui) enum KeySequence {
+    Single(Key),
+    Chord([Key; 2]),
+}
 
-    pub mod defaults {
-        use super::Key;
-        use crate::tui::key::config::Binding;
-
-        /// Built-in bindings in declaration order; no configuration serialization needed.
-        pub struct DefaultMap<A> {
-            bindings: Vec<Binding<A>>,
+impl KeySequence {
+    pub fn as_slice(&self) -> &[Key] {
+        match self {
+            Self::Single(key) => std::slice::from_ref(key),
+            Self::Chord(keys) => keys,
         }
+    }
 
-        impl<A> DefaultMap<A> {
-            pub fn new() -> Self {
-                Self {
-                    bindings: Vec::new(),
-                }
-            }
-
-            pub fn with_common(
-                mut self,
-                map: impl IntoIterator<Item = (impl Into<Key>, A)>,
-            ) -> Self {
-                self.bindings
-                    .extend(map.into_iter().map(|(key, action)| Binding {
-                        on: vec![key.into().normalize()],
-                        action: Some(action),
-                        desc: None,
-                    }));
-                self
-            }
-
-            pub fn with_submap(
-                mut self,
-                key: impl Into<Key>,
-                map: impl IntoIterator<Item = (impl Into<Key>, A)>,
-            ) -> Self {
-                let first = key.into().normalize();
-                self.bindings
-                    .extend(map.into_iter().map(|(key, action)| Binding {
-                        on: vec![first, key.into().normalize()],
-                        action: Some(action),
-                        desc: None,
-                    }));
-                self
-            }
-
-            pub fn into_bindings(self) -> Vec<Binding<A>> {
-                self.bindings
-            }
-        }
+    fn validate_action(self) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            !matches!(self, Self::Chord([_, second]) if second == Key::from_code(KeyCode::Esc)),
+            "Esc is reserved for cancelling a pending chord; choose another second key"
+        );
+        Ok(())
     }
 }
 
@@ -142,22 +111,6 @@ macro_rules! key_map {
                     bindings
                         .into_iter()
                         .map(|binding| binding.map_action(crate::tui::key::Action::$scope))
-                        .collect()
-                })
-            }
-
-            #[cfg(test)]
-            pub fn validate_config(map: serde_yml::Value) -> anyhow::Result<Vec<(String, String)>> {
-                bindings(map).map(|bindings| {
-                    bindings
-                        .into_iter()
-                        .filter(|binding| binding.action.is_some())
-                        .map(|binding| {
-                            (
-                                crate::tui::key::notation::format_sequence(&binding.on),
-                                binding.desc,
-                            )
-                        })
                         .collect()
                 })
             }

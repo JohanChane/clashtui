@@ -75,13 +75,13 @@ mod tests {
 
     fn screen(width: u16, height: u16, area: Option<Rect>, count: usize) -> String {
         use crate::tui::{
-            key::{Action, Keymaps, Scope, config::ResolvedBinding},
+            key::{Action, KeySequence, Keymaps, Scope, config::ResolvedBinding},
             tab::logs,
         };
         let bindings = (0..count)
             .map(|i| ResolvedBinding {
-                on: vec!["g".parse().unwrap(), i.to_string().parse().unwrap()],
-                action: Some(Action::Logs(logs::Key::Clear)),
+                on: KeySequence::Chord(["g".parse().unwrap(), i.to_string().parse().unwrap()]),
+                action: Some(Action::Logs(logs::Action::Clear)),
                 desc: format!("Custom action {i}"),
             })
             .collect();

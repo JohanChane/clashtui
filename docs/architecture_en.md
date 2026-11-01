@@ -36,8 +36,12 @@ src/
 ├── tui.rs               # TUI module entry, re-exports from tui/
 │   └── tui/
 │       ├── app.rs       # App struct, event loop (~50fps), key routing
-│       ├── key.rs       # Keys, default-binding macro, and loading entry point
+│       ├── app/
+│       │   ├── actions.rs   # Global actions, tab targets, and default bindings
+│       │   └── tests.rs     # Global shortcut and tab-label regression tests
+│       ├── key.rs       # Keys, typed sequences, default-binding macro, and loading entry point
 │       ├── key/
+│       │   ├── defaults.rs  # Typed single-key and chord declarations
 │       │   ├── config.rs    # Parsing, overrides, unbinding, scope validation
 │       │   ├── runtime.rs # Binding store, ID lookup tables, and global conflict validation
 │       │   ├── matcher.rs   # Pending-chord state owned by App
@@ -116,7 +120,7 @@ Per-frame flow:
 
 ### Effective Binding Maps and Input State
 
-`key_map!` declares typed defaults and configuration parsers. `Keymaps::from_config` applies core-specific scopes, default overrides, and unbindings, then checks each page against global bindings. Identical complete sequences and single-key/chord prefix overlaps stop startup with an error; `gp` and `gg` can share a prefix.
+`Key` represents normalized terminal input; page `Action` enums represent commands. `KeySequence` distinguishes a single key from a two-key chord throughout configuration and runtime. `key_map!` declares typed defaults and configuration parsers. `Keymaps::from_config` applies core-specific scopes, default overrides, and unbindings, then checks each page against global bindings. Identical complete sequences and single-key/chord prefix overlaps stop startup with an error; `gp` and `gg` can share a prefix.
 
 `Keymaps` owns each `RuntimeBinding` once. `scope_bindings` indexes IDs by source, `key_lookup` compiles global and page IDs for each focus context, and `tab_shortcuts` caches tab-binding IDs. Profile and Template have separate lookup tables; Status uses the global table. The store is installed in a read-only `OnceLock` only after all validation succeeds.
 
@@ -145,8 +149,8 @@ App owns the only mutable pending-chord state. Tab changes, focus changes, and p
 
 `Tab<C>` is a generic container. `C` must implement two traits:
 
-- `BasicTabContent` — defines the typed action enum `Key`, `State` type, title
-- `TabContent` — defines `init`, `handle_key_event`, `render`
+- `BasicTabContent` — defines the `Action` and `State` types and title
+- `TabContent` — defines `init`, `handle_action`, `render`
 
 #### Dual Panel (DualTab)
 
@@ -160,7 +164,7 @@ The `enum_dispatch!` macro unifies all tabs into a single `Tab` enum. Each varia
 
 Async I/O operations are managed via `FutureSet<C>` (i.e. `tokio::task::JoinSet`):
 
-- Spawn async tasks in `handle_key_event` or `init` via `task_set.spawn(async { ... })`
+- Spawn async tasks in `handle_action` or `init` via `task_set.spawn(async { ... })`
 - Completed tasks produce `Callback<C>` (i.e. `Box<dyn FnOnce(&mut C)>`)
 - `sync()` advances completed callbacks each frame; state changes happen here uniformly
 
@@ -188,7 +192,7 @@ Popups use a `oneshot` channel pattern:
 
 ### key_map! Macro
 
-`key_map!(Logs, Key, DefaultMap::new()...)` declares the scope's action variant and defaults. The generated `km::bindings` applies overrides and returns typed `Action` bindings for context composition.
+`key_map!(Logs, Action, DefaultBindings::new()...)` declares the scope's action variant and defaults. `DefaultBindings::with_keys` and `with_chords` declare single keys and chords. Configuration resolves nested sections directly to `Scope`, without intermediate path strings. The generated `km::bindings` applies overrides and returns typed `Action` bindings for context composition.
 
 `keymap.yaml` uses lists such as `[{on: j, action: MoveDown, desc: "Move down"}]`. The `on` field accepts a single key or a two-key sequence; `action: null` unbinds it. See [Getting Started](getting_started_en.md) for the configuration contract.
 

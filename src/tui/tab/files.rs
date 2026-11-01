@@ -50,7 +50,7 @@ impl crate::tui::tab::TuiTab for FileTab {
     }
 
     fn input_scope(&self) -> crate::tui::key::Scope {
-        if self.0.is_foucus_on_left() {
+        if self.0.is_focused_on_left() {
             crate::tui::key::Scope::Profile
         } else {
             crate::tui::key::Scope::Template
@@ -94,8 +94,8 @@ mod tests {
             if scope == Scope::Template {
                 assert!(matches!(
                     result,
-                    Match::Execute(Action::Template(template::Key::Action(
-                        template::Action::Generate
+                    Match::Execute(Action::Template(template::Action::Operation(
+                        template::Operation::Generate
                     )))
                 ));
                 assert!(
@@ -106,8 +106,8 @@ mod tests {
             } else {
                 assert!(matches!(
                     result,
-                    Match::Execute(Action::Profile(profile::Key::Action(
-                        profile::Action::Preview
+                    Match::Execute(Action::Profile(profile::Action::Operation(
+                        profile::Operation::Preview
                     )))
                 ));
                 assert!(

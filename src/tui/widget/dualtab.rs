@@ -12,9 +12,9 @@ where
     fn init(&mut self, task_set: &mut FutureSet<(Self, Self::Mate)>, state: &mut Self::State);
 
     /// If true, switch to Mate
-    fn handle_key_event(
+    fn handle_action(
         &mut self,
-        key: Self::Key,
+        action: Self::Action,
         task_set: &mut FutureSet<(Self, Self::Mate)>,
         state: &mut Self::State,
     ) -> bool;
@@ -32,9 +32,9 @@ where
     fn init(&mut self, task_set: &mut FutureSet<(Self::Mate, Self)>, state: &mut Self::State);
 
     /// If true, switch to Mate
-    fn handle_key_event(
+    fn handle_action(
         &mut self,
-        key: Self::Key,
+        action: Self::Action,
         task_set: &mut FutureSet<(Self::Mate, Self)>,
         state: &mut Self::State,
     ) -> bool;
@@ -51,18 +51,6 @@ where
     state: (C1::State, C2::State),
     tasks: FutureSet<(C1, C2)>,
     is_focus_on_c1: bool,
-}
-
-impl<C1, C2> DualTab<C1, C2>
-where
-    C1: DualTabContent<Mate = C2> + Default,
-    C1::State: Default,
-    C2: DualTabContentMate<Mate = C1> + Default,
-    C2::State: Default,
-{
-    pub fn is_foucus_on_left(&self) -> bool {
-        self.is_focus_on_c1
-    }
 }
 
 impl<C1, C2> Default for DualTab<C1, C2>
@@ -92,22 +80,26 @@ where
     C1: DualTabContent<Mate = C2>,
     C2: DualTabContentMate<Mate = C1>,
 {
-    pub fn handle_left_action(&mut self, action: C1::Key) {
+    pub fn is_focused_on_left(&self) -> bool {
+        self.is_focus_on_c1
+    }
+
+    pub fn handle_left_action(&mut self, action: C1::Action) {
         debug_assert!(self.is_focus_on_c1);
         if self
             .content
             .0
-            .handle_key_event(action, &mut self.tasks, &mut self.state.0)
+            .handle_action(action, &mut self.tasks, &mut self.state.0)
         {
             self.is_focus_on_c1 = false;
         }
     }
-    pub fn handle_right_action(&mut self, action: C2::Key) {
+    pub fn handle_right_action(&mut self, action: C2::Action) {
         debug_assert!(!self.is_focus_on_c1);
         if self
             .content
             .1
-            .handle_key_event(action, &mut self.tasks, &mut self.state.1)
+            .handle_action(action, &mut self.tasks, &mut self.state.1)
         {
             self.is_focus_on_c1 = true;
         }

@@ -1,9 +1,9 @@
 //! Immutable bindings for each page/focus context. All shortcut views use these maps.
 
 use super::config::ResolvedBinding;
-use super::{Document, Key, config, notation};
+use super::{Document, Key, KeySequence, config, notation};
 use crate::tui::{
-    app::{AppKey, TabTarget},
+    app::{AppAction, TabTarget},
     tab,
 };
 use anyhow::{Context, Result, ensure};
@@ -49,26 +49,18 @@ impl Scope {
             Self::Template => "file.template",
         }
     }
-
-    fn section(self) -> &'static str {
-        match self {
-            Self::Profile => "files/profile",
-            Self::Template => "files/template",
-            _ => self.name(),
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::tui) enum Action {
-    App(AppKey),
-    Connections(tab::connections::Key),
-    Proxies(tab::proxies::Key),
-    Srvctl(tab::srvctl::Key),
-    Settings(tab::settings::Key),
-    Logs(tab::logs::Key),
-    Profile(tab::files::profile::Key),
-    Template(tab::files::template::Key),
+    App(AppAction),
+    Connections(tab::connections::Action),
+    Proxies(tab::proxies::Action),
+    Srvctl(tab::srvctl::Action),
+    Settings(tab::settings::Action),
+    Logs(tab::logs::Action),
+    Profile(tab::files::profile::Action),
+    Template(tab::files::template::Action),
 }
 
 impl Document for Action {
@@ -104,21 +96,6 @@ impl Action {
 /// An index into one immutable Keymaps instance; never a copy of a binding.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(in crate::tui) struct BindingId(usize);
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(in crate::tui) enum KeySequence {
-    Single(Key),
-    Chord([Key; 2]),
-}
-
-impl KeySequence {
-    pub fn as_slice(&self) -> &[Key] {
-        match self {
-            Self::Single(key) => std::slice::from_ref(key),
-            Self::Chord(keys) => keys,
-        }
-    }
-}
 
 /// The sole owner of a resolved binding's action and presentation text.
 #[derive(Debug)]
@@ -207,7 +184,7 @@ impl Keymaps {
         type Loader = fn(Value) -> Result<Vec<ResolvedBinding<Action>>>;
         let mut sections = config::sections(value, core)?;
         let loaders: [(Scope, Loader); 8] = [
-            (Scope::App, crate::tui::app::km::km::bindings),
+            (Scope::App, crate::tui::app::km::bindings),
             (Scope::Connections, connections::km::bindings),
             (Scope::Proxies, proxies::km::bindings),
             (Scope::Srvctl, srvctl::km::bindings),
@@ -218,7 +195,7 @@ impl Keymaps {
         ];
         let mut scopes = HashMap::new();
         for (scope, load) in loaders {
-            let bindings = load(sections.remove(scope.section()).unwrap_or_default())
+            let bindings = load(sections.remove(&scope).unwrap_or_default())
                 .with_context(|| format!("failed to load keymap for {}", scope.name()))?;
             scopes.insert(scope, bindings);
         }
@@ -234,22 +211,12 @@ impl Keymaps {
             let mut ids = Vec::new();
             let mut disabled = HashSet::new();
             for binding in scopes.remove(&scope).unwrap_or_default() {
-                let on = match binding.on.as_slice() {
-                    [key] => KeySequence::Single(*key),
-                    [first, second] => {
-                        ensure!(
-                            binding.action.is_none()
-                                || *second != Key::from_code(super::KeyCode::Esc),
-                            "Esc is reserved for cancelling a pending chord; choose another second key"
-                        );
-                        KeySequence::Chord([*first, *second])
-                    }
-                    _ => anyhow::bail!("binding must contain 1 or 2 keys"),
-                };
+                let on = binding.on;
                 let Some(action) = binding.action else {
                     disabled.insert(on);
                     continue;
                 };
+                on.validate_action()?;
                 ensure!(
                     action.scope() == scope,
                     "binding action belongs to another scope"
@@ -286,7 +253,7 @@ impl Keymaps {
         }
         let mut tabs: [Vec<BindingId>; TabTarget::ALL.len()] = std::array::from_fn(|_| Vec::new());
         for &id in &maps.scope_bindings[&Scope::App] {
-            if let Action::App(AppKey::Tab(target)) = maps.binding(id).action {
+            if let Action::App(AppAction::Tab(target)) = maps.binding(id).action {
                 tabs[target as usize].push(id);
             }
         }
@@ -544,17 +511,15 @@ mod tests {
 
     #[test]
     fn runtime_construction_rejects_unmatchable_sequences_and_wrong_sources() {
-        for keys in [vec![], vec!["g", "g", "g"], vec!["g", "<Esc>"]] {
-            let binding = ResolvedBinding {
-                on: keys.into_iter().map(|key| key.parse().unwrap()).collect(),
-                action: Some(Action::Logs(tab::logs::Key::Clear)),
-                desc: "Clear".into(),
-            };
-            assert!(Keymaps::from_bindings([(Scope::Logs, vec![binding])].into()).is_err());
-        }
         let binding = ResolvedBinding {
-            on: vec!["x".parse().unwrap()],
-            action: Some(Action::App(AppKey::Quit)),
+            on: KeySequence::Chord(["g".parse().unwrap(), "<Esc>".parse().unwrap()]),
+            action: Some(Action::Logs(tab::logs::Action::Clear)),
+            desc: "Clear".into(),
+        };
+        assert!(Keymaps::from_bindings([(Scope::Logs, vec![binding])].into()).is_err());
+        let binding = ResolvedBinding {
+            on: KeySequence::Single("x".parse().unwrap()),
+            action: Some(Action::App(AppAction::Quit)),
             desc: "Quit".into(),
         };
         assert!(Keymaps::from_bindings([(Scope::Logs, vec![binding])].into()).is_err());
@@ -576,7 +541,7 @@ mod tests {
         for target in TabTarget::ALL {
             for binding in maps.tab_bindings(target).iter() {
                 assert_eq!(binding.source_scope, Scope::App);
-                assert!(binding.action == Action::App(AppKey::Tab(target)));
+                assert!(binding.action == Action::App(AppAction::Tab(target)));
             }
         }
     }

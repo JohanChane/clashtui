@@ -12,7 +12,6 @@ mod derive_alias {
         Action = ::core::hash::Hash, ::core::cmp::PartialEq, ::core::cmp::Eq,
             ::serde::Serialize, ::serde::Deserialize,
             ::core::marker::Copy, ::core::clone::Clone;
-        Key = ..Action;
     }
 }
 

@@ -52,12 +52,12 @@ After entering the TUI, a row of tabs appears at the top, with a hint bar at the
 | Shortcut | Action |
 |----------|--------|
 | `1` ~ `7` | Jump to corresponding tab |
-| `Tab` | Next tab |
+| `Tab` / `Shift-Tab` | Next / previous tab |
 | `q` or `Ctrl-c` | Quit |
 | `?` | Show shortcut help |
-| `Ctrl-g` then `c` | Open Clashtui config directory in file manager |
-| `Ctrl-g` then `m` | Open core config directory |
-| `Ctrl-g` then `f` | Start core service |
+| `Ctrl-g` then `c` | Open core data directory in file manager |
+| `Ctrl-g` then `m` | Open core install directory |
+| `Ctrl-g` then `f` | Start/restart core service |
 | `Ctrl-g` then `t` | Close all connections |
 
 > For page-specific shortcuts, press `?` in each tab.

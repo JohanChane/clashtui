@@ -13,7 +13,7 @@ use crate::tui::TuiWidget;
 use ratatui::prelude::{Frame, Rect};
 
 pub trait BasicTabContent: 'static {
-    type Key: Copy;
+    type Action: Copy;
     type State;
 
     const TITLE: &str;
@@ -32,9 +32,9 @@ pub trait TabContent: BasicTabContent {
     /// This function will be called when creating an instance(`Tab<C>::default()`)
     fn init(&mut self, task_set: &mut FutureSet<Self>, state: &mut Self::State);
 
-    fn handle_key_event(
+    fn handle_action(
         &mut self,
-        key: Self::Key,
+        action: Self::Action,
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
     );
@@ -49,9 +49,9 @@ pub struct Tab<C: TabContent> {
 }
 
 impl<C: TabContent> Tab<C> {
-    pub fn handle_action(&mut self, action: C::Key) {
+    pub fn handle_action(&mut self, action: C::Action) {
         self.content
-            .handle_key_event(action, &mut self.tasks, &mut self.state);
+            .handle_action(action, &mut self.tasks, &mut self.state);
     }
 }
 
