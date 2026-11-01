@@ -1,4 +1,7 @@
+mod actions;
+
 use super::*;
+pub(in crate::tui) use actions::{AppAction, TabTarget, km};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use tab::prelude::*;
 use tokio::sync::Notify;
@@ -11,79 +14,11 @@ pub(super) static FULL_RENDER: Notify = Notify::const_new();
 pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
 
-#[derive_aliases::derive(..Key)]
-pub enum AppKey {
-    Tab(u8),
-    TabNext,
-    Quit,
-    Help,
-}
-
-pub(in crate::tui) mod km {
-    //! We override the `set` and `get_docs` to keep
-    //! the core key bindings under control
-    use super::AppKey;
-    use crate::tui::key::{Document, Key, KeyDesc};
-    use crossterm::event::KeyCode;
-
-    // There is no need to write those to file,
-    // as they are overritten when set
-    key_map!(AppKey, FileMap::new());
-
-    pub use km::default;
-    pub(super) use km::get_submap_name;
-
-    pub fn set(mut map: serde_yml::Value) -> anyhow::Result<bool> {
-        let mmap = map
-            .as_mapping_mut()
-            .unwrap()
-            .entry("common".into())
-            .or_insert(serde_yml::Value::Mapping(Default::default()))
-            .as_mapping_mut()
-            .unwrap();
-        (2..=7u8)
-            .map(|num| (KeyCode::Char((b'0' + num) as char), AppKey::Tab(num)))
-            .chain(APP_KEYS)
-            .map(|(key, act)| (act, vec![Key::from_code(key)]))
-            .try_for_each(|(key, act)| {
-                mmap.insert(serde_yml::to_value(key)?, serde_yml::to_value(act)?);
-                Ok::<_, serde_yml::Error>(())
-            })?;
-        km::set(map)
-    }
-
-    pub fn get_docs() -> KeyDesc {
-        km::get_docs()
-            .into_iter()
-            .filter(|(_, b)| *b != TAB_NUM)
-            .chain(std::iter::once(("1~7".to_string(), TAB_NUM)))
-            .collect()
-    }
-
-    const APP_KEYS: [(KeyCode, AppKey); 4] = [
-        (KeyCode::Char('1'), AppKey::Tab(1)),
-        (KeyCode::Tab, AppKey::TabNext),
-        (KeyCode::Char('q'), AppKey::Quit),
-        (KeyCode::Char('?'), AppKey::Help),
-    ];
-    const TAB_NUM: &str = "Switch tab 1-7";
-
-    impl Document for AppKey {
-        fn get_doc(&self) -> &'static str {
-            match self {
-                Self::Tab(..) => TAB_NUM,
-                Self::TabNext => "Tab Next",
-                Self::Quit => "Quit",
-                Self::Help => "Help",
-            }
-        }
-    }
-}
-
 pub struct App {
     tabs: Vec<Tab>,
     popup: PopUp,
     help: HelpPanel,
+    input: key::Matcher<'static>,
 
     tab_index: u8,
 }
@@ -102,6 +37,7 @@ impl App {
             ],
             popup: PopUp::default(),
             help: HelpPanel::default(),
+            input: key::Matcher::new(key::keymaps()),
             tab_index: 0,
         };
         app.tabs[0].on_enter();
@@ -157,25 +93,33 @@ impl App {
         Ok(())
     }
 
-    /// KeyEvent Route:
-    /// PopUp(0) → GlobalChord(0.5) → Help(1) → Which(2) → Tab(3) → Global(4)
+    /// Popups capture text input; all page/global shortcuts share one compiled map.
+    /// Help can start a global-only chord, which retains its candidates until completion.
     fn handle_key_event(&mut self, kv: &Key) {
         log::debug!("K: {kv:?}");
-
         if self.popup.check() {
+            self.input.cancel();
             self.popup.handle_key_event(kv);
             return;
         }
-
-        if self.help.is_active() {
+        let scope = self.tabs[self.tab_index as usize].input_scope();
+        let map_scope = if self.help.is_active() {
+            self.input.cancel();
+            if !self.input.starts_chord(key::Scope::App, kv) {
+                self.help.handle_key_event(kv);
+                return;
+            }
             self.help.dismiss();
-            return;
+            key::Scope::App
+        } else {
+            scope
+        };
+        if let key::Match::Execute(action) = self.input.feed(kv, scope, map_scope) {
+            match action {
+                key::Action::App(action) => self.handle_action(action),
+                action => self.tabs[self.tab_index as usize].handle_action(action),
+            }
         }
-
-        let ti = self.tab_index as usize;
-
-        self.tabs[ti].handle_key_event(kv);
-        self.handle_global_kv(kv);
     }
     fn render(&mut self, f: &mut ratatui::Frame) {
         use ratatui::prelude::{Constraint, Layout};
@@ -184,8 +128,11 @@ impl App {
             .constraints([Constraint::Length(3), Constraint::Fill(1)])
             .split(f.area());
 
+        let scope = self.tabs[self.tab_index as usize].input_scope();
+        let maps = key::keymaps();
+        let hints = self.input.hints(scope);
         render_tabbar(
-            self.tabs.iter().map(|tab| tab.title()),
+            tab_titles(self.tabs.iter().map(|tab| tab.title()), maps),
             self.tab_index,
             f,
             chunks[0],
@@ -193,8 +140,12 @@ impl App {
 
         self.tabs[self.tab_index as usize].render(f, chunks[1]);
 
+        if let Some(hints) = hints {
+            widget::which::render(f, &hints);
+        }
         if self.help.is_active() {
-            self.render_help(f, &self.tabs[self.tab_index as usize]);
+            self.help
+                .render(f, self.tabs[self.tab_index as usize].title(), maps, scope);
         }
 
         if self.popup.check() {
@@ -202,74 +153,85 @@ impl App {
         }
     }
 
-    fn render_help(&self, f: &mut ratatui::Frame, tab: &Tab) {
-        widget::help::render_help(f, tab);
+    fn switch_tab(&mut self, new_index: u8) {
+        if new_index != self.tab_index {
+            self.input.cancel();
+            self.tabs[self.tab_index as usize].on_leave();
+            self.tab_index = new_index;
+            self.tabs[self.tab_index as usize].on_enter();
+        }
     }
-    /// Global layer (4) — last resort: Tab switch, Quit, Help
-    fn handle_global_kv(&mut self, kv: &Key) -> bool {
-        if let Ok(key) = AppKey::try_from(kv) {
-            match key {
-                AppKey::Tab(new_index) => {
-                    let new_index = new_index - 1;
-                    if new_index != self.tab_index {
-                        self.tabs[self.tab_index as usize].on_leave();
-                        self.tab_index = new_index;
-                        self.tabs[self.tab_index as usize].on_enter();
-                    }
-                }
-                AppKey::TabNext => {
-                    const TAB_COUNT: u8 = 7;
-                    let old_index = self.tab_index;
-                    if self.tab_index == TAB_COUNT - 1 {
-                        self.tab_index = 0;
-                    } else {
-                        self.tab_index += 1;
-                    }
-                    self.tabs[old_index as usize].on_leave();
-                    self.tabs[self.tab_index as usize].on_enter();
-                }
-                AppKey::Quit => {
-                    QUIT.store(true, Ordering::Relaxed);
-                }
-                AppKey::Help => self.help.toggle(),
+
+    fn handle_action(&mut self, action: AppAction) {
+        match action {
+            AppAction::Tab(target) => self.switch_tab(target as u8),
+            AppAction::TabNext | AppAction::TabPrev => {
+                let count = self.tabs.len();
+                let offset = if action == AppAction::TabPrev {
+                    count - 1
+                } else {
+                    1
+                };
+                self.switch_tab(((self.tab_index as usize + offset) % count) as u8);
             }
-            true
-        } else {
-            false
+            AppAction::Quit => {
+                QUIT.store(true, Ordering::Relaxed);
+            }
+            AppAction::Help => self.help.toggle(),
+            AppAction::Global(action) => {
+                tokio::task::spawn_blocking(move || {
+                    if let Err(error) = action.execute() {
+                        popmsg::prelude::Confirm::err(format!("{error:#}"));
+                    }
+                });
+            }
         }
     }
     fn sync(&mut self) {
         SPINNER_FRAME.fetch_add(1, Ordering::Relaxed);
         self.popup.sync();
+        if self.popup.check() {
+            self.input.cancel();
+        }
         self.tabs.iter_mut().for_each(|tab| tab.sync());
     }
 }
 
+fn tab_titles(titles: impl IntoIterator<Item = &'static str>, maps: &key::Keymaps) -> Vec<String> {
+    TabTarget::ALL
+        .into_iter()
+        .zip(titles)
+        .map(|(target, title)| {
+            let keys: Vec<_> = maps
+                .tab_bindings(target)
+                .iter()
+                .map(|binding| binding.key_text.as_str())
+                .collect();
+            if keys.is_empty() {
+                title.to_owned()
+            } else {
+                format!("{} {title}", keys.join("/"))
+            }
+        })
+        .collect()
+}
+
 /// each item should represent for one tab
 fn render_tabbar(
-    titles: impl IntoIterator<Item = &'static str>,
+    titles: impl IntoIterator<Item = String>,
     selected: u8,
     f: &mut ratatui::Frame,
     area: ratatui::layout::Rect,
 ) {
     use crate::tui::theme::Theme;
-    use ratatui::style::{Styled, Stylize};
-    use ratatui::text::Line;
+    use ratatui::style::Styled;
     use ratatui::widgets::{Block, Tabs};
 
     let theme = Theme::get();
-    let block = Block::bordered()
-        .title(" Clashtui ")
-        .title_bottom(Line::raw(" Tab or num ").right_aligned().reversed());
-    let block = if let Some(submap_name) = km::get_submap_name() {
-        block.title_bottom(submap_name)
-    } else {
-        block
-    };
+    let block = Block::bordered().title(" Clashtui ");
     let titles = titles
         .into_iter()
-        .enumerate()
-        .map(|(idx, s)| format!("{} {s}", idx + 1).set_style(theme.tabbar.text));
+        .map(|title| title.set_style(theme.tabbar.text));
     let widget = Tabs::new(titles)
         .block(block)
         .highlight_style(theme.tabbar.highlight)
@@ -300,3 +262,6 @@ fn the_egg(key: crossterm::event::KeyCode) {
         log::debug!("You've found the egg!")
     }
 }
+
+#[cfg(test)]
+mod tests;

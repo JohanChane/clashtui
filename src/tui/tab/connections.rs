@@ -4,68 +4,63 @@ use ratatui::text::Line;
 use ratatui::widgets::{Cell, Row, Table};
 use std::collections::HashMap;
 
-newtype_tab!(ConnectionsTab(Tab<Connections>));
+newtype_tab!(ConnectionsTab(Tab<Connections>), Connections);
 
 key_map!(
-    Key,
-    FileMap::new()
-        .with_common([
-            (KeyCode::Up, Key::MoveUp),
-            (KeyCode::Down, Key::MoveDown),
-            (KeyCode::Char('k'), Key::MoveUp),
-            (KeyCode::Char('j'), Key::MoveDown),
-            (KeyCode::Char('G'), Key::GoBottom),
-            (KeyCode::Char('/'), Key::Search),
-            (KeyCode::Char('p'), Key::TogglePause),
-            (KeyCode::Char('f'), Key::FzfFind),
+    Connections,
+    Action,
+    DefaultBindings::new()
+        .with_keys([
+            (KeyCode::Up, Action::MoveUp),
+            (KeyCode::Down, Action::MoveDown),
+            (KeyCode::Char('k'), Action::MoveUp),
+            (KeyCode::Char('j'), Action::MoveDown),
+            (KeyCode::Char('G'), Action::GoBottom),
+            (KeyCode::Char('/'), Action::Search),
+            (KeyCode::Char('p'), Action::TogglePause),
+            (KeyCode::Char('f'), Action::FzfFind),
         ])
-        .with_submap(
-            "Nav",
-            KeyCode::Char('g'),
-            [(KeyCode::Char('g'), Key::GoTop)]
-        )
-        .with_submap(
-            "Terminate",
+        .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
+        .with_chords(
             KeyCode::Char('d'),
-            [(KeyCode::Char('d'), Key::Terminate)]
+            [(KeyCode::Char('d'), Action::Terminate)]
         )
-        .with_submap(
-            "All",
+        .with_chords(
             KeyCode::Char('a'),
-            [(KeyCode::Char('c'), Key::TerminateAll)]
+            [(KeyCode::Char('c'), Action::TerminateAll)]
         )
-        .with_submap(
-            "Sort",
+        .with_chords(
             KeyCode::Char('s'),
             [
-                (KeyCode::Char('h'), Key::SortBy(SortColumn::Host)),
-                (KeyCode::Char('l'), Key::SortBy(SortColumn::Rule)),
-                (KeyCode::Char('c'), Key::SortBy(SortColumn::Chains)),
-                (KeyCode::Char('n'), Key::SortBy(SortColumn::Download)),
-                (KeyCode::Char('u'), Key::SortBy(SortColumn::Upload)),
-                (KeyCode::Char('d'), Key::SortBy(SortColumn::DlSpeed)),
-                (KeyCode::Char('s'), Key::SortBy(SortColumn::UlSpeed)),
-                (KeyCode::Char('r'), Key::SortReset),
+                (KeyCode::Char('h'), Action::SortBy(SortColumn::Host)),
+                (KeyCode::Char('l'), Action::SortBy(SortColumn::Rule)),
+                (KeyCode::Char('c'), Action::SortBy(SortColumn::Chains)),
+                (KeyCode::Char('n'), Action::SortBy(SortColumn::Download)),
+                (KeyCode::Char('u'), Action::SortBy(SortColumn::Upload)),
+                (KeyCode::Char('d'), Action::SortBy(SortColumn::DlSpeed)),
+                (KeyCode::Char('s'), Action::SortBy(SortColumn::UlSpeed)),
+                (KeyCode::Char('r'), Action::SortReset),
             ]
         )
 );
 
-#[derive_aliases::derive(..Key)]
-enum Key {
+#[derive_aliases::derive(..Action, Debug)]
+pub(in crate::tui) enum Action {
     MoveUp,
     MoveDown,
     GoTop,
     GoBottom,
     Terminate,
     TerminateAll,
-    SortBy(SortColumn),
     SortReset,
     Search,
     TogglePause,
     FzfFind,
+    #[serde(untagged)]
+    SortBy(SortColumn),
 }
 
-impl Document for Key {
+impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
@@ -120,14 +115,21 @@ macro_rules! tri {
     };
 }
 
-#[derive_aliases::derive(..Key)]
-enum SortColumn {
+#[derive_aliases::derive(..Action, Debug)]
+pub(in crate::tui) enum SortColumn {
+    #[serde(rename = "SortByHost")]
     Host,
+    #[serde(rename = "SortByRule")]
     Rule,
+    #[serde(rename = "SortByChains")]
     Chains,
+    #[serde(rename = "SortByDownload")]
     Download,
+    #[serde(rename = "SortByUpload")]
     Upload,
+    #[serde(rename = "SortByDlSpeed")]
     DlSpeed,
+    #[serde(rename = "SortByUlSpeed")]
     UlSpeed,
 }
 
@@ -269,7 +271,7 @@ fn sort_header(sort_state: SortState, column: SortColumn, base: &str) -> String 
 }
 
 impl BasicTabContent for Connections {
-    type Key = Key;
+    type Action = Action;
     type State = ();
 
     const TITLE: &str = "Connections";
@@ -335,14 +337,14 @@ impl TabContent for Connections {
         self.error = Some("Loading connections...".to_owned());
     }
 
-    fn handle_key_event(
+    fn handle_action(
         &mut self,
-        key: Key,
+        action: Action,
         task_set: &mut FutureSet<Self>,
         _state: &mut Self::State,
     ) {
-        match key {
-            Key::MoveUp => {
+        match action {
+            Action::MoveUp => {
                 if let Some(r) = self.row {
                     if r > 0 {
                         self.row = Some(r - 1);
@@ -351,7 +353,7 @@ impl TabContent for Connections {
                     self.row = Some(self.display_rows.len() - 1);
                 }
             }
-            Key::MoveDown => {
+            Action::MoveDown => {
                 if let Some(r) = self.row {
                     if r + 1 < self.display_rows.len() {
                         self.row = Some(r + 1);
@@ -360,17 +362,17 @@ impl TabContent for Connections {
                     self.row = Some(0);
                 }
             }
-            Key::GoTop => {
+            Action::GoTop => {
                 if !self.display_rows.is_empty() {
                     self.row = Some(0);
                 }
             }
-            Key::GoBottom => {
+            Action::GoBottom => {
                 if !self.display_rows.is_empty() {
                     self.row = Some(self.display_rows.len().saturating_sub(1));
                 }
             }
-            Key::Terminate => {
+            Action::Terminate => {
                 let Some(row) = self.row else { return };
                 let Some(display_row) = self.display_rows.get(row) else {
                     return;
@@ -395,7 +397,7 @@ impl TabContent for Connections {
                 }
                 .spawn_at(task_set);
             }
-            Key::TerminateAll => {
+            Action::TerminateAll => {
                 let (use_bulk, ids): (bool, Vec<String>) = if let Some(ref pat) = self.filter {
                     let ids: Vec<String> = self
                         .display_rows
@@ -446,12 +448,12 @@ impl TabContent for Connections {
                 }
                 .spawn_at(task_set);
             }
-            Key::SortBy(col) => self.toggle_sort(col),
-            Key::SortReset => {
+            Action::SortBy(col) => self.toggle_sort(col),
+            Action::SortReset => {
                 self.sort_state = SortState::default();
                 self.apply_sort();
             }
-            Key::Search => {
+            Action::Search => {
                 async move {
                     let filter = tri!(
                         Input::new()
@@ -466,10 +468,10 @@ impl TabContent for Connections {
                 }
                 .spawn_at(task_set);
             }
-            Key::TogglePause => {
+            Action::TogglePause => {
                 self.paused = !self.paused;
             }
-            Key::FzfFind => {
+            Action::FzfFind => {
                 self.paused = true;
                 let names: Vec<String> = self
                     .display_rows
@@ -510,11 +512,6 @@ impl TabContent for Connections {
             block
         } else {
             block.title_bottom(Line::raw(title).right_aligned().reversed())
-        };
-        let block = if let Some(submap_name) = km::get_submap_name() {
-            block.title_bottom(submap_name)
-        } else {
-            block
         };
 
         if !self.error.as_deref().unwrap_or("").is_empty() && self.display_rows.is_empty() {

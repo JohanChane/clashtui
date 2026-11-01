@@ -12,7 +12,6 @@ mod derive_alias {
         Action = ::core::hash::Hash, ::core::cmp::PartialEq, ::core::cmp::Eq,
             ::serde::Serialize, ::serde::Deserialize,
             ::core::marker::Copy, ::core::clone::Clone;
-        Key = ..Action;
     }
 }
 
@@ -51,7 +50,7 @@ fn main() {
         .init();
 
     if let Err(e) = tui::init() {
-        eprintln!("Failed to initiate TUI due to {e}");
+        eprintln!("Failed to initiate TUI due to {e:#}");
         eprintln!("Exiting");
         return;
     };

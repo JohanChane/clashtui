@@ -170,149 +170,10 @@ impl Proxies {
             }
         }
     }
-
-    fn dispatch_key(
-        &mut self,
-        key: super::Key,
-        task_set: &mut FutureSet<Self>,
-        state: &mut ListState,
-    ) {
-        let current = state.selected().unwrap_or(0);
-
-        match key {
-            super::Key::MoveUp => {
-                if current > 0 {
-                    state.select(Some(current - 1));
-                }
-            }
-            super::Key::MoveDown => {
-                if current + 1 < self.tree.len() {
-                    state.select(Some(current + 1));
-                }
-            }
-            super::Key::GoTop => {
-                if !self.tree.is_empty() {
-                    state.select(Some(0));
-                }
-            }
-            super::Key::GoBottom => {
-                if !self.tree.is_empty() {
-                    state.select(Some(self.tree.len().saturating_sub(1)));
-                }
-            }
-            super::Key::Parent => {
-                let info = self.tree.node_at(current).map(|n| n.parent.clone());
-                if let Some(Some(ref parent)) = info
-                    && let Some(idx) = self.tree.find_folder_index(parent)
-                {
-                    state.select(Some(idx));
-                }
-            }
-            super::Key::Expand => {
-                let info = self
-                    .tree
-                    .node_at(current)
-                    .map(|n| (n.name.clone(), n.node_type.clone(), n.parent.clone()));
-                if let Some((name, ntype, _parent)) = info {
-                    match ntype {
-                        NodeType::Folder => self.tree.expand_at(&name, &self.proxies),
-                        NodeType::Link => {
-                            if let Some(idx) = self.tree.find_folder_index(&name) {
-                                state.select(Some(idx));
-                            }
-                        }
-                        NodeType::File => {}
-                    }
-                }
-            }
-            super::Key::Select => {
-                let info = self
-                    .tree
-                    .node_at(current)
-                    .map(|n| (n.name.clone(), n.node_type.clone(), n.parent.clone()));
-                if let Some((name, ntype, parent)) = info {
-                    match ntype {
-                        NodeType::Folder => {
-                            self.tree.toggle_expand_at(&name, &self.proxies);
-                        }
-                        NodeType::Link | NodeType::File => {
-                            if let Some(ref parent) = parent {
-                                self.select_inline(parent.clone(), name, task_set);
-                            }
-                        }
-                    }
-                }
-            }
-            super::Key::CollapseAll => {
-                let key = self.selection_key(state);
-                self.tree.collapse_all(&self.proxies);
-                self.restore_selection(key, state);
-            }
-            super::Key::ExpandAll => {
-                let key = self.selection_key(state);
-                self.tree.expand_all(&self.proxies);
-                self.restore_selection(key, state);
-            }
-            super::Key::Refresh => self.refresh(task_set),
-            super::Key::Sort(sort_mode) => self.handle_sort(current, sort_mode, state),
-            super::Key::TestDelay => {
-                let info = self
-                    .tree
-                    .node_at(current)
-                    .map(|n| (n.name.clone(), n.node_type.clone()));
-                if let Some((name, ntype)) = info {
-                    self.test_delay(name, ntype, task_set);
-                }
-            }
-            super::Key::TestAllDelay => self.test_all_delay(task_set),
-            super::Key::Search => {
-                async move {
-                    let filter = tri!(
-                        Input::new()
-                            .with_title("Filter".to_owned())
-                            .build_and_send()
-                            .await,
-                        or_cancel
-                    );
-                    wrapper(move |content: &mut Self| {
-                        content.filter = (!filter.is_empty()).then_some(filter);
-                    })
-                }
-                .spawn_at(task_set);
-            }
-            super::Key::FzfFind => {
-                let items: Vec<(String, usize)> = self
-                    .tree
-                    .nodes
-                    .iter()
-                    .enumerate()
-                    .map(|(i, n)| (Self::fzf_display(n), i))
-                    .collect();
-                self.fzf_find(items, task_set);
-            }
-            super::Key::GroupSelect => {
-                let node = self.tree.node_at(current);
-                let parent = node.and_then(|n| n.parent.clone());
-                let group_name = parent.as_deref().unwrap_or("top");
-                let prompt = format!("Select in {group_name}");
-                let items: Vec<(String, usize)> = self
-                    .tree
-                    .nodes
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, n)| n.parent == parent)
-                    .map(|(i, n)| (Self::fzf_display(n), i))
-                    .collect();
-                if !items.is_empty() {
-                    self.fzf_find_with_prompt(items, prompt, task_set);
-                }
-            }
-        }
-    }
 }
 
 impl BasicTabContent for Proxies {
-    type Key = super::Key;
+    type Action = super::Action;
     type State = ListState;
 
     const TITLE: &str = "Proxies";
@@ -375,13 +236,143 @@ impl TabContent for Proxies {
         self.error = Some("Loading proxies...".to_owned());
     }
 
-    fn handle_key_event(
+    fn handle_action(
         &mut self,
-        key: super::Key,
+        action: super::Action,
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
     ) {
-        self.dispatch_key(key, task_set, state);
+        let current = state.selected().unwrap_or(0);
+
+        match action {
+            super::Action::MoveUp => {
+                if current > 0 {
+                    state.select(Some(current - 1));
+                }
+            }
+            super::Action::MoveDown => {
+                if current + 1 < self.tree.len() {
+                    state.select(Some(current + 1));
+                }
+            }
+            super::Action::GoTop => {
+                if !self.tree.is_empty() {
+                    state.select(Some(0));
+                }
+            }
+            super::Action::GoBottom => {
+                if !self.tree.is_empty() {
+                    state.select(Some(self.tree.len().saturating_sub(1)));
+                }
+            }
+            super::Action::Parent => {
+                let info = self.tree.node_at(current).map(|n| n.parent.clone());
+                if let Some(Some(ref parent)) = info
+                    && let Some(idx) = self.tree.find_folder_index(parent)
+                {
+                    state.select(Some(idx));
+                }
+            }
+            super::Action::Expand => {
+                let info = self
+                    .tree
+                    .node_at(current)
+                    .map(|n| (n.name.clone(), n.node_type.clone(), n.parent.clone()));
+                if let Some((name, ntype, _parent)) = info {
+                    match ntype {
+                        NodeType::Folder => self.tree.expand_at(&name, &self.proxies),
+                        NodeType::Link => {
+                            if let Some(idx) = self.tree.find_folder_index(&name) {
+                                state.select(Some(idx));
+                            }
+                        }
+                        NodeType::File => {}
+                    }
+                }
+            }
+            super::Action::Select => {
+                let info = self
+                    .tree
+                    .node_at(current)
+                    .map(|n| (n.name.clone(), n.node_type.clone(), n.parent.clone()));
+                if let Some((name, ntype, parent)) = info {
+                    match ntype {
+                        NodeType::Folder => {
+                            self.tree.toggle_expand_at(&name, &self.proxies);
+                        }
+                        NodeType::Link | NodeType::File => {
+                            if let Some(ref parent) = parent {
+                                self.select_inline(parent.clone(), name, task_set);
+                            }
+                        }
+                    }
+                }
+            }
+            super::Action::CollapseAll => {
+                let key = self.selection_key(state);
+                self.tree.collapse_all(&self.proxies);
+                self.restore_selection(key, state);
+            }
+            super::Action::ExpandAll => {
+                let key = self.selection_key(state);
+                self.tree.expand_all(&self.proxies);
+                self.restore_selection(key, state);
+            }
+            super::Action::Refresh => self.refresh(task_set),
+            super::Action::Sort(sort_mode) => self.handle_sort(current, sort_mode, state),
+            super::Action::TestDelay => {
+                let info = self
+                    .tree
+                    .node_at(current)
+                    .map(|n| (n.name.clone(), n.node_type.clone()));
+                if let Some((name, ntype)) = info {
+                    self.test_delay(name, ntype, task_set);
+                }
+            }
+            super::Action::TestAllDelay => self.test_all_delay(task_set),
+            super::Action::Search => {
+                async move {
+                    let filter = tri!(
+                        Input::new()
+                            .with_title("Filter".to_owned())
+                            .build_and_send()
+                            .await,
+                        or_cancel
+                    );
+                    wrapper(move |content: &mut Self| {
+                        content.filter = (!filter.is_empty()).then_some(filter);
+                    })
+                }
+                .spawn_at(task_set);
+            }
+            super::Action::FzfFind => {
+                let items: Vec<(String, usize)> = self
+                    .tree
+                    .nodes
+                    .iter()
+                    .enumerate()
+                    .map(|(i, n)| (Self::fzf_display(n), i))
+                    .collect();
+                self.fzf_find(items, task_set);
+            }
+            super::Action::GroupSelect => {
+                let node = self.tree.node_at(current);
+                let parent = node.and_then(|n| n.parent.clone());
+                let group_name = parent.as_deref().unwrap_or("top");
+                let prompt = format!("Select in {group_name}");
+                let items: Vec<(String, usize)> = self
+                    .tree
+                    .nodes
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, n)| n.parent == parent)
+                    .map(|(i, n)| (Self::fzf_display(n), i))
+                    .collect();
+                if !items.is_empty() {
+                    self.fzf_find_with_prompt(items, prompt, task_set);
+                }
+            }
+        }
     }
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State) {
