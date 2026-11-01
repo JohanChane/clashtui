@@ -122,7 +122,7 @@ Per-frame flow:
 
 `Key` represents normalized terminal input; page `Action` enums represent commands. `KeySequence` distinguishes a single key from a two-key chord throughout configuration and runtime. `key_map!` declares typed defaults and configuration parsers. `Keymaps::from_config` applies core-specific scopes, default overrides, and unbindings, then checks each page against global bindings. Identical complete sequences and single-key/chord prefix overlaps stop startup with an error; `gp` and `gg` can share a prefix.
 
-`Keymaps` owns each `RuntimeBinding` once. `scope_bindings` indexes IDs by source, `key_lookup` compiles global and page IDs for each focus context, and `tab_shortcuts` caches tab-binding IDs. Profile and Template have separate lookup tables; Status uses the global table. The store is installed in a read-only `OnceLock` only after all validation succeeds.
+`Keymaps` owns each `RuntimeBinding` once. `scope_bindings` indexes IDs by source, and `key_lookup` compiles global and page IDs for each focus context. Profile and Template have separate lookup tables; Status uses the global table. The store is installed in a read-only `OnceLock` only after all validation succeeds.
 
 Input handling:
 
@@ -131,7 +131,7 @@ Input handling:
 3. App's `Matcher` uses the effective map and returns `Pending`, `Execute(Action)`, `Cancelled`, or `Unmatched`.
 4. App executes global actions or passes typed page actions to `TuiTab::handle_action`.
 
-App owns the only mutable pending-chord state. Tab changes, focus changes, and popups do not inherit old candidates. Esc and unmatched second keys are consumed. Help and tab labels borrow the same binding store. Which borrows candidates from the original prefix branch and sorts them at display time without persistent copies of descriptions or candidate order. Its title shows the pending prefix; pages need no matching state.
+App owns the only mutable pending-chord state. Tab changes, focus changes, and popups do not inherit old candidates. Esc and unmatched second keys are consumed. Help borrows the binding store. Tab labels display fixed one-based positions, independent of key bindings. Which borrows candidates from the original prefix branch and sorts them at display time without persistent copies of descriptions or candidate order. Its title shows the pending prefix; pages need no matching state.
 
 ### TuiWidget Trait
 

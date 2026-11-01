@@ -266,7 +266,7 @@ mihomo:
 }
 
 #[test]
-fn tabbar_uses_rebound_keys_and_omits_unbound_shortcuts() {
+fn tabbar_uses_indices_with_rebound_and_unbound_shortcuts() {
     let app: serde_yml::Value = serde_yml::from_str(
         r#"
 - {on: "1", action: TabLogs}
@@ -281,27 +281,34 @@ fn tabbar_uses_rebound_keys_and_omits_unbound_shortcuts() {
     let mut config = serde_yml::Mapping::new();
     config.insert("app".into(), app);
     let maps = key::Keymaps::from_config(config, "mihomo").unwrap();
-    let titles = tab_titles(
-        [
-            "Status",
-            "File",
-            "Proxies",
-            "Connections",
-            "Logs",
-            "Settings",
-            "CoreSrvCtl",
-        ],
-        &maps,
-    );
+    for (keys, target) in [
+        (vec!["1"], TabTarget::Logs),
+        (vec!["8"], TabTarget::Status),
+        (vec!["z", "f"], TabTarget::File),
+    ] {
+        assert_eq!(resolve_global(&maps, &keys), Some(AppAction::Tab(target)));
+    }
+    for key in ["2", "5", "6"] {
+        assert!(resolve_global(&maps, &[key]).is_none());
+    }
+    let titles = tab_titles([
+        "Status",
+        "File",
+        "Proxies",
+        "Connections",
+        "Logs",
+        "Settings",
+        "CoreSrvCtl",
+    ]);
     assert_eq!(
         titles,
         [
-            "8 Status",
-            "z f File",
+            "1 Status",
+            "2 File",
             "3 Proxies",
             "4 Connections",
-            "1 Logs",
-            "Settings",
+            "5 Logs",
+            "6 Settings",
             "7 CoreSrvCtl"
         ]
     );
@@ -316,9 +323,11 @@ fn tabbar_uses_rebound_keys_and_omits_unbound_shortcuts() {
         .iter()
         .map(|cell| cell.symbol())
         .collect();
-    assert!(screen.contains("8 Status"));
-    assert!(screen.contains("1 Logs"));
-    assert!(screen.contains("z f File"));
-    assert!(!screen.contains("1 Status"));
-    assert!(!screen.contains("6 Settings"));
+    assert!(screen.contains("1 Status"));
+    assert!(screen.contains("2 File"));
+    assert!(screen.contains("5 Logs"));
+    assert!(screen.contains("6 Settings"));
+    assert!(!screen.contains("8 Status"));
+    assert!(!screen.contains("1 Logs"));
+    assert!(!screen.contains("z f File"));
 }
