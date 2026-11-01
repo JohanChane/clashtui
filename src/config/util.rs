@@ -41,6 +41,58 @@ pub(super) fn load_home_dir() -> Result<std::path::PathBuf> {
     }
 }
 
+#[cfg(target_family = "unix")]
+pub fn check_startup_perms() {
+    if crate::config::CONFIG.cfg_file.mihomo.core_service.is_user {
+        return;
+    }
+    use std::io::Write;
+
+    let dirs_to_check = [
+        &crate::config::CONFIG.cfg_file.mihomo.core.config_dir,
+        &crate::config::CONFIG.cfg_file.singbox.core.config_dir,
+    ];
+
+    for dir_str in &dirs_to_check {
+        if dir_str.is_empty() {
+            continue;
+        }
+        let dir = std::path::Path::new(dir_str);
+        if !dir.exists() {
+            continue;
+        }
+        if crate::functions::command::check_file_permissions(dir) {
+            continue;
+        }
+
+        print!(
+            "File permissions in '{}' need repair. Fix now? [Y/n] ",
+            dir.display()
+        );
+        let _ = std::io::stdout().flush();
+        let mut input = String::new();
+        let _ = std::io::stdin().read_line(&mut input);
+
+        if input.trim().to_lowercase().as_str() != "y" {
+            continue;
+        }
+
+        let Some(group) = crate::functions::command::get_dir_group_name(dir) else {
+            continue;
+        };
+
+        if let Err(e) = crate::functions::command::repair_file_permissions(dir, &group) {
+            eprintln!("Error: {}", e);
+            use std::io::Read;
+            print!("Press Enter to continue...");
+            let _ = std::io::stdout().flush();
+            let _ = std::io::stdin().read(&mut [0u8]);
+        }
+    }
+}
+#[cfg(not(target_family = "unix"))]
+pub fn check_startup_perms() {}
+
 macro_rules! load_save {
     ($id:ident, $name:expr) => {
         impl $id {

@@ -1,6 +1,6 @@
-mod agent;
-mod app;
+#[macro_use]
 mod key;
+mod app;
 mod popmsg;
 mod signals;
 mod tab;
@@ -10,7 +10,8 @@ mod utils;
 mod widget;
 
 pub use app::App;
-pub use key::Key;
+use key::Key;
+pub use key::init as keymap_init;
 pub use term::hold;
 pub(crate) use theme::Theme;
 
@@ -23,7 +24,7 @@ trait TuiWidget {
 }
 
 pub fn init() -> anyhow::Result<()> {
-    agent::init()?;
+    key::load()?;
     theme::Theme::load();
     term::setup()
 }

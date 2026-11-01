@@ -20,9 +20,11 @@ use std::{
 use util::*;
 
 mod core;
-pub use core::{CoreType, ServiceController};
 #[macro_use]
 mod util;
+
+pub use core::{CoreType, ServiceController};
+pub use util::check_startup_perms;
 pub mod database;
 
 /// Load using [init]
@@ -290,6 +292,7 @@ pub fn init_config() -> Result<()> {
     )?;
     ConfigFile::default().to_file()?;
     ProfileManager::default().to_file()?;
+    crate::tui::keymap_init()?;
 
     fs::create_dir(mihomo.join(defs::TEMPLATE_DIR))?;
     fs::create_dir(mihomo.join(defs::PROFILE_YAMLS_DIR))?;
@@ -305,19 +308,19 @@ pub fn theme_path() -> PathBuf {
     DATA_DIR.get().unwrap().join(defs::THEME_FILE)
 }
 fn mihomo_dir() -> PathBuf {
-    DATA_DIR.get().unwrap().join("mihomo")
+    core_data_dir(CoreType::Mihomo)
 }
 fn singbox_dir() -> PathBuf {
-    DATA_DIR.get().unwrap().join("sing-box")
+    core_data_dir(CoreType::Singbox)
 }
 pub fn config_dir_path() -> PathBuf {
     DATA_DIR.get().unwrap().clone()
 }
 pub fn core_data_dir(core_type: CoreType) -> PathBuf {
-    match core_type {
-        CoreType::Mihomo => mihomo_dir(),
-        CoreType::Singbox => singbox_dir(),
-    }
+    DATA_DIR.get().unwrap().join(match core_type {
+        CoreType::Mihomo => "mihomo",
+        CoreType::Singbox => "sing-box",
+    })
 }
 pub fn template_path() -> PathBuf {
     mihomo_dir().join(defs::TEMPLATE_DIR)

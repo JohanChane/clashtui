@@ -25,7 +25,7 @@ env_logger = { version = "0.11.7", default-features = false, features = [
 anyhow = "1.0.86"
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.150"
-serde_yml = "0.0.12"
+serde_yml = { package = "yaml_serde", version = "0.10" }
 indexmap = { version = "2", features = ["serde"] }
 minreq = { version = "2.12.0", features = [
     "proxy",
@@ -62,12 +62,18 @@ futures-lite = { version = "2.6.0", default-features = false, optional = true }
 
 unicode-width = { version = "0.2.0", default-features = false }
 nix = { version = "0", features = ["user", "fs"] }
-tungstenite = { version = "0.29", default-features = false, features = ["handshake", "url"], optional = true }
+tungstenite = { version = "0.29", default-features = false, features = [
+    "handshake",
+    "url",
+], optional = true }
+derive_aliases = "0.4"
 simsearch = "0.4.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
-signal-hook-tokio = { version = "0", features = ["futures-v0_3"], optional = true }
+signal-hook-tokio = { version = "0", features = [
+    "futures-v0_3",
+], optional = true }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
@@ -80,7 +86,14 @@ windows = { version = "0.62", features = [
 
 [features]
 customized-theme = ["tui", "ratatui/serde"]
-tui = ["dep:ratatui", "dep:crossterm", "dep:tokio", "dep:futures-lite", "dep:signal-hook-tokio", "dep:tungstenite"]
+tui = [
+    "dep:ratatui",
+    "dep:crossterm",
+    "dep:tokio",
+    "dep:futures-lite",
+    "dep:signal-hook-tokio",
+    "dep:tungstenite",
+]
 
 default = ["customized-theme"]
 
