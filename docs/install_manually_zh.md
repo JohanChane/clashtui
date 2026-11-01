@@ -95,7 +95,6 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra: {}
 ```
 
 安装服务控制脚本，并生成命令配置：
@@ -366,7 +365,6 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra: {}
 ```
 
 > 将 `<HOME_REPLACE>` 替换为你的 home 目录路径, 如 `/home/johan`。不能使用 `~` 或 `$HOME`。

@@ -37,6 +37,7 @@ struct Status {
     detected_core_type: Option<CoreType>,
     error: Option<String>,
     paused: bool,
+    probing: bool,
 }
 
 impl BasicTabContent for Status {
@@ -92,25 +93,33 @@ impl BasicTabContent for Status {
 
     fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         self.paused = false;
+        if !self.probing && self.detected_core_type.is_some() {
+            self.probing = true;
+            self.after_sync(task_set);
+        }
+    }
 
-        let was_unknown = self.detected_core_type.is_none();
-        self.error = Some("Detecting...".to_owned());
-
+    fn command_done(
+        &mut self,
+        event: &crate::tui::commands::CommandEvent,
+        task_set: &mut FutureSet<Self>,
+    ) {
+        use crate::{scripts::ServiceState, tui::commands::CommandEvent};
+        let CommandEvent::Status { core, result, .. } = event else {
+            return;
+        };
+        if *core != CONFIG.core_type() || self.paused || self.probing {
+            return;
+        }
+        if let Ok(report) = result
+            && matches!(report.state, ServiceState::Inactive | ServiceState::Missing)
+        {
+            self.error = Some(format!("Core service: {}", report.state.as_str()));
+            return;
+        }
+        self.error = Some("Detecting...".into());
+        self.probing = true;
         async move {
-            if was_unknown {
-                let report = tokio::task::spawn_blocking(crate::functions::service::current_status)
-                    .await
-                    .unwrap_or_else(crate::functions::service::StatusReport::unknown);
-                if matches!(
-                    report.state,
-                    crate::functions::service::ServiceState::Inactive
-                        | crate::functions::service::ServiceState::Missing
-                ) {
-                    return wrapper(move |content: &mut Self| {
-                        content.error = Some(format!("Core service: {}", report.state.as_str()));
-                    });
-                }
-            }
             let detected = tri!(
                 tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
                     .await
@@ -149,14 +158,17 @@ impl BasicTabContent for Status {
         .spawn_at(task_set);
     }
 
-    fn on_leave(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
+    fn on_leave(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         self.paused = true;
+        self.probing = false;
+        task_set.abort_all();
     }
 }
 
 impl TabContent for Status {
     fn init(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
         self.paused = true;
+        self.probing = false;
         self.error = Some("Waiting".to_owned());
     }
 
@@ -165,6 +177,7 @@ impl TabContent for Status {
         action: Self::Action,
         _task_set: &mut FutureSet<Self>,
         _state: &mut Self::State,
+        _commands: &mut crate::tui::commands::Commands,
     ) {
         match action {}
     }

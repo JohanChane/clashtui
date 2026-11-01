@@ -43,7 +43,7 @@ clashtui --config-dir /my/config/path
 | `4` | Connections | 查看当前所有连接，可关闭单个或全部连接 |
 | `5` | Logs | 实时查看核心日志 |
 | `6` | Settings | 修改 Clashtui 设置项 |
-| `7` | CoreSrvCtl | 控制核心服务：启动、停止、重启、切换 Mihomo / sing-box |
+| `7` | CoreSrvCtl | 控制核心服务：启动、停止、重启、自启设置 |
 
 ### 快捷键
 
@@ -275,7 +275,6 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra: {}
 ```
 
 ### core_override_config.yaml
@@ -347,11 +346,9 @@ sing-box 使用深度合并。你只需写要覆盖的部分，其他字段保�
 
 ## 核心管理
 
-### 切换核心
+### 核心服务动作
 
-在 CoreSrvCtl 标签页（按 `7`）中，可以切换 Mihomo 和 sing-box 两种核心。切换后需要重启 Clashtui。
-
-服务动作由 `CONFIG_ROOT/scripts.json` 定义，支持分核命令、自定义菜单及自启设置。见[服务控制脚本](service_scripts_zh.md)。切核仅在目标启动成功后保存选择；失败会报告已完成的步骤。
+CoreSrvCtl（按 `7`）从 `CONFIG_ROOT/scripts.json` 列出当前核心的启停、重启、自启及自定义动作，见[服务脚本](service_scripts_zh.md)。本版不提供 Switch Core／Stop All。当前核心由 `clashtui.db` 的 `core_type` 决定，修改后重启 Clashtui。
 
 Clashtui 会自动检测当前运行的核心类型是否与设置匹配。如果不匹配，会弹窗提示并阻止显示错误数据。
 
@@ -377,7 +374,7 @@ clashtui -vv    # 显示调试信息
 请确保 Mihomo 或 sing-box 核心已启动。到 CoreSrvCtl 标签页（按 `7`）可以启动服务。
 
 **提示 "core mismatch"？**
-说明正在运行的核心和 Clashtui 设置的不一致。到 CoreSrvCtl 标签页确认你实际想用的是哪个核心，切换后重启 Clashtui。
+说明正在运行的核心和 Clashtui 设置的不一致。检查 `clashtui.db` 的 `core_type` 与所配置的核心 API 地址，使其匹配后重启 Clashtui。
 
 **怎么添加订阅？**
 进入 Files 标签页（按 `2`），按 `?` 查看快捷键，通常用 `a` 添加新 Profile，输入订阅 URL 即可。Clashtui 会自动下载和更新。

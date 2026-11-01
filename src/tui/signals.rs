@@ -1,6 +1,7 @@
 use anyhow::Result;
 
 pub struct Signals {
+    _commands: crate::command::SignalGuard,
     #[cfg(unix)]
     previous: Vec<(libc::c_int, libc::sigaction)>,
     #[cfg(unix)]
@@ -18,13 +19,6 @@ extern "C" fn receive(signal: libc::c_int) {
     // Only lock-free atomic stores/loads are allowed in the signal handler.
     // Terminal changes, task creation and logging happen in normal execution.
     match signal {
-        libc::SIGINT if super::term::is_external() => {
-            crate::functions::process::cancel_foreground();
-        }
-        libc::SIGQUIT | libc::SIGHUP | libc::SIGTERM => {
-            crate::functions::process::request_shutdown();
-            crate::tui::request_quit();
-        }
         libc::SIGTSTP => SUSPEND.store(true, Ordering::SeqCst),
         libc::SIGCONT => CONTINUE.store(true, Ordering::SeqCst),
         _ => (),
@@ -32,13 +26,13 @@ extern "C" fn receive(signal: libc::c_int) {
 }
 
 impl Signals {
-    pub fn start() -> Result<Self> {
-        crate::functions::process::install_console_handler()?;
+    pub fn start(cancel: std::sync::Arc<std::sync::atomic::AtomicBool>) -> Result<Self> {
+        let commands = crate::command::signal_scope(cancel.clone())?;
         #[cfg(unix)]
         {
-            use libc::{SIGCONT, SIGHUP, SIGINT, SIGQUIT, SIGTERM, SIGTSTP};
+            use libc::{SIGCONT, SIGTSTP};
             let mut previous = Vec::new();
-            for signal in [SIGINT, SIGQUIT, SIGHUP, SIGTERM, SIGTSTP, SIGCONT] {
+            for signal in [SIGTSTP, SIGCONT] {
                 let mut action = unsafe { std::mem::zeroed::<libc::sigaction>() };
                 let mut old = unsafe { std::mem::zeroed::<libc::sigaction>() };
                 action.sa_sigaction = receive as *const () as usize;
@@ -58,14 +52,15 @@ impl Signals {
                 previous.push((signal, old));
             }
             let task = tokio::runtime::Handle::try_current().ok().map(|runtime| {
-                runtime.spawn(async {
+                runtime.spawn(async move {
                     use std::sync::atomic::Ordering;
                     let mut tick = tokio::time::interval(std::time::Duration::from_millis(20));
                     loop {
                         tick.tick().await;
                         if SUSPEND.swap(false, Ordering::SeqCst) && !super::term::is_external() {
-                            tokio::task::spawn_blocking(|| {
-                                if let Err(error) = super::term::suspend() {
+                            let cancel = cancel.clone();
+                            tokio::task::spawn_blocking(move || {
+                                if let Err(error) = super::term::suspend(&cancel) {
                                     log::warn!("Could not suspend terminal: {error:#}");
                                 }
                             });
@@ -76,10 +71,16 @@ impl Signals {
                     }
                 })
             });
-            Ok(Self { previous, task })
+            Ok(Self {
+                _commands: commands,
+                previous,
+                task,
+            })
         }
         #[cfg(not(unix))]
-        Ok(Self {})
+        Ok(Self {
+            _commands: commands,
+        })
     }
 }
 
@@ -96,6 +97,5 @@ impl Drop for Signals {
                 }
             }
         }
-        crate::functions::process::remove_console_handler();
     }
 }

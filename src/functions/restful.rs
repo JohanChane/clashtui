@@ -74,7 +74,14 @@ pub mod config {
     use super::*;
 
     pub fn fetch_from(controller: &str, secret: Option<&str>) -> Result<serde_json::Value> {
-        let response = request_to(Method::Get, controller, secret, "/configs", None)?;
+        let response = request_to(
+            Method::Get,
+            controller,
+            secret,
+            "/configs",
+            None,
+            DEFAULT_TIMEOUT,
+        )?;
         if !(200..300).contains(&response.status_code) {
             return Err(minreq::Error::IoError(std::io::Error::other(format!(
                 "GET /configs: HTTP {}",

@@ -13,4 +13,3 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout:
-extra: {}

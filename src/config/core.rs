@@ -28,13 +28,6 @@ impl CoreType {
             Self::Singbox => 1,
         }
     }
-
-    pub const fn other(self) -> Self {
-        match self {
-            Self::Mihomo => Self::Singbox,
-            Self::Singbox => Self::Mihomo,
-        }
-    }
 }
 
 impl std::fmt::Display for CoreType {
@@ -84,7 +77,6 @@ pub struct ConfigFile {
     pub mihomo: MihomoSection,
     pub singbox: SingboxSection,
     pub timeout: Option<u64>,
-    pub extra: Extra,
 }
 impl Default for ConfigFile {
     fn default() -> Self {
@@ -119,7 +111,6 @@ impl Default for ConfigFile {
                     },
                 },
                 timeout: Default::default(),
-                extra: Default::default(),
             }
         }
         #[cfg(not(windows))]
@@ -145,62 +136,8 @@ impl Default for ConfigFile {
                 },
             },
             timeout: Default::default(),
-            extra: Default::default(),
         }
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
-#[derive(Default)]
-pub struct Extra {
-    #[serde(
-        rename = "edit_cmd",
-        skip_serializing,
-        deserialize_with = "reject_edit_cmd"
-    )]
-    _legacy_edit_cmd: (),
-    #[serde(
-        rename = "open_dir_cmd",
-        skip_serializing,
-        deserialize_with = "reject_open_dir_cmd"
-    )]
-    _legacy_open_dir_cmd: (),
-    #[serde(
-        rename = "copy_cmd",
-        skip_serializing,
-        deserialize_with = "reject_copy_cmd"
-    )]
-    _legacy_copy_cmd: (),
-}
-
-// Empty legacy settings selected platform defaults and need no command migration.
-fn reject_legacy_file_command<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-    field: &str,
-    action: &str,
-) -> Result<(), D::Error> {
-    let value = Option::<String>::deserialize(deserializer)?;
-    if value.as_deref().is_none_or(str::is_empty) {
-        return Ok(());
-    }
-    Err(serde::de::Error::custom(format!(
-        "extra.{field} has moved to the {action} action in scripts.json; use program/args with ${{path}} instead of %s; see docs/service_scripts_en.md"
-    )))
-}
-
-fn reject_edit_cmd<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<(), D::Error> {
-    reject_legacy_file_command(deserializer, "edit_cmd", "edit_file")
-}
-
-fn reject_open_dir_cmd<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<(), D::Error> {
-    reject_legacy_file_command(deserializer, "open_dir_cmd", "open_dir")
-}
-
-fn reject_copy_cmd<'de, D: serde::Deserializer<'de>>(_deserializer: D) -> Result<(), D::Error> {
-    Err(serde::de::Error::custom(
-        "extra.copy_cmd has moved to the copy action in scripts.json; see docs/clipboard_en.md",
-    ))
 }
 
 #[derive(Debug, serde:: Deserialize)]
@@ -245,14 +182,6 @@ mod test {
     use super::*;
 
     #[test]
-    fn old_clipboard_config_requires_explicit_migration() {
-        for value in ["osc52", "null", "{program: pbcopy, args: []}"] {
-            let error = serde_yml::from_str::<Extra>(&format!("copy_cmd: {value}")).unwrap_err();
-            assert!(error.to_string().contains("copy action in scripts.json"));
-        }
-    }
-
-    #[test]
     fn config_file_roundtrip() {
         let yaml = r#"mihomo:
   core:
@@ -269,7 +198,6 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: 5
-extra: {}
 "#;
         let cfg: ConfigFile = serde_yml::from_str(yaml).unwrap();
         assert_eq!(cfg.mihomo.core.config_dir, "/opt/clashtui/mihomo/config");
@@ -309,39 +237,6 @@ profiles:
         assert_eq!(data.cur_profile.as_deref(), Some("my"));
         assert!(data.profiles.get("pf1").unwrap().no_pp);
         assert!(!data.profiles.get("pf2").unwrap().no_pp);
-    }
-
-    #[test]
-    fn legacy_file_commands_require_migration_but_empty_settings_are_accepted() {
-        for (field, action) in [("edit_cmd", "edit_file"), ("open_dir_cmd", "open_dir")] {
-            for value in ["null", "\"\""] {
-                let extra: Extra = serde_yml::from_str(&format!("{field}: {value}")).unwrap();
-                assert!(!serde_yml::to_string(&extra).unwrap().contains(field));
-            }
-            let error = serde_yml::from_str::<Extra>(&format!("{field}: tool %s")).unwrap_err();
-            assert!(
-                error
-                    .to_string()
-                    .contains(&format!("{action} action in scripts.json"))
-            );
-        }
-    }
-
-    #[test]
-    fn core_service_config_deser() {
-        let yaml = "service_name: svc";
-        let csc: CoreServiceConfig = serde_yml::from_str(yaml).unwrap();
-        assert_eq!(csc.service_name, "svc");
-    }
-
-    #[test]
-    fn core_service_config_roundtrip() {
-        let csc = CoreServiceConfig {
-            service_name: "roundtrip_svc".into(),
-        };
-        let yaml = serde_yml::to_string(&csc).unwrap();
-        let deser: CoreServiceConfig = serde_yml::from_str(&yaml).unwrap();
-        assert_eq!(deser.service_name, csc.service_name);
     }
 
     fn fixture_path(name: &str) -> String {

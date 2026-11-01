@@ -43,7 +43,7 @@ After entering the TUI, a row of tabs appears at the top, with a hint bar at the
 | `4` | Connections | View all current connections, close individual or all connections |
 | `5` | Logs | View core logs in real time |
 | `6` | Settings | Modify Clashtui settings |
-| `7` | CoreSrvCtl | Control core services: start, stop, restart, switch between Mihomo / sing-box |
+| `7` | CoreSrvCtl | Control core services: start, stop, restart, autostart settings |
 
 ### Shortcuts
 
@@ -275,7 +275,6 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra: {}
 ```
 
 ### core_override_config.yaml
@@ -347,11 +346,9 @@ Override rules:
 
 ## Core Management
 
-### Switching Cores
+### Core service actions
 
-In the CoreSrvCtl tab (press `7`), you can switch between Mihomo and sing-box cores. After switching, restart Clashtui.
-
-Service actions now come from `CONFIG_ROOT/scripts.json`, with optional `cores` scopes, custom menu entries and autostart actions. See [service scripts](service_scripts_en.md). A switch saves the selection only after the target starts successfully; failures report completed steps.
+CoreSrvCtl (press `7`) lists actions for the configured core from `CONFIG_ROOT/scripts.json`: start, stop, restart, autostart and custom actions. See [service scripts](service_scripts_en.md). Switch Core and Stop All are not provided. The selected core is `core_type` in `clashtui.db`; restart Clashtui after changing it.
 
 Clashtui automatically detects whether the currently running core type matches the configured one. If there's a mismatch, a popup will warn you and prevent displaying incorrect data.
 
@@ -377,7 +374,7 @@ System installations enable TUN by default, which may prevent the core from down
 Make sure the Mihomo or sing-box core has been started. Go to the CoreSrvCtl tab (press `7`) to start the service.
 
 **Seeing "core mismatch" warning?**
-This means the running core doesn't match Clashtui's configured core. Go to the CoreSrvCtl tab to confirm which core you actually want to use, switch to it, then restart Clashtui.
+This means the running core doesn't match Clashtui's configured core. Check `core_type` in `clashtui.db` and the configured core API address, then restart Clashtui with matching settings.
 
 **How do I add a subscription?**
 Go to the Files tab (press `2`), press `?` to see shortcuts. Typically press `a` to add a new Profile, then enter the subscription URL. Clashtui will automatically download and update.

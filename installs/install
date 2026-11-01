@@ -938,7 +938,6 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout:
-extra: {}
 EOF
 
   log_info "Config written to: $CLASHTUI_CONFIG_DIR/config.yaml"

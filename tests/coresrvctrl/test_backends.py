@@ -427,8 +427,6 @@ class ResourceTests(unittest.TestCase):
                     self.assertEqual(args[2], "${scope}")
                     self.assertTrue((ROOT / args[0].removeprefix("${root}/")).is_file())
                     self.assertNotIn("sudo", args)
-                self.assertEqual(actions["enable_autostart_core"]["label"], "Enable Autostart")
-                self.assertEqual(actions["disable_autostart_core"]["label"], "Disable Autostart")
 
     def test_windows_bom_and_proxy_disable_has_no_port_dependency(self):
         for script in (ROOT / "windows").glob("*.ps1"):

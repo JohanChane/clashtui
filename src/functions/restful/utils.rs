@@ -23,6 +23,7 @@ pub fn request(
         CONFIG.secret_for_core(),
         sub_url,
         payload,
+        timeout!(),
     )
 }
 
@@ -33,6 +34,7 @@ pub fn request_to(
     secret: Option<&str>,
     sub_url: &str,
     payload: Option<String>,
+    timeout_secs: u64,
 ) -> Result<minreq::Response> {
     let mut req = minreq::Request::new(method, format!("{controller}{sub_url}"));
     if let Some(kv) = payload {
@@ -43,5 +45,5 @@ pub fn request_to(
     if let Some(s) = secret {
         req = req.with_header(headers::AUTHORIZATION, format!("Bearer {s}"));
     }
-    req.with_timeout(timeout!()).send()
+    req.with_timeout(timeout_secs).send()
 }

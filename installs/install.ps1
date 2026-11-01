@@ -497,7 +497,6 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout:
-extra: {}
 "@
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false

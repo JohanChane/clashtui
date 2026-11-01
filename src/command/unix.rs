@@ -116,38 +116,40 @@ pub fn was_interrupted(status: ExitStatus) -> bool {
     status.signal() == Some(libc::SIGINT) || status.code() == Some(128 + libc::SIGINT)
 }
 
-pub fn install_console_handler() -> Result<()> {
-    Ok(())
+extern "C" fn receive(signal: libc::c_int) {
+    use std::sync::atomic::Ordering;
+    super::INTERRUPTED.store(true, Ordering::Release);
+    if signal != libc::SIGINT {
+        super::SHUTDOWN.store(true, Ordering::Release);
+    }
 }
 
-pub fn remove_console_handler() {}
-
-pub fn wait_for_enter() -> Result<()> {
-    if !io::stdin().is_terminal() {
-        return Ok(());
-    }
-    while !super::foreground_cancelled() {
-        let mut fd = libc::pollfd {
-            fd: libc::STDIN_FILENO,
-            events: libc::POLLIN,
-            revents: 0,
-        };
-        let ready = unsafe { libc::poll(&mut fd, 1, 50) };
-        if ready < 0 {
-            let error = io::Error::last_os_error();
-            if error.kind() == io::ErrorKind::Interrupted {
-                continue;
+pub struct Signals(Vec<(libc::c_int, libc::sigaction)>);
+impl Signals {
+    pub fn install() -> Result<Self> {
+        let mut registered = Self(Vec::new());
+        for signal in [libc::SIGINT, libc::SIGQUIT, libc::SIGHUP, libc::SIGTERM] {
+            let mut action = unsafe { std::mem::zeroed::<libc::sigaction>() };
+            let mut old = unsafe { std::mem::zeroed::<libc::sigaction>() };
+            action.sa_sigaction = receive as *const () as usize;
+            action.sa_flags = libc::SA_RESTART;
+            unsafe {
+                libc::sigemptyset(&mut action.sa_mask);
             }
-            return Err(error.into());
+            if unsafe { libc::sigaction(signal, &action, &mut old) } != 0 {
+                return Err(io::Error::last_os_error().into());
+            }
+            registered.0.push((signal, old));
         }
-        if ready > 0 {
-            let mut line = String::new();
-            match io::stdin().read_line(&mut line) {
-                Ok(_) => return Ok(()),
-                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
-                Err(error) => return Err(error.into()),
+        Ok(registered)
+    }
+}
+impl Drop for Signals {
+    fn drop(&mut self) {
+        for (signal, old) in &self.0 {
+            unsafe {
+                libc::sigaction(*signal, old, std::ptr::null_mut());
             }
         }
     }
-    Ok(())
 }

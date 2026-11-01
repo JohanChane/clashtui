@@ -5,6 +5,8 @@
 服务控制按[脚本协议](service_scripts_zh.md)执行。平台服务命令在 `contrib/scripts/coresrvctrl/`；Rust 仅保留通用配置、执行、终端与进程适配。
 
 
+`scripts/config` 保存只读定义，`scripts/variables` 解析本次调用变量，`scripts/action` 解释动作输入和状态协议。`command` 执行通用进程选项；内部检查用 capture，权限修复用 inherit。`tui/commands` 单任务调度并向 App 返回完成事件，`tui/term` 提供可取消的终端交接。`functions/service` 保留同步 CLI 桥接。安装器管理默认资源。
+
 ## 技术栈
 
 - 语言：Rust（Edition 2024）
@@ -19,6 +21,10 @@
 
 ```
 src/
+├── command.rs           # 通用进程执行：capture / inherit / run
+├── command/             # Unix 进程组／Windows Job、信号作用域
+├── scripts.rs           # 启动时加载脚本配置
+├── scripts/             # config.rs / variables.rs / action.rs
 ├── main.rs              # 入口：五阶段启动流程
 ├── cli.rs               # CLI 模块入口，re-exports from cli/
 │   └── cli/
@@ -28,19 +34,18 @@ src/
 ├── config.rs            # 配置模块入口，re-exports from config/
 │   └── config/
 │       ├── core.rs      # CoreType 枚举、core 配置
-│       ├── scripts.rs   # 统一 scripts.json 命令协议与执行选项
 │       ├── database.rs  # ProfileManager（Profile 持久化结构）
 │       └── util.rs      # 配置目录解析、load_save! 宏、文件路径常量
 ├── functions.rs         # 业务逻辑入口，re-exports from functions/
 │   └── functions/
-│       ├── command.rs   # 系统操作（文件权限、服务启停、目录打开）
-│       ├── service.rs   # 目标命令计划、状态协议、组合动作
-│       ├── process.rs   # 通用子进程、输出限额、进程组/Job
+│       ├── command.rs   # 核心 Test/Check；CLI restart/stop 入口
+│       ├── service.rs   # 同步 CLI 脚本桥接
 │       ├── file.rs      # 文件操作（Profile 导入/更新、Template 处理）
 │       └── restful.rs   # REST API 调用（config/mode/proxies/connections）
 ├── tui.rs               # TUI 模块入口，re-exports from tui/
 │   └── tui/
 │       ├── app.rs       # App 结构体、事件循环（~50fps）、按键路由
+│       ├── commands.rs  # 单任务调度、完成事件
 │       ├── app/
 │       │   ├── actions.rs   # 全局动作、标签目标和默认绑定
 │       │   └── tests.rs     # 全局快捷键和标签标题回归测试
@@ -214,12 +219,13 @@ src/
 
 ## 业务逻辑
 
-`functions/` 目录包含所有业务逻辑，分为三个模块：
+`functions/` 保留文件操作、核心配置检查、CLI 服务调用和 REST API：
 
 | 模块 | 职责 |
 |------|------|
-| `command` | 系统级操作：服务启停（systemd）、文件权限修复、打开目录、文件编辑器 |
+| `command` | 核心 Test/Check 使用 capture；保留 CLI restart/stop 入口 |
 | `file` | Profile 管理：导入、更新（下载 + 解析）、Template 展开、订阅类型检测 |
+| `service` | CLI 脚本桥接 |
 | `restful` | REST API：获取/设置 config、切换 proxies、查询 connections、获取日志 |
 
 ## 构建脚本

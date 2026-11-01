@@ -48,7 +48,7 @@ run_privileged() {
 run_service_command() {
     if [ "$scope" = user ]; then
         rc-service --user "$@"
-    elif [ "$1" = --exists ] || [ "${2:-}" = status ]; then
+    elif [ "${2:-}" = status ]; then
         rc-service "$@"
     else
         run_privileged rc-service "$@"

@@ -24,7 +24,6 @@ mod core;
 mod util;
 
 pub use core::CoreType;
-pub mod scripts;
 pub use util::check_startup_perms;
 pub mod database;
 

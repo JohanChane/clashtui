@@ -1,10 +1,9 @@
 #[macro_use]
 mod key;
 mod app;
-mod clipboard;
+pub(crate) mod commands;
 mod input;
 mod popmsg;
-pub(crate) mod script_output;
 mod signals;
 mod tab;
 mod term;
@@ -15,10 +14,6 @@ mod widget;
 pub use app::App;
 use key::Key;
 pub use key::init as keymap_init;
-#[cfg(windows)]
-pub(crate) use term::is_external;
-pub(crate) use term::is_running;
-pub use term::with_terminal;
 pub(crate) use theme::Theme;
 
 trait TuiWidget {
@@ -26,19 +21,19 @@ trait TuiWidget {
     fn sync(&mut self);
     fn on_enter(&mut self) {}
     fn on_leave(&mut self) {}
+    fn command_done(&mut self, _event: &commands::CommandEvent) {}
 }
 
 pub fn init() -> anyhow::Result<()> {
     key::load()?;
     theme::Theme::load();
+    if let Err(error) = crate::scripts::init(&crate::config::config_dir_path()) {
+        log::warn!("{error:#}");
+    }
     term::setup()
 }
 
 pub fn restore() -> anyhow::Result<()> {
     term::teardown();
     Ok(())
-}
-
-pub(crate) fn request_quit() {
-    app::QUIT.store(true, std::sync::atomic::Ordering::SeqCst);
 }

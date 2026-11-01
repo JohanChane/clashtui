@@ -132,7 +132,6 @@ function Initialize-ServiceContext {
         if (-not (Test-Administrator)) { throw 'Administrator privileges were not granted' }
         Join-ManagedJob $ManagedJob
     }
-    $null = Get-Command nssm.exe -CommandType Application -ErrorAction Stop
 }
 
 function Test-OperationComplete([string]$State) {

@@ -342,6 +342,7 @@ impl TabContent for Connections {
         action: Action,
         task_set: &mut FutureSet<Self>,
         _state: &mut Self::State,
+        _commands: &mut crate::tui::commands::Commands,
     ) {
         match action {
             Action::MoveUp => {

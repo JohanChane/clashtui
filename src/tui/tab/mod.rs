@@ -53,11 +53,11 @@ macro_rules! newtype_tab {
             fn input_scope(&self) -> crate::tui::key::Scope {
                 crate::tui::key::Scope::$scope
             }
-            fn handle_action(&mut self, action: crate::tui::key::Action) {
+            fn handle_action(&mut self, action: crate::tui::key::Action, commands: &mut crate::tui::commands::Commands) {
                 let crate::tui::key::Action::$scope(action) = action else {
                     unreachable!("action routed to the wrong page");
                 };
-                self.0.handle_action(action);
+                self.0.handle_action(action, commands);
             }
         }
     };
@@ -69,7 +69,7 @@ macro_rules! newtype_tab {
         impl crate::tui::tab::TuiTab for $tab {
             fn title(&self) -> &'static str { $inner::TITLE }
             fn input_scope(&self) -> crate::tui::key::Scope { crate::tui::key::Scope::App }
-            fn handle_action(&mut self, _: crate::tui::key::Action) {
+            fn handle_action(&mut self, _: crate::tui::key::Action, _: &mut crate::tui::commands::Commands) {
                 unreachable!("this page has no local actions");
             }
         }
@@ -79,7 +79,11 @@ macro_rules! newtype_tab {
 pub(in crate::tui) trait TuiTab: super::TuiWidget {
     fn title(&self) -> &'static str;
     fn input_scope(&self) -> crate::tui::key::Scope;
-    fn handle_action(&mut self, action: crate::tui::key::Action);
+    fn handle_action(
+        &mut self,
+        action: crate::tui::key::Action,
+        commands: &mut crate::tui::commands::Commands,
+    );
 }
 
 pub(super) mod connections;
@@ -124,6 +128,10 @@ macro_rules! enum_dispatch {
             }
         }
 
+        fn command_done(&mut self, event: &crate::tui::commands::CommandEvent) {
+            match self { $(Self::$item(inner) => inner.command_done(event),)+ }
+        }
+
         fn on_leave(&mut self) {
             match self {
                 $(Self::$item(inner) => inner.on_leave(),)+
@@ -143,9 +151,9 @@ macro_rules! enum_dispatch {
                 $(Self::$item(inner) => inner.input_scope(),)+
             }
         }
-        fn handle_action(&mut self, action: crate::tui::key::Action) {
+        fn handle_action(&mut self, action: crate::tui::key::Action, commands: &mut crate::tui::commands::Commands) {
             match self {
-                $(Self::$item(inner) => inner.handle_action(action),)+
+                $(Self::$item(inner) => inner.handle_action(action, commands),)+
             }
         }
     }

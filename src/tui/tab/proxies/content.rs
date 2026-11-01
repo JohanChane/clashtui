@@ -241,6 +241,7 @@ impl TabContent for Proxies {
         action: super::Action,
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
+        _commands: &mut crate::tui::commands::Commands,
     ) {
         let current = state.selected().unwrap_or(0);
 

@@ -95,7 +95,6 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra: {}
 ```
 
 Install the service command script and materialize its template:
@@ -366,7 +365,6 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra: {}
 ```
 
 > Replace `<HOME_REPLACE>` with your home directory path, e.g. `/home/johan`. Do not use `~` or `$HOME`.

@@ -1,6 +1,6 @@
 # Scripts
 
-CoreSrvCtl, clipboard, file editing and directory commands share one `CONFIG_ROOT/scripts.json` action format. CLI service commands, global restart, status queries and core switching use the same configuration.
+CoreSrvCtl, clipboard, file editing and directory commands share one `CONFIG_ROOT/scripts.json` action format. CLI service commands, global restart, status queries use the same configuration.
 
 ```text
 CONFIG_ROOT/
@@ -69,13 +69,13 @@ Every `cmd` also accepts these optional fields:
 
 Execution waits for the main command. An optional `timeout_secs` bounds the entire command, including stdin writes, in either interactive mode. Zero is rejected. Shipped copy and status actions set it to 5; file actions omit it so a GUI process may remain active. Automatic status queries retain a separate fixed five-second deadline. This field is independent of the network `timeout` in `config.yaml`. Capture retains at most 64 KiB per stream and marks truncation; terminal stdout allows 2 MiB and fails without forwarding if exceeded. Failure, timeout, and cancellation clean up managed children even when preservation was requested. On success, the caller collects the parent's remaining output and closes capture pipes without waiting for descendants to close them. Retained children must detach their standard streams and manage their own lifetime. These rules apply on Unix and Windows.
 
-The reserved `copy`, `edit_file` and `open_dir` actions are excluded from CoreSrvCtl even with labels and do not by themselves create service composite entries. See [clipboard copying](clipboard_en.md) for the stdin contract and [file actions](#file-actions) for target paths.
+The reserved `copy`, `edit_file` and `open_dir` actions are excluded from CoreSrvCtl even with labels. See [clipboard copying](clipboard_en.md) for the stdin contract and [file actions](#file-actions) for target paths.
 
-Visibility does not affect execution or capabilities. Hidden actions still support background queries, shortcuts and composite operations. Default templates hide `status_core`; other actions can be hidden the same way. Built-in Switch Core and Stop All entries still use all configured actions to determine availability.
+Visibility only affects the menu. Hidden actions still support background queries and shortcuts. Default templates hide `status_core`.
 
 Optional `"cores": ["mihomo"]` or `["singbox"]` limits an action. Omission means all cores. Use the machine ID `singbox`, not the display name `sing-box`. Explicit scopes must be nonempty and contain no duplicates. Repeated IDs may have disjoint scopes only; a targeted action cannot override a shared action.
 
-Filtering by core and label preserves array order. Custom IDs work without Rust changes. Entering the tab reloads the whole file and preserves the selected ID when applicable. Invalid edits disable actions instead of running stale commands. In-flight operations keep their original snapshot.
+Filtering by core and label preserves array order. Custom IDs work without Rust changes. TUI loads and validates the file once at startup. Restart after changing it. Invalid startup configuration disables script actions; internal core checks and permission repair remain available. CLI restart/stop load a local configuration per invocation.
 
 | Standard ID | Meaning |
 | --- | --- |
@@ -90,7 +90,7 @@ Autostart actions require an installed service and are idempotent. Missing stand
 
 ## File actions
 
-The file pane's Edit actions (Profile, Template and providers) invoke `edit_file`. Global directory shortcuts invoke `open_dir` with the existing selected directory. Each invocation reloads `scripts.json`; missing or invalid actions report an error. Neither action automatically reloads or validates edited contents after returning.
+The file pane's Edit actions (Profile, Template and providers) invoke `edit_file`. Global directory shortcuts invoke `open_dir` with the existing selected directory. Actions use the startup configuration; missing or invalid actions report an error. Neither action automatically reloads or validates edited contents after returning.
 
 The Unix default entries are:
 
@@ -121,8 +121,6 @@ Pass `${path}` as its own argument. It is expanded once, without shell evaluatio
 
 Successful launcher exit means the launch completed, not that editing was saved. A command using a GUI editor's wait option stays active until that editor returns. Running commands are cancelled on clashtui exit; successful retained children manage their own lifetime. `keep_children_on_success` does not disable a timeout or preserve an unfinished main command.
 
-**Migration:** move custom `extra.edit_cmd` and `extra.open_dir_cmd` from `config.yaml` to the corresponding actions, replacing `%s` templates with `program` and separate `args` using `${path}`. Nonempty legacy commands report a migration error; legacy `null` and empty strings are accepted but omitted when saving. Install the platform opener script and merge the two actions into an existing `scripts.json`; do not replace custom service actions. Copy/status actions from older installations can add `timeout_secs: 5` to retain their previous manual timeout.
-
 ## Paths and variables
 
 - Relative `root` is based on `CONFIG_ROOT`; absolute roots are accepted. The child working directory is always root.
@@ -152,11 +150,11 @@ Ordinary actions return exit code `0` for success and nonzero for failure. stdou
 
 `status_core` must exit `0` and print exactly one UTF-8 line without BOM: `active`, `inactive` or `missing`. A final LF or CRLF is allowed. An installed but stopped or failed service is inactive. Missing means confirmed uninstalled. Diagnostics belong on stderr.
 
-Permission errors, missing tools, nonzero/signal exits, invalid output, timeout and excessive output mean unknown. An absent status action means unsupported. Runtime state does not describe autostart.
+Permission errors, missing tools, nonzero/signal exits, invalid output, timeout and stdout overflow mean unknown. An absent status action means unsupported. Runtime state does not describe autostart.
 
-Internal status queries always capture and consume the result without popups or terminal forwarding, independently of manual invocation settings. Background queries close stdin, have a total five-second deadline and capture at most 64 KiB per stream. Status scripts must be noninteractive; use `sudo -n` if needed, without password or UAC prompts. Scripts must not detach from their managed process group/Job. Real core services started by the service manager are outside script cleanup.
+Internal status queries always capture and consume the result without popups or terminal forwarding, independently of manual invocation settings. Background queries close stdin, have a total five-second deadline and capture at most 64 KiB per stream. stdout overflow fails; stderr may be truncated with a marker and remains available even on success. Both status pages use the same single-task scheduler; a user request cancels and reaps the current query before starting. Status scripts must be noninteractive; use `sudo -n` if needed, without password or UAC prompts. Scripts must not detach from their managed process group/Job. Real core services started by the service manager are outside script cleanup.
 
-Interactive commands exclusively own the terminal after the input reader acknowledges suspension. They inherit all standard streams. Press Enter once to return; Ctrl-C interrupts the command. CLI adds no Enter prompt.
+Interactive commands exclusively own the terminal after the input reader acknowledges suspension. They inherit standard streams except Copy, which always receives text on stdin. Press Enter once to return; Ctrl-C interrupts the command. CLI adds no Enter prompt.
 
 Unix defaults invoke `/bin/sh`; scripts use sudo only for commands that require system privileges. User scope never elevates; root does not elevate again. Status queries use no sudo on systemd, OpenRC or launchd. Launchd reads the domain and plist as the current user; read failures remain query errors. Only service writes may authenticate. Custom scripts can call sudo directly without a special wrapper.
 
@@ -172,4 +170,4 @@ Command tracing is off by default. Use `/bin/sh -x service.sh restart system mih
 - Windows: NSSM manages lifecycle; SCM queries state. Autostart uses AUTO_START/DEMAND_START. Service writes request UAC when needed; cancellation fails. PowerShell files use UTF-8 BOM, protocol output does not. ExecutionPolicy Bypass cannot override group policy.
 - Windows proxy: current-user HKCU settings plus a change broadcast; enabling and disabling are independent actions.
 
-Stop All preflights both stop actions, attempts both and aggregates errors. Switch Core preflights both stops and target start, starts only after all stops succeed, and saves the selection only after target start succeeds. It then exits after queued terminal output is delivered and any output popups are dismissed. Failures preserve the previous selection and report completed steps; no automatic rollback or retry.
+Cancellation, timeout and spawn failures have distinct error kinds and retain bounded partial diagnostics. Silent mode still hides captured output. Failed terminal actions never forward partial raw stdout. Cleanup covers the managed Unix process group or Windows Job; escaped descendants are outside that boundary, and UAC tracking requires the bundled script to join the Job.

@@ -98,7 +98,6 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra: {}
 ```
 
 Design principle: Mihomo and sing-box cannot be used together, so they are placed in separate `mihomo` and `sing-box` sections.
@@ -700,7 +699,7 @@ The `core_type` in `clashtui.db` takes precedence. If the API returns core data 
 
 - The user started another core's service outside of Clashtui
 - Both cores happen to listen on the same port, and API requests return data from the wrong core
-- CoreSrvCtl switched cores but Clashtui was not restarted (current design)
+- Core selection or API configuration changed without restarting Clashtui
 
 ### Detection Method
 
@@ -1091,8 +1090,6 @@ Implementation: Use the `winreg` crate to directly manipulate the registry (reco
 | Install Srv      | Install current core as Windows Service (SCM API create_service) |
 | Uninstall Srv    | Uninstall current core's Windows Service (stop then delete) |
 | Toggle SysProxy  | Toggle system proxy (enable/disable)                        |
-| Switch Core      | Switch to the other core (mihomo ↔ sing-box)                |
-| Stop All         | Stop all core services                                      |
 
 #### Service States
 
@@ -1121,67 +1118,9 @@ Windows uses NTFS ACL (Access Control List) for file permissions, which is funda
 
 Rationale: Windows' permission model is based on user/group ACLs — concepts like group sticky bit and mode bits do not exist. Core files running as Administrator have sufficient privileges. The regular user's TUI tool only needs read/write access to `%APPDATA%\clashtui` config directory (which users have by default).
 
-### CoreSrvCtl Tab Windows Adaptation
+### CoreSrvCtl execution
 
-#### Current State — CoreSrvCtl Operations
-
-```rust
-enum SrvCtlOp {
-    Stop,        // "Stop Service"
-    Restart,     // "Start Service"
-    SwitchCore,  // "Switch Core"
-    StopAll,     // "Stop All Services"
-}
-```
-
-#### Windows Extensions
-
-On Windows, when `ServiceController::default()` returns `WindowsService`, three additional operations are available:
-
-```rust
-#[cfg(windows)]
-SrvCtlOp::Install,       // "Install Service" — SCM API create_service
-#[cfg(windows)]
-SrvCtlOp::Uninstall,     // "Uninstall Service" — stop + delete
-#[cfg(windows)]
-SrvCtlOp::ToggleSysProxy, // "Toggle System Proxy" — registry read/write
-```
-
-**Install** execution logic:
-1. Call `ServiceManager::create_service()` via the `windows-service` crate
-2. service type: `OWN_PROCESS`, account: `LocalSystem`, start: `AutoStart`
-3. `executable_path` = `bin_path`, `launch_arguments` derived from CoreType
-4. Update status to `installed`
-
-**Uninstall** execution logic:
-1. Open service; if running, call `service.stop()`
-2. Then `service.delete()`
-3. Update status to `uninstalled`
-
-**Toggle System Proxy** execution logic:
-1. Read current `ProxyEnable` registry value
-2. If currently disabled → enable: set `ProxyEnable=1`, `ProxyServer=127.0.0.1:<port>`, `ProxyOverride=<-loopback>`, broadcast `WM_SETTINGCHANGE`
-3. If currently enabled → disable: set `ProxyEnable=0`, broadcast `WM_SETTINGCHANGE`
-4. Mixed port obtained from REST API `GET /configs` mixed inbound config
-
-#### Status Query Adaptation
-
-The current srvctl status query hardcodes `systemctl is-active` for non-Launchd cases. It needs to be adapted:
-
-```rust
-match ServiceController::default() {
-    ServiceController::Launchd => launchd_status(...),
-    ServiceController::WindowsService => windows_service_status(...), // new
-    _ => systemd_status(...),
-}
-```
-
-`windows_service_status()` implementation:
-1. Open service via `windows-service` crate → `service.query_status()`
-2. Parse `ServiceState`:
-   - `Running` → `"active"`
-   - `Stopped` / `Paused` etc. → `"inactive"`
-   - `ERROR_SERVICE_DOES_NOT_EXIST` → `"uninstalled"`
+The menu uses labeled actions from `scripts.json`, filtered by core. Windows service operations and proxy settings run through bundled PowerShell scripts. Rust owns a neutral process engine and a single TUI task slot; App consumes completion events. Internal status queries use the same scheduler and retain successful stderr diagnostics. See [script protocol](service_scripts_en.md) and [architecture](architecture_en.md).
 
 ### Install Script
 

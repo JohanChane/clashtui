@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result, bail};
 use std::{
-    io::{self, IsTerminal},
+    io::{self},
     os::windows::{io::AsRawHandle, process::CommandExt},
     process::{Child, Command, ExitStatus},
     ptr,
@@ -11,13 +11,9 @@ use std::{
 use windows_sys::Win32::{
     Foundation::{
         CloseHandle, ERROR_ALREADY_EXISTS, ERROR_BROKEN_PIPE, FILETIME, GetLastError, HANDLE,
-        INVALID_HANDLE_VALUE, WAIT_OBJECT_0, WAIT_TIMEOUT,
+        INVALID_HANDLE_VALUE,
     },
     System::{
-        Console::{
-            GetStdHandle, INPUT_RECORD, KEY_EVENT, ReadConsoleInputW, STD_INPUT_HANDLE,
-            SetConsoleCtrlHandler,
-        },
         Diagnostics::ToolHelp::{
             CreateToolhelp32Snapshot, TH32CS_SNAPTHREAD, THREADENTRY32, Thread32First, Thread32Next,
         },
@@ -29,7 +25,7 @@ use windows_sys::Win32::{
         Pipes::PeekNamedPipe,
         Threading::{
             CREATE_SUSPENDED, GetThreadTimes, OpenThread, ResumeThread,
-            THREAD_QUERY_LIMITED_INFORMATION, THREAD_SUSPEND_RESUME, WaitForSingleObject,
+            THREAD_QUERY_LIMITED_INFORMATION, THREAD_SUSPEND_RESUME,
         },
     },
 };
@@ -233,59 +229,46 @@ pub fn was_interrupted(status: ExitStatus) -> bool {
 }
 
 unsafe extern "system" fn console_control(event: u32) -> i32 {
+    use std::sync::atomic::Ordering;
     match event {
         0 | 1 => {
-            if crate::tui::is_external() {
-                super::cancel_foreground();
-            }
+            super::INTERRUPTED.store(true, Ordering::Release);
             1
         }
         2 | 5 | 6 => {
-            super::request_shutdown();
-            crate::tui::request_quit();
+            super::SHUTDOWN.store(true, Ordering::Release);
             1
         }
         _ => 0,
     }
 }
-
-pub fn install_console_handler() -> Result<()> {
-    if unsafe { SetConsoleCtrlHandler(Some(console_control), 1) } == 0 {
-        return Err(io::Error::last_os_error().into());
+pub struct Signals;
+impl Signals {
+    pub fn install() -> Result<Self> {
+        if unsafe {
+            windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(console_control), 1)
+        } == 0
+        {
+            return Err(io::Error::last_os_error().into());
+        }
+        Ok(Self)
     }
-    Ok(())
 }
-
-pub fn remove_console_handler() {
-    unsafe {
-        SetConsoleCtrlHandler(Some(console_control), 0);
-    }
-}
-
-pub fn wait_for_enter() -> Result<()> {
-    if !io::stdin().is_terminal() {
-        return Ok(());
-    }
-    let input = unsafe { GetStdHandle(STD_INPUT_HANDLE) };
-    while !super::foreground_cancelled() {
-        match unsafe { WaitForSingleObject(input, 50) } {
-            WAIT_OBJECT_0 => {
-                let mut record = INPUT_RECORD::default();
-                let mut read = 0;
-                if unsafe { ReadConsoleInputW(input, &mut record, 1, &mut read) } == 0 {
-                    return Err(io::Error::last_os_error().into());
-                }
-                if read == 1
-                    && u32::from(record.EventType) == KEY_EVENT
-                    && unsafe { record.Event.KeyEvent.bKeyDown } != 0
-                    && unsafe { record.Event.KeyEvent.wVirtualKeyCode } == 13
-                {
-                    return Ok(());
-                }
-            }
-            WAIT_TIMEOUT => (),
-            _ => return Err(io::Error::last_os_error().into()),
+impl Drop for Signals {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::System::Console::SetConsoleCtrlHandler(Some(console_control), 0);
         }
     }
-    Ok(())
+}
+
+/// A descendant outside the Job may retain stdin. Cancel the dedicated writer's
+/// synchronous I/O as well as setting its token; retry to close the check/write race.
+pub fn cancel_writer(writer: &std::thread::JoinHandle<()>) {
+    while !writer.is_finished() {
+        unsafe {
+            windows_sys::Win32::System::IO::CancelSynchronousIo(writer.as_raw_handle());
+        }
+        std::thread::sleep(super::POLL_INTERVAL);
+    }
 }

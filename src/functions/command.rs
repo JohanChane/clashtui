@@ -1,53 +1,56 @@
-#[cfg(unix)]
-mod unix;
-mod utils;
+//! Internal core configuration checks. These do not use script actions.
+use crate::{
+    command,
+    config::{CONFIG, CoreType},
+};
+use anyhow::{Result, ensure};
+use std::{ffi::OsString, path::Path, sync::atomic::AtomicBool};
 
-use crate::config::CONFIG;
-use crate::config::CoreType;
-use anyhow::Result;
-use std::{path::Path, process::Command};
-
-#[cfg(unix)]
-pub use unix::*;
-pub(crate) use utils::sanitize_windows_path;
-use utils::*;
-
-pub fn test_config(profile_path: Option<&Path>, enable_geodata_mode: bool) -> String {
+pub fn test_config(
+    profile_path: Option<&Path>,
+    enable_geodata_mode: bool,
+    cancel: &AtomicBool,
+) -> Result<String> {
     let cfg = &CONFIG.cfg_file.mihomo.core;
-
-    let mut cmd = Command::new(&cfg.bin_path);
-    cmd.args(["-t", "-d", &cfg.config_dir, "-f"]);
-    if let Some(path) = profile_path {
-        cmd.arg(path);
-    } else {
-        cmd.arg(&cfg.config_path);
-    }
-
+    let mut args: Vec<OsString> = vec![
+        "-t".into(),
+        "-d".into(),
+        cfg.config_dir.clone().into(),
+        "-f".into(),
+        profile_path
+            .unwrap_or_else(|| Path::new(&cfg.config_path))
+            .into(),
+    ];
     if enable_geodata_mode {
-        cmd.arg("-m");
+        args.push("-m".into());
     }
-
-    let opt = cmd.output().unwrap();
-    stringify_output(opt)
+    let output = command::capture(cfg.bin_path.as_ref(), &args, cancel)?;
+    Ok(format!(
+        "{}\n{}",
+        if output.status.success() {
+            "OK".into()
+        } else {
+            format!("Error({})", output.status)
+        },
+        output.captured.diagnostic()
+    ))
 }
 
-pub fn check_config(profile_path: &Path) -> anyhow::Result<()> {
-    match CONFIG.core_type() {
+pub fn check_config(core: CoreType, profile_path: &Path, cancel: &AtomicBool) -> Result<()> {
+    let output = match core {
         CoreType::Mihomo => {
             let cfg = &CONFIG.cfg_file.mihomo.core;
-            let output = Command::new(&cfg.bin_path)
-                .args(["-t", "-d", &cfg.config_dir, "-f"])
-                .arg(profile_path)
-                .output()
-                .map_err(|e| anyhow::anyhow!("Failed to run mihomo -t: {e}"))?;
-            if output.status.success() {
-                Ok(())
-            } else {
-                Err(anyhow::anyhow!(
-                    "mihomo -t failed:\n{}",
-                    stringify_output(output)
-                ))
-            }
+            command::capture(
+                cfg.bin_path.as_ref(),
+                &[
+                    "-t".into(),
+                    "-d".into(),
+                    cfg.config_dir.clone().into(),
+                    "-f".into(),
+                    profile_path.into(),
+                ],
+                cancel,
+            )?
         }
         CoreType::Singbox => {
             let cfg = &CONFIG.cfg_file.singbox.core;
@@ -79,59 +82,35 @@ pub fn check_config(profile_path: &Path) -> anyhow::Result<()> {
             } else {
                 profile_path.to_path_buf()
             };
-            let output = Command::new(&cfg.bin_path)
-                .args(["check", "-D", &cfg.config_dir, "-c"])
-                .arg(&check_path)
-                .output()
-                .map_err(|e| anyhow::anyhow!("Failed to run sing-box check: {e}"))?;
-            // Clean up temp file
+
+            let output = command::capture(
+                cfg.bin_path.as_ref(),
+                &[
+                    "check".into(),
+                    "-D".into(),
+                    cfg.config_dir.clone().into(),
+                    "-c".into(),
+                    check_path.as_os_str().into(),
+                ],
+                cancel,
+            );
             if check_path != profile_path {
                 let _ = std::fs::remove_file(&check_path);
             }
-            if output.status.success() {
-                Ok(())
-            } else {
-                Err(anyhow::anyhow!(
-                    "sing-box check failed:\n{}",
-                    stringify_output(output)
-                ))
-            }
+            output?
         }
-    }
+    };
+    ensure!(
+        output.status.success(),
+        "{core} configuration check failed ({}):\n{}",
+        output.status,
+        output.captured.diagnostic()
+    );
+    Ok(())
 }
-
 pub fn restart_service() -> Result<String> {
     super::service::execute_current("restart_core")
 }
-
 pub fn stop_service() -> Result<String> {
     super::service::execute_current("stop_core")
-}
-
-pub fn edit(path: &Path) -> Result<()> {
-    run_file_action("edit_file", path)
-}
-
-pub fn open_dir(path: &Path) -> Result<()> {
-    run_file_action("open_dir", path)
-}
-
-fn run_file_action(id: &str, path: &Path) -> Result<()> {
-    let root = crate::config::config_dir_path();
-    let scripts = crate::config::scripts::ScriptConfig::load(&root)?;
-    let command = super::service::resolve_current(&scripts, &root, id, Some(path))?;
-    let terminal_session = command.interactive || !crate::tui::is_running();
-    let execute = || {
-        let outcome = super::process::run(&command, None, &[], terminal_session)?;
-        if command.interactive {
-            outcome.ensure_success()
-        } else {
-            crate::tui::script_output::submit(id.into(), command.output, outcome)
-        }
-    };
-    if terminal_session {
-        crate::tui::with_terminal(execute)
-    } else {
-        execute()
-    }
 }

@@ -1,4 +1,3 @@
-use crate::functions::command::{check_config, edit, test_config};
 use crate::functions::file::profile::{db, select, update_profile};
 use crate::functions::restful::download;
 use std::cell::Cell;
@@ -188,7 +187,7 @@ pub(super) struct Profile {
 
 impl Profile {
     fn selected_name(&self, state: &ListState) -> Option<&String> {
-        crate::tui::clipboard::selected(
+        super::selected(
             self.items
                 .iter()
                 .zip(&self.atime)
@@ -216,6 +215,37 @@ impl BasicTabContent for Profile {
 impl DualTabContent for Profile {
     type Mate = super::template::Template;
 
+    fn command_completed(
+        &mut self,
+        event: &crate::tui::commands::CommandEvent,
+        tasks: &mut FutureSet<(Self, Self::Mate)>,
+    ) {
+        use crate::tui::commands::{CheckPurpose, CommandEvent};
+        let CommandEvent::Checked {
+            target,
+            purpose: CheckPurpose::Apply,
+            result: Ok(()),
+            ..
+        } = event
+        else {
+            return;
+        };
+        let target = target.clone();
+        async move {
+            let profile = tri!(
+                db::get(&target.name)
+                    .filter(|profile| profile.local_path() == target.path
+                        && crate::config::CONFIG.core_type() == target.core)
+                    .ok_or_else(|| anyhow::anyhow!(
+                        "Checked profile no longer matches its submitted target"
+                    ))
+            );
+            tri!(select(profile).await);
+            sync!((Self, Self::Mate))
+        }
+        .spawn_at(tasks);
+    }
+
     fn init(&mut self, task_set: &mut FutureSet<(Self, Self::Mate)>, _: &mut Self::State) {
         async { sync!((Self, Self::Mate)) }.spawn_at(task_set);
     }
@@ -225,38 +255,58 @@ impl DualTabContent for Profile {
         action: Self::Action,
         task_set: &mut FutureSet<(Self, Self::Mate)>,
         state: &mut Self::State,
+        commands: &mut crate::tui::commands::Commands,
     ) -> bool {
         match action {
-            Action::CopySubscription | Action::CopyPath => {
-                let text = match self.selected_name(state).and_then(db::get) {
-                    Some(profile) if matches!(action, Action::CopySubscription) => {
-                        match subscription_url(&profile.dtype) {
-                            Ok(url) => Some(url.to_owned()),
-                            Err(error) => {
-                                Confirm::err(error);
-                                return false;
-                            }
-                        }
-                    }
-                    Some(profile) => Some(crate::tui::clipboard::path_text(&profile.local_path())),
-                    None => None,
+            Action::CopySubscription
+            | Action::CopyPath
+            | Action::Select
+            | Action::Operation(Operation::Edit | Operation::Test | Operation::Check) => {
+                use crate::{
+                    scripts::ActionRequest,
+                    tui::commands::{CheckPurpose, ProfileTarget},
                 };
-                crate::tui::clipboard::copy(text, "profile", "text");
+                let result = (|| -> anyhow::Result<()> {
+                    let name = self
+                        .selected_name(state)
+                        .ok_or_else(|| anyhow::anyhow!("Nothing selected"))?
+                        .clone();
+                    let profile = db::get(&name)
+                        .ok_or_else(|| anyhow::anyhow!("Profile no longer exists"))?;
+                    let core = crate::config::CONFIG.core_type();
+                    let path = profile.local_path();
+                    let target = ProfileTarget {
+                        core,
+                        name,
+                        path: path.clone(),
+                    };
+                    match action {
+                        Action::CopySubscription => commands.submit(
+                            core,
+                            ActionRequest::Copy(subscription_url(&profile.dtype)?.to_owned()),
+                        ),
+                        Action::CopyPath => {
+                            commands.submit(core, ActionRequest::Copy(super::path_text(&path)))
+                        }
+                        Action::Select => commands.check_config(target, CheckPurpose::Apply),
+                        Action::Operation(Operation::Edit) => {
+                            commands.submit(core, ActionRequest::EditFile(path))
+                        }
+                        Action::Operation(Operation::Test) => commands.test_config(target, false),
+                        Action::Operation(Operation::Check) => {
+                            commands.check_config(target, CheckPurpose::Inspect)
+                        }
+                        _ => unreachable!(),
+                    }
+                })();
+                if let Err(error) = result {
+                    Confirm::err(format!("{error:#}"));
+                }
             }
             Action::Switch => return true,
             Action::MoveUp => state.select_previous(),
             Action::MoveDown => state.select_next(),
 
-            Action::Select => {
-                let name = get_name!(self, state);
-                async move {
-                    let pf = tri!(db::get(&name).unwrap().load_local_profile());
-                    tri!(check_config(&pf.path));
-                    tri!(select(db::get(&name).unwrap()).await);
-                    sync!((Self, Self::Mate))
-                }
-                .spawn_at(task_set);
-            }
             Action::GoTop => state.select_first(),
             Action::GoEnd => state.select_last(),
             Action::Operation(action) => match action {
@@ -373,12 +423,10 @@ mod actions {
             match self {
                 Self::Search => search().await,
                 Self::Add => import().await,
-                Self::Edit => _edit(name).await,
+                Self::Edit | Self::Test | Self::Check => unreachable!("command submitted directly"),
                 Self::Delete => delete(name).await,
                 Self::Preview => preview(name).await,
                 Self::Update => update(name).await,
-                Self::Test => test(name).await,
-                Self::Check => check(name).await,
                 Self::ToggleNoPp => toggle_no_pp(name).await,
                 Self::ToggleUpdateWithProxy => toggle_update_with_proxy(name).await,
                 Self::Traffic => {
@@ -488,15 +536,6 @@ mod actions {
         }
 
         sync!(C)
-    }
-
-    async fn _edit(name: String) -> CB {
-        let pf = tri!(db::get(name).unwrap().load_local_profile());
-        tri!(tri!(
-            tokio::task::spawn_blocking(move || edit(&pf.path)).await
-        ));
-
-        do_nothing()
     }
 
     async fn toggle_no_pp(name: String) -> CB {
@@ -778,30 +817,6 @@ mod actions {
         Confirm::dismiss_any("Traffic".to_owned())
             .with_prompt(lines.join("\n"))
             .build_and_send();
-
-        do_nothing()
-    }
-
-    async fn test(name: String) -> CB {
-        let pf = tri!(db::get(name).unwrap().load_local_profile());
-        let result = test_config(Some(&pf.path), false);
-        Confirm::title("Test Result".to_owned())
-            .with_prompt(result)
-            .build_and_send();
-
-        do_nothing()
-    }
-
-    async fn check(name: String) -> CB {
-        let pf = tri!(db::get(name).unwrap().load_local_profile());
-        match check_config(&pf.path) {
-            Ok(()) => {
-                Confirm::title("Check Passed".to_owned())
-                    .with_prompt("Configuration is valid.".to_owned())
-                    .build_and_send();
-            }
-            Err(e) => Confirm::err(e),
-        }
 
         do_nothing()
     }

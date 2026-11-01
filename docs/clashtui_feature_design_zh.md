@@ -98,7 +98,6 @@ singbox:
   core_service:
     service_name: clashtui_singbox
 timeout: null
-extra: {}
 ```
 
 设计原则: Mihomo 和 sing-box 不能共同使用的, 分别放在 mihomo 和 sing-box section。
@@ -700,7 +699,7 @@ App 持有唯一的组合键等待状态。执行、Which、帮助和标签栏�
 
 - 用户在 clashtui 外部启动了另一内核的 service
 - 两个内核恰好监听同一端口，API 请求返回的数据来自错误内核
-- CoreSrvCtl 切换内核后未重启 clashtui（当前设计）
+- 核心选择或 API 配置变更后未重启 Clashtui
 
 ### 检测方案
 
@@ -1082,8 +1081,6 @@ CoreSrvCtl tab 的操作列表:
 |------------------|------------------------------------------------|
 | Stop Service     | 停止当前 core 的 service                       |
 | Start Service    | 启动当前 core 的 service                       |
-| Switch Core      | 切换到另一个 core (mihomo ↔ sing-box)           |
-| Stop All         | 停止所有 core services                          |
 | Install Srv      | 通过 nssm 安装当前 core 为 Windows Service      |
 | Uninstall Srv    | 通过 nssm 卸载当前 core 的 Windows Service       |
 | Toggle SysProxy  | 切换系统代理 (enable/disable)                   |

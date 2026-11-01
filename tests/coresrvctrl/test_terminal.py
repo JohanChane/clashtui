@@ -3,6 +3,8 @@
 import errno
 import fcntl
 import json
+import http.server
+import threading
 import os
 from pathlib import Path
 import pty
@@ -169,37 +171,6 @@ class TerminalTests(unittest.TestCase):
         self.assertNotIn(ENTER, session.output)
         self.assertNotIn(b"\x1b[?1049l", session.output)
 
-    def configure_switch(self, start_body, stop_interactive):
-        self.configure("printf stopped\n")
-        path = self.root / "scripts.json"
-        config = json.loads(path.read_text())
-        config["actions"][0]["id"] = "stop_core"
-        config["actions"][0]["cmd"].update(interactive=stop_interactive, output="silent")
-        (self.root / "start.sh").write_text(start_body)
-        config["actions"].append({"id": "start_core", "cmd": {
-            "program": "/bin/sh", "args": ["${root}/start.sh"],
-            "interactive": False, "output": "terminal"}})
-        path.write_text(json.dumps(config))
-
-    def test_switch_delivers_captured_output_before_exiting(self):
-        self.configure_switch("printf '\\033]0;SWITCH_FINISHED\\007'\n", False)
-        session = self.start()
-        session.send(b"j\r")
-        session.expect(b"\x1b]0;SWITCH_FINISHED\x07")
-
-    def test_ctrl_c_cancels_captured_step_in_interactive_switch(self):
-        self.configure_switch("printf ready > start-ready; sleep 2; printf started > start-completed\n", True)
-        session = self.start()
-        session.send(b"j\r")
-        deadline = time.monotonic() + 5
-        while not (self.root / "start-ready").exists():
-            self.assertLess(time.monotonic(), deadline, "Captured start did not begin")
-            session.drain(0.02)
-        session.send(b"\x03")
-        session.expect(RESTORED)
-        self.assertFalse((self.root / "start-completed").exists())
-        self.assertIn("core_type: mihomo", (self.root / "clashtui.db").read_text())
-
     def test_file_copy_chords_send_subscription_and_paths(self):
         self.configure("exit 0\n")
         url = "https://example.test/sub?token=a%2Fb&flag=1"
@@ -213,7 +184,7 @@ class TerminalTests(unittest.TestCase):
         path = self.root / "scripts.json"
         config = json.loads(path.read_text())
         config["actions"].append({"id": "copy", "cmd": {
-            "program": "/bin/sh", "args": ["-c", 'cat > .copied; printf "%s/%s" "$CLASHTUI_COPY_SOURCE" "$CLASHTUI_COPY_FORMAT" > copy-metadata; mv .copied copied'],
+            "program": "/bin/sh", "args": ["-c", 'cat > .copied; mv .copied copied'],
             "interactive": False, "output": "silent"}})
         path.write_text(json.dumps(config))
         session = self.start()
@@ -223,10 +194,10 @@ class TerminalTests(unittest.TestCase):
         session.send(b"y")
         session.drain(0.2)
         self.assertFalse(copied.exists(), "Copy must wait for the chord's second key")
-        for keys, expected, source in (
-            (b"s", url, "profile"),
-            (b"yp", str(profile.resolve()), "profile"),
-            (b"lyp", str(template.resolve()), "template"),
+        for keys, expected in (
+            (b"s", url),
+            (b"yp", str(profile.resolve())),
+            (b"lyp", str(template.resolve())),
         ):
             copied.unlink(missing_ok=True)
             session.send(keys)
@@ -235,7 +206,6 @@ class TerminalTests(unittest.TestCase):
                 self.assertLess(time.monotonic(), deadline, "Copy action did not finish")
                 session.drain(0.02)
             self.assertEqual(copied.read_text(), expected)
-            self.assertEqual((self.root / "copy-metadata").read_text(), source + "/text")
             session.drain(0.15)
         self.assertNotIn(ENTER, session.output)
 
@@ -262,7 +232,7 @@ class TerminalTests(unittest.TestCase):
         (self.root / "scripts.json").write_text(json.dumps(config))
         return profile, template
 
-    def test_file_actions_pass_paths_without_terminal_handoff_and_reload_config(self):
+    def test_file_actions_pass_paths_and_keep_startup_configuration(self):
         profile, template = self.configure_file_actions(
             'printf "%s" "$1" > .opened; mv .opened opened\n')
         session = self.start()
@@ -287,12 +257,31 @@ class TerminalTests(unittest.TestCase):
             self.assertEqual(actual.resolve(), expected.resolve())
             session.drain(0.15)
         self.assertNotIn(ENTER, session.output)
-        # The next invocation must use the updated command and route its error.
+        # Editing scripts.json does not change the already loaded definitions.
         path = self.root / "scripts.json"
         config = json.loads(path.read_text())
         action = next(a for a in config["actions"] if a["id"] == "edit_file")
         action["cmd"].update(args=["-c", "echo FILE_EDIT_FAILURE >&2; exit 7"], output="popup")
         path.write_text(json.dumps(config))
+        marker.unlink()
+        session.send(b"e")
+        deadline = time.monotonic() + 5
+        while not marker.exists():
+            self.assertLess(time.monotonic(), deadline, "Loaded edit action did not finish")
+            session.drain(0.02)
+        self.assertEqual(Path(marker.read_text()).resolve(), template.resolve())
+        self.assertNotIn(b"FILE_EDIT_FAILURE", session.output)
+        self.assertNotIn(ENTER, session.output)
+
+    def test_file_action_failure_uses_configured_diagnostics(self):
+        self.configure_file_actions('echo FILE_EDIT_FAILURE >&2; exit 7\n')
+        path = self.root / "scripts.json"
+        config = json.loads(path.read_text())
+        next(action for action in config["actions"] if action["id"] == "edit_file")["cmd"]["output"] = "popup"
+        path.write_text(json.dumps(config))
+        session = self.start()
+        session.send(b"2")
+        session.expect(b"subscription")
         session.send(b"e")
         session.expect(b"FILE_EDIT_FAILURE")
         self.assertNotIn(ENTER, session.output)
@@ -423,7 +412,7 @@ class TerminalTests(unittest.TestCase):
         session.send(b"\n")
         session.expect(RESTORED)
 
-    def test_sigterm_reaps_foreground_command_and_restores_terminal(self):
+    def test_sigterm_reaps_foreground_command_and_descendants(self):
         self.configure("printf '%s\\n' \"$$\" > wrapper-pid\n"
                        "/bin/sh -c 'echo $$ > child-pid; printf \"CANCEL_READY\\n\"; exec sleep 30'\n"
                        "result=$?\nexit \"$result\"\n")
@@ -437,21 +426,6 @@ class TerminalTests(unittest.TestCase):
             os.kill(child, 0)
         with self.assertRaises(ProcessLookupError):
             os.kill(wrapper, 0)
-
-    def test_stop_all_uses_one_terminal_handoff(self):
-        self.configure("printf '%s\\n' \"$1\" >> stopped\n")
-        path = self.root / "scripts.json"
-        config = json.loads(path.read_text())
-        config["actions"][0]["id"] = "stop_core"
-        config["actions"][0]["cmd"]["args"].append("${core_type}")
-        path.write_text(json.dumps(config))
-        session = self.start()
-        session.send(b"jj\r")
-        session.expect(ENTER)
-        self.assertEqual((self.root / "stopped").read_text().splitlines(), ["mihomo", "singbox"])
-        session.send(b"\n")
-        session.expect(RESTORED)
-        session.expect(b"Stop All Services")
 
     def test_child_terminal_mode_changes_are_restored_before_enter(self):
         self.configure("stty raw -echo\nprintf 'MODES_CHANGED\\n'\n")
@@ -496,6 +470,147 @@ class TerminalTests(unittest.TestCase):
                             os.kill(child, signal.SIGKILL)
                         except ProcessLookupError:
                             pass
+
+
+    def test_enter_confirmation_can_cancel_after_partial_line_and_eof(self):
+        self.configure("exit 0\n")
+        session = self.start()
+        session.send(b"\r")
+        session.expect(ENTER)
+        session.send(b"partial\x04")
+        session.drain(0.15)
+        # read_line would block waiting for the rest of this line after Ctrl-D.
+        session.close()
+        self.assertTrue(session.final_modes[3] & termios.ECHO)
+        self.assertTrue(session.final_modes[3] & termios.ICANON)
+
+    def test_interactive_copy_keeps_text_on_stdin(self):
+        self.configure_file_actions("exit 0\n")
+        path = self.root / "scripts.json"
+        config = json.loads(path.read_text())
+        config["actions"].append({"id": "copy", "cmd": {
+            "program": "/bin/sh", "args": ["-c", "cat > copied; printf COPY_INPUT_DONE"],
+            "interactive": True}})
+        path.write_text(json.dumps(config))
+        session = self.start()
+        session.send(b"2")
+        session.expect(b"subscription")
+        session.send(b"ys")
+        session.expect(b"COPY_INPUT_DONE")
+        session.expect(ENTER)
+        self.assertEqual((self.root / "copied").read_text(), "https://example.invalid/sub")
+        session.send(b"\n")
+        session.expect(RESTORED)
+
+    def test_user_action_preempts_and_reaps_background_status(self):
+        self.configure("printf done > user-done\n")
+        self.set_command_options(interactive=False, output="silent")
+        path = self.root / "scripts.json"
+        config = json.loads(path.read_text())
+        config["actions"][1]["cmd"]["args"] = ["-c", "echo $$ > query-pid; exec sleep 30"]
+        path.write_text(json.dumps(config))
+        session = self.start()
+        child = int((self.root / "query-pid").read_text())
+        session.send(b"\r")
+        deadline = time.monotonic() + 3
+        while not (self.root / "user-done").exists():
+            self.assertLess(time.monotonic(), deadline, "User task did not preempt status query")
+            session.drain(0.02)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(child, 0)
+
+    def test_cli_proxy_port_is_lazy_cached_per_call_and_refreshed_next_call(self):
+        values = {"port": 7890, "requests": []}
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                values["requests"].append((self.path, self.headers.get("Authorization")))
+                body = json.dumps({"mixed-port": values["port"]}).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        try:
+            self.configure('printf "%s/%s" "$1" "$2" > .ports; mv .ports ports\n')
+            override = self.root / "mihomo/core_override_config.yaml"
+            override.parent.mkdir()
+            override.write_text(
+                f'external-controller: 127.0.0.1:{server.server_port}\n'
+                'mixed-port: 7890\nsecret: fixture\n')
+            path = self.root / "scripts.json"
+            config = json.loads(path.read_text())
+            config["actions"][0]["cmd"].update(
+                args=["${root}/action.sh", "plain", "text"], interactive=False, output="silent")
+            path.write_text(json.dumps(config))
+            worker.start()
+
+            def invoke():
+                # CLI isolates variable lookup from unrelated TUI REST queries.
+                result = subprocess.run(
+                    [str(BINARY), f"--config-dir={self.root}", "service", "restart"],
+                    stdin=subprocess.DEVNULL, capture_output=True, timeout=10,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+            invoke()
+            self.assertEqual(values["requests"], [])
+            marker = self.root / "ports"
+            self.assertEqual(marker.read_text(), "plain/text")
+            config["actions"][0]["cmd"]["args"] = [
+                "${root}/action.sh", "${proxy_port}", "${proxy_port}"]
+            path.write_text(json.dumps(config))
+            for index, port in enumerate((7890, 7891), 1):
+                values["port"] = port
+                marker.unlink(missing_ok=True)
+                invoke()
+                self.assertEqual(marker.read_text(), f"{port}/{port}")
+                self.assertEqual(values["requests"], [("/configs", "Bearer fixture")] * index)
+        finally:
+            if worker.is_alive():
+                server.shutdown()
+                worker.join(timeout=2)
+            server.server_close()
+
+    def test_slow_status_queries_take_turns_between_cores(self):
+        self.configure("exit 0\n")
+        path = self.root / "scripts.json"
+        config = json.loads(path.read_text())
+        config["actions"][1]["cmd"]["args"] = [
+            "-c", 'printf "%s\\n" "$1" >> queried; exec sleep 30', "status-test", "${core_type}"]
+        path.write_text(json.dumps(config))
+        session = self.start()
+        deadline = time.monotonic() + 7
+        while True:
+            queried = (self.root / "queried").read_text().splitlines()
+            if "singbox" in queried:
+                self.assertEqual(queried[:2], ["mihomo", "singbox"])
+                break
+            self.assertLess(time.monotonic(), deadline, "First core starved the second status query")
+            session.drain(0.05)
+
+    def test_noninteractive_ctrl_c_cancels_with_partial_diagnostics(self):
+        self.configure("printf READY_CAPTURE; printf $$ > capture-pid; exec sleep 30\n")
+        self.set_command_options(interactive=False, output="popup")
+        session = self.start()
+        session.send(b"\r")
+        marker = self.root / "capture-pid"
+        deadline = time.monotonic() + 3
+        while not marker.exists() or not marker.read_text():
+            self.assertLess(time.monotonic(), deadline)
+            session.drain(0.02)
+        child = int(marker.read_text())
+        session.send(b"\x03")
+        session.expect(b"cancelled")
+        session.expect(b"READY_CAPTURE")
+        with self.assertRaises(ProcessLookupError):
+            os.kill(child, 0)
+        self.assertNotIn(ENTER, session.output)
 
     def test_cli_sigterm_reaps_its_command(self):
         self.configure("printf '%s\\n' \"$$\" > child-pid\nexec sleep 30\n")

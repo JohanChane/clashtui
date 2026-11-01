@@ -351,6 +351,7 @@ impl TabContent for Logs {
         action: Action,
         task_set: &mut FutureSet<Self>,
         _state: &mut Self::State,
+        _commands: &mut crate::tui::commands::Commands,
     ) {
         match action {
             Action::MoveUp => {
@@ -525,7 +526,12 @@ mod tests {
         let receiver_paused = Arc::clone(&logs.paused);
         let mut tasks = FutureSet::new();
 
-        logs.handle_action(Action::TogglePause, &mut tasks, &mut ());
+        logs.handle_action(
+            Action::TogglePause,
+            &mut tasks,
+            &mut (),
+            &mut crate::tui::commands::Commands::default(),
+        );
         let kickstart = tasks.join_next().await.unwrap().unwrap();
         kickstart(&mut logs);
         assert!(!receiver_paused.load(Ordering::Relaxed));
@@ -537,7 +543,12 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        logs.handle_action(Action::TogglePause, &mut tasks, &mut ());
+        logs.handle_action(
+            Action::TogglePause,
+            &mut tasks,
+            &mut (),
+            &mut crate::tui::commands::Commands::default(),
+        );
         assert!(receiver_paused.load(Ordering::Relaxed));
         queue("during pause", &pending, &receiver_paused);
         callback(&mut logs);

@@ -55,9 +55,9 @@ jobs:
           python tests/files/test_open.py
       - name: Native Windows protocol and operation tests
         run: |
-          cargo test --locked --all-features config::scripts::
-          cargo test --locked --all-features functions::service::
-          cargo test --locked --all-features functions::process::
+          cargo test --locked --all-features scripts::
+          cargo test --locked --all-features tui::commands::
+          cargo test --locked --all-features command::
 
   terminal:
     runs-on: ubuntu-latest

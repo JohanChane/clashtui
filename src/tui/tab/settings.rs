@@ -154,6 +154,7 @@ impl TabContent for SettingsContent {
         action: Action,
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
+        _commands: &mut crate::tui::commands::Commands,
     ) {
         if self.mode_selector_visible {
             match action {

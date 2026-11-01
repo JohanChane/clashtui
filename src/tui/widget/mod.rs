@@ -20,6 +20,10 @@ macro_rules! new_type_impl_tuiwidget {
                 self.0.on_enter();
             }
 
+            fn command_done(&mut self, event: &$crate::tui::commands::CommandEvent) {
+                self.0.command_done(event);
+            }
+
             fn on_leave(&mut self) {
                 self.0.on_leave();
             }

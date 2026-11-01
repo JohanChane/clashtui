@@ -7,6 +7,12 @@ where
     Self: Sized,
 {
     type Mate: DualTabContentMate<Mate = Self>;
+    fn command_completed(
+        &mut self,
+        _event: &crate::tui::commands::CommandEvent,
+        _tasks: &mut FutureSet<(Self, Self::Mate)>,
+    ) {
+    }
 
     /// This function will be called when creating an instance(`DualTab<C1,C2>::default()`)
     fn init(&mut self, task_set: &mut FutureSet<(Self, Self::Mate)>, state: &mut Self::State);
@@ -17,6 +23,7 @@ where
         action: Self::Action,
         task_set: &mut FutureSet<(Self, Self::Mate)>,
         state: &mut Self::State,
+        commands: &mut crate::tui::commands::Commands,
     ) -> bool;
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, is_focused: bool);
@@ -37,6 +44,7 @@ where
         action: Self::Action,
         task_set: &mut FutureSet<(Self::Mate, Self)>,
         state: &mut Self::State,
+        commands: &mut crate::tui::commands::Commands,
     ) -> bool;
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, is_focused: bool);
@@ -84,22 +92,30 @@ where
         self.is_focus_on_c1
     }
 
-    pub fn handle_left_action(&mut self, action: C1::Action) {
+    pub fn handle_left_action(
+        &mut self,
+        action: C1::Action,
+        commands: &mut crate::tui::commands::Commands,
+    ) {
         debug_assert!(self.is_focus_on_c1);
         if self
             .content
             .0
-            .handle_action(action, &mut self.tasks, &mut self.state.0)
+            .handle_action(action, &mut self.tasks, &mut self.state.0, commands)
         {
             self.is_focus_on_c1 = false;
         }
     }
-    pub fn handle_right_action(&mut self, action: C2::Action) {
+    pub fn handle_right_action(
+        &mut self,
+        action: C2::Action,
+        commands: &mut crate::tui::commands::Commands,
+    ) {
         debug_assert!(!self.is_focus_on_c1);
         if self
             .content
             .1
-            .handle_action(action, &mut self.tasks, &mut self.state.1)
+            .handle_action(action, &mut self.tasks, &mut self.state.1, commands)
         {
             self.is_focus_on_c1 = true;
         }
@@ -127,6 +143,10 @@ where
         self.content
             .1
             .render(f, hori[1], &mut self.state.1, !self.is_focus_on_c1);
+    }
+
+    fn command_done(&mut self, event: &crate::tui::commands::CommandEvent) {
+        self.content.0.command_completed(event, &mut self.tasks);
     }
 
     fn sync(&mut self) {

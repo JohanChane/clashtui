@@ -13,4 +13,3 @@ singbox:
   core_service:
     service_name: singbox_svc
 timeout:
-extra: {}

@@ -1,5 +1,4 @@
 use super::*;
-use crate::functions::command::edit;
 use crate::functions::file::template::*;
 use ratatui::style::Style;
 use std::cell::Cell;
@@ -110,25 +109,41 @@ impl DualTabContentMate for Template {
         action: Self::Action,
         task_set: &mut FutureSet<(Self::Mate, Self)>,
         state: &mut Self::State,
+        commands: &mut crate::tui::commands::Commands,
     ) -> bool {
         log::debug!(
             "Template::handle_action: action={action:?} items.len={}",
             self.items.len()
         );
         match action {
-            Action::CopyPath => {
-                let text = crate::tui::clipboard::selected(
-                    self.items
-                        .iter()
-                        .filter(|name| self.filter.as_deref().is_none_or(|pat| name.contains(pat))),
-                    state.selected(),
-                )
-                .map(|name| {
-                    crate::tui::clipboard::path_text(
-                        &crate::functions::file::TEMPLATE_PATH.join(name),
+            Action::CopyPath | Action::Operation(Operation::Edit | Operation::EditProviders) => {
+                use crate::scripts::ActionRequest;
+                let result = (|| -> anyhow::Result<()> {
+                    let core = crate::config::CONFIG.core_type();
+                    let path = if matches!(action, Action::Operation(Operation::EditProviders)) {
+                        crate::config::core_data_dir(core).join("template_proxy_providers.yaml")
+                    } else {
+                        let name = super::selected(
+                            self.items.iter().filter(|name| {
+                                self.filter.as_deref().is_none_or(|pat| name.contains(pat))
+                            }),
+                            state.selected(),
+                        )
+                        .ok_or_else(|| anyhow::anyhow!("Nothing selected"))?;
+                        crate::functions::file::TEMPLATE_PATH.join(name)
+                    };
+                    commands.submit(
+                        core,
+                        if matches!(action, Action::CopyPath) {
+                            ActionRequest::Copy(super::path_text(&path))
+                        } else {
+                            ActionRequest::EditFile(path)
+                        },
                     )
-                });
-                crate::tui::clipboard::copy(text, "template", "text");
+                })();
+                if let Err(error) = result {
+                    Confirm::err(format!("{error:#}"));
+                }
             }
             Action::Switch => return true,
             Action::MoveDown => state.select_next(),
@@ -144,10 +159,6 @@ impl DualTabContentMate for Template {
                     Operation::FzfFind => {
                         let items = self.items.clone();
                         actions::fzf_find(items).spawn_at(task_set);
-                        return false;
-                    }
-                    Operation::EditProviders => {
-                        action.act(String::new()).spawn_at(task_set);
                         return false;
                     }
                     _ => {
@@ -226,8 +237,7 @@ mod actions {
             match self {
                 Self::Generate => generate(name).await,
                 Self::Delete => delete(name).await,
-                Self::Edit => _edit(name).await,
-                Self::EditProviders => _edit_providers(name).await,
+                Self::Edit | Self::EditProviders => unreachable!("command submitted directly"),
                 Self::Preview => preview(name).await,
                 Self::Search => search().await,
                 Self::FzfFind => unreachable!("FzfFind handled directly"),
@@ -271,26 +281,6 @@ mod actions {
         wrapper(move |(_, content): &mut C| {
             content.items = templates;
         })
-    }
-
-    async fn _edit(name: String) -> CB {
-        let path = crate::functions::file::TEMPLATE_PATH.join(&name);
-        log::debug!("template::_edit: path={}", path.display());
-        tri!(tri!(tokio::task::spawn_blocking(move || edit(&path)).await));
-        do_nothing()
-    }
-
-    async fn _edit_providers(_name: String) -> CB {
-        let subdir = match crate::config::CONFIG.core_type() {
-            crate::config::CoreType::Mihomo => "mihomo",
-            crate::config::CoreType::Singbox => "sing-box",
-        };
-        let path = crate::config::config_dir_path()
-            .join(subdir)
-            .join("template_proxy_providers.yaml");
-        log::debug!("template::_edit_providers: path={}", path.display());
-        tri!(tri!(tokio::task::spawn_blocking(move || edit(&path)).await));
-        do_nothing()
     }
 
     async fn preview(_name: String) -> CB {

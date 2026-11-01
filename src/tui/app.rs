@@ -13,9 +13,11 @@ const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
 pub(super) static FULL_RENDER: Notify = Notify::const_new();
 pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
-pub(super) static QUIT_AFTER_OUTPUT: AtomicBool = AtomicBool::new(false);
 
 pub struct App {
+    commands: commands::Commands,
+    status_due: [std::time::Instant; 2],
+    next_status: usize,
     tabs: Vec<Tab>,
     popup: PopUp,
     help: HelpPanel,
@@ -28,6 +30,9 @@ pub struct App {
 impl App {
     fn new() -> Self {
         let mut app = Self {
+            commands: commands::Commands::default(),
+            status_due: [std::time::Instant::now(); 2],
+            next_status: crate::config::CONFIG.core_type().index(),
             tabs: vec![
                 StatusTab::default().into(),
                 FileTab::default().into(),
@@ -48,78 +53,84 @@ impl App {
     }
     #[tokio::main]
     pub async fn serve() -> anyhow::Result<()> {
-        // Blocking command workers must finish before Tokio drops its runtime,
-        // including on normal quit and early errors, not only on OS signals.
-        struct StopCommands;
-        impl Drop for StopCommands {
-            fn drop(&mut self) {
-                crate::functions::process::request_shutdown();
-            }
-        }
-        let _stop_commands = StopCommands;
-        let _signals = signals::Signals::start()?;
-        let mut coordinator = term::Coordinator::register()?;
         let mut app = Self::new();
+        let cancel = app.commands.cancellation();
+        let _signals = signals::Signals::start(cancel.clone())?;
+        let mut coordinator = term::Coordinator::register()?;
         let mut events = input::InputReader::start();
         let mut invt = tokio::time::interval(TICK_RATE);
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
 
-        while !QUIT.load(Ordering::Relaxed) {
-            // Acquire before draining queues: a completed switch publishes all
-            // command output before requesting exit. Popups remain dismissible.
-            let quit_after_output = QUIT_AFTER_OUTPUT.load(Ordering::Acquire);
-            app.sync();
-            if quit_after_output && !app.popup.check() {
-                break;
-            }
-            terminal.draw(|f| app.render(f))?;
+        let result = async {
+            while !QUIT.load(Ordering::Relaxed) && !crate::command::shutdown_requested() {
+                app.sync();
+                terminal.draw(|f| app.render(f))?;
 
-            let ev = {
-                // this tick here ensures that fps is stable
-                let mut tick = Box::pin(invt.tick());
-                let ev = tokio::select! {
-                    ev = events.next() => match ev {
-                        Some(ev) => ev?,
-                        None => anyhow::bail!("Terminal input reader stopped"),
-                    },
-                    _ = &mut tick => continue,
-                    Some(request) = coordinator.next() => {
-                        coordinator.handoff(request, &mut events).await?;
-                        terminal.clear()?;
-                        continue;
-                    },
-                    // if we switch between screens
-                    _ = FULL_RENDER.notified() => {
-                        terminal.clear()?;
-                        continue
-                    },
+                let ev = {
+                    // this tick here ensures that fps is stable
+                    let mut tick = Box::pin(invt.tick());
+                    let ev = tokio::select! {
+                        ev = events.next() => match ev {
+                            Some(ev) => ev?,
+                            None => anyhow::bail!("Terminal input reader stopped"),
+                        },
+                        _ = &mut tick => continue,
+                        Some(request) = coordinator.next() => {
+                            coordinator.handoff(request, &mut events, &cancel).await?;
+                            terminal.clear()?;
+                            continue;
+                        },
+                        // if we switch between screens
+                        _ = FULL_RENDER.notified() => {
+                            terminal.clear()?;
+                            continue
+                        },
+                    };
+                    tick.await;
+                    ev
                 };
-                tick.await;
-                ev
-            };
 
-            use crossterm::event::Event;
-            match ev {
-                Event::Key(key_event) if key_event.kind.is_press() => {
-                    #[cfg(debug_assertions)]
-                    the_egg(key_event.code);
-                    let key = key_event.into();
-                    app.handle_key_event(&key);
+                use crossterm::event::Event;
+                match ev {
+                    Event::Key(key_event) if key_event.kind.is_press() => {
+                        #[cfg(debug_assertions)]
+                        the_egg(key_event.code);
+                        let key = key_event.into();
+                        app.handle_key_event(&key);
+                    }
+                    Event::Resize(..) => terminal.autoresize()?,
+                    _ => (),
                 }
-                Event::Resize(..) => terminal.autoresize()?,
-                _ => (),
             }
-        }
 
+            Ok::<(), anyhow::Error>(())
+        }
+        .await;
+        app.commands.begin_shutdown();
+        coordinator.close();
+        while !app.commands.is_drained() {
+            if let Some(event) = app.commands.poll() {
+                app.commands.acknowledge(event.task());
+            }
+            tokio::time::sleep(TICK_RATE).await;
+        }
         log::trace!("App Exit");
-        Ok(())
+        result
     }
 
     /// Popups capture text input; all page/global shortcuts share one compiled map.
     /// Help can start a global-only chord, which retains its candidates until completion.
     fn handle_key_event(&mut self, kv: &Key) {
         log::debug!("K: {kv:?}");
+        if kv.code == crossterm::event::KeyCode::Char('c')
+            && kv
+                .modifiers
+                .contains(crossterm::event::KeyModifiers::CONTROL)
+        {
+            self.commands.cancel();
+            return;
+        }
         if self.popup.check() {
             self.input.cancel();
             self.popup.handle_key_event(kv);
@@ -140,7 +151,9 @@ impl App {
         if let key::Match::Execute(action) = self.input.feed(kv, scope, map_scope) {
             match action {
                 key::Action::App(action) => self.handle_action(action),
-                action => self.tabs[self.tab_index as usize].handle_action(action),
+                action => {
+                    self.tabs[self.tab_index as usize].handle_action(action, &mut self.commands)
+                }
             }
         }
     }
@@ -212,29 +225,78 @@ impl App {
             }
             AppAction::Help => self.help.toggle(),
             AppAction::Global(action) => {
-                tokio::task::spawn_blocking(move || {
-                    if let Err(error) = action.execute() {
-                        popmsg::prelude::Confirm::err(format!("{error:#}"));
-                    }
-                });
+                if let Err(error) = action.execute(&mut self.commands) {
+                    popmsg::prelude::Confirm::err(format!("{error:#}"));
+                }
             }
         }
     }
     fn sync(&mut self) {
         SPINNER_FRAME.fetch_add(1, Ordering::Relaxed);
-        if let Some(result) = clipboard::poll() {
-            match result {
-                Ok(Some(message)) => {
-                    self.copy_notice = Some((
-                        message,
-                        std::time::Instant::now() + std::time::Duration::from_secs(3),
-                    ))
+        while let Some(event) = self.commands.poll() {
+            use commands::CommandEvent;
+            for tab in &mut self.tabs {
+                tab.command_done(&event);
+            }
+            match &event {
+                CommandEvent::Script { target, result, .. } => {
+                    if target.changes_service {
+                        self.status_due[target.core.index()] = std::time::Instant::now();
+                    }
+                    match commands::present(target, result) {
+                        Ok(Some(message)) => {
+                            self.copy_notice = Some((
+                                message,
+                                std::time::Instant::now() + std::time::Duration::from_secs(3),
+                            ))
+                        }
+                        Ok(None) => (),
+                        Err(error) => popmsg::prelude::Confirm::err(format!("{error:#}")),
+                    }
                 }
-                Ok(None) => (),
-                Err(error) => popmsg::prelude::Confirm::err(format!("{error:#}")),
+                CommandEvent::Tested { target, result, .. } => match result {
+                    Ok(text) => {
+                        popmsg::prelude::Confirm::title(format!("Test: {}", target.name))
+                            .with_prompt(text.clone())
+                            .build_and_send();
+                    }
+                    Err(error) => popmsg::prelude::Confirm::err(commands::error_text(error)),
+                },
+                CommandEvent::Checked {
+                    target,
+                    purpose,
+                    result,
+                    ..
+                } => match result {
+                    Ok(()) if *purpose == commands::CheckPurpose::Inspect => {
+                        popmsg::prelude::Confirm::title("Check Passed".into())
+                            .with_prompt(target.name.clone())
+                            .build_and_send();
+                    }
+                    Ok(()) => (),
+                    Err(error) => popmsg::prelude::Confirm::err(commands::error_text(error)),
+                },
+                CommandEvent::Failed { error, .. } => popmsg::prelude::Confirm::err(error.clone()),
+                CommandEvent::Status { .. } => (),
+            }
+            self.commands.acknowledge(event.task());
+        }
+        if !self.commands.is_busy() {
+            let now = std::time::Instant::now();
+            if let Some(core) = (0..2)
+                .map(|offset| crate::config::CoreType::ALL[(self.next_status + offset) % 2])
+                .find(|core| self.status_due[core.index()] <= now)
+            {
+                self.next_status = (core.index() + 1) % 2;
+                self.status_due[core.index()] = now + std::time::Duration::from_secs(5);
+                if let Err(error) = self
+                    .commands
+                    .submit(core, crate::scripts::ActionRequest::Status)
+                {
+                    log::warn!("{error:#}");
+                }
             }
         }
-        super::script_output::poll();
         self.popup.sync();
         if self.popup.check() {
             self.input.cancel();

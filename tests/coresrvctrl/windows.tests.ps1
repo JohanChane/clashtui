@@ -35,7 +35,10 @@ public static class FakeNssm {
     $env:CLASHTUI_TEST_ARGUMENTS = Join-Path $temporary 'argv.txt'
     function Get-Command {
         param($Name, $CommandType, $ErrorAction)
-        if ($Name -eq 'nssm.exe') { return [pscustomobject]@{ Source = $script:fakeNssm } }
+        if ($Name -eq 'nssm.exe') {
+            if ($script:NssmMissing) { throw 'nssm.exe is unavailable' }
+            return [pscustomobject]@{ Source = $script:fakeNssm }
+        }
         Microsoft.PowerShell.Core\Get-Command @PSBoundParameters
     }
     $expected = @('install','service name','C:\Program Files\core.exe','quote"value','trailing\','',"中文",'$(no-command)')
@@ -117,6 +120,7 @@ public static class ClashTuiManagedJob {
         $expectedState = if ($status -eq 'Running') { 'active' } elseif ($status -eq 'missing') { 'missing' } else { 'inactive' }
         Assert-True ((Get-CoreServiceState $ServiceName) -eq $expectedState) "Wrong state for $status"
     }
+    $script:NssmMissing = $true
     $Operation = 'status'; $NativeState = 'Stopped'; $IsAdmin = $false
     $capture = New-Object IO.StringWriter
     $original = [Console]::Out
@@ -131,6 +135,7 @@ public static class ClashTuiManagedJob {
     Assert-True ((Main) -eq 0 -and $Calls.Count -eq 0) 'Start restarted a running service'
     $Operation = 'stop'; $NativeState = 'missing'
     Assert-True ((Main) -eq 0) 'Stop missing is not idempotent'
+    $script:NssmMissing = $false
     $Operation = 'start'
     Assert-Throws { Main }
 

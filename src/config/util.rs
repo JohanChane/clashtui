@@ -74,11 +74,15 @@ pub fn check_startup_perms() {
             continue;
         }
 
-        let Some(group) = crate::functions::command::get_dir_group_name(dir) else {
+        let Some(group) = get_dir_group_name(dir) else {
             continue;
         };
 
-        if let Err(e) = crate::functions::command::repair_file_permissions(dir, &group) {
+        if let Err(e) = (|| -> Result<()> {
+            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let _signals = crate::command::signal_scope(cancel.clone())?;
+            repair_file_permissions(dir, &group, &cancel)
+        })() {
             eprintln!("Error: {}", e);
             use std::io::Read;
             print!("Press Enter to continue...");
@@ -182,6 +186,199 @@ mod tests {
         assert!(
             result.ends_with(".config/clashtui"),
             "expected path ending with .config/clashtui, got: {result:?}"
+        );
+    }
+}
+
+#[cfg(unix)]
+use {
+    nix::unistd::{Gid, Group},
+    std::{
+        os::unix::fs::{MetadataExt, PermissionsExt},
+        path::{Path, PathBuf},
+    },
+};
+#[cfg(unix)]
+fn find_files_not_group_writable(dir: &Path) -> Vec<PathBuf> {
+    let mut result = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                result.extend(find_files_not_group_writable(&path));
+            }
+            if let Ok(metadata) = entry.metadata()
+                && metadata.permissions().mode() & 0o0020 == 0
+            {
+                result.push(path);
+            }
+        }
+    }
+
+    if let Ok(metadata) = std::fs::metadata(dir)
+        && metadata.permissions().mode() & 0o0020 == 0
+    {
+        result.push(dir.to_path_buf());
+    }
+
+    result
+}
+
+#[cfg(unix)]
+fn find_files_not_in_group(dir: &Path, group_name: &str) -> Vec<PathBuf> {
+    let mut result = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                result.extend(find_files_not_in_group(&path, group_name));
+            }
+            if let Ok(metadata) = entry.metadata()
+                && let Some(group) = Group::from_gid(Gid::from_raw(metadata.gid()))
+                    .ok()
+                    .flatten()
+                && group.name != group_name
+            {
+                result.push(path);
+            }
+        }
+    }
+
+    if let Ok(metadata) = std::fs::metadata(dir)
+        && let Some(group) = Group::from_gid(Gid::from_raw(metadata.gid()))
+            .ok()
+            .flatten()
+        && group.name != group_name
+    {
+        result.push(dir.to_path_buf());
+    }
+
+    result
+}
+
+#[cfg(unix)]
+fn get_dir_group_name(dir: &Path) -> Option<String> {
+    let metadata = std::fs::metadata(dir).ok()?;
+    Group::from_gid(Gid::from_raw(metadata.gid()))
+        .ok()
+        .flatten()
+        .map(|g| g.name)
+}
+
+#[cfg(unix)]
+fn repair_file_permissions(
+    dir: &Path,
+    group_name: &str,
+    cancel: &std::sync::atomic::AtomicBool,
+) -> Result<()> {
+    fn sudo(args: Vec<std::ffi::OsString>, cancel: &std::sync::atomic::AtomicBool) -> Result<()> {
+        let status = crate::command::inherit(std::ffi::OsStr::new("sudo"), &args, cancel)?;
+        println!("Command exited: {status}");
+        anyhow::ensure!(status.success(), "sudo failed: {status}");
+        Ok(())
+    }
+    sudo(
+        vec![
+            "--".into(),
+            "chmod".into(),
+            "g+s".into(),
+            "--".into(),
+            dir.into(),
+        ],
+        cancel,
+    )?;
+    for path in find_files_not_in_group(dir, group_name) {
+        sudo(
+            vec![
+                "--".into(),
+                "chown".into(),
+                format!(":{group_name}").into(),
+                "--".into(),
+                path.into(),
+            ],
+            cancel,
+        )?;
+    }
+    for path in find_files_not_group_writable(dir) {
+        sudo(
+            vec![
+                "--".into(),
+                "chmod".into(),
+                "g+w".into(),
+                "--".into(),
+                path.into(),
+            ],
+            cancel,
+        )?;
+    }
+    Ok(())
+}
+#[cfg(all(test, unix))]
+mod permission_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn make_temp_dir() -> (PathBuf, impl Drop) {
+        let path = std::env::temp_dir().join(format!(
+            "clashtui_test_{}_{}",
+            std::process::id(),
+            fastrand::u64(..)
+        ));
+        std::fs::create_dir(&path).unwrap();
+        struct Cleanup(PathBuf);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        (path.clone(), Cleanup(path))
+    }
+
+    #[test]
+    fn test_find_files_not_group_writable_all_writable() {
+        let (dir, _cleanup) = make_temp_dir();
+        let file = dir.join("foo.txt");
+        std::fs::write(&file, "bar").unwrap();
+        let mut perms = std::fs::metadata(&file).unwrap().permissions();
+        perms.set_mode(0o0660);
+        std::fs::set_permissions(&file, perms).unwrap();
+
+        let result = find_files_not_group_writable(&dir);
+        // The file with group-write should NOT be in the result
+        assert!(
+            !result.contains(&file),
+            "file with group-write should not be in result: {result:?}"
+        );
+    }
+
+    #[test]
+    fn test_find_files_not_group_writable_nested() {
+        let (dir, _cleanup) = make_temp_dir();
+
+        let sub = dir.join("sub");
+        std::fs::create_dir(&sub).unwrap();
+        let file1 = dir.join("a.txt");
+        let file2 = sub.join("b.txt");
+        std::fs::write(&file1, "a").unwrap();
+        std::fs::write(&file2, "b").unwrap();
+
+        // Only set permissions on files (not dirs) to avoid PermissionDenied on macOS
+        for p in [&file1, &file2] {
+            let mut perms = std::fs::metadata(p).unwrap().permissions();
+            perms.set_mode(0o0644);
+            std::fs::set_permissions(p, perms).unwrap();
+        }
+
+        let result = find_files_not_group_writable(&dir);
+        assert!(
+            result.contains(&file1),
+            "file1 should be in result: {result:?}"
+        );
+        assert!(
+            result.contains(&file2),
+            "file2 should be in result: {result:?}"
         );
     }
 }
