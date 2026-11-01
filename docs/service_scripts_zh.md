@@ -1,6 +1,6 @@
 # 服务控制脚本
 
-CoreSrvCtl 从 `CONFIG_ROOT/scripts.json` 生成菜单。CLI 服务命令、全局重启、状态页和切核使用同一配置。
+CoreSrvCtl 与剪贴板共用 `CONFIG_ROOT/scripts.json` 的 action 结构，CoreSrvCtl 从中生成菜单。CLI 服务命令、全局重启、状态页和切核使用同一配置。
 
 ```text
 CONFIG_ROOT/
@@ -12,6 +12,9 @@ CONFIG_ROOT/
     launchd/service.sh
     windows/service.ps1
     windows/sysproxy.ps1
+  scripts/clipboard/
+    copy.sh                 # Unix
+    copy.ps1                # Windows
 ```
 
 安装器根据平台和选项选择后端（Linux：systemd/OpenRC；macOS：launchd；Windows：NSSM），只安装对应脚本并生成 `scripts.json`。Unix 的 `--is-user` 选择 `user`，否则为 `system`。重装先按编号后缀备份配置目录，再替换所选默认脚本和配置；其他自定义文件保留。
@@ -38,7 +41,9 @@ CONFIG_ROOT/
       "id": "status_core",
       "cmd": {
         "program": "/bin/sh",
-        "args": ["${root}/systemd/service.sh", "status", "system", "${service_name}"]
+        "args": ["${root}/systemd/service.sh", "status", "system", "${service_name}"],
+        "interactive": false,
+        "output": "silent"
       }
     }
   ]
@@ -48,6 +53,20 @@ CONFIG_ROOT/
 `root`、`actions`、`id`、`cmd.program`、`cmd.args` 必填。`label` 可选：省略或设为 `null` 时，动作不显示在菜单中；填写时必须是非空白字符串。拒绝未知字段和空程序。`id` 格式为 `[a-z][a-z0-9_-]*`。
 
 隐藏只影响显示，不影响执行和能力判断。隐藏动作仍可供后台查询、快捷键和组合操作调用。默认模板隐藏 `status_core`，其他动作也可用相同方式隐藏。内置 Switch Core、Stop All 仍根据全部已配置动作判断可用性。
+
+所有 `cmd` 均支持以下可选字段：
+
+| 字段 | 默认值 | 含义 |
+| --- | --- | --- |
+| `interactive` | `true` | 交接终端并允许键盘输入；`false` 时保持 TUI，捕获输出 |
+| `output` | `"popup"` | 非交互输出去向：`popup`、`silent`、`terminal` |
+| `keep_children_on_success` | `false` | 仅在命令成功后允许后台子进程继续存活 |
+
+交互执行时忽略 `output`。popup 将 stdout/stderr 作为文字弹窗；silent 隐藏两路输出，失败仍报告退出状态；terminal 将成功命令的 stdout 原样交主线程写入终端，stderr 单独显示。控制序列由脚本构造，clashtui 不识别 OSC52。所有模式的捕获结果仍可供内部调用方读取。
+
+非交互执行等待主命令完成，总超时 5 秒，包含 stdin 写入；交互命令没有此超时。两路捕获各限 64 KiB，超限标注截断；terminal 的 stdout 上限为 2 MiB，超限失败且不发送部分序列。失败、超时、取消始终清理受管理子进程。成功后收集主命令的剩余输出并关闭捕获管道，不等待后台子进程关闭管道；保留的后台进程应脱离标准流并自行管理生命周期。Unix 和 Windows 使用相同规则。
+
+保留的 `copy` action 用于[剪贴板复制](clipboard_zh.md)，不出现在 CoreSrvCtl，也不会单独生成服务组合项；其 stdin 协议另行定义。手动安装还需将 `contrib/scripts/clipboard/copy.sh` 或 `copy.ps1` 复制到 `CONFIG_ROOT/scripts/clipboard/`。
 
 可选 `"cores": ["mihomo"]` 或 `["singbox"]`；省略表示全部 core。使用机器名 `singbox`，不是显示名 `sing-box`。数组不可为空或重复。同 ID 可分核定义不同命令，但作用域不可重叠；共用动作不能再用同 ID 定向覆盖。
 
@@ -94,9 +113,9 @@ CONFIG_ROOT/
 
 权限错误、工具缺失、非零退出、信号、格式错误、超时和输出超限均为 unknown。未配置状态动作显示 unsupported。状态表示当前运行状态，不表示是否自启。
 
-后台查询关闭 stdin，超时 5 秒，stdout/stderr 各限 64 KiB。状态脚本必须非交互；若需要 sudo，配置 `sudo -n`，不得弹密码或 UAC。脚本不得自行脱离受管理进程组/Job；真正由服务管理器启动的 core 不属于脚本清理对象。
+内部状态查询始终捕获并消费结果，不弹窗、不转发终端输出，不受手动调用设置影响。后台查询关闭 stdin，超时 5 秒，stdout/stderr 各限 64 KiB。状态脚本必须非交互；若需要 sudo，配置 `sudo -n`，不得弹密码或 UAC。脚本不得自行脱离受管理进程组/Job；真正由服务管理器启动的 core 不属于脚本清理对象。
 
-前台动作独占终端。输入线程确认停读后交接，命令继承标准流，结束后回车一次返回；Ctrl-C 中断命令。CLI 不增加回车等待。
+交互动作独占终端。输入线程确认停读后交接，命令继承标准流，结束后回车一次返回；Ctrl-C 中断命令。CLI 不增加回车等待。
 
 Unix 默认配置通过 `/bin/sh` 调用脚本；脚本仅给需要 system 权限的具体命令加 sudo。user 不提权，root 不重复提权。systemd、OpenRC、launchd 状态查询均不使用 sudo。launchd 以当前用户读取域和 plist；读取失败仍报告查询错误。只有服务写操作可能要求认证。自定义脚本可直接调用 sudo，无需特殊包装。
 
@@ -112,4 +131,4 @@ Unix 默认配置通过 `/bin/sh` 调用脚本；脚本仅给需要 system 权�
 - Windows：NSSM 管理生命周期，SCM 查询状态；自启为 AUTO_START/DEMAND_START。写服务时按需 UAC，拒绝即失败。PowerShell 脚本 UTF-8 BOM，协议输出无 BOM；ExecutionPolicy Bypass 不覆盖组策略。
 - Windows 代理：以当前用户修改 HKCU 并广播变更；启用、关闭各自独立。
 
-Stop All 先预检两核 stop，再逐核执行并汇总错误。Switch Core 预检两核 stop 与目标 start；全部停止成功后启动目标，启动成功才保存选择并退出。失败保留原选择，报告已发生步骤，不自动回滚或重试。
+Stop All 先预检两核 stop，再逐核执行并汇总错误。Switch Core 预检两核 stop 与目标 start；全部停止成功后启动目标，启动成功才保存选择，待终端输出送达、输出弹窗关闭后退出。失败保留原选择，报告已发生步骤，不自动回滚或重试。

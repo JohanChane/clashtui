@@ -317,6 +317,8 @@ def load_service_setup(config_dir: str) -> tuple[str, str]:
         for arg in action["cmd"]["args"]:
             if arg.startswith("${root}/"):
                 check_path("service script", os.path.join(root, arg[len("${root}/"):]), "file")
+            elif arg.startswith("${config_root}/"):
+                check_path("script", os.path.join(config_dir, arg[len("${config_root}/"):]), "file")
     start = next(action for action in scripts["actions"] if action["id"] == "start_core")
     args = start["cmd"]["args"]
     if "${root}/windows/service.ps1" in args:

@@ -60,11 +60,15 @@ class UnixInstallTests(unittest.TestCase):
                     self.assertEqual(actual, expected)
                     self.assertEqual((self.config / f"scripts/coresrvctrl/{backend}/service.sh").read_bytes(),
                                      (source / "service.sh").read_bytes())
+                    self.assertEqual((self.config / "scripts/clipboard/copy.sh").read_bytes(),
+                                     (ROOT / "contrib/scripts/clipboard/copy.sh").read_bytes())
                     self.assertFalse(list(self.config.glob(".service-scripts.*")))
 
     def test_config_generation_backs_up_and_refreshes_defaults(self):
         result = self.run_helper("create_clashtui_config all")
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.config / "scripts/clipboard/copy.sh").read_bytes(),
+                         (ROOT / "contrib/scripts/clipboard/copy.sh").read_bytes())
         (self.config / "scripts.json").write_text("custom config")
         script = self.config / "scripts/coresrvctrl/systemd/service.sh"
         script.write_text("custom script")

@@ -1,6 +1,6 @@
 # Service scripts
 
-CoreSrvCtl builds its menu from one `CONFIG_ROOT/scripts.json`. CLI service commands, global restart, status queries and core switching use the same configuration.
+CoreSrvCtl and clipboard commands share one `CONFIG_ROOT/scripts.json` action format. CLI service commands, global restart, status queries and core switching use the same configuration.
 
 ```text
 CONFIG_ROOT/
@@ -12,13 +12,16 @@ CONFIG_ROOT/
     launchd/service.sh
     windows/service.ps1
     windows/sysproxy.ps1
+  scripts/clipboard/
+    copy.sh                 # Unix
+    copy.ps1                # Windows
 ```
 
 The installer selects the backend (Linux: systemd/OpenRC, macOS: launchd, Windows: NSSM), installs only its scripts, and writes `scripts.json`. Unix `--is-user` selects `user`; otherwise the scope is `system`. Reinstallation backs up the config directory with a numbered suffix, then replaces the selected default scripts and configuration. Other custom files remain in place.
 
 Each Unix backend has one `default.json`. The installer replaces standalone `"${scope}"` arguments with `"system"` or `"user"`; other variables stay intact. Neither `${scope}` nor `${is_user}` is a runtime variable. Windows uses `windows/system.json` directly. There is no template index or runtime migration. `config.yaml` supplies service names and core paths; it contains no backend or scope selector.
 
-For manual installation, copy the chosen backend's script(s) from `contrib/scripts/coresrvctrl/` into the matching directory above. Copy its JSON template to `CONFIG_ROOT/scripts.json`, replacing `"${scope}"` with the desired literal on Unix. The application only reads these files; missing or invalid configuration disables service actions and reports the path. Other tabs remain available.
+For manual installation, also copy the platform's `contrib/scripts/clipboard/copy.sh` or `copy.ps1` to `CONFIG_ROOT/scripts/clipboard/`. Copy the chosen service backend's script(s) from `contrib/scripts/coresrvctrl/` into the matching directory above. Copy its JSON template to `CONFIG_ROOT/scripts.json`, replacing `"${scope}"` with the desired literal on Unix. The application only reads these files; missing or invalid configuration disables service actions and reports the path. Other tabs remain available.
 
 ## Configuration
 
@@ -38,7 +41,9 @@ For manual installation, copy the chosen backend's script(s) from `contrib/scrip
       "id": "status_core",
       "cmd": {
         "program": "/bin/sh",
-        "args": ["${root}/systemd/service.sh", "status", "system", "${service_name}"]
+        "args": ["${root}/systemd/service.sh", "status", "system", "${service_name}"],
+        "interactive": false,
+        "output": "silent"
       }
     }
   ]
@@ -46,6 +51,20 @@ For manual installation, copy the chosen backend's script(s) from `contrib/scrip
 ```
 
 `root`, `actions`, `id`, `cmd.program` and `cmd.args` are required. `label` is optional: omit it or use `null` to hide the action from the menu. A supplied label must be a nonblank string. Unknown fields and empty programs are rejected. IDs match `[a-z][a-z0-9_-]*`.
+
+Every `cmd` also accepts these optional fields:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `interactive` | `true` | Hand over the terminal for keyboard input; `false` captures output without switching screens |
+| `output` | `"popup"` | Noninteractive output destination: `popup`, `silent`, or `terminal` |
+| `keep_children_on_success` | `false` | Allow background children to survive only after a successful command |
+
+`output` is ignored for interactive execution. `popup` displays stdout/stderr as text. `silent` suppresses both streams; failed exits still report their status. `terminal` forwards successful stdout verbatim on the render thread and displays stderr separately; scripts construct any terminal control sequences themselves. Captured results remain available to internal callers in all modes.
+
+Noninteractive execution waits for the command and has a five-second total deadline, including stdin writes. Interactive commands have no such timeout. Capture retains at most 64 KiB per stream and marks truncation; terminal stdout allows 2 MiB and fails without forwarding if exceeded. Failure, timeout, and cancellation clean up managed children even when preservation was requested. On success, the caller collects the parent's remaining output and closes capture pipes without waiting for descendants to close them. Retained children must detach their standard streams and manage their own lifetime. These rules apply on Unix and Windows.
+
+The reserved `copy` action implements [clipboard copying](clipboard_en.md); it is never listed in CoreSrvCtl and does not by itself create service composite entries. Its stdin contract is documented separately.
 
 Visibility does not affect execution or capabilities. Hidden actions still support background queries, shortcuts and composite operations. Default templates hide `status_core`; other actions can be hidden the same way. Built-in Switch Core and Stop All entries still use all configured actions to determine availability.
 
@@ -94,9 +113,9 @@ Ordinary actions return exit code `0` for success and nonzero for failure. stdou
 
 Permission errors, missing tools, nonzero/signal exits, invalid output, timeout and excessive output mean unknown. An absent status action means unsupported. Runtime state does not describe autostart.
 
-Background queries close stdin, have a total five-second deadline and capture at most 64 KiB per stream. Status scripts must be noninteractive; use `sudo -n` if needed, without password or UAC prompts. Scripts must not detach from their managed process group/Job. Real core services started by the service manager are outside script cleanup.
+Internal status queries always capture and consume the result without popups or terminal forwarding, independently of manual invocation settings. Background queries close stdin, have a total five-second deadline and capture at most 64 KiB per stream. Status scripts must be noninteractive; use `sudo -n` if needed, without password or UAC prompts. Scripts must not detach from their managed process group/Job. Real core services started by the service manager are outside script cleanup.
 
-Foreground commands exclusively own the terminal after the input reader acknowledges suspension. They inherit all standard streams. Press Enter once to return; Ctrl-C interrupts the command. CLI adds no Enter prompt.
+Interactive commands exclusively own the terminal after the input reader acknowledges suspension. They inherit all standard streams. Press Enter once to return; Ctrl-C interrupts the command. CLI adds no Enter prompt.
 
 Unix defaults invoke `/bin/sh`; scripts use sudo only for commands that require system privileges. User scope never elevates; root does not elevate again. Status queries use no sudo on systemd, OpenRC or launchd. Launchd reads the domain and plist as the current user; read failures remain query errors. Only service writes may authenticate. Custom scripts can call sudo directly without a special wrapper.
 
@@ -112,4 +131,4 @@ Command tracing is off by default. Use `/bin/sh -x service.sh restart system mih
 - Windows: NSSM manages lifecycle; SCM queries state. Autostart uses AUTO_START/DEMAND_START. Service writes request UAC when needed; cancellation fails. PowerShell files use UTF-8 BOM, protocol output does not. ExecutionPolicy Bypass cannot override group policy.
 - Windows proxy: current-user HKCU settings plus a change broadcast; enabling and disabling are independent actions.
 
-Stop All preflights both stop actions, attempts both and aggregates errors. Switch Core preflights both stops and target start, starts only after all stops succeed, and saves the selection only after target start succeeds. It then exits as before. Failures preserve the previous selection and report completed steps; no automatic rollback or retry.
+Stop All preflights both stop actions, attempts both and aggregates errors. Switch Core preflights both stops and target start, starts only after all stops succeed, and saves the selection only after target start succeeds. It then exits after queued terminal output is delivered and any output popups are dismissed. Failures preserve the previous selection and report completed steps; no automatic rollback or retry.

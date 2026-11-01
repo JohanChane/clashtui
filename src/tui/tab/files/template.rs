@@ -30,10 +30,12 @@ key_map!(
             (KeyCode::Char('/'), Action::Operation(Operation::Search)),
         ])
         .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
+        .with_chords(KeyCode::Char('y'), [(KeyCode::Char('p'), Action::CopyPath)])
 );
 
 #[derive_aliases::derive(..Action, Debug)]
 pub(in crate::tui) enum Action {
+    CopyPath,
     Switch,
     MoveUp,
     MoveDown,
@@ -49,6 +51,7 @@ impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
+            Self::CopyPath => "Copy template path",
             Self::Switch => "Switch panel",
             Self::MoveUp => MOVE_UP,
             Self::MoveDown => MOVE_DOWN,
@@ -113,6 +116,20 @@ impl DualTabContentMate for Template {
             self.items.len()
         );
         match action {
+            Action::CopyPath => {
+                let text = crate::tui::clipboard::selected(
+                    self.items
+                        .iter()
+                        .filter(|name| self.filter.as_deref().is_none_or(|pat| name.contains(pat))),
+                    state.selected(),
+                )
+                .map(|name| {
+                    crate::tui::clipboard::path_text(
+                        &crate::functions::file::TEMPLATE_PATH.join(name),
+                    )
+                });
+                crate::tui::clipboard::copy(text, "template", "text");
+            }
             Action::Switch => return true,
             Action::MoveDown => state.select_next(),
             Action::MoveUp => state.select_previous(),

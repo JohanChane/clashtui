@@ -27,6 +27,13 @@ pub fn teardown() {
     let _ = raw_mode::restore();
 }
 
+pub(crate) fn is_running() -> bool {
+    COORDINATOR
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .is_some()
+}
+
 pub(crate) fn is_external() -> bool {
     EXTERNAL.load(Ordering::SeqCst)
 }

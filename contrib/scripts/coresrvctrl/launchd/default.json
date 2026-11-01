@@ -49,7 +49,9 @@
           "status",
           "${scope}",
           "${service_name}"
-        ]
+        ],
+        "interactive": false,
+        "output": "silent"
       }
     },
     {
@@ -76,6 +78,19 @@
           "${scope}",
           "${service_name}"
         ]
+      }
+    },
+    {
+      "id": "copy",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${config_root}/scripts/clipboard/copy.sh",
+          "auto"
+        ],
+        "interactive": false,
+        "output": "terminal",
+        "keep_children_on_success": true
       }
     }
   ]

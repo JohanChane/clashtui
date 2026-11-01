@@ -153,6 +153,8 @@ Only the list format above is supported. Legacy structured Key mappings, `common
 
 See [`default_keymap.yaml`](../contrib/default_configs/default_keymap.yaml) for a complete reference. Missing files, empty files, and `{}` use the defaults.
 
+In File, use `y s` (`CopySubscription`) to copy the selected Profile's subscription URL, or `y p` (`CopyPath`) to copy the selected Profile/Template path. See [clipboard](clipboard_en.md) for the script contract.
+
 ## CLI Mode
 
 You can operate without entering the TUI, suitable for scripting or automation.

@@ -398,10 +398,17 @@ class ResourceTests(unittest.TestCase):
             actions = {action["id"]: action for action in template["actions"]}
             self.assertTrue(ids <= actions.keys())
             self.assertNotIn("label", actions["status_core"])
-            self.assertTrue(all(action.get("label") for action_id, action in actions.items() if action_id != "status_core"))
+            self.assertTrue(all(action.get("label") for action_id, action in actions.items() if action_id not in ("status_core", "copy")))
             self.assertTrue(all("cores" not in action for action in actions.values()))
+            self.assertFalse(actions["status_core"]["cmd"]["interactive"])
+            self.assertEqual(actions["status_core"]["cmd"]["output"], "silent")
+            copy = actions["copy"]
+            self.assertNotIn("label", copy)
+            self.assertFalse(copy["cmd"]["interactive"])
+            self.assertEqual(copy["cmd"]["output"], "terminal")
+            self.assertTrue(copy["cmd"]["keep_children_on_success"])
             if backend != "windows":
-                for action in actions.values():
+                for action in (a for a in actions.values() if a["id"] != "copy"):
                     self.assertEqual(action["cmd"]["program"], "/bin/sh")
                     args = action["cmd"]["args"]
                     self.assertEqual(args[2], "${scope}")

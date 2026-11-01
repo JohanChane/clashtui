@@ -13,6 +13,7 @@ const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
 pub(super) static FULL_RENDER: Notify = Notify::const_new();
 pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
+pub(super) static QUIT_AFTER_OUTPUT: AtomicBool = AtomicBool::new(false);
 
 pub struct App {
     tabs: Vec<Tab>,
@@ -21,6 +22,7 @@ pub struct App {
     input: key::Matcher<'static>,
 
     tab_index: u8,
+    copy_notice: Option<(&'static str, std::time::Instant)>,
 }
 
 impl App {
@@ -39,6 +41,7 @@ impl App {
             help: HelpPanel::default(),
             input: key::Matcher::new(key::keymaps()),
             tab_index: 0,
+            copy_notice: None,
         };
         app.tabs[0].on_enter();
         app
@@ -54,8 +57,14 @@ impl App {
             ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
 
         while !QUIT.load(Ordering::Relaxed) {
-            terminal.draw(|f| app.render(f))?;
+            // Acquire before draining queues: a completed switch publishes all
+            // command output before requesting exit. Popups remain dismissible.
+            let quit_after_output = QUIT_AFTER_OUTPUT.load(Ordering::Acquire);
             app.sync();
+            if quit_after_output && !app.popup.check() {
+                break;
+            }
+            terminal.draw(|f| app.render(f))?;
 
             let ev = {
                 // this tick here ensures that fps is stable
@@ -145,6 +154,16 @@ impl App {
 
         self.tabs[self.tab_index as usize].render(f, chunks[1]);
 
+        if let Some((message, until)) = self.copy_notice
+            && until > std::time::Instant::now()
+        {
+            let area = f.area();
+            let notice =
+                ratatui::layout::Rect::new(area.x, area.bottom().saturating_sub(1), area.width, 1);
+            f.render_widget(ratatui::widgets::Clear, notice);
+            f.render_widget(ratatui::widgets::Paragraph::new(message), notice);
+        }
+
         if let Some(hints) = hints {
             widget::which::render(f, &hints);
         }
@@ -194,6 +213,19 @@ impl App {
     }
     fn sync(&mut self) {
         SPINNER_FRAME.fetch_add(1, Ordering::Relaxed);
+        if let Some(result) = clipboard::poll() {
+            match result {
+                Ok(Some(message)) => {
+                    self.copy_notice = Some((
+                        message,
+                        std::time::Instant::now() + std::time::Duration::from_secs(3),
+                    ))
+                }
+                Ok(None) => (),
+                Err(error) => popmsg::prelude::Confirm::err(format!("{error:#}")),
+            }
+        }
+        super::script_output::poll();
         self.popup.sync();
         if self.popup.check() {
             self.input.cancel();

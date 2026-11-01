@@ -153,6 +153,8 @@ app:
 
 完整参考见 [`default_keymap.yaml`](../contrib/default_configs/default_keymap.yaml)。文件不存在、为空或内容为 `{}` 时，使用默认按键。
 
+File 页面用 `y s`（`CopySubscription`）复制选中 Profile 的订阅 URL，用 `y p`（`CopyPath`）复制选中 Profile/Template 的路径。脚本参数见[复制到剪贴板](clipboard_zh.md)。
+
 ## 命令行模式
 
 不进入 TUI 也可以用命令操作，适合写脚本或自动化。

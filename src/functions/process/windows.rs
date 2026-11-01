@@ -10,8 +10,8 @@ use std::{
 
 use windows_sys::Win32::{
     Foundation::{
-        CloseHandle, ERROR_ALREADY_EXISTS, FILETIME, GetLastError, HANDLE, INVALID_HANDLE_VALUE,
-        WAIT_OBJECT_0, WAIT_TIMEOUT,
+        CloseHandle, ERROR_ALREADY_EXISTS, ERROR_BROKEN_PIPE, FILETIME, GetLastError, HANDLE,
+        INVALID_HANDLE_VALUE, WAIT_OBJECT_0, WAIT_TIMEOUT,
     },
     System::{
         Console::{
@@ -26,12 +26,54 @@ use windows_sys::Win32::{
             JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
             SetInformationJobObject, TerminateJobObject,
         },
+        Pipes::PeekNamedPipe,
         Threading::{
             CREATE_SUSPENDED, GetThreadTimes, OpenThread, ResumeThread,
             THREAD_QUERY_LIMITED_INFORMATION, THREAD_SUSPEND_RESUME, WaitForSingleObject,
         },
     },
 };
+
+pub trait Pipe: io::Read + AsRawHandle {}
+impl<T: io::Read + AsRawHandle> Pipe for T {}
+
+pub fn prepare_pipe(_pipe: &impl AsRawHandle) -> io::Result<()> {
+    Ok(())
+}
+
+pub fn pending_bytes(pipe: &impl Pipe) -> io::Result<usize> {
+    let mut available = 0;
+    // Each pipe has a single reader. Read only bytes already available, so a
+    // background child retaining the write handle cannot make us wait for EOF.
+    if unsafe {
+        PeekNamedPipe(
+            pipe.as_raw_handle(),
+            ptr::null_mut(),
+            0,
+            ptr::null_mut(),
+            &mut available,
+            ptr::null_mut(),
+        )
+    } == 0
+    {
+        let error = io::Error::last_os_error();
+        return if error.raw_os_error() == Some(ERROR_BROKEN_PIPE as i32) {
+            Ok(0)
+        } else {
+            Err(error)
+        };
+    }
+    Ok(available as usize)
+}
+
+pub fn read_pipe(pipe: &mut impl Pipe, buffer: &mut [u8]) -> io::Result<usize> {
+    let available = pending_bytes(pipe)?;
+    if available == 0 {
+        return Err(io::ErrorKind::WouldBlock.into());
+    }
+    let count = buffer.len().min(available);
+    pipe.read(&mut buffer[..count])
+}
 
 struct OwnedHandle(HANDLE);
 
@@ -110,6 +152,26 @@ impl ProcessGroup {
             // Close immediately. An elevated script still waiting for UAC then
             // cannot open the Job; an already-open handle closes before work.
         }
+    }
+
+    pub fn keep_children(&mut self) -> Result<()> {
+        if let Some(job) = &self.job {
+            let limits = unsafe { std::mem::zeroed::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() };
+            if unsafe {
+                SetInformationJobObject(
+                    job.0,
+                    JobObjectExtendedLimitInformation,
+                    (&limits as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+                    std::mem::size_of_val(&limits) as u32,
+                )
+            } == 0
+            {
+                return Err(io::Error::last_os_error().into());
+            }
+        }
+        // Clearing KILL_ON_JOB_CLOSE before closing releases surviving children.
+        self.job.take();
+        Ok(())
     }
 }
 

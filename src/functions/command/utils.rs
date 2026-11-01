@@ -31,6 +31,7 @@ pub fn exec_sudo(pgm: &str, args: Vec<&str>) -> Result<String> {
         program: "sudo".into(),
         args: argv,
         cwd: std::env::current_dir()?,
+        ..Default::default()
     };
     crate::tui::with_terminal(|| {
         let outcome = crate::functions::process::run_foreground(&command)?;

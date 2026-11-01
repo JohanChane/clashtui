@@ -28,7 +28,7 @@ src/
 ├── config.rs            # 配置模块入口，re-exports from config/
 │   └── config/
 │       ├── core.rs      # CoreType 枚举、core 配置
-│       ├── scripts.rs   # scripts.json 协议；scripts/assets.rs 内嵌资源和迁移
+│       ├── scripts.rs   # 统一 scripts.json 命令协议与执行选项
 │       ├── database.rs  # ProfileManager（Profile 持久化结构）
 │       └── util.rs      # 配置目录解析、load_save! 宏、文件路径常量
 ├── functions.rs         # 业务逻辑入口，re-exports from functions/

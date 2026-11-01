@@ -106,10 +106,19 @@ key_map!(
             (KeyCode::Char('n'), Action::Operation(Operation::Traffic)),
         ])
         .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
+        .with_chords(
+            KeyCode::Char('y'),
+            [
+                (KeyCode::Char('s'), Action::CopySubscription),
+                (KeyCode::Char('p'), Action::CopyPath),
+            ]
+        )
 );
 
 #[derive_aliases::derive(..Action, Debug)]
 pub(in crate::tui) enum Action {
+    CopySubscription,
+    CopyPath,
     Switch,
     MoveUp,
     MoveDown,
@@ -126,6 +135,8 @@ impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
+            Self::CopySubscription => "Copy subscription URL",
+            Self::CopyPath => "Copy profile path",
             Self::Switch => "Switch panel",
             Self::MoveUp => MOVE_UP,
             Self::MoveDown => MOVE_DOWN,
@@ -175,6 +186,26 @@ pub(super) struct Profile {
     jump_target: Cell<Option<usize>>,
 }
 
+impl Profile {
+    fn selected_name(&self, state: &ListState) -> Option<&String> {
+        crate::tui::clipboard::selected(
+            self.items
+                .iter()
+                .zip(&self.atime)
+                .filter(|(name, _)| self.filter.as_deref().is_none_or(|pat| name.contains(pat))),
+            state.selected(),
+        )
+        .map(|(name, _)| name)
+    }
+}
+
+fn subscription_url(dtype: &crate::config::database::ProfileType) -> anyhow::Result<&str> {
+    match dtype {
+        crate::config::database::ProfileType::Url(url) if !url.is_empty() => Ok(url),
+        _ => anyhow::bail!("Selected profile has no subscription URL"),
+    }
+}
+
 impl BasicTabContent for Profile {
     type Action = Action;
     type State = ListState;
@@ -196,6 +227,22 @@ impl DualTabContent for Profile {
         state: &mut Self::State,
     ) -> bool {
         match action {
+            Action::CopySubscription | Action::CopyPath => {
+                let text = match self.selected_name(state).and_then(db::get) {
+                    Some(profile) if matches!(action, Action::CopySubscription) => {
+                        match subscription_url(&profile.dtype) {
+                            Ok(url) => Some(url.to_owned()),
+                            Err(error) => {
+                                Confirm::err(error);
+                                return false;
+                            }
+                        }
+                    }
+                    Some(profile) => Some(crate::tui::clipboard::path_text(&profile.local_path())),
+                    None => None,
+                };
+                crate::tui::clipboard::copy(text, "profile", "text");
+            }
             Action::Switch => return true,
             Action::MoveUp => state.select_previous(),
             Action::MoveDown => state.select_next(),
@@ -826,6 +873,54 @@ fn display_duration(t: std::time::Duration) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn subscription_copy_preserves_url_and_rejects_profiles_without_one() {
+        use crate::config::database::ProfileType;
+        let url = "https://example.test/订阅?token=a%2Fb&next=$literal#fragment";
+        assert_eq!(
+            subscription_url(&ProfileType::Url(url.into())).unwrap(),
+            url
+        );
+        for dtype in [
+            ProfileType::File,
+            ProfileType::Singbox,
+            ProfileType::Template {
+                template: "test.yaml".into(),
+            },
+            ProfileType::Url(String::new()),
+        ] {
+            assert!(
+                subscription_url(&dtype)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("no subscription URL")
+            );
+        }
+    }
+
+    #[test]
+    fn copy_selection_matches_filtered_display_and_clamps_cursor() {
+        let mut profile = Profile {
+            items: ["first", "selected", "last"].map(String::from).to_vec(),
+            atime: vec![String::new(); 3],
+            filter: Some("selected".into()),
+            ..Default::default()
+        };
+        let state = ListState::default().with_selected(Some(99));
+        assert_eq!(
+            profile.selected_name(&state).map(String::as_str),
+            Some("selected")
+        );
+        profile.filter = Some("no matches".into());
+        assert!(profile.selected_name(&state).is_none());
+        profile.filter = None;
+        assert!(profile.selected_name(&ListState::default()).is_none());
+        assert_eq!(
+            profile.selected_name(&state).map(String::as_str),
+            Some("last")
+        );
+    }
 
     #[test]
     fn parse_traffic_info_all_fields() {

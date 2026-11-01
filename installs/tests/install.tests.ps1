@@ -123,7 +123,8 @@ Describe "Service script installation" {
         (Get-FileHash $jsonPath).Hash | Should -Be (Get-FileHash $source).Hash
         $config = Get-Content $jsonPath -Raw | ConvertFrom-Json
         $config.root | Should -Be "scripts/coresrvctrl"
-        @($config.actions).Count | Should -Be 10
+        @($config.actions).Count | Should -Be 11
+        (Get-FileHash (Join-Path $CLASHTUI_CONFIG_DIR "scripts/clipboard/copy.ps1")).Hash | Should -Be (Get-FileHash (Join-Path $CONTRIB_DIR "scripts/clipboard/copy.ps1")).Hash
         @(Get-ChildItem $CLASHTUI_CONFIG_DIR -Filter ".service-scripts.*" -Force).Count | Should -Be 0
     }
 

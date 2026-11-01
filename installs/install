@@ -889,12 +889,14 @@ create_service_scripts() {
   mkdir -p "$CLASHTUI_CONFIG_DIR" || return 1
   stage=$(mktemp -d "$CLASHTUI_CONFIG_DIR/.service-scripts.XXXXXX") || return 1
   target="$CLASHTUI_CONFIG_DIR/scripts/coresrvctrl/$backend"
-  # Download both inputs before publishing a configuration that references them.
+  # Download all inputs before publishing a configuration that references them.
   if ! copy_contrib "scripts/coresrvctrl/$backend/service.sh" "$stage/service.sh" ||
      ! copy_contrib "scripts/coresrvctrl/$backend/default.json" "$stage/default.json" ||
+     ! copy_contrib "scripts/clipboard/copy.sh" "$stage/copy.sh" ||
      ! sed 's/"${scope}"/"'"$scope"'"/g' "$stage/default.json" > "$stage/scripts.json" ||
-     ! mkdir -p "$target" ||
+     ! mkdir -p "$target" "$CLASHTUI_CONFIG_DIR/scripts/clipboard" ||
      ! mv -f "$stage/service.sh" "$target/service.sh" ||
+     ! mv -f "$stage/copy.sh" "$CLASHTUI_CONFIG_DIR/scripts/clipboard/copy.sh" ||
      ! mv -f "$stage/scripts.json" "$CLASHTUI_CONFIG_DIR/scripts.json"; then
     rm -rf "$stage"
     log_error "Failed to install service scripts ($backend/$scope)"

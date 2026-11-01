@@ -7,6 +7,30 @@ use std::{
 
 pub struct PreparedGroup;
 
+pub trait Pipe: io::Read + std::os::fd::AsRawFd {}
+impl<T: io::Read + std::os::fd::AsRawFd> Pipe for T {}
+
+pub fn prepare_pipe(pipe: &impl std::os::fd::AsRawFd) -> io::Result<()> {
+    let fd = pipe.as_raw_fd();
+    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+    if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(())
+}
+
+pub fn read_pipe(pipe: &mut impl Pipe, buffer: &mut [u8]) -> io::Result<usize> {
+    pipe.read(buffer)
+}
+
+pub fn pending_bytes(pipe: &impl Pipe) -> io::Result<usize> {
+    let mut count: libc::c_int = 0;
+    if unsafe { libc::ioctl(pipe.as_raw_fd(), libc::FIONREAD, &mut count) } < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(count as usize)
+}
+
 pub fn configure(command: &mut Command) -> Result<PreparedGroup> {
     command.process_group(0);
     Ok(PreparedGroup)
@@ -53,6 +77,12 @@ impl ProcessGroup {
         unsafe {
             libc::kill(-self.pid, libc::SIGKILL);
         }
+    }
+
+    pub fn keep_children(&mut self) -> Result<()> {
+        // The command explicitly transfers ownership of its surviving children.
+        self.terminated = true;
+        Ok(())
     }
 }
 

@@ -1,4 +1,4 @@
-//! The single, platform-independent service command configuration.
+//! Shared, platform-independent script command configuration.
 
 use super::CoreType;
 use crate::functions::command::sanitize_windows_path;
@@ -49,6 +49,37 @@ pub struct ScriptAction {
 pub struct ScriptCommand {
     pub program: String,
     pub args: Vec<String>,
+    #[serde(default = "default_interactive")]
+    pub interactive: bool,
+    #[serde(default)]
+    pub output: CommandOutput,
+    #[serde(default)]
+    pub keep_children_on_success: bool,
+}
+
+const fn default_interactive() -> bool {
+    true
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandOutput {
+    #[default]
+    Popup,
+    Silent,
+    Terminal,
+}
+
+impl Default for ScriptCommand {
+    fn default() -> Self {
+        Self {
+            program: String::new(),
+            args: Vec::new(),
+            interactive: true,
+            output: CommandOutput::Popup,
+            keep_children_on_success: false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -56,6 +87,22 @@ pub struct ResolvedCommand {
     pub program: OsString,
     pub args: Vec<OsString>,
     pub cwd: PathBuf,
+    pub interactive: bool,
+    pub output: CommandOutput,
+    pub keep_children_on_success: bool,
+}
+
+impl Default for ResolvedCommand {
+    fn default() -> Self {
+        Self {
+            program: OsString::new(),
+            args: Vec::new(),
+            cwd: PathBuf::new(),
+            interactive: true,
+            output: CommandOutput::Popup,
+            keep_children_on_success: false,
+        }
+    }
 }
 
 fn deserialize_cores<'de, D>(
@@ -264,6 +311,9 @@ impl ScriptConfig {
         Ok(ResolvedCommand {
             program,
             args,
+            interactive: action.cmd.interactive,
+            output: action.cmd.output,
+            keep_children_on_success: action.cmd.keep_children_on_success,
             cwd: if cfg!(windows) {
                 sanitize_windows_path(root.to_str().context("root is not valid UTF-8")?).into()
             } else {
@@ -302,7 +352,7 @@ fn expand(text: &str, lookup: &mut impl FnMut(&str) -> Result<String>) -> Result
     Ok(output)
 }
 
-fn validate_host_path(path: &str) -> Result<()> {
+pub(crate) fn validate_host_path(path: &str) -> Result<()> {
     if cfg!(windows) {
         validate_windows_path(path)?;
     }
@@ -337,6 +387,7 @@ mod tests {
             cmd: ScriptCommand {
                 program: "test-command".into(),
                 args: vec![],
+                ..Default::default()
             },
         }
     }
@@ -345,6 +396,48 @@ mod tests {
         ScriptConfig {
             root: "scripts/coresrvctrl".into(),
             actions,
+        }
+    }
+
+    #[test]
+    fn execution_options_default_validate_and_resolve() {
+        let mut config = config(vec![action("copy", None)]);
+        let bare = r#"{"program":"tool","args":[]}"#;
+        let cmd: ScriptCommand = serde_json::from_str(bare).unwrap();
+        assert!(cmd.interactive);
+        assert_eq!(cmd.output, CommandOutput::Popup);
+        assert!(!cmd.keep_children_on_success);
+        for output in ["popup", "silent", "terminal"] {
+            config.actions[0].cmd = serde_json::from_value(json!({
+                "program": "tool", "args": [], "interactive": false,
+                "output": output, "keep_children_on_success": true,
+            }))
+            .unwrap();
+            let resolved = config
+                .resolve(
+                    &std::env::temp_dir(),
+                    &config.actions[0],
+                    |_| unreachable!(),
+                )
+                .unwrap();
+            assert!(!resolved.interactive);
+            assert!(resolved.keep_children_on_success);
+            assert_eq!(resolved.output, config.actions[0].cmd.output);
+        }
+        for (key, value) in [
+            ("interactive", json!(null)),
+            ("interactive", json!("false")),
+            ("output", json!("return")),
+            ("output", json!(true)),
+            ("keep_children_on_success", json!(null)),
+            ("show_output", json!(true)),
+        ] {
+            let mut value_cmd: serde_json::Value = serde_json::from_str(bare).unwrap();
+            value_cmd[key] = value;
+            assert!(
+                serde_json::from_value::<ScriptCommand>(value_cmd).is_err(),
+                "{key}"
+            );
         }
     }
 

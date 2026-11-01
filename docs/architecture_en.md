@@ -28,7 +28,7 @@ src/
 ├── config.rs            # Config module entry, re-exports from config/
 │   └── config/
 │       ├── core.rs      # CoreType enum and core configuration
-│       ├── scripts.rs   # scripts.json protocol; scripts/assets.rs embeds and migrates resources
+│       ├── scripts.rs   # shared scripts.json commands and execution options
 │       ├── database.rs  # ProfileManager (Profile persistence structures)
 │       └── util.rs      # Config dir resolution, load_save! macro, file path constants
 ├── functions.rs         # Business logic entry, re-exports from functions/

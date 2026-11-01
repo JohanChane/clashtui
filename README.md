@@ -26,6 +26,7 @@ ClashTui is a terminal user interface (TUI) proxy management tool supporting bot
 - **Config Override** — Override final config via `core_override_config` without modifying original subscription files
 - **Template System** — Auto-generate config files using templates + proxy node groups, with variable expansion (recommended for sing-box to avoid configuration version issues)
 - **Custom Key Bindings** — Customize shortcuts for each tab via `keymap.yaml`
+- **Clipboard** — Copy subscription URLs with `y s` and file paths with `y p` in File; supports custom scripts and OSC 52 over SSH. See [clipboard](docs/clipboard_en.md) ([中文](docs/clipboard_zh.md)).
 - **Custom themes** - user-definable via theme.yaml
 - **which panel** - convenient for user operations
 - **Supports fzf** - users can use fzf for selection
@@ -124,7 +125,7 @@ iex "& {$(irm https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/m
 
 3. Start clashtui, then use CoreSrvCtl to install and start core services:
 
-Service commands are configured in `CONFIG_ROOT/scripts.json`. See [service scripts](docs/service_scripts_en.md) ([中文](docs/service_scripts_zh.md)) for custom commands, per-core scopes and autostart.
+Service and clipboard commands are configured in `CONFIG_ROOT/scripts.json`. See [service scripts](docs/service_scripts_en.md) ([中文](docs/service_scripts_zh.md)) for custom commands, per-core scopes and autostart.
 
 The install script does NOT register Windows Services. Launch clashtui and use the built-in CoreSrvCtl to manage services. Enable only one core service at boot (do not enable both simultaneously).
 

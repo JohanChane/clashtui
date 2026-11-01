@@ -69,7 +69,9 @@
           "status",
           "-ServiceName",
           "${service_name}"
-        ]
+        ],
+        "interactive": false,
+        "output": "silent"
       }
     },
     {
@@ -184,6 +186,25 @@
           "-Operation",
           "disable"
         ]
+      }
+    },
+    {
+      "id": "copy",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-STA",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${config_root}/scripts/clipboard/copy.ps1",
+          "auto"
+        ],
+        "interactive": false,
+        "output": "terminal",
+        "keep_children_on_success": true
       }
     }
   ]

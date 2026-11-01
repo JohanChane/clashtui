@@ -1,8 +1,10 @@
 #[macro_use]
 mod key;
 mod app;
+mod clipboard;
 mod input;
 mod popmsg;
+pub(crate) mod script_output;
 mod signals;
 mod tab;
 mod term;
@@ -15,6 +17,7 @@ use key::Key;
 pub use key::init as keymap_init;
 #[cfg(windows)]
 pub(crate) use term::is_external;
+pub(crate) use term::is_running;
 pub use term::with_terminal;
 pub(crate) use theme::Theme;
 

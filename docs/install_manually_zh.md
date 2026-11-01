@@ -103,7 +103,8 @@ extra:
 安装服务控制脚本，并生成命令配置：
 
 ```sh
-mkdir -p ~/.config/clashtui/scripts/coresrvctrl/systemd
+mkdir -p ~/.config/clashtui/scripts/coresrvctrl/systemd ~/.config/clashtui/scripts/clipboard
+curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/clipboard/copy.sh -o ~/.config/clashtui/scripts/clipboard/copy.sh
 curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/service.sh -o ~/.config/clashtui/scripts/coresrvctrl/systemd/service.sh
 curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/default.json -o /tmp/clashtui-scripts-template.json
 sed 's/"${scope}"/"system"/g' /tmp/clashtui-scripts-template.json > ~/.config/clashtui/scripts.json
@@ -376,7 +377,8 @@ extra:
 安装服务控制脚本，并生成命令配置：
 
 ```sh
-mkdir -p ~/.config/clashtui/scripts/coresrvctrl/systemd
+mkdir -p ~/.config/clashtui/scripts/coresrvctrl/systemd ~/.config/clashtui/scripts/clipboard
+curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/clipboard/copy.sh -o ~/.config/clashtui/scripts/clipboard/copy.sh
 curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/service.sh -o ~/.config/clashtui/scripts/coresrvctrl/systemd/service.sh
 curl -fL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/contrib/scripts/coresrvctrl/systemd/default.json -o /tmp/clashtui-scripts-template.json
 sed 's/"${scope}"/"user"/g' /tmp/clashtui-scripts-template.json > ~/.config/clashtui/scripts.json

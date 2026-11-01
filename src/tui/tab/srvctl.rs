@@ -77,6 +77,7 @@ impl MenuEntry {
 fn menu(scripts: &ScriptConfig, core: CoreType) -> Vec<MenuEntry> {
     let mut entries: Vec<_> = scripts
         .actions_for(core)
+        .filter(|action| action.id != "copy")
         .filter_map(|action| {
             let label = action.label.as_ref()?;
             Some(MenuEntry {
@@ -89,7 +90,7 @@ fn menu(scripts: &ScriptConfig, core: CoreType) -> Vec<MenuEntry> {
             })
         })
         .collect();
-    if scripts.actions_for(core).next().is_some() {
+    if scripts.actions_for(core).any(|action| action.id != "copy") {
         entries.push(MenuEntry::new(
             Operation::SwitchCore(core.other()),
             "Switch Core",
@@ -315,7 +316,8 @@ impl TabContent for SrvCtlContent {
                         Confirm::err(format!("{error:#}"));
                     }
                     if switching && result.is_ok() {
-                        crate::tui::app::QUIT.store(true, std::sync::atomic::Ordering::Relaxed);
+                        crate::tui::app::QUIT_AFTER_OUTPUT
+                            .store(true, std::sync::atomic::Ordering::Release);
                     }
                     wrapper(move |content: &mut Self| {
                         content.busy = false;
@@ -426,6 +428,17 @@ mod tests {
         let config: ScriptConfig = serde_json::from_value(value).unwrap();
         config.validate().unwrap();
         config
+    }
+
+    #[test]
+    fn copy_is_not_a_service_menu_entry_or_capability() {
+        let scripts = ScriptConfig::parse(
+            r#"{"root":".","actions":[
+            {"id":"copy","label":"Copy","cmd":{"program":"tool","args":[]}}
+        ]}"#,
+        )
+        .unwrap();
+        assert!(menu(&scripts, CoreType::Mihomo).is_empty());
     }
 
     #[test]

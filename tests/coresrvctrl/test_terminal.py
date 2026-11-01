@@ -129,6 +129,116 @@ class TerminalTests(unittest.TestCase):
         self.session.enter_menu()
         return self.session
 
+    def set_command_options(self, **options):
+        path = self.root / "scripts.json"
+        config = json.loads(path.read_text())
+        config["actions"][0]["cmd"].update(options)
+        path.write_text(json.dumps(config))
+
+    def test_capture_popup_shows_both_streams_without_terminal_handoff(self):
+        self.configure("printf 'POPUP_STDOUT'; printf 'POPUP_STDERR' >&2\n")
+        self.set_command_options(interactive=False)
+        session = self.start()
+        session.send(b"\r")
+        session.drain(1)
+        self.assertIn(b"POPUP_STDOUT", session.output)
+        self.assertIn(b"POPUP_STDERR", session.output)
+        self.assertNotIn(ENTER, session.output)
+        self.assertNotIn(b"\x1b[?1049l", session.output)
+
+    def test_capture_silent_suppresses_both_streams(self):
+        self.configure("printf 'SILENT_STDOUT'; printf 'SILENT_STDERR' >&2; printf done > completed\n")
+        self.set_command_options(interactive=False, output="silent")
+        session = self.start()
+        session.send(b"\r")
+        session.drain(1)
+        self.assertEqual((self.root / "completed").read_text(), "done")
+        self.assertNotIn(b"SILENT_STDOUT", session.output)
+        self.assertNotIn(b"SILENT_STDERR", session.output)
+        self.assertNotIn(ENTER, session.output)
+
+    def test_capture_terminal_forwards_raw_stdout_on_render_thread(self):
+        # A title sequence exercises raw bytes without touching the real clipboard.
+        self.configure("printf '\\033]0;SCRIPT_TITLE\\007'; printf 'SCRIPT_DIAGNOSTIC' >&2\n")
+        self.set_command_options(interactive=False, output="terminal")
+        session = self.start()
+        session.send(b"\r")
+        session.drain(1)
+        self.assertIn(b"\x1b]0;SCRIPT_TITLE\x07", session.output)
+        self.assertIn(b"SCRIPT_DIAGNOSTIC", session.output)
+        self.assertNotIn(ENTER, session.output)
+        self.assertNotIn(b"\x1b[?1049l", session.output)
+
+    def configure_switch(self, start_body, stop_interactive):
+        self.configure("printf stopped\n")
+        path = self.root / "scripts.json"
+        config = json.loads(path.read_text())
+        config["actions"][0]["id"] = "stop_core"
+        config["actions"][0]["cmd"].update(interactive=stop_interactive, output="silent")
+        (self.root / "start.sh").write_text(start_body)
+        config["actions"].append({"id": "start_core", "cmd": {
+            "program": "/bin/sh", "args": ["${root}/start.sh"],
+            "interactive": False, "output": "terminal"}})
+        path.write_text(json.dumps(config))
+
+    def test_switch_delivers_captured_output_before_exiting(self):
+        self.configure_switch("printf '\\033]0;SWITCH_FINISHED\\007'\n", False)
+        session = self.start()
+        session.send(b"j\r")
+        session.expect(b"\x1b]0;SWITCH_FINISHED\x07")
+
+    def test_ctrl_c_cancels_captured_step_in_interactive_switch(self):
+        self.configure_switch("printf ready > start-ready; sleep 2; printf started > start-completed\n", True)
+        session = self.start()
+        session.send(b"j\r")
+        deadline = time.monotonic() + 5
+        while not (self.root / "start-ready").exists():
+            self.assertLess(time.monotonic(), deadline, "Captured start did not begin")
+            session.drain(0.02)
+        session.send(b"\x03")
+        session.expect(RESTORED)
+        self.assertFalse((self.root / "start-completed").exists())
+        self.assertIn("core_type: mihomo", (self.root / "clashtui.db").read_text())
+
+    def test_file_copy_chords_send_subscription_and_paths(self):
+        self.configure("exit 0\n")
+        url = "https://example.test/sub?token=a%2Fb&flag=1"
+        (self.root / "clashtui.db").write_text(
+            "core_type: mihomo\nmihomo:\n  profiles:\n    subscription: !Url " + json.dumps(url) + "\n")
+        profile = self.root / "mihomo/profiles/subscription.yaml"
+        template = self.root / "mihomo/templates/template.yaml"
+        for path in (profile, template):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("proxies: []\n")
+        path = self.root / "scripts.json"
+        config = json.loads(path.read_text())
+        config["actions"].append({"id": "copy", "cmd": {
+            "program": "/bin/sh", "args": ["-c", 'cat > .copied; printf "%s/%s" "$CLASHTUI_COPY_SOURCE" "$CLASHTUI_COPY_FORMAT" > copy-metadata; mv .copied copied'],
+            "interactive": False, "output": "silent"}})
+        path.write_text(json.dumps(config))
+        session = self.start()
+        session.send(b"2")
+        session.expect(b"subscription")
+        copied = self.root / "copied"
+        session.send(b"y")
+        session.drain(0.2)
+        self.assertFalse(copied.exists(), "Copy must wait for the chord's second key")
+        for keys, expected, source in (
+            (b"s", url, "profile"),
+            (b"yp", str(profile.resolve()), "profile"),
+            (b"lyp", str(template.resolve()), "template"),
+        ):
+            copied.unlink(missing_ok=True)
+            session.send(keys)
+            deadline = time.monotonic() + 5
+            while not copied.exists():
+                self.assertLess(time.monotonic(), deadline, "Copy action did not finish")
+                session.drain(0.02)
+            self.assertEqual(copied.read_text(), expected)
+            self.assertEqual((self.root / "copy-metadata").read_text(), source + "/text")
+            session.drain(0.15)
+        self.assertNotIn(ENTER, session.output)
+
     def test_child_owns_stdin_and_repeated_actions_restore_terminal(self):
         self.configure("printf 'INPUT_READY\\n'\nIFS= read -r value\nprintf '%s\\n' \"$value\" >> received\n")
         session = self.start()
@@ -250,6 +360,38 @@ class TerminalTests(unittest.TestCase):
         session.close()
         self.assertTrue(session.final_modes[3] & termios.ECHO)
         self.assertTrue(session.final_modes[3] & termios.ICANON)
+
+    def test_cli_capture_cancellation_reaps_its_command(self):
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            with self.subTest(signal=sig):
+                marker = self.root / "capture-pid"
+                marker.unlink(missing_ok=True)
+                self.configure("printf '%s\\n' \"$$\" > capture-pid; exec sleep 30\n")
+                self.set_command_options(interactive=False, output="silent")
+                process = subprocess.Popen(
+                    [str(BINARY), f"--config-dir={self.root}", "service", "restart"],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                child = None
+                try:
+                    deadline = time.monotonic() + 5
+                    while not marker.exists():
+                        self.assertLess(time.monotonic(), deadline, "Captured CLI command did not start")
+                        time.sleep(0.01)
+                    child = int(marker.read_text())
+                    process.send_signal(sig)
+                    process.communicate(timeout=3)
+                    self.assertNotEqual(process.returncode, 0)
+                    with self.assertRaises(ProcessLookupError):
+                        os.kill(child, 0)
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.communicate()
+                    if child:
+                        try:
+                            os.kill(child, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
 
     def test_cli_sigterm_reaps_its_command(self):
         self.configure("printf '%s\\n' \"$$\" > child-pid\nexec sleep 30\n")

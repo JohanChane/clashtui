@@ -156,6 +156,18 @@ impl Default for ConfigFile {
 pub struct Extra {
     pub edit_cmd: Option<String>,
     pub open_dir_cmd: Option<String>,
+    #[serde(
+        rename = "copy_cmd",
+        skip_serializing,
+        deserialize_with = "reject_copy_cmd"
+    )]
+    _legacy_copy_cmd: (),
+}
+
+fn reject_copy_cmd<'de, D: serde::Deserializer<'de>>(_deserializer: D) -> Result<(), D::Error> {
+    Err(serde::de::Error::custom(
+        "extra.copy_cmd has moved to the copy action in scripts.json; see docs/clipboard_en.md",
+    ))
 }
 
 #[derive(Debug, serde:: Deserialize)]
@@ -198,6 +210,14 @@ impl BasicInfo {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn old_clipboard_config_requires_explicit_migration() {
+        for value in ["osc52", "null", "{program: pbcopy, args: []}"] {
+            let error = serde_yml::from_str::<Extra>(&format!("copy_cmd: {value}")).unwrap_err();
+            assert!(error.to_string().contains("copy action in scripts.json"));
+        }
+    }
 
     #[test]
     fn config_file_roundtrip() {
@@ -298,6 +318,7 @@ open_dir_cmd: ""
         let extra = Extra {
             edit_cmd: None,
             open_dir_cmd: None,
+            _legacy_copy_cmd: (),
         };
         let serialized = serde_yml::to_string(&extra).unwrap();
         let deser: Extra = serde_yml::from_str(&serialized).unwrap();
@@ -310,6 +331,7 @@ open_dir_cmd: ""
         let extra = Extra {
             edit_cmd: Some(r#"notepad.exe "%s""#.into()),
             open_dir_cmd: Some(r#"explorer "%s""#.into()),
+            _legacy_copy_cmd: (),
         };
         let serialized = serde_yml::to_string(&extra).unwrap();
         let deser: Extra = serde_yml::from_str(&serialized).unwrap();

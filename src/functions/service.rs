@@ -15,13 +15,23 @@ use std::{
 
 static STATUS_LOCKS: [Mutex<()>; 2] = [Mutex::new(()), Mutex::new(())];
 static REVISION: AtomicU64 = AtomicU64::new(0);
+static OPERATION_LOCK: Mutex<()> = Mutex::new(());
 
 pub fn revision() -> u64 {
     REVISION.load(Ordering::Acquire)
 }
 
-fn with_operation<T>(job: impl FnOnce() -> Result<T>) -> Result<T> {
-    let result = crate::tui::with_terminal(job);
+fn with_operation<T>(interactive: bool, job: impl FnOnce(bool) -> Result<T>) -> Result<T> {
+    let _operation = OPERATION_LOCK
+        .try_lock()
+        .map_err(|_| anyhow::anyhow!("Another service operation is running"))?;
+    // CLI commands also need cancellation handlers. With no TUI coordinator,
+    // this lease does not switch screens or add an Enter acknowledgement.
+    let result = if interactive || !crate::tui::is_running() {
+        crate::tui::with_terminal(|| job(true))
+    } else {
+        job(false)
+    };
     REVISION.fetch_add(1, Ordering::Release);
     result
 }
@@ -55,7 +65,9 @@ impl Operation {
         match self {
             Self::Script { core, id } => {
                 let action = plan(scripts, root, &TargetContext::snapshot(*core), id)?;
-                with_operation(|| run(&action))
+                with_operation(action.command.interactive, |terminal_session| {
+                    run(&action, terminal_session)
+                })
             }
             Self::StopAll => stop_all(scripts, root),
             Self::SwitchCore(target) => switch_core(scripts, root, *target),
@@ -198,17 +210,32 @@ fn plan(
     })
 }
 
-fn run(action: &PlannedAction) -> Result<String> {
-    println!("{}: {}", action.core.id(), action.id);
-    let outcome = super::process::run_foreground(&action.command)?;
-    ensure!(
-        outcome.status.success(),
-        "{} {} failed: {}",
-        action.core.id(),
-        action.id,
-        outcome.status
-    );
+fn run(action: &PlannedAction, terminal_session: bool) -> Result<String> {
+    let title = format!("{}: {}", action.core.id(), action.id);
+    if action.command.interactive {
+        println!("{title}");
+    }
+    let outcome = super::process::run(&action.command, None, &[], terminal_session)?;
+    if action.command.interactive {
+        outcome.ensure_success()?;
+    } else {
+        crate::tui::script_output::submit(title, action.command.output, outcome)?;
+    }
     Ok(format!("{} {}: OK", action.core.id(), action.id))
+}
+
+pub(crate) fn resolve_current(
+    scripts: &ScriptConfig,
+    root: &Path,
+    id: &str,
+) -> Result<ResolvedCommand> {
+    Ok(plan(
+        scripts,
+        root,
+        &TargetContext::snapshot(CONFIG.core_type()),
+        id,
+    )?
+    .command)
 }
 
 pub fn execute_current(id: &str) -> Result<String> {
@@ -257,7 +284,10 @@ fn run_stops(
 fn stop_all(scripts: &ScriptConfig, root: &Path) -> Result<String> {
     let targets = CoreType::ALL.map(TargetContext::snapshot);
     let stops = stop_plan(scripts, root, &targets)?;
-    with_operation(|| run_stops(&stops, run))
+    let interactive = stops.iter().any(|action| action.command.interactive);
+    with_operation(interactive, |terminal_session| {
+        run_stops(&stops, |action| run(action, terminal_session))
+    })
 }
 
 fn run_switch(
@@ -281,18 +311,25 @@ fn switch_core(scripts: &ScriptConfig, root: &Path, target: CoreType) -> Result<
     // Resolve every required capability before any side effect.
     let stops = stop_plan(scripts, root, &targets)?;
     let start = plan(scripts, root, &targets[target.index()], "start_core")?;
-    with_operation(|| {
-        run_switch(&stops, &start, run, |target| {
-            let mut data = CONFIG.data.lock().unwrap();
-            let previous = data.core_type;
-            data.core_type = target;
-            let result = save_selection(&data, root);
-            if let Err(error) = result {
-                data.core_type = previous;
-                return Err(error);
-            }
-            Ok(())
-        })
+    let interactive =
+        start.command.interactive || stops.iter().any(|action| action.command.interactive);
+    with_operation(interactive, |terminal_session| {
+        run_switch(
+            &stops,
+            &start,
+            |action| run(action, terminal_session),
+            |target| {
+                let mut data = CONFIG.data.lock().unwrap();
+                let previous = data.core_type;
+                data.core_type = target;
+                let result = save_selection(&data, root);
+                if let Err(error) = result {
+                    data.core_type = previous;
+                    return Err(error);
+                }
+                Ok(())
+            },
+        )
     })
 }
 
@@ -388,7 +425,9 @@ pub fn query_status(scripts: &ScriptConfig, root: &Path, core: CoreType) -> Stat
         };
     };
     let result = (|| -> Result<StatusReport> {
-        let action = plan(scripts, root, &TargetContext::snapshot(core), "status_core")?;
+        let mut action = plan(scripts, root, &TargetContext::snapshot(core), "status_core")?;
+        // Background status uses a fixed data protocol, not manual presentation settings.
+        action.command.output = crate::config::scripts::CommandOutput::Silent;
         let output = super::process::run_capture(&action.command)?;
         let diagnostic = String::from_utf8_lossy(&output.stderr).trim().to_owned();
         ensure!(
@@ -433,6 +472,7 @@ mod tests {
                 program: "unused".into(),
                 args: vec![],
                 cwd: PathBuf::from("/"),
+                ..Default::default()
             },
         }
     }

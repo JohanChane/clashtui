@@ -4,8 +4,9 @@ on:
   push:
     branches: [main, dev]
     paths:
-      - 'contrib/scripts/coresrvctrl/**'
+      - 'contrib/scripts/**'
       - 'tests/coresrvctrl/**'
+      - 'tests/clipboard/**'
       - 'installs/**'
       - 'src/**'
       - 'Cargo.toml'
@@ -13,8 +14,9 @@ on:
       - '.github/workflows/service_scripts.yml'
   pull_request:
     paths:
-      - 'contrib/scripts/coresrvctrl/**'
+      - 'contrib/scripts/**'
       - 'tests/coresrvctrl/**'
+      - 'tests/clipboard/**'
       - 'installs/**'
       - 'src/**'
       - 'Cargo.toml'
@@ -34,6 +36,7 @@ jobs:
         run: |
           python3 tests/coresrvctrl/test_backends.py
           python3 tests/coresrvctrl/test_install.py
+          python3 tests/clipboard/test_copy.py
 
   windows:
     runs-on: windows-latest
@@ -43,7 +46,9 @@ jobs:
         shell: powershell
         run: ./tests/coresrvctrl/windows.tests.ps1
       - name: Resource contracts
-        run: python tests/coresrvctrl/test_backends.py
+        run: |
+          python tests/coresrvctrl/test_backends.py
+          python tests/clipboard/test_copy.py
       - name: Native Windows protocol and operation tests
         run: |
           cargo test --locked --all-features config::scripts::

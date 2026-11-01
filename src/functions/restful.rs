@@ -281,7 +281,7 @@ pub mod connection {
     }
 
     #[cfg_attr(test, derive(Debug, Clone))]
-    #[derive(Deserialize)]
+    #[derive(Deserialize, serde::Serialize)]
     pub struct Conn {
         pub id: String,
         pub metadata: ConnMetaData,
@@ -298,7 +298,7 @@ pub mod connection {
     }
 
     #[cfg_attr(test, derive(Debug, Clone))]
-    #[derive(Deserialize)]
+    #[derive(Deserialize, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct ConnMetaData {
         #[cfg_attr(not(test), allow(dead_code))]
