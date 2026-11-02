@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+
+usage() {
+    printf 'Usage: %s install\n' "$0"
+}
+
+if [ "$#" -ne 1 ]; then
+    usage >&2
+    exit 2
+fi
+
+case "$1" in
+    install)
+        repo_dir=$(CDPATH= cd -P "$(dirname "$0")/.." && pwd)
+        git -C "$repo_dir" config --local core.hooksPath .githooks
+        printf 'Local Git hooks path set to .githooks\n'
+        ;;
+    -h|--help)
+        usage
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac

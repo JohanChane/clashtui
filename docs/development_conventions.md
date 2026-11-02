@@ -91,10 +91,10 @@ Do not modify CHANGELOG in daily commits — only update it at release time. Sin
 
 ## Git Hooks
 
-Run once after clone:
+Run once after cloning, from the repository root (use Git Bash on Windows):
 
 ```bash
-git config core.hooksPath .githooks
+tools/githook install
 ```
 
 Check manually:
