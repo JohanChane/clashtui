@@ -140,12 +140,22 @@ fn import_singbox_profile(source: &std::path::Path, profile_name: &str) -> anyho
 pub struct UpdateResult {
     pub name: String,
     pub net_updates: Vec<crate::functions::file::net_resource::NetResourceUpdate>,
+    pub selection: Option<anyhow::Result<SelectionOutcome>>,
 }
 
 pub async fn update_profile(profile: Profile, with_proxy: bool) -> anyhow::Result<UpdateResult> {
+    update_profile_with_check(profile, with_proxy, || true).await
+}
+
+/// Updating the selected profile saves it locally; only the reload needs API permission.
+pub async fn update_profile_with_check(
+    profile: Profile,
+    with_proxy: bool,
+    allowed: impl Fn() -> bool + Send,
+) -> anyhow::Result<UpdateResult> {
     use super::template::fetch_net_resource_statuses;
 
-    let result = if matches!(profile.dtype, ProfileType::Template { .. }) {
+    let mut result = if matches!(profile.dtype, ProfileType::Template { .. }) {
         update_template_profile(profile.clone(), with_proxy).await
     } else if matches!(profile.dtype, ProfileType::Singbox)
         || crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox
@@ -181,13 +191,14 @@ pub async fn update_profile(profile: Profile, with_proxy: bool) -> anyhow::Resul
         Ok(UpdateResult {
             name: profile.name.clone(),
             net_updates,
+            selection: None,
         })
     };
 
-    if result.is_ok() {
+    if let Ok(updated) = &mut result {
         let cur = db::get_current();
         if cur.name == profile.name {
-            let _ = select(profile).await;
+            updated.selection = Some(select_with_check(profile, allowed).await);
         }
     }
 
@@ -236,6 +247,7 @@ async fn update_singbox_profile(
     Ok(UpdateResult {
         name: profile.name,
         net_updates,
+        selection: None,
     })
 }
 
@@ -428,10 +440,35 @@ async fn update_template_profile(
     Ok(UpdateResult {
         name: profile.name,
         net_updates: statuses,
+        selection: None,
     })
 }
 
 pub async fn select(profile: Profile) -> anyhow::Result<()> {
+    select_with_check(profile, || true).await.map(|_| ())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SelectionOutcome {
+    Reloaded,
+    Saved,
+}
+
+/// Local configuration can be repaired offline. Recheck permission only before reload.
+pub async fn select_with_check(
+    profile: Profile,
+    allowed: impl Fn() -> bool + Send,
+) -> anyhow::Result<SelectionOutcome> {
+    let out_path = save_selection(profile).await?;
+    if !allowed() {
+        return Ok(SelectionOutcome::Saved);
+    }
+    crate::functions::restful::config::reload(out_path.display().to_string())
+        .map_err(|e| anyhow::anyhow!("Config saved but reload failed: {e}"))?;
+    Ok(SelectionOutcome::Reloaded)
+}
+
+async fn save_selection(profile: Profile) -> anyhow::Result<std::path::PathBuf> {
     use super::template::{
         check_template_ppg_availability, fetch_net_resource_statuses, update_profile_without_pp,
     };
@@ -444,7 +481,7 @@ pub async fn select(profile: Profile) -> anyhow::Result<()> {
     if matches!(profile.dtype, ProfileType::Singbox)
         || crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox
     {
-        return select_singbox(profile).await;
+        return save_singbox_selection(profile);
     }
 
     let cfg = &crate::config::CONFIG.cfg_file.mihomo.core;
@@ -473,11 +510,12 @@ pub async fn select(profile: Profile) -> anyhow::Result<()> {
     let out_path = std::path::absolute(std::path::PathBuf::from(&cfg.config_path))
         .map_err(|e| anyhow::anyhow!("Failed to resolve config path: {e}"))?;
     lprofile.path = out_path.clone();
+    if let Some(parent) = out_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     lprofile.sync_to_disk()?;
     db::set_current(profile)?;
-    crate::functions::restful::config::reload(out_path.display().to_string())
-        .map_err(|e| anyhow::anyhow!("Config written but reload failed: {e}"))?;
-    Ok(())
+    Ok(out_path)
 }
 
 fn rewrite_provider_paths(_content: Option<&mut serde_yml::Mapping>) {
@@ -506,7 +544,7 @@ fn deep_merge(base: &mut serde_json::Value, overlay: &serde_json::Value) {
     }
 }
 
-async fn select_singbox(profile: Profile) -> anyhow::Result<()> {
+fn save_singbox_selection(profile: Profile) -> anyhow::Result<std::path::PathBuf> {
     let profile_path = super::PROFILE_JSONS_PATH.join(format!("{}.json", profile.name));
     anyhow::ensure!(
         profile_path.exists(),
@@ -554,9 +592,7 @@ async fn select_singbox(profile: Profile) -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to write config to {}: {e}", out_path.display()))?;
 
     db::set_current(profile)?;
-    crate::functions::restful::config::reload(out_path.display().to_string())
-        .map_err(|e| anyhow::anyhow!("Config written but reload failed: {e}"))?;
-    Ok(())
+    Ok(out_path)
 }
 
 pub fn extract_domain(url: &str) -> Option<&str> {
@@ -587,6 +623,133 @@ pub fn extract_domain(url: &str) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn offline_selection_and_current_profile_update_save_both_cores() {
+        const CHILD: &str = "CLASHTUI_TEST_OFFLINE_SELECTION";
+        // CONFIG is process-global. Isolate real file/database operations from other tests.
+        if std::env::var_os(CHILD).is_none() {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "functions::file::profile::tests::offline_selection_and_current_profile_update_save_both_cores",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return;
+        }
+
+        let root = std::env::temp_dir().join(format!("clashtui-offline-{}", fastrand::u64(..)));
+        struct Cleanup(std::path::PathBuf);
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let _cleanup = Cleanup(root.clone());
+        std::fs::create_dir_all(&root).unwrap();
+        let config = serde_json::json!({
+            "mihomo": {"core": {"config_dir": root.join("mihomo-runtime"),
+                "config_path": root.join("mihomo-runtime/config.yaml")}},
+            "singbox": {"core": {"config_dir": root.join("singbox-runtime"),
+                "config_path": root.join("singbox-runtime/config.json")}}
+        });
+        std::fs::write(root.join("config.yaml"), config.to_string()).unwrap();
+        crate::config::init(Some(root)).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            for core in [
+                crate::config::CoreType::Mihomo,
+                crate::config::CoreType::Singbox,
+            ] {
+                let (source, target, mut content, dtype) = match core {
+                    crate::config::CoreType::Mihomo => (
+                        PROFILE_YAMLS_PATH.join("repair.yaml"),
+                        std::path::PathBuf::from(
+                            &crate::config::CONFIG.cfg_file.mihomo.core.config_path,
+                        ),
+                        serde_json::json!({"rules": ["MATCH,DIRECT"], "clashtui": {"test": true}}),
+                        ProfileType::File,
+                    ),
+                    crate::config::CoreType::Singbox => (
+                        PROFILE_JSONS_PATH.join("repair.json"),
+                        std::path::PathBuf::from(
+                            &crate::config::CONFIG.cfg_file.singbox.core.config_path,
+                        ),
+                        serde_json::json!({"outbounds": [{"type": "direct", "tag": "direct"}],
+                            "route": {"final": "direct"}, "clashtui": {"test": true}}),
+                        ProfileType::Singbox,
+                    ),
+                };
+                {
+                    let mut data = crate::config::CONFIG.data.lock().unwrap();
+                    data.core_type = core;
+                    data.insert("repair", dtype);
+                }
+                let profile = db::get("repair").unwrap();
+                std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+                std::fs::write(&source, content.to_string()).unwrap();
+                // No API permit: missing runtime config and current selection must still be repaired.
+                assert!(!target.exists());
+                let result = select_with_check(profile.clone(), || {
+                    assert!(target.exists());
+                    assert_eq!(db::get_current().name, "repair");
+                    false
+                })
+                .await
+                .unwrap();
+                assert_eq!(result, SelectionOutcome::Saved);
+                let saved: serde_json::Value =
+                    serde_yml::from_slice(&std::fs::read(&target).unwrap()).unwrap();
+                assert!(saved.get("clashtui").is_none());
+                assert!(
+                    saved
+                        .get(if core == crate::config::CoreType::Mihomo {
+                            "external-controller"
+                        } else {
+                            "experimental"
+                        })
+                        .is_some()
+                );
+
+                if core == crate::config::CoreType::Mihomo {
+                    content["rules"] = serde_json::json!(["MATCH,REJECT"]);
+                } else {
+                    content["outbounds"][0]["tag"] = "updated".into();
+                    content["route"]["final"] = "updated".into();
+                }
+                std::fs::write(&source, content.to_string()).unwrap();
+                let updated = update_profile_with_check(profile.clone(), false, || false)
+                    .await
+                    .unwrap();
+                assert_eq!(updated.selection.unwrap().unwrap(), SelectionOutcome::Saved);
+                let saved: serde_json::Value =
+                    serde_yml::from_slice(&std::fs::read(&target).unwrap()).unwrap();
+                if core == crate::config::CoreType::Mihomo {
+                    assert_eq!(saved["rules"], content["rules"]);
+                } else {
+                    assert_eq!(saved["outbounds"], content["outbounds"]);
+                    assert_eq!(saved["route"], content["route"]);
+                }
+
+                let before = std::fs::read(&target).unwrap();
+                std::fs::write(&source, "{invalid").unwrap();
+                assert!(select_with_check(profile, || false).await.is_err());
+                assert_eq!(std::fs::read(&target).unwrap(), before);
+            }
+        });
+    }
 
     fn merge(base_json: &str, overlay_json: &str) -> serde_json::Value {
         let mut base: serde_json::Value = serde_json::from_str(base_json).unwrap();
