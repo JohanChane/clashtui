@@ -6,7 +6,6 @@ on:
     paths:
       - "src/**"
       - "contrib/scripts/coresrvctrl/**"
-      - "tests/coresrvctrl/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "build.rs"
@@ -17,7 +16,6 @@ on:
     paths:
       - "src/**"
       - "contrib/scripts/coresrvctrl/**"
-      - "tests/coresrvctrl/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "build.rs"
