@@ -50,7 +50,7 @@ impl Msg for Confirm {
         let _ = tx.send(());
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, block: Block, is_focused: bool) {
+    fn render(&mut self, f: &mut Frame, area: Rect, block: Block, is_focused: bool) {
         let widget = Paragraph::new(if is_focused {
             Span::raw("OK").reversed()
         } else {

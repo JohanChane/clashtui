@@ -1,7 +1,9 @@
 mod actions;
 
 use super::*;
-pub(in crate::tui) use actions::{AppAction, TabTarget, km};
+#[cfg(test)]
+pub(in crate::tui) use actions::TabTarget;
+pub(in crate::tui) use actions::{AppAction, km};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use tab::prelude::*;
 use tokio::sync::Notify;
@@ -132,7 +134,7 @@ impl App {
         let maps = key::keymaps();
         let hints = self.input.hints(scope);
         render_tabbar(
-            tab_titles(self.tabs.iter().map(|tab| tab.title()), maps),
+            tab_titles(self.tabs.iter().map(|tab| tab.title())),
             self.tab_index,
             f,
             chunks[0],
@@ -197,22 +199,11 @@ impl App {
     }
 }
 
-fn tab_titles(titles: impl IntoIterator<Item = &'static str>, maps: &key::Keymaps) -> Vec<String> {
-    TabTarget::ALL
+fn tab_titles(titles: impl IntoIterator<Item = &'static str>) -> Vec<String> {
+    titles
         .into_iter()
-        .zip(titles)
-        .map(|(target, title)| {
-            let keys: Vec<_> = maps
-                .tab_bindings(target)
-                .iter()
-                .map(|binding| binding.key_text.as_str())
-                .collect();
-            if keys.is_empty() {
-                title.to_owned()
-            } else {
-                format!("{} {title}", keys.join("/"))
-            }
-        })
+        .enumerate()
+        .map(|(index, title)| format!("{} {title}", index + 1))
         .collect()
 }
 

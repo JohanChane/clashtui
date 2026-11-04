@@ -34,7 +34,7 @@ impl Msg for Input {
         tx.send(self.buffer).unwrap()
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, block: Block, is_focused: bool) {
+    fn render(&mut self, f: &mut Frame, area: Rect, block: Block, is_focused: bool) {
         let widget = {
             let byte_pos = self.byte_offset();
             let mut before = format!("{} ", self.buffer);

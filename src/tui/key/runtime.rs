@@ -2,10 +2,7 @@
 
 use super::config::ResolvedBinding;
 use super::{Document, Key, KeySequence, config, notation};
-use crate::tui::{
-    app::{AppAction, TabTarget},
-    tab,
-};
+use crate::tui::{app::AppAction, tab};
 use anyhow::{Context, Result, ensure};
 use serde_yml::{Mapping, Value};
 use std::{
@@ -105,7 +102,7 @@ pub(in crate::tui) struct RuntimeBinding {
     pub on: KeySequence,
     pub action: Action,
     pub desc: String,
-    /// Format once; help and tab titles borrow this text every frame.
+    /// Format once; help borrows this text every frame.
     pub key_text: String,
 }
 
@@ -174,8 +171,6 @@ pub(in crate::tui) struct Keymaps {
     scope_bindings: HashMap<Scope, Box<[BindingId]>>,
     // Effective execution tables: global bindings plus each page's bindings.
     key_lookup: HashMap<Scope, KeyLookup>,
-    // Reverse index for tab titles, preserving aliases and chord shortcuts.
-    tab_shortcuts: [Box<[BindingId]>; TabTarget::ALL.len()],
 }
 
 impl Keymaps {
@@ -238,7 +233,6 @@ impl Keymaps {
             bindings: bindings.into_boxed_slice(),
             scope_bindings,
             key_lookup: HashMap::new(),
-            tab_shortcuts: std::array::from_fn(|_| Box::default()),
         };
         for scope in Scope::ALL {
             maps.validate_global_conflicts(scope)?;
@@ -251,13 +245,6 @@ impl Keymaps {
             lookup.disabled.extend(&scope_disabled[&scope]);
             maps.key_lookup.insert(scope, lookup);
         }
-        let mut tabs: [Vec<BindingId>; TabTarget::ALL.len()] = std::array::from_fn(|_| Vec::new());
-        for &id in &maps.scope_bindings[&Scope::App] {
-            if let Action::App(AppAction::Tab(target)) = maps.binding(id).action {
-                tabs[target as usize].push(id);
-            }
-        }
-        maps.tab_shortcuts = tabs.map(Vec::into_boxed_slice);
         Ok(maps)
     }
 
@@ -304,10 +291,6 @@ impl Keymaps {
 
     pub fn page_bindings(&self, scope: Scope) -> BindingView<'_> {
         self.view(self.page_ids(scope))
-    }
-
-    pub fn tab_bindings(&self, target: TabTarget) -> BindingView<'_> {
-        self.view(&self.tab_shortcuts[target as usize])
     }
 
     fn effective_ids(&self, scope: Scope) -> Vec<BindingId> {
@@ -441,6 +424,7 @@ impl KeyLookup {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tui::app::TabTarget;
     use std::collections::HashSet;
 
     fn maps(yaml: &str) -> Keymaps {
@@ -506,7 +490,6 @@ mod tests {
             assert!(maps.key_lookup[&scope].dispatch.is_empty());
             assert_eq!(maps.effective_bindings(scope).len(), 0);
         }
-        assert!(maps.tab_shortcuts.iter().all(|ids| ids.is_empty()));
     }
 
     #[test]
@@ -526,24 +509,23 @@ mod tests {
     }
 
     #[test]
-    fn tab_shortcuts_keep_all_aliases_and_omit_fully_unbound_targets() {
+    fn global_bindings_keep_tab_aliases_and_omit_fully_unbound_targets() {
         let maps = maps(
             "app: [{on: '<F2>', action: TabLogs}, {on: [z, l], action: TabLogs}, {on: '6', action: null}]",
         );
         assert_eq!(
-            maps.tab_bindings(TabTarget::Logs)
+            maps.global_bindings()
                 .iter()
+                .filter(|b| b.action == Action::App(AppAction::Tab(TabTarget::Logs)))
                 .map(|b| b.key_text.as_str())
                 .collect::<Vec<_>>(),
             ["5", "<F2>", "z l"]
         );
-        assert!(maps.tab_bindings(TabTarget::Settings).is_empty());
-        for target in TabTarget::ALL {
-            for binding in maps.tab_bindings(target).iter() {
-                assert_eq!(binding.source_scope, Scope::App);
-                assert!(binding.action == Action::App(AppAction::Tab(target)));
-            }
-        }
+        assert!(
+            maps.global_bindings()
+                .iter()
+                .all(|b| b.action != Action::App(AppAction::Tab(TabTarget::Settings)))
+        );
     }
 
     #[test]
