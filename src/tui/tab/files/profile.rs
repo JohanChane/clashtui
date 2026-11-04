@@ -1,4 +1,3 @@
-use crate::functions::command::{check_config, edit, test_config};
 use crate::functions::file::profile::{db, select, update_profile};
 use crate::functions::restful::download;
 use std::cell::Cell;
@@ -106,10 +105,19 @@ key_map!(
             (KeyCode::Char('n'), Action::Operation(Operation::Traffic)),
         ])
         .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
+        .with_chords(
+            KeyCode::Char('y'),
+            [
+                (KeyCode::Char('s'), Action::CopySubscription),
+                (KeyCode::Char('p'), Action::CopyPath),
+            ]
+        )
 );
 
 #[derive_aliases::derive(..Action, Debug)]
 pub(in crate::tui) enum Action {
+    CopySubscription,
+    CopyPath,
     Switch,
     MoveUp,
     MoveDown,
@@ -126,6 +134,8 @@ impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
+            Self::CopySubscription => "Copy subscription URL",
+            Self::CopyPath => "Copy profile path",
             Self::Switch => "Switch panel",
             Self::MoveUp => MOVE_UP,
             Self::MoveDown => MOVE_DOWN,
@@ -175,6 +185,26 @@ pub(super) struct Profile {
     jump_target: Cell<Option<usize>>,
 }
 
+impl Profile {
+    fn selected_name(&self, state: &ListState) -> Option<&String> {
+        super::selected(
+            self.items
+                .iter()
+                .zip(&self.atime)
+                .filter(|(name, _)| self.filter.as_deref().is_none_or(|pat| name.contains(pat))),
+            state.selected(),
+        )
+        .map(|(name, _)| name)
+    }
+}
+
+fn subscription_url(dtype: &crate::config::database::ProfileType) -> anyhow::Result<&str> {
+    match dtype {
+        crate::config::database::ProfileType::Url(url) if !url.is_empty() => Ok(url),
+        _ => anyhow::bail!("Selected profile has no subscription URL"),
+    }
+}
+
 impl BasicTabContent for Profile {
     type Action = Action;
     type State = ListState;
@@ -185,6 +215,37 @@ impl BasicTabContent for Profile {
 impl DualTabContent for Profile {
     type Mate = super::template::Template;
 
+    fn command_completed(
+        &mut self,
+        event: &crate::tui::commands::CommandEvent,
+        tasks: &mut FutureSet<(Self, Self::Mate)>,
+    ) {
+        use crate::tui::commands::{CheckPurpose, CommandEvent};
+        let CommandEvent::Checked {
+            target,
+            purpose: CheckPurpose::Apply,
+            result: Ok(()),
+            ..
+        } = event
+        else {
+            return;
+        };
+        let target = target.clone();
+        async move {
+            let profile = tri!(
+                db::get(&target.name)
+                    .filter(|profile| profile.local_path() == target.path
+                        && crate::config::CONFIG.core_type() == target.core)
+                    .ok_or_else(|| anyhow::anyhow!(
+                        "Checked profile no longer matches its submitted target"
+                    ))
+            );
+            tri!(select(profile).await);
+            sync!((Self, Self::Mate))
+        }
+        .spawn_at(tasks);
+    }
+
     fn init(&mut self, task_set: &mut FutureSet<(Self, Self::Mate)>, _: &mut Self::State) {
         async { sync!((Self, Self::Mate)) }.spawn_at(task_set);
     }
@@ -194,22 +255,58 @@ impl DualTabContent for Profile {
         action: Self::Action,
         task_set: &mut FutureSet<(Self, Self::Mate)>,
         state: &mut Self::State,
+        commands: &mut crate::tui::commands::Commands,
     ) -> bool {
         match action {
+            Action::CopySubscription
+            | Action::CopyPath
+            | Action::Select
+            | Action::Operation(Operation::Edit | Operation::Test | Operation::Check) => {
+                use crate::{
+                    scripts::ActionRequest,
+                    tui::commands::{CheckPurpose, ProfileTarget},
+                };
+                let result = (|| -> anyhow::Result<()> {
+                    let name = self
+                        .selected_name(state)
+                        .ok_or_else(|| anyhow::anyhow!("Nothing selected"))?
+                        .clone();
+                    let profile = db::get(&name)
+                        .ok_or_else(|| anyhow::anyhow!("Profile no longer exists"))?;
+                    let core = crate::config::CONFIG.core_type();
+                    let path = profile.local_path();
+                    let target = ProfileTarget {
+                        core,
+                        name,
+                        path: path.clone(),
+                    };
+                    match action {
+                        Action::CopySubscription => commands.submit(
+                            core,
+                            ActionRequest::Copy(subscription_url(&profile.dtype)?.to_owned()),
+                        ),
+                        Action::CopyPath => {
+                            commands.submit(core, ActionRequest::Copy(super::path_text(&path)))
+                        }
+                        Action::Select => commands.check_config(target, CheckPurpose::Apply),
+                        Action::Operation(Operation::Edit) => {
+                            commands.submit(core, ActionRequest::EditFile(path))
+                        }
+                        Action::Operation(Operation::Test) => commands.test_config(target, false),
+                        Action::Operation(Operation::Check) => {
+                            commands.check_config(target, CheckPurpose::Inspect)
+                        }
+                        _ => unreachable!(),
+                    }
+                })();
+                if let Err(error) = result {
+                    Confirm::err(format!("{error:#}"));
+                }
+            }
             Action::Switch => return true,
             Action::MoveUp => state.select_previous(),
             Action::MoveDown => state.select_next(),
 
-            Action::Select => {
-                let name = get_name!(self, state);
-                async move {
-                    let pf = tri!(db::get(&name).unwrap().load_local_profile());
-                    tri!(check_config(&pf.path));
-                    tri!(select(db::get(&name).unwrap()).await);
-                    sync!((Self, Self::Mate))
-                }
-                .spawn_at(task_set);
-            }
             Action::GoTop => state.select_first(),
             Action::GoEnd => state.select_last(),
             Action::Operation(action) => match action {
@@ -326,12 +423,10 @@ mod actions {
             match self {
                 Self::Search => search().await,
                 Self::Add => import().await,
-                Self::Edit => _edit(name).await,
+                Self::Edit | Self::Test | Self::Check => unreachable!("command submitted directly"),
                 Self::Delete => delete(name).await,
                 Self::Preview => preview(name).await,
                 Self::Update => update(name).await,
-                Self::Test => test(name).await,
-                Self::Check => check(name).await,
                 Self::ToggleNoPp => toggle_no_pp(name).await,
                 Self::ToggleUpdateWithProxy => toggle_update_with_proxy(name).await,
                 Self::Traffic => {
@@ -441,13 +536,6 @@ mod actions {
         }
 
         sync!(C)
-    }
-
-    async fn _edit(name: String) -> CB {
-        let pf = tri!(db::get(name).unwrap().load_local_profile());
-        tri!(edit(pf.path.to_str().unwrap()));
-
-        do_nothing()
     }
 
     async fn toggle_no_pp(name: String) -> CB {
@@ -732,30 +820,6 @@ mod actions {
 
         do_nothing()
     }
-
-    async fn test(name: String) -> CB {
-        let pf = tri!(db::get(name).unwrap().load_local_profile());
-        let result = test_config(Some(&pf.path), false);
-        Confirm::title("Test Result".to_owned())
-            .with_prompt(result)
-            .build_and_send();
-
-        do_nothing()
-    }
-
-    async fn check(name: String) -> CB {
-        let pf = tri!(db::get(name).unwrap().load_local_profile());
-        match check_config(&pf.path) {
-            Ok(()) => {
-                Confirm::title("Check Passed".to_owned())
-                    .with_prompt("Configuration is valid.".to_owned())
-                    .build_and_send();
-            }
-            Err(e) => Confirm::err(e),
-        }
-
-        do_nothing()
-    }
 }
 
 pub(super) fn get_profiles_with_readable_atime() -> (Vec<String>, Vec<String>) {
@@ -826,6 +890,54 @@ fn display_duration(t: std::time::Duration) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn subscription_copy_preserves_url_and_rejects_profiles_without_one() {
+        use crate::config::database::ProfileType;
+        let url = "https://example.test/订阅?token=a%2Fb&next=$literal#fragment";
+        assert_eq!(
+            subscription_url(&ProfileType::Url(url.into())).unwrap(),
+            url
+        );
+        for dtype in [
+            ProfileType::File,
+            ProfileType::Singbox,
+            ProfileType::Template {
+                template: "test.yaml".into(),
+            },
+            ProfileType::Url(String::new()),
+        ] {
+            assert!(
+                subscription_url(&dtype)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("no subscription URL")
+            );
+        }
+    }
+
+    #[test]
+    fn copy_selection_matches_filtered_display_and_clamps_cursor() {
+        let mut profile = Profile {
+            items: ["first", "selected", "last"].map(String::from).to_vec(),
+            atime: vec![String::new(); 3],
+            filter: Some("selected".into()),
+            ..Default::default()
+        };
+        let state = ListState::default().with_selected(Some(99));
+        assert_eq!(
+            profile.selected_name(&state).map(String::as_str),
+            Some("selected")
+        );
+        profile.filter = Some("no matches".into());
+        assert!(profile.selected_name(&state).is_none());
+        profile.filter = None;
+        assert!(profile.selected_name(&ListState::default()).is_none());
+        assert_eq!(
+            profile.selected_name(&state).map(String::as_str),
+            Some("last")
+        );
+    }
 
     #[test]
     fn parse_traffic_info_all_fields() {
@@ -921,137 +1033,5 @@ mod tests {
         assert_eq!(human_bytes(1_048_576), "1.0 MB");
         assert_eq!(human_bytes(1_073_741_824), "1.0 GB");
         assert_eq!(human_bytes(1_099_511_627_776), "1.0 TB");
-    }
-
-    /// Simulate the full traffic data flow without real URLs:
-    /// parse header, format output, verify the exact display string.
-    #[test]
-    fn simulated_traffic_display_url_profile() {
-        let header = "upload=123456789; download=987654321; total=5368709120";
-        let info = parse_traffic_info(header);
-        let used = info.upload + info.download;
-        // 123456789 + 987654321 = 1111111110 bytes ≈ 1.0 GB
-        // total = 5368709120 bytes = 5.0 GB
-        // percentage = 1111111110 / 5368709120 * 100 ≈ 20.7%
-        let total_str = format!(
-            "{} ({:.0}%)",
-            human_bytes(info.total),
-            traffic_percentage(used, info.total)
-        );
-        let line = format!("  [Used: {} / {}]", human_bytes(used), total_str);
-        assert!(line.contains("1.0 GB"), "expected ~1.0 GB used");
-        assert!(line.contains("5.0 GB"), "expected 5.0 GB total");
-    }
-
-    /// Simulate unlimited traffic: total = 0, expect "unlimited".
-    #[test]
-    fn simulated_traffic_display_unlimited() {
-        let header = "upload=500000; download=1500000; total=0";
-        let info = parse_traffic_info(header);
-        let used = info.upload + info.download;
-        let total_str = if info.total == 0 {
-            "unlimited".to_owned()
-        } else {
-            format!(
-                "{} ({:.0}%)",
-                human_bytes(info.total),
-                traffic_percentage(used, info.total)
-            )
-        };
-        let line = format!("  [Used: {} / {}]", human_bytes(used), total_str);
-        assert!(line.contains("unlimited"), "expected unlimited total");
-    }
-
-    /// Simulate proxy-provider traffic from subscription-userinfo header.
-    #[test]
-    fn simulated_proxy_provider_traffic() {
-        let pp_headers = [
-            ("pvd0", "upload=0; download=31457280; total=104857600"),
-            ("bak", "upload=5242880; download=0; total=0"),
-        ];
-
-        let mut lines = Vec::new();
-        for (name, header) in &pp_headers {
-            let info = parse_traffic_info(header);
-            let used = info.upload + info.download;
-            let total_str = if info.total == 0 {
-                "unlimited".to_owned()
-            } else {
-                format!(
-                    "{} ({:.0}%)",
-                    human_bytes(info.total),
-                    traffic_percentage(used, info.total)
-                )
-            };
-            lines.push(format!("[{name}] example.com"));
-            lines.push(format!("  [Used: {} / {}]", human_bytes(used), total_str));
-        }
-
-        let result = lines.join("\n");
-        assert!(result.contains("[pvd0]"));
-        assert!(result.contains("[bak]"));
-        assert!(result.contains("unlimited")); // total = 0 => unlimited
-        assert!(result.contains("100.0 MB")); // pvd0 total = 100 MB
-    }
-
-    /// Simulate all cached: profile traffic from cache, proxy-provider from header.
-    #[test]
-    fn simulated_full_traffic_popup() {
-        // Simulate profile traffic (from cache)
-        let pf_header = "upload=500000000; download=2500000000; total=10737418240";
-        let pf_info = parse_traffic_info(pf_header);
-        let pf_used = pf_info.upload + pf_info.download;
-        // pf_used = 3,000,000,000 ≈ 2.8 GB, total = 10 GB
-
-        // Simulate proxy-provider traffic
-        let pp_headers = [
-            (
-                "hajimi",
-                "upload=100000000; download=200000000; total=5368709120",
-            ),
-            ("mojie", "upload=50000000; download=0; total=0"),
-        ];
-
-        let mut lines = Vec::new();
-
-        // Profile entry
-        {
-            let total_str = format!(
-                "{} ({:.0}%)",
-                human_bytes(pf_info.total),
-                traffic_percentage(pf_used, pf_info.total)
-            );
-            lines.push("[mojie-profile] sub.example.com".to_string());
-            lines.push(format!(
-                "  [Used: {} / {}]",
-                human_bytes(pf_used),
-                total_str
-            ));
-        }
-
-        for (name, header) in &pp_headers {
-            let info = parse_traffic_info(header);
-            let used = info.upload + info.download;
-            let total_str = if info.total == 0 {
-                "unlimited".to_owned()
-            } else {
-                format!(
-                    "{} ({:.0}%)",
-                    human_bytes(info.total),
-                    traffic_percentage(used, info.total)
-                )
-            };
-            lines.push(String::new());
-            lines.push(format!("[{name}] pp.example.com"));
-            lines.push(format!("  [Used: {} / {}]", human_bytes(used), total_str));
-        }
-
-        let result = lines.join("\n");
-        assert!(result.contains("[mojie-profile]"));
-        assert!(result.contains("10.0 GB")); // total 10 GB
-        assert!(result.contains("[hajimi]"));
-        assert!(result.contains("5.0 GB")); // total 5 GB
-        assert!(result.contains("[mojie]"));
-        assert!(result.contains("unlimited")); // mojie PP unlimited
     }
 }

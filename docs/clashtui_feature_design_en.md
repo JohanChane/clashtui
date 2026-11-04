@@ -90,7 +90,6 @@ mihomo:
     config_path: /opt/clashtui/mihomo/config/config.yaml
   core_service:
     service_name: clashtui_mihomo
-    is_user: false
 singbox:
   core:
     bin_path: /opt/clashtui/sing-box/sing-box
@@ -98,11 +97,7 @@ singbox:
     config_path: /opt/clashtui/sing-box/config/config.json
   core_service:
     service_name: clashtui_singbox
-    is_user: false
 timeout: null
-extra:
-  edit_cmd: ghostty -e nvim "%s"
-  open_dir_cmd: ghostty -e yazi "%s"
 ```
 
 Design principle: Mihomo and sing-box cannot be used together, so they are placed in separate `mihomo` and `sing-box` sections.
@@ -704,7 +699,7 @@ The `core_type` in `clashtui.db` takes precedence. If the API returns core data 
 
 - The user started another core's service outside of Clashtui
 - Both cores happen to listen on the same port, and API requests return data from the wrong core
-- CoreSrvCtl switched cores but Clashtui was not restarted (current design)
+- Core selection or API configuration changed without restarting Clashtui
 
 ### Detection Method
 
@@ -1095,8 +1090,6 @@ Implementation: Use the `winreg` crate to directly manipulate the registry (reco
 | Install Srv      | Install current core as Windows Service (SCM API create_service) |
 | Uninstall Srv    | Uninstall current core's Windows Service (stop then delete) |
 | Toggle SysProxy  | Toggle system proxy (enable/disable)                        |
-| Switch Core      | Switch to the other core (mihomo ↔ sing-box)                |
-| Stop All         | Stop all core services                                      |
 
 #### Service States
 
@@ -1125,67 +1118,9 @@ Windows uses NTFS ACL (Access Control List) for file permissions, which is funda
 
 Rationale: Windows' permission model is based on user/group ACLs — concepts like group sticky bit and mode bits do not exist. Core files running as Administrator have sufficient privileges. The regular user's TUI tool only needs read/write access to `%APPDATA%\clashtui` config directory (which users have by default).
 
-### CoreSrvCtl Tab Windows Adaptation
+### CoreSrvCtl execution
 
-#### Current State — CoreSrvCtl Operations
-
-```rust
-enum SrvCtlOp {
-    Stop,        // "Stop Service"
-    Restart,     // "Start Service"
-    SwitchCore,  // "Switch Core"
-    StopAll,     // "Stop All Services"
-}
-```
-
-#### Windows Extensions
-
-On Windows, when `ServiceController::default()` returns `WindowsService`, three additional operations are available:
-
-```rust
-#[cfg(windows)]
-SrvCtlOp::Install,       // "Install Service" — SCM API create_service
-#[cfg(windows)]
-SrvCtlOp::Uninstall,     // "Uninstall Service" — stop + delete
-#[cfg(windows)]
-SrvCtlOp::ToggleSysProxy, // "Toggle System Proxy" — registry read/write
-```
-
-**Install** execution logic:
-1. Call `ServiceManager::create_service()` via the `windows-service` crate
-2. service type: `OWN_PROCESS`, account: `LocalSystem`, start: `AutoStart`
-3. `executable_path` = `bin_path`, `launch_arguments` derived from CoreType
-4. Update status to `installed`
-
-**Uninstall** execution logic:
-1. Open service; if running, call `service.stop()`
-2. Then `service.delete()`
-3. Update status to `uninstalled`
-
-**Toggle System Proxy** execution logic:
-1. Read current `ProxyEnable` registry value
-2. If currently disabled → enable: set `ProxyEnable=1`, `ProxyServer=127.0.0.1:<port>`, `ProxyOverride=<-loopback>`, broadcast `WM_SETTINGCHANGE`
-3. If currently enabled → disable: set `ProxyEnable=0`, broadcast `WM_SETTINGCHANGE`
-4. Mixed port obtained from REST API `GET /configs` mixed inbound config
-
-#### Status Query Adaptation
-
-The current srvctl status query hardcodes `systemctl is-active` for non-Launchd cases. It needs to be adapted:
-
-```rust
-match ServiceController::default() {
-    ServiceController::Launchd => launchd_status(...),
-    ServiceController::WindowsService => windows_service_status(...), // new
-    _ => systemd_status(...),
-}
-```
-
-`windows_service_status()` implementation:
-1. Open service via `windows-service` crate → `service.query_status()`
-2. Parse `ServiceState`:
-   - `Running` → `"active"`
-   - `Stopped` / `Paused` etc. → `"inactive"`
-   - `ERROR_SERVICE_DOES_NOT_EXIST` → `"uninstalled"`
+The menu uses labeled actions from `scripts.json`, filtered by core. Windows service operations and proxy settings run through bundled PowerShell scripts. Rust owns a neutral process engine and a single TUI task slot; App consumes completion events. Internal status queries use the same scheduler and retain successful stderr diagnostics. See [script protocol](service_scripts_en.md) and [architecture](architecture_en.md).
 
 ### Install Script
 
@@ -1245,20 +1180,9 @@ The script registers Windows Services via clashtui's own `clashtui service insta
 
 ClashTui defaults to `systemd` as the service manager on Linux. Support for `openrc` is added for Linux distributions running OpenRC (e.g. Gentoo, Alpine).
 
-### Configuration Field
+### Configuration
 
-The `service_controller` field is added to `core_service` sections in `config.yaml`:
-
-```yaml
-core_service:
-  service_name: clashtui_mihomo
-  is_user: false
-  service_controller: openrc   # Optional: systemd (default) / openrc
-```
-
-- `"systemd"` or absent → uses systemd
-- `"openrc"` → uses OpenRC (`rc-service`/`rc-update`)
-- Non-Linux platforms ignore this field, using platform default
+The installer option `--service-controller openrc` selects the OpenRC template; `--is-user` selects user scope. Defaults use systemd/system on Linux. The installer writes literal scope arguments into `scripts.json`; `config.yaml` only stores the service name under `core_service`. Runtime service commands come from `scripts.json`.
 
 ### Runtime Behavior
 
@@ -1270,10 +1194,10 @@ core_service:
 | Reload       | `systemctl reload <name>`          | `rc-service <name> restart`      |
 | Status       | `systemctl is-active <name>`       | `rc-service <name> status`       |
 
-`is_user` determines sudo/--user prefix:
+The script scope argument controls runtime privileges:
 
-- `is_user: false`: `sudo rc-service <name> <op>` (system mode)
-- `is_user: true`: `rc-service --user <name> <op>` (user mode)
+- `scope=system`: writes use `sudo rc-service <name> <op>` when needed; queries do not elevate
+- `scope=user`: `rc-service --user <name> <op>`, without elevation
 - OpenRC has supported user services since v0.60; scripts go in `/etc/user/init.d/`; requires `XDG_RUNTIME_DIR` to be set
 
 ### Install Script (`installs/install`)
@@ -1294,7 +1218,7 @@ The `install` script accepts a `--service-controller` argument:
 When `--service-controller openrc`:
 - System mode: generates OpenRC init scripts in `/etc/init.d/`, uses `command_user` for the service user
 - User mode: generates OpenRC init scripts in `/etc/user/init.d/` (requires sudo to write), no `command_user` (runs as current user)
-- `config.yaml` is written with `service_controller: openrc` and the corresponding `is_user` value
+- Installs the OpenRC script and writes its literal scope into `scripts.json`
 - Uses `supervise-daemon` to manage foreground processes
 
 Generated OpenRC init script — system mode (mihomo):

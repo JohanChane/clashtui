@@ -1,6 +1,8 @@
 #[macro_use]
 mod key;
 mod app;
+pub(crate) mod commands;
+mod input;
 mod popmsg;
 mod signals;
 mod tab;
@@ -12,7 +14,6 @@ mod widget;
 pub use app::App;
 use key::Key;
 pub use key::init as keymap_init;
-pub use term::hold;
 pub(crate) use theme::Theme;
 
 trait TuiWidget {
@@ -20,11 +21,15 @@ trait TuiWidget {
     fn sync(&mut self);
     fn on_enter(&mut self) {}
     fn on_leave(&mut self) {}
+    fn command_done(&mut self, _event: &commands::CommandEvent) {}
 }
 
 pub fn init() -> anyhow::Result<()> {
     key::load()?;
     theme::Theme::load();
+    if let Err(error) = crate::scripts::init(&crate::config::config_dir_path()) {
+        log::warn!("{error:#}");
+    }
     term::setup()
 }
 

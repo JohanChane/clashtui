@@ -2,6 +2,10 @@
 
 This document describes the code architecture of Clashtui for developers to understand the project structure.
 
+Service control follows the [script protocol](service_scripts_en.md). Platform service commands live in `contrib/scripts/coresrvctrl/`; Rust handles generic configuration, execution, terminal ownership and process management.
+
+
+`scripts/config` loads immutable definitions, `scripts/variables` resolves one invocation, and `scripts/action` owns action inputs and status parsing. `command` runs neutral process specifications; internal checks use capture and permission repair uses inherit. `tui/commands` schedules one task and returns completion events to App; `tui/term` provides cancellable terminal handoff. `functions/service` preserves the synchronous CLI bridge. Installers own default resources.
 
 ## Tech Stack
 
@@ -17,6 +21,10 @@ This document describes the code architecture of Clashtui for developers to unde
 
 ```
 src/
+├── command.rs           # Neutral process engine: capture / inherit / run
+├── command/             # Unix process groups / Windows Jobs and signal scopes
+├── scripts.rs           # Startup script configuration
+├── scripts/             # config.rs / variables.rs / action.rs
 ├── main.rs              # Entry point: five-phase startup flow
 ├── cli.rs               # CLI module entry, re-exports from cli/
 │   └── cli/
@@ -25,17 +33,19 @@ src/
 │       └── utils.rs     # Version info, shell completion generation
 ├── config.rs            # Config module entry, re-exports from config/
 │   └── config/
-│       ├── core.rs      # CoreType enum, ServiceController
+│       ├── core.rs      # CoreType enum and core configuration
 │       ├── database.rs  # ProfileManager (Profile persistence structures)
 │       └── util.rs      # Config dir resolution, load_save! macro, file path constants
 ├── functions.rs         # Business logic entry, re-exports from functions/
 │   └── functions/
-│       ├── command.rs   # System operations (file permissions, service start/stop, directory opening)
+│       ├── command.rs   # Core Test/Check; CLI restart/stop entry points
+│       ├── service.rs   # Synchronous CLI script bridge
 │       ├── file.rs      # File operations (Profile import/update, Template processing)
 │       └── restful.rs   # REST API calls (config/mode/proxies/connections)
 ├── tui.rs               # TUI module entry, re-exports from tui/
 │   └── tui/
 │       ├── app.rs       # App struct, event loop (~50fps), key routing
+│       ├── commands.rs  # Single-task scheduling and completion events
 │       ├── app/
 │       │   ├── actions.rs   # Global actions, tab targets, and default bindings
 │       │   └── tests.rs     # Global shortcut and tab-label regression tests
@@ -47,7 +57,8 @@ src/
 │       │   ├── matcher.rs   # Pending-chord state owned by App
 │       │   └── notation.rs  # Key notation parsing and formatting
 │       ├── signals.rs   # OS signal handling
-│       ├── term.rs      # Terminal raw mode enter/exit/suspend
+│       ├── input.rs     # Single reader with acknowledged pause
+│       ├── term.rs      # Exclusive terminal lease, restoration and suspension
 │       ├── theme.rs     # Theme loading
 │       ├── utils.rs     # Utility functions
 │       ├── popmsg.rs    # Popup definitions (Confirm, Input, etc.)
@@ -208,12 +219,13 @@ Use `#[cfg(feature = "tui")]` rather than `#[cfg(feature = "customized-theme")]`
 
 ## Business Logic
 
-The `functions/` directory contains all business logic, divided into three modules:
+File operations, core configuration checks, CLI service calls and REST APIs remain in `functions/`:
 
 | Module | Responsibility |
 |--------|----------------|
-| `command` | System-level operations: service start/stop (systemd), file permission fixes, open directory, file editor |
+| `command` | Core Test/Check through capture; CLI restart/stop entry points |
 | `file` | Profile management: import, update (download + parse), Template expansion, subscription type detection |
+| `service` | Synchronous CLI script bridge |
 | `restful` | REST API: get/set config, switch proxies, query connections, get logs |
 
 ## Build Script

@@ -90,7 +90,6 @@ mihomo:
     config_path: /opt/clashtui/mihomo/config/config.yaml
   core_service:
     service_name: clashtui_mihomo
-    is_user: false
 singbox:
   core:
     bin_path: /opt/clashtui/sing-box/sing-box
@@ -98,11 +97,7 @@ singbox:
     config_path: /opt/clashtui/sing-box/config/config.json
   core_service:
     service_name: clashtui_singbox
-    is_user: false
 timeout: null
-extra:
-  edit_cmd: ghostty -e nvim "%s"
-  open_dir_cmd: ghostty -e yazi "%s"
 ```
 
 设计原则: Mihomo 和 sing-box 不能共同使用的, 分别放在 mihomo 和 sing-box section。
@@ -704,7 +699,7 @@ App 持有唯一的组合键等待状态。执行、Which、帮助和标签栏�
 
 - 用户在 clashtui 外部启动了另一内核的 service
 - 两个内核恰好监听同一端口，API 请求返回的数据来自错误内核
-- CoreSrvCtl 切换内核后未重启 clashtui（当前设计）
+- 核心选择或 API 配置变更后未重启 Clashtui
 
 ### 检测方案
 
@@ -1086,8 +1081,6 @@ CoreSrvCtl tab 的操作列表:
 |------------------|------------------------------------------------|
 | Stop Service     | 停止当前 core 的 service                       |
 | Start Service    | 启动当前 core 的 service                       |
-| Switch Core      | 切换到另一个 core (mihomo ↔ sing-box)           |
-| Stop All         | 停止所有 core services                          |
 | Install Srv      | 通过 nssm 安装当前 core 为 Windows Service      |
 | Uninstall Srv    | 通过 nssm 卸载当前 core 的 Windows Service       |
 | Toggle SysProxy  | 切换系统代理 (enable/disable)                   |
@@ -1133,20 +1126,9 @@ CoreSrvCtl tab 的操作列表:
 
 ClashTui 在 Linux 平台上默认使用 `systemd` 作为服务管理器。为了支持运行 OpenRC 的 Linux 发行版 (如 Gentoo, Alpine), 需要支持 `openrc` service controller。
 
-### 配置字段
+### 配置
 
-在 `config.yaml` 的 `core_service` 段中, 新增 `service_controller` 字段:
-
-```yaml
-core_service:
-  service_name: clashtui_mihomo
-  is_user: false
-  service_controller: openrc   # 可选: systemd (默认) / openrc
-```
-
-- 当值为 `"systemd"` 或不填时, 使用 systemd
-- 当值为 `"openrc"` 时, 使用 OpenRC (`rc-service`/`rc-update`)
-- 非 Linux 平台忽略此字段, 使用平台默认值
+安装选项 `--service-controller openrc` 选择 OpenRC 模板，`--is-user` 选择 user scope。Linux 默认使用 systemd/system。安装器把字面 scope 参数写入 `scripts.json`；`config.yaml` 的 `core_service` 只保存服务名。运行期命令由 `scripts.json` 决定。
 
 ### 运行时行为
 
@@ -1158,10 +1140,10 @@ core_service:
 | 重载         | `systemctl reload <name>`             | `rc-service <name> restart`        |
 | 查询状态      | `systemctl is-active <name>`          | `rc-service <name> status`         |
 
-通过 config 内的 `is_user` 参数判断是否使用 `--user` 或 `sudo` 前缀:
+运行时由脚本的 scope 参数决定权限:
 
-- `is_user: false`: 使用 `sudo rc-service <name> <op>` (system 模式)
-- `is_user: true`: 使用 `rc-service --user <name> <op>` (user 模式)
+- `scope=system`: 写操作按需使用 `sudo rc-service <name> <op>`，查询不提权
+- `scope=user`: 使用 `rc-service --user <name> <op>`，不提权
 - OpenRC 从 v0.60 起支持 user service, 脚本放在 `/etc/user/init.d/`, 需要 `XDG_RUNTIME_DIR` 已设置
 
 ### install 脚本 (installs/install)
@@ -1182,7 +1164,7 @@ core_service:
 当 `--service-controller openrc` 时:
 - System 模式: 在 `/etc/init.d/` 下生成 OpenRC init 脚本, 使用 `command_user` 指定运行用户
 - User 模式: 在 `/etc/user/init.d/` 下生成 OpenRC init 脚本 (需要 sudo 写入), 不使用 `command_user` (以当前用户运行)
-- config.yaml 中写入 `service_controller: openrc` 和相应的 `is_user` 值
+- 安装 OpenRC 脚本，将对应字面 scope 写入 `scripts.json`
 - init 脚本使用 `supervise-daemon` 管理前台进程
 
 生成的 OpenRC init 脚本示例 — system 模式 (mihomo):

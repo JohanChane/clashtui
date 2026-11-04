@@ -1,0 +1,251 @@
+{
+  "root": "scripts/coresrvctrl",
+  "actions": [
+    {
+      "id": "start_core",
+      "label": "Start Core",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${root}/windows/service.ps1",
+          "-Operation",
+          "start",
+          "-ServiceName",
+          "${service_name}"
+        ]
+      }
+    },
+    {
+      "id": "stop_core",
+      "label": "Stop Core",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${root}/windows/service.ps1",
+          "-Operation",
+          "stop",
+          "-ServiceName",
+          "${service_name}"
+        ]
+      }
+    },
+    {
+      "id": "restart_core",
+      "label": "Restart Core",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${root}/windows/service.ps1",
+          "-Operation",
+          "restart",
+          "-ServiceName",
+          "${service_name}"
+        ]
+      }
+    },
+    {
+      "id": "status_core",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${root}/windows/service.ps1",
+          "-Operation",
+          "status",
+          "-ServiceName",
+          "${service_name}"
+        ],
+        "interactive": false,
+        "output": "silent",
+        "timeout_secs": 5
+      }
+    },
+    {
+      "id": "enable_autostart_core",
+      "label": "Enable Boot Autostart",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${root}/windows/service.ps1",
+          "-Operation",
+          "enable-autostart",
+          "-ServiceName",
+          "${service_name}"
+        ]
+      }
+    },
+    {
+      "id": "disable_autostart_core",
+      "label": "Disable Boot Autostart",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${root}/windows/service.ps1",
+          "-Operation",
+          "disable-autostart",
+          "-ServiceName",
+          "${service_name}"
+        ]
+      }
+    },
+    {
+      "id": "install_core",
+      "label": "Install Core Service",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${root}/windows/service.ps1",
+          "-Operation",
+          "install",
+          "-ServiceName",
+          "${service_name}",
+          "-CoreType",
+          "${core_type}",
+          "-CoreBin",
+          "${core_bin}",
+          "-ConfigDir",
+          "${core_config_dir}",
+          "-ConfigPath",
+          "${core_config_path}"
+        ]
+      }
+    },
+    {
+      "id": "uninstall_core",
+      "label": "Uninstall Core Service",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${root}/windows/service.ps1",
+          "-Operation",
+          "uninstall",
+          "-ServiceName",
+          "${service_name}"
+        ]
+      }
+    },
+    {
+      "id": "enable_system_proxy",
+      "label": "Enable System Proxy",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${root}/windows/sysproxy.ps1",
+          "-Operation",
+          "enable",
+          "-Port",
+          "${proxy_port}"
+        ]
+      }
+    },
+    {
+      "id": "disable_system_proxy",
+      "label": "Disable System Proxy",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${root}/windows/sysproxy.ps1",
+          "-Operation",
+          "disable"
+        ]
+      }
+    },
+    {
+      "id": "copy",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-STA",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${config_root}/scripts/clipboard/copy.ps1",
+          "auto"
+        ],
+        "interactive": false,
+        "output": "terminal",
+        "keep_children_on_success": true,
+        "timeout_secs": 5
+      }
+    },
+    {
+      "id": "edit_file",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${config_root}/scripts/files/open.ps1",
+          "-Path",
+          "${path}"
+        ],
+        "interactive": false,
+        "output": "silent",
+        "keep_children_on_success": true
+      }
+    },
+    {
+      "id": "open_dir",
+      "cmd": {
+        "program": "powershell.exe",
+        "args": [
+          "-NoProfile",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          "${config_root}/scripts/files/open.ps1",
+          "-Path",
+          "${path}"
+        ],
+        "interactive": false,
+        "output": "silent",
+        "keep_children_on_success": true
+      }
+    }
+  ]
+}

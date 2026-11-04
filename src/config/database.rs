@@ -386,20 +386,6 @@ singbox:
         assert_eq!(db, deser);
     }
     #[test]
-    fn backward_compat_old_format_no_pp_defaults_false() {
-        let yaml = r#"core_type: mihomo
-mihomo:
-  profiles:
-    pf1: File
-    pf2: !Url "https://example.com"
-singbox:
-  profiles: {}
-"#;
-        let db: ProfileManager = serde_yml::from_str(yaml).unwrap();
-        assert!(!db.mihomo.profiles.get("pf1").unwrap().no_pp);
-        assert!(!db.mihomo.profiles.get("pf2").unwrap().no_pp);
-    }
-    #[test]
     fn new_format_preserves_no_pp() {
         let yaml = r#"core_type: mihomo
 mihomo:

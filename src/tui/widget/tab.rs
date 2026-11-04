@@ -22,6 +22,13 @@ pub trait BasicTabContent: 'static {
     fn after_sync(&self, _task_set: &mut FutureSet<Self>) {}
 
     fn on_enter(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {}
+    fn command_done(
+        &mut self,
+        _event: &crate::tui::commands::CommandEvent,
+        _tasks: &mut FutureSet<Self>,
+    ) {
+    }
+
     fn on_leave(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {}
 }
 
@@ -37,6 +44,7 @@ pub trait TabContent: BasicTabContent {
         action: Self::Action,
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
+        commands: &mut crate::tui::commands::Commands,
     );
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State);
@@ -49,9 +57,13 @@ pub struct Tab<C: TabContent> {
 }
 
 impl<C: TabContent> Tab<C> {
-    pub fn handle_action(&mut self, action: C::Action) {
+    pub fn handle_action(
+        &mut self,
+        action: C::Action,
+        commands: &mut crate::tui::commands::Commands,
+    ) {
         self.content
-            .handle_action(action, &mut self.tasks, &mut self.state);
+            .handle_action(action, &mut self.tasks, &mut self.state, commands);
     }
 }
 
@@ -66,13 +78,23 @@ where
     fn sync(&mut self) {
         while let Some(f) = self.tasks.try_join_next() {
             // SAFETY: panic happens only when a task is canceled(not gonna to happen) or paniced
-            f.unwrap()(&mut self.content);
-            self.content.after_sync(&mut self.tasks);
+            match f {
+                Ok(update) => {
+                    update(&mut self.content);
+                    self.content.after_sync(&mut self.tasks);
+                }
+                Err(error) if error.is_cancelled() => (),
+                Err(error) => log::error!("Page task failed: {error}"),
+            }
         }
     }
 
     fn on_enter(&mut self) {
         self.content.on_enter(&mut self.tasks, &mut self.state);
+    }
+
+    fn command_done(&mut self, event: &crate::tui::commands::CommandEvent) {
+        self.content.command_done(event, &mut self.tasks);
     }
 
     fn on_leave(&mut self) {

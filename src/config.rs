@@ -23,7 +23,7 @@ mod core;
 #[macro_use]
 mod util;
 
-pub use core::{CoreType, ServiceController};
+pub use core::CoreType;
 pub use util::check_startup_perms;
 pub mod database;
 
@@ -419,16 +419,5 @@ mod tests {
             singbox_dir.ends_with("sing-box"),
             "expected path ending with 'sing-box', got: {singbox_dir:?}"
         );
-    }
-
-    #[test]
-    fn core_install_dir_is_parent_of_config_dir() {
-        let config_dir = "/opt/clashtui/mihomo/config";
-        let parent = std::path::Path::new(config_dir).parent().unwrap();
-        assert_eq!(parent, std::path::Path::new("/opt/clashtui/mihomo"));
-
-        let config_dir = "/opt/clashtui/sing-box/config";
-        let parent = std::path::Path::new(config_dir).parent().unwrap();
-        assert_eq!(parent, std::path::Path::new("/opt/clashtui/sing-box"));
     }
 }

@@ -44,3 +44,62 @@ pub mod raw_mode {
         }));
     }
 }
+
+/// Preserve normal terminal modes across external programs, including programs
+/// interrupted after they changed echo or console input processing.
+#[derive(Clone)]
+pub(super) struct TerminalState {
+    #[cfg(unix)]
+    state: libc::termios,
+    #[cfg(windows)]
+    modes: Vec<(isize, u32)>,
+}
+
+impl TerminalState {
+    pub fn capture() -> std::io::Result<Self> {
+        #[cfg(unix)]
+        {
+            let mut state = unsafe { std::mem::zeroed::<libc::termios>() };
+            if unsafe { libc::tcgetattr(libc::STDIN_FILENO, &mut state) } == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(Self { state })
+        }
+        #[cfg(windows)]
+        {
+            use windows_sys::Win32::System::Console::{
+                GetConsoleMode, GetStdHandle, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
+            };
+            let mut modes = Vec::new();
+            for kind in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE] {
+                let handle = unsafe { GetStdHandle(kind) };
+                let mut mode = 0;
+                if unsafe { GetConsoleMode(handle, &mut mode) } == 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                modes.push((handle as isize, mode));
+            }
+            Ok(Self { modes })
+        }
+    }
+
+    pub fn restore(&self) -> std::io::Result<()> {
+        #[cfg(unix)]
+        if unsafe { libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &self.state) } == -1 {
+            return Err(std::io::Error::last_os_error());
+        }
+        #[cfg(windows)]
+        for (handle, mode) in &self.modes {
+            if unsafe {
+                windows_sys::Win32::System::Console::SetConsoleMode(
+                    *handle as windows_sys::Win32::Foundation::HANDLE,
+                    *mode,
+                )
+            } == 0
+            {
+                return Err(std::io::Error::last_os_error());
+            }
+        }
+        Ok(())
+    }
+}
