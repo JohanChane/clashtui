@@ -35,7 +35,9 @@ src/
 │       └── restful.rs   # REST API 调用（config/mode/proxies/connections）
 ├── tui.rs               # TUI 模块入口，re-exports from tui/
 │   └── tui/
-│       ├── app.rs       # App 结构体、事件循环（~50fps）、按键路由
+│       ├── app.rs       # App 结构体、事件驱动循环、按键路由
+│       ├── business.rs  # 业务提交与只读视图
+│       ├── core.rs      # 服务/API 状态、请求所有权、页面数据槽
 │       ├── app/
 │       │   ├── actions.rs   # 全局动作、标签目标和默认绑定
 │       │   └── tests.rs     # 全局快捷键和标签标题回归测试
@@ -47,7 +49,7 @@ src/
 │       │   ├── matcher.rs   # App 持有的组合键状态机
 │       │   └── notation.rs  # 按键记法解析和显示
 │       ├── signals.rs   # OS 信号处理
-│       ├── term.rs      # 终端 raw mode 进入/退出/挂起
+│       ├── term.rs      # 终端初始化、带确认的借用、输入线程
 │       ├── theme.rs     # 主题加载
 │       ├── utils.rs     # 工具函数
 │       ├── popmsg.rs    # 弹窗定义（Confirm、Input 等）
@@ -64,7 +66,7 @@ src/
 │           ├── files.rs      # FileTab（DualTab: Profile + Template）
 │           ├── proxies.rs    # 代理标签页
 │           ├── connections.rs # 连接标签页
-│           ├── logs.rs       # 日志标签页
+│           ├── logs.rs       # 日志视图；logs/collector.rs 持有后台采集
 │           ├── settings.rs   # 设置标签页
 │           └── srvctl.rs     # 核心服务控制标签页
 ```
@@ -107,16 +109,11 @@ src/
 
 ### 事件循环
 
-运行在 `App::serve()` 中，以约 50fps（20ms/帧）循环执行：
+`App::serve()` 用 `tokio::select!` 等待输入、弹窗、实际任务完成、日志变化、终端交接、退出及业务和显示期限，没有固定帧 tick。API 页面仅在可见时安排刷新期限；Files 有更新操作时，每 160 ms 推进一次转圈动画。
 
-```
-每帧流程：
-1. 处理 resize（原子标志，在帧顶部处理避免竞态）
-2. terminal.draw(render) — 渲染当前帧
-3. sync() — 推进完成的异步任务
-4. tokio::select! 等待下一事件（按键/tick/resize）
-5. 处理按键事件
-```
+Business 持有 CoreBusiness 和 LogCollector。每次命令或核心任务完成，先提交状态、失效关联查询和日志会话，再推进待办工作、同步采集器。服务命令在日志失效后才启动。App 随后通过只读视图直接同步当前普通页面，在界面有变化且持有终端时绘制。没有组件 ID、订阅表或本地通知队列。窗口尺寸变化由输入线程投递。
+
+退出时，App 先停止 Business，再让当前页 leave，然后停止弹窗和终端所有者。主循环继续接收完成，直到任务、日志采集、终端工作和输入线程真正退出。外部程序借用终端前，必须等输入线程确认停读。
 
 ### 有效绑定表与输入状态
 
@@ -137,9 +134,11 @@ src/
 
 `TuiWidget` 负责界面生命周期：
 
-- `render(&mut self, f, area)` — 绘制界面
-- `sync(&mut self)` — 推进异步任务
-- `on_enter(&mut self)` / `on_leave(&mut self)` — 标签页切换回调
+- `render(&mut self, f, area, view)` — 读取业务视图绘制界面
+- `on_enter(&mut self, business)` / `on_leave(&mut self, business)` — 有序提交生命周期动作
+- `sync_from(&mut self, view)` — 更新本地显示缓存，不启动工作
+- `advance` — 由可见 Files 容器推进两侧加载
+- `poll_tasks` / `finish_task` — 等待任务完成，应用仍属于当前可见期的回调
 
 `TuiTab` 另外提供 `title`、`input_scope` 和 `handle_action`。页面容器接收已解析的动作；文本弹窗通过自身的 `handle_key_event` 处理原始按键。
 
@@ -149,12 +148,14 @@ src/
 
 `Tab<C>` 是泛型容器，`C` 需实现两个 trait：
 
-- `BasicTabContent` — 定义 `Action`、`State` 类型和标题
+- `BasicTabContent` — 定义 `Action`、`State`、标题、生命周期和只读同步
 - `TabContent` — 定义 `init`、`handle_action`、`render`
 
 #### 双面板（DualTab）
 
 `DualTab<C1, C2>` 用于需要两个面板切换的场景（如 Files 标签页的 Profile 和 Template）。两个内容类型通过 `DualTabContent` / `DualTabContentMate` trait 互相引用。
+
+两个可见面板直接同步，不受键盘焦点影响；焦点仅决定动作发给哪一侧。FileTab 为两侧各持有一个实际加载槽。
 
 #### Tab 枚举
 
@@ -162,11 +163,21 @@ src/
 
 ### 异步任务模型
 
-异步 I/O 操作通过 `FutureSet<C>`（即 `tokio::task::JoinSet`）管理：
+`init` 只初始化本地状态。`on_enter` 激活资源需求；`on_leave` 停止需求、清页面数据并保留偏好。`sync_from` 和 `render` 接收只读 BusinessView。Status、Settings 直接读取共享配置；Proxies、Connections 按数据 revision 更新必要的派生缓存。
 
-- 在 `handle_action` 或 `init` 中通过 `task_set.spawn(async { ... })` 生成异步任务
-- 任务完成后产生 `Callback<C>`（即 `Box<dyn FnOnce(&mut C)>`）
-- `sync()` 会在每帧推进已完成的回调，状态变更统一在此发生
+`CoreBusiness` 持有服务/API 状态、请求句柄和已验收的页面数据。API 由系统服务的同一 core 进程提供：服务 Stopped 时 API 不可用，Running 后仍须确认 API；Unknown 保留服务查询诊断。API 检查等待当前服务确认 Running，以及该服务的待执行和在途检查结束。新服务检查废弃旧 API 回复，保留一次确认需求；API 成功不改写服务观察。普通 API 页可复用已确认的 Running，旧 Stopped／Unknown 则在进入或刷新时先复查当前服务。启动窗口内按服务、API 的顺序有限重试；外部启停没有即时发现保证。
+
+请求只有仍持有有效所有权才能提交。服务变化先使不再有效的请求和日志连接失效，再推进待办工作。多阶段写操作持有可失效的 API 许可，在重载配置或每次批量请求前复核；恢复资格不会复活旧许可。
+
+每个 QuerySlot 用一个 InFlight 直接返回任务结果，同时保存接纳资格、待刷新需求和期限。激活资源失效时保留需求及实际句柄；每次完成，包括废弃结果，都继续推进需求。Status、Proxies 成功后间隔 5 秒刷新，Connections 为 1 秒，Settings 无周期；错误停止自动续刷。Connections 暂停不会被手动刷新或 API 恢复解除。
+
+`FutureSet<C>` 用 JoinSet 持有真实页面操作，用 Weak 标识回调所属可见期。离页废弃回调；实际操作仍完成、清 busy 并交付反馈。隐藏任务也参与 App 等待。Files 变更和手动刷新增加共享 revision；可见容器加载尚未尝试的版本。两侧 LoadSlot 跨离页保留实际 JoinHandle，拒收旧结果，完成后立即追赶最新 revision。失败也记为已尝试，仅新变更或重新进入才重试。
+
+Files 选择配置先完成本地校验、合并、落盘和当前选择记录。API 许可只限制在线 reload；无许可或许可失效时，仍保存配置并提示启动或重启核心。更新当前配置后的自动应用复用同一入口，分别报告更新和应用结果。
+
+`LogCollector` 属于 Business，隐藏时仍维护最多 300 条 `VecDeque<Arc<LogEntry>>` 记录，满后淘汰最旧记录。WebSocket 单消息和单帧均限制为 256 KiB。快照共享记录，不复制字符串；最后一个引用释放后回收。核心失效和暂停切换更换连接身份，拒收旧记录及诊断。采集先检查暂停再解析 JSON，追加前再次检查暂停和连接身份。
+
+后台变化通过 Notify 合并唤醒。Logs 可见时，首次变化安排 34 ms 后的显示期限，后续通知不后移它。每轮绘制或等待前检查到期状态，即使 select 选中了输入或其他任务。仅到期、进入 Logs 或本地控制才复制快照；暂停、清空和级别变化立即显示并清旧期限。隐藏日志不触发普通页重绘；离页和退出取消期限。日志记录不进入弹窗队列。连接有有限超时和可中断退避，实际 worker 退出后才释放句柄；系统域名解析仍受平台解析器约束。
 
 错误处理：
 - `tri!()` 宏 — 捕获错误并弹窗提示用户
@@ -174,10 +185,9 @@ src/
 
 ### 弹窗
 
-弹窗通过 `oneshot` channel 模式实现：
-- 调用 `Input::new().with_title(...).build_and_send().await` 阻塞等待用户输入
-- 弹出事件由 `PopUp::check()` 和 `PopUp::handle_key_event()` 管理
-- 仅在需要用户输入时使用弹窗；简单确认/错误用内联状态显示
+后台任务通过有界通道提交弹窗：`let reply = Input::new().with_title(...).build_and_send_async().await;`，再用 `reply.await` 等待用户回答。通道满时施加背压。App 的同步回调把弹窗收集到本地，避免等待自己消费的队列。
+
+`PopUp::check()` 和 `PopUp::handle_key_event()` 管理显示和输入；确认、错误消息使用同一入口。退出时关闭待答复请求，让等待中的操作能够结束。
 
 ## 核心宏
 
@@ -208,7 +218,7 @@ src/
 
 ## 业务逻辑
 
-`functions/` 目录包含所有业务逻辑，分为三个模块：
+`functions/` 提供命令、文件和 REST 操作；`tui/core.rs` 持有这些操作在 TUI 中的状态和请求生命周期。
 
 | 模块 | 职责 |
 |------|------|
@@ -233,3 +243,4 @@ src/
 3. 用 `key_map!` 声明默认绑定，用 `newtype_tab!(MyTab(Tab<MyContent>), MyScope)` 生成包装器；在 `tab/mod.rs` 的 `enum_dispatch!` 注册。
 4. 在 `App::new()` 添加标签实例，并更新 `TabTarget` 及默认切页绑定；两者顺序必须与标签列表一致。
 5. 双面板分别提供动作类型和作用域，由 `input_scope` 根据焦点选择有效表。
+6. `init` 只做本地初始化；生命周期动作经 Business 提交，`sync_from` 和 `render` 只读已提交数据，不启动工作。操作清理和反馈不得依赖可丢弃的页面回调。

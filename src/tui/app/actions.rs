@@ -9,6 +9,7 @@ pub enum AppAction {
     TabPrev,
     Quit,
     Help,
+    RefreshCurrent,
     #[serde(untagged)]
     Tab(TabTarget),
     #[serde(untagged)]
@@ -58,7 +59,7 @@ impl GlobalAction {
     pub(super) fn execute(self) -> anyhow::Result<()> {
         use crate::{
             config::{CONFIG, CoreType},
-            functions::{command, restful::connection},
+            functions::command,
         };
         match self {
             Self::OpenCoreDataDir => {
@@ -74,11 +75,11 @@ impl GlobalAction {
                 command::open_dir(dir.parent().unwrap_or(dir))
             }
             Self::RestartCoreService => {
-                let output = command::restart_service()?;
-                anyhow::ensure!(!output.starts_with("Error"), "{output}");
-                Ok(())
+                anyhow::bail!("Core operations must be dispatched by App")
             }
-            Self::CloseAllConnections => Ok(connection::terminate_all_connections()?),
+            Self::CloseAllConnections => {
+                anyhow::bail!("Connection operations must be dispatched by Business")
+            }
         }
     }
 }
@@ -99,6 +100,13 @@ fn defaults() -> DefaultBindings<AppAction> {
                 })
                 .chain(APP_KEYS),
         )
+        .with_keys([(
+            Key {
+                code: KeyCode::Char('l'),
+                modifiers: KeyModifiers::CONTROL,
+            },
+            AppAction::RefreshCurrent,
+        )])
         .with_chords(
             Key {
                 code: KeyCode::Char('g'),
@@ -147,6 +155,7 @@ impl Document for AppAction {
             Self::TabPrev => "Tab Previous",
             Self::Quit => "Quit",
             Self::Help => "Help",
+            Self::RefreshCurrent => "Refresh current page",
             Self::Global(action) => match action {
                 GlobalAction::OpenCoreDataDir => "Open core data dir",
                 GlobalAction::OpenCoreInstallDir => "Open core install dir",

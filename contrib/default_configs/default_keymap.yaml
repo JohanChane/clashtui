@@ -21,6 +21,7 @@ app:
   - {on: "<S-Tab>", action: TabPrev}
   - {on: "q", action: Quit}
   - {on: "?", action: Help}
+  - {on: "<C-l>", action: RefreshCurrent, desc: Refresh current page}
   - {on: ["<C-g>", "c"], action: OpenCoreDataDir}
   - {on: ["<C-g>", "m"], action: OpenCoreInstallDir}
   - {on: ["<C-g>", "f"], action: RestartCoreService}

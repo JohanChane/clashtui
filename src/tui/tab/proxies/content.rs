@@ -1,6 +1,11 @@
 use super::super::dev::*;
 use crate::functions::restful::proxies::{self};
+use crate::tui::{
+    business::{Business, BusinessView},
+    core::ApiResource,
+};
 use std::cell::Cell;
+use std::collections::HashMap;
 use std::time::Instant;
 
 use super::tree::{NodeItem, NodeType, ProxyTree, SortMode};
@@ -13,7 +18,10 @@ pub(super) struct Proxies {
     pub testing_since: Option<Instant>,
     pub jump_target: Cell<Option<usize>>,
     pub filter: Option<String>,
-    pub paused: bool,
+    pub data_available: bool,
+    pub(super) revision: u64,
+    pub(super) preferences: HashMap<String, (bool, SortMode)>,
+    pub(super) saved_selection: Option<SelectionKey>,
 }
 
 type SelectionKey = (String, Option<String>, NodeType);
@@ -172,67 +180,87 @@ impl Proxies {
     }
 }
 
+impl Proxies {
+    fn clear_data(&mut self, state: &ListState) {
+        if self.data_available {
+            self.saved_selection = self.selection_key(state);
+            self.preferences = self
+                .tree
+                .nodes
+                .iter()
+                .filter(|node| node.node_type == NodeType::Folder)
+                .map(|node| (node.name.clone(), (node.expanded, node.sort_mode)))
+                .collect();
+        }
+        self.proxies = Default::default();
+        self.tree = Default::default();
+        self.data_available = false;
+        self.testing_since = None;
+    }
+    fn read_state(&mut self, state: &mut ListState, view: BusinessView<'_>) {
+        if !view.core.api_allowed() {
+            self.clear_data(state);
+            self.error = view.core.diagnostic();
+            return;
+        }
+        let slot = &view.core.queries.proxies;
+        if !slot.busy() {
+            self.testing_since = None;
+        }
+        if self.testing_since.is_none() {
+            self.error = slot.error.clone();
+        }
+        if self.revision == slot.revision() {
+            return;
+        }
+        self.revision = slot.revision();
+        if let Some(data) = &slot.data {
+            let selection = if self.data_available {
+                self.selection_key(state)
+            } else {
+                self.saved_selection.clone()
+            };
+            self.proxies = (**data).clone();
+            if !self.data_available {
+                self.tree = ProxyTree::build(self.proxies.clone());
+                for node in &mut self.tree.nodes {
+                    if let Some((expanded, sort)) = self.preferences.get(&node.name) {
+                        node.expanded = *expanded;
+                        node.sort_mode = *sort;
+                    }
+                }
+            }
+            self.tree.rebuild_from_proxies(&self.proxies);
+            self.restore_selection(selection, state);
+            self.data_available = true;
+        } else {
+            self.clear_data(state);
+        }
+    }
+}
 impl BasicTabContent for Proxies {
     type Action = super::Action;
     type State = ListState;
-
     const TITLE: &str = "Proxies";
-
-    fn after_sync(&self, task_set: &mut FutureSet<Self>) {
-        if self.paused {
-            return;
-        }
-        if crate::config::is_core_mismatch() {
-            return;
-        }
-        async {
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let response = tri!(
-                tokio::task::spawn_blocking(proxies::fetch_proxies)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-            wrapper(|content: &mut Self| {
-                content.proxies = response;
-                content.tree.rebuild_from_proxies(&content.proxies);
-                content.error = None;
-            })
-        }
-        .spawn_at(task_set);
+    fn sync_from(&mut self, view: BusinessView<'_>, state: &mut ListState) {
+        self.read_state(state, view);
     }
 
-    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = false;
-        if crate::config::is_core_mismatch() {
-            self.proxies = proxies::ProxyCatalog::default();
-            self.tree = ProxyTree::default();
-            self.error = Some("API data mismatch with configured core".to_owned());
-            return;
-        }
-        async {
-            let response = tri!(
-                tokio::task::spawn_blocking(proxies::fetch_proxies)
-                    .await
-                    .unwrap()
-            );
-            wrapper(|content: &mut Self| {
-                content.proxies = response.clone();
-                content.tree = ProxyTree::build(response);
-                content.error = None;
-            })
-        }
-        .spawn_at(task_set);
+    fn needs_animation(&self) -> bool {
+        self.testing_since.is_some()
     }
-
-    fn on_leave(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = true;
+    fn on_enter(&mut self, _: &mut FutureSet<Self>, state: &mut ListState, cx: &mut Business) {
+        cx.enter(ApiResource::Proxies);
+        self.read_state(state, cx.view());
+    }
+    fn on_leave(&mut self, _: &mut FutureSet<Self>, state: &mut ListState, cx: &mut Business) {
+        cx.leave(ApiResource::Proxies);
+        self.clear_data(state);
     }
 }
 
 impl TabContent for Proxies {
     fn init(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = true;
         self.error = Some("Loading proxies...".to_owned());
     }
 
@@ -241,6 +269,7 @@ impl TabContent for Proxies {
         action: super::Action,
         task_set: &mut FutureSet<Self>,
         state: &mut Self::State,
+        cx: &mut Business,
     ) {
         let current = state.selected().unwrap_or(0);
 
@@ -302,7 +331,7 @@ impl TabContent for Proxies {
                         }
                         NodeType::Link | NodeType::File => {
                             if let Some(ref parent) = parent {
-                                self.select_inline(parent.clone(), name, task_set);
+                                self.select_inline(parent.clone(), name, cx);
                             }
                         }
                     }
@@ -318,7 +347,9 @@ impl TabContent for Proxies {
                 self.tree.expand_all(&self.proxies);
                 self.restore_selection(key, state);
             }
-            super::Action::Refresh => self.refresh(task_set),
+            super::Action::Refresh => {
+                cx.refresh(ApiResource::Proxies);
+            }
             super::Action::Sort(sort_mode) => self.handle_sort(current, sort_mode, state),
             super::Action::TestDelay => {
                 let info = self
@@ -326,16 +357,17 @@ impl TabContent for Proxies {
                     .node_at(current)
                     .map(|n| (n.name.clone(), n.node_type.clone()));
                 if let Some((name, ntype)) = info {
-                    self.test_delay(name, ntype, task_set);
+                    self.test_delay(name, ntype, cx);
                 }
             }
-            super::Action::TestAllDelay => self.test_all_delay(task_set),
+            super::Action::TestAllDelay => self.test_all_delay(cx),
             super::Action::Search => {
                 async move {
                     let filter = tri!(
                         Input::new()
                             .with_title("Filter".to_owned())
-                            .build_and_send()
+                            .build_and_send_async()
+                            .await
                             .await,
                         or_cancel
                     );
@@ -375,11 +407,24 @@ impl TabContent for Proxies {
         }
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State) {
+    fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, _view: BusinessView<'_>) {
         if let Some(idx) = self.jump_target.take()
             && idx < self.tree.len()
         {
             state.select(Some(idx));
+        }
+        if !self.data_available {
+            let block = Block::bordered()
+                .border_style(Theme::get().section("proxies").border)
+                .title(Self::TITLE);
+            f.render_widget(
+                ratatui::widgets::Paragraph::new(
+                    self.error.as_deref().unwrap_or("Loading proxies..."),
+                )
+                .block(block),
+                area,
+            );
+            return;
         }
         super::render::render(self, f, area, state);
     }

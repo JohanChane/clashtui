@@ -1,5 +1,9 @@
 use super::dev::*;
 use crate::config::CONFIG;
+use crate::tui::{
+    business::{Business, BusinessView},
+    core::ApiResource,
+};
 use ratatui::{
     layout::{Constraint, Layout},
     text::{Line, Span},
@@ -72,10 +76,6 @@ impl SettingsOp {
 #[derive(Default)]
 struct SettingsContent {
     ops: Vec<SettingsOp>,
-    current_mode: String,
-    allow_lan: bool,
-    tun_enable: bool,
-    tun_stack: String,
     mode_selector_state: ListState,
     mode_selector_visible: bool,
     tun_selector_state: ListState,
@@ -86,23 +86,23 @@ struct SettingsContent {
 
 impl BasicTabContent for SettingsContent {
     type Action = Action;
-
     type State = ListState;
-
     const TITLE: &str = "Settings";
-
-    fn on_enter(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        if crate::config::is_core_mismatch() {
-            self.current_mode = "core mismatch".to_owned();
-            self.allow_lan = false;
-            self.tun_enable = false;
-            self.tun_stack = "core mismatch".to_owned();
+    fn sync_from(&mut self, view: BusinessView<'_>, _: &mut ListState) {
+        if !view.core.api_allowed() {
+            self.mode_selector_visible = false;
+            self.tun_selector_visible = false;
         }
     }
+    fn on_enter(&mut self, _: &mut FutureSet<Self>, _: &mut ListState, cx: &mut Business) {
+        cx.enter(ApiResource::Settings);
+    }
+    fn on_leave(&mut self, _: &mut FutureSet<Self>, _: &mut ListState, cx: &mut Business) {
+        cx.leave(ApiResource::Settings);
+    }
 }
-
 impl TabContent for SettingsContent {
-    fn init(&mut self, task_set: &mut FutureSet<Self>, state: &mut Self::State) {
+    fn init(&mut self, _: &mut FutureSet<Self>, state: &mut ListState) {
         self.ops = SettingsOp::all();
         self.modes = Mode::VARIANTS.to_vec();
         self.tun_stacks = TunStack::VARIANTS.to_vec();
@@ -111,50 +111,19 @@ impl TabContent for SettingsContent {
         if !self.ops.is_empty() {
             state.select(Some(0));
         }
-        if crate::config::is_core_mismatch() {
-            self.current_mode = "core mismatch".to_owned();
-            self.allow_lan = false;
-            self.tun_enable = false;
-            self.tun_stack = "core mismatch".to_owned();
-            return;
-        }
-
-        async move {
-            let result = tokio::task::spawn_blocking(crate::functions::restful::config::fetch)
-                .await
-                .unwrap();
-            match result {
-                Ok(config) => {
-                    let mode = config.mode.to_string();
-                    let allow_lan = config.allow_lan.unwrap_or(false);
-                    let tun_enable = config.tun.as_ref().map(|t| t.enable).unwrap_or(false);
-                    let tun_stack = config
-                        .tun
-                        .as_ref()
-                        .map(|t| t.stack.to_string())
-                        .unwrap_or_else(|| "Mixed".to_owned());
-                    wrapper(move |c: &mut SettingsContent| {
-                        c.current_mode = mode;
-                        c.allow_lan = allow_lan;
-                        c.tun_enable = tun_enable;
-                        c.tun_stack = tun_stack;
-                    })
-                }
-                Err(e) => {
-                    Confirm::err(e);
-                    do_nothing()
-                }
-            }
-        }
-        .spawn_at(task_set);
     }
-
     fn handle_action(
         &mut self,
         action: Action,
-        task_set: &mut FutureSet<Self>,
-        state: &mut Self::State,
+        _: &mut FutureSet<Self>,
+        state: &mut ListState,
+        cx: &mut Business,
     ) {
+        if matches!(action, Action::Execute)
+            && (!cx.view().core.api_allowed() || cx.view().core.queries.settings.data.is_none())
+        {
+            return;
+        }
         if self.mode_selector_visible {
             match action {
                 Action::MoveUp => {
@@ -167,44 +136,21 @@ impl TabContent for SettingsContent {
                         self.mode_selector_state.select(Some(i + 1));
                     }
                 }
-                Action::Esc => {
-                    self.mode_selector_visible = false;
-                }
+                Action::Esc => self.mode_selector_visible = false,
                 Action::Execute => {
-                    let idx = self.mode_selector_state.selected().unwrap_or(0);
-                    if let Some(mode) = self.modes.get(idx) {
-                        let mode = *mode;
-                        self.mode_selector_visible = false;
-                        async move {
-                            if crate::config::is_core_mismatch() {
-                                return do_nothing();
-                            }
-                            let payload = serde_json::json!({"mode": mode.to_string()}).to_string();
-                            let result = tokio::task::spawn_blocking(move || {
-                                crate::functions::restful::config::patch(payload)
-                            })
-                            .await
-                            .unwrap();
-                            match result {
-                                Ok(_) => {
-                                    let new_val = mode.to_string();
-                                    wrapper(move |c: &mut SettingsContent| {
-                                        c.current_mode = new_val;
-                                    })
-                                }
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        }
-                        .spawn_at(task_set);
+                    if let Some(mode) = self
+                        .modes
+                        .get(self.mode_selector_state.selected().unwrap_or(0))
+                    {
+                        cx.patch_settings(
+                            serde_json::json!({"mode": mode.to_string()}).to_string(),
+                        );
                     }
+                    self.mode_selector_visible = false;
                 }
             }
             return;
         }
-
         if self.tun_selector_visible {
             match action {
                 Action::MoveUp => {
@@ -217,45 +163,21 @@ impl TabContent for SettingsContent {
                         self.tun_selector_state.select(Some(i + 1));
                     }
                 }
-                Action::Esc => {
-                    self.tun_selector_visible = false;
-                }
+                Action::Esc => self.tun_selector_visible = false,
                 Action::Execute => {
-                    let idx = self.tun_selector_state.selected().unwrap_or(0);
-                    if let Some(stack) = self.tun_stacks.get(idx) {
-                        let stack = *stack;
-                        self.tun_selector_visible = false;
-                        async move {
-                            if crate::config::is_core_mismatch() {
-                                return do_nothing();
-                            }
-                            let payload = serde_json::json!({"tun": {"stack": stack.to_string()}})
-                                .to_string();
-                            let result = tokio::task::spawn_blocking(move || {
-                                crate::functions::restful::config::patch(payload)
-                            })
-                            .await
-                            .unwrap();
-                            match result {
-                                Ok(_) => {
-                                    let new_val = stack.to_string();
-                                    wrapper(move |c: &mut SettingsContent| {
-                                        c.tun_stack = new_val;
-                                    })
-                                }
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        }
-                        .spawn_at(task_set);
+                    if let Some(stack) = self
+                        .tun_stacks
+                        .get(self.tun_selector_state.selected().unwrap_or(0))
+                    {
+                        cx.patch_settings(
+                            serde_json::json!({"tun": {"stack": stack.to_string()}}).to_string(),
+                        );
                     }
+                    self.tun_selector_visible = false;
                 }
             }
             return;
         }
-
         match action {
             Action::MoveUp => {
                 let i = state.selected().unwrap_or(0);
@@ -267,148 +189,63 @@ impl TabContent for SettingsContent {
                     state.select(Some(i + 1));
                 }
             }
+            Action::Esc => {}
             Action::Execute => {
-                let Some(idx) = state.selected() else { return };
-                let Some(op) = self.ops.get(idx) else { return };
+                let Some(op) = state.selected().and_then(|i| self.ops.get(i)).copied() else {
+                    return;
+                };
                 match op {
-                    SettingsOp::SwitchMode => {
-                        self.mode_selector_visible = true;
-                    }
-                    SettingsOp::AllowLan => {
-                        let new_val = !self.allow_lan;
-                        self.allow_lan = new_val;
-                        async move {
-                            if crate::config::is_core_mismatch() {
-                                return do_nothing();
-                            }
-                            let payload = serde_json::json!({"allow-lan": new_val}).to_string();
-                            let result = tokio::task::spawn_blocking(move || {
-                                crate::functions::restful::config::patch(payload)
-                            })
-                            .await
-                            .unwrap();
-                            match result {
-                                Ok(_) => wrapper(move |c: &mut SettingsContent| {
-                                    c.allow_lan = new_val;
-                                }),
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    wrapper(move |c: &mut SettingsContent| {
-                                        c.allow_lan = !new_val;
-                                    })
-                                }
-                            }
-                        }
-                        .spawn_at(task_set);
-                    }
-                    SettingsOp::TunEnable => {
-                        let new_val = !self.tun_enable;
-                        self.tun_enable = new_val;
-                        async move {
-                            if crate::config::is_core_mismatch() {
-                                return do_nothing();
-                            }
-                            let payload =
-                                serde_json::json!({"tun": {"enable": new_val}}).to_string();
-                            let result = tokio::task::spawn_blocking(move || {
-                                crate::functions::restful::config::patch(payload)
-                            })
-                            .await
-                            .unwrap();
-                            match result {
-                                Ok(_) => wrapper(move |c: &mut SettingsContent| {
-                                    c.tun_enable = new_val;
-                                }),
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    wrapper(move |c: &mut SettingsContent| {
-                                        c.tun_enable = !new_val;
-                                    })
-                                }
-                            }
-                        }
-                        .spawn_at(task_set);
-                    }
-                    SettingsOp::TunStackOp => {
-                        self.tun_selector_visible = true;
-                    }
-                    SettingsOp::FlushFakeIP => {
-                        async move {
-                            if crate::config::is_core_mismatch() {
-                                return do_nothing();
-                            }
-                            let result = tokio::task::spawn_blocking(|| {
-                                crate::functions::restful::cache::flush_fakeip()
-                            })
-                            .await
-                            .unwrap();
-                            match result {
-                                Ok(_) => do_nothing(),
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        }
-                        .spawn_at(task_set);
-                    }
-                    SettingsOp::FlushDNSCache => {
-                        async move {
-                            if crate::config::is_core_mismatch() {
-                                return do_nothing();
-                            }
-                            let result = tokio::task::spawn_blocking(|| {
-                                crate::functions::restful::cache::flush_dns()
-                            })
-                            .await
-                            .unwrap();
-                            match result {
-                                Ok(_) => do_nothing(),
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        }
-                        .spawn_at(task_set);
-                    }
-                    SettingsOp::UpdateGeo => {
-                        async move {
-                            if crate::config::is_core_mismatch() {
-                                return do_nothing();
-                            }
-                            let result = tokio::task::spawn_blocking(|| {
-                                crate::functions::restful::geo::upgrade_geo()
-                            })
-                            .await
-                            .unwrap();
-                            match result {
-                                Ok(_) => do_nothing(),
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        }
-                        .spawn_at(task_set);
+                    SettingsOp::SwitchMode => self.mode_selector_visible = true,
+                    SettingsOp::TunStackOp => self.tun_selector_visible = true,
+                    SettingsOp::AllowLan => cx.patch_settings(
+                        serde_json::json!({"allow-lan": !cx.view().core.queries.settings.data.as_ref().and_then(|c| c.allow_lan).unwrap_or(false)}).to_string(),
+                    ),
+                    SettingsOp::TunEnable => cx.patch_settings(
+                        serde_json::json!({"tun": {"enable": !cx.view().core.queries.settings.data.as_ref().and_then(|c| c.tun.as_ref()).is_some_and(|t| t.enable)}}).to_string(),
+                    ),
+                    SettingsOp::FlushFakeIP | SettingsOp::FlushDNSCache | SettingsOp::UpdateGeo => {
+                        use crate::tui::business::SettingsMaintenance;
+                        cx.maintain_settings(match op {
+                            SettingsOp::FlushFakeIP => SettingsMaintenance::FlushFakeIp,
+                            SettingsOp::FlushDNSCache => SettingsMaintenance::FlushDns,
+                            _ => SettingsMaintenance::UpdateGeo,
+                        });
                     }
                 }
             }
-            _ => {}
         }
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State) {
+    fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, view: BusinessView<'_>) {
         let block = Block::bordered()
             .border_style(Theme::get().section("settings").border)
             .title(Self::TITLE);
 
-        if crate::config::is_core_mismatch() {
-            let widget = Paragraph::new("API data mismatch with configured core").block(block);
+        let error = view
+            .core
+            .diagnostic()
+            .or_else(|| view.core.queries.settings.error.clone());
+        if let Some(error) = error {
+            let widget = Paragraph::new(error.as_str()).block(block);
             f.render_widget(widget, area);
             return;
         }
 
+        let Some(config) = &view.core.queries.settings.data else {
+            f.render_widget(
+                Paragraph::new("Loading configuration...").block(block),
+                area,
+            );
+            return;
+        };
+        let current_mode = config.mode.to_string();
+        let allow_lan = config.allow_lan.unwrap_or(false);
+        let tun_enable = config.tun.as_ref().is_some_and(|tun| tun.enable);
+        let tun_stack = config
+            .tun
+            .as_ref()
+            .map(|tun| tun.stack.to_string())
+            .unwrap_or_else(|| "Mixed".into());
         let value_style = Theme::get().section("settings").muted;
 
         let items: Vec<ListItem> = self
@@ -416,16 +253,16 @@ impl TabContent for SettingsContent {
             .iter()
             .map(|op| {
                 let (name, current) = match op {
-                    SettingsOp::SwitchMode => ("Mode", self.current_mode.as_str()),
+                    SettingsOp::SwitchMode => ("Mode", current_mode.as_str()),
                     SettingsOp::AllowLan => {
-                        let val = if self.allow_lan { "Yes" } else { "No" };
+                        let val = if allow_lan { "Yes" } else { "No" };
                         ("Allow LAN", val)
                     }
                     SettingsOp::TunEnable => {
-                        let val = if self.tun_enable { "Yes" } else { "No" };
+                        let val = if tun_enable { "Yes" } else { "No" };
                         ("TUN", val)
                     }
-                    SettingsOp::TunStackOp => ("TUN Stack", self.tun_stack.as_str()),
+                    SettingsOp::TunStackOp => ("TUN Stack", tun_stack.as_str()),
                     SettingsOp::FlushFakeIP => ("Flush Fake-IP", ""),
                     SettingsOp::FlushDNSCache => ("Flush DNS Cache", ""),
                     SettingsOp::UpdateGeo => ("Update GEO", ""),

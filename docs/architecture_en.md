@@ -35,7 +35,9 @@ src/
 │       └── restful.rs   # REST API calls (config/mode/proxies/connections)
 ├── tui.rs               # TUI module entry, re-exports from tui/
 │   └── tui/
-│       ├── app.rs       # App struct, event loop (~50fps), key routing
+│       ├── app.rs       # App struct, event-driven loop, key routing
+│       ├── business.rs  # Business commits and read-only views
+│       ├── core.rs      # Service/API state, request ownership, data slots
 │       ├── app/
 │       │   ├── actions.rs   # Global actions, tab targets, and default bindings
 │       │   └── tests.rs     # Global shortcut and tab-label regression tests
@@ -47,7 +49,7 @@ src/
 │       │   ├── matcher.rs   # Pending-chord state owned by App
 │       │   └── notation.rs  # Key notation parsing and formatting
 │       ├── signals.rs   # OS signal handling
-│       ├── term.rs      # Terminal raw mode enter/exit/suspend
+│       ├── term.rs      # Terminal setup, acknowledged leases, input worker
 │       ├── theme.rs     # Theme loading
 │       ├── utils.rs     # Utility functions
 │       ├── popmsg.rs    # Popup definitions (Confirm, Input, etc.)
@@ -64,7 +66,7 @@ src/
 │           ├── files.rs      # FileTab (DualTab: Profile + Template)
 │           ├── proxies.rs    # Proxies tab
 │           ├── connections.rs # Connections tab
-│           ├── logs.rs       # Logs tab
+│           ├── logs.rs       # Logs view; logs/collector.rs owns background capture
 │           ├── settings.rs   # Settings tab
 │           └── srvctl.rs     # Core service control tab
 ```
@@ -107,16 +109,11 @@ Uses the `load_save!` macro to auto-generate `from_file()` and `to_file()` metho
 
 ### Event Loop
 
-Runs in `App::serve()`, looping at ~50fps (20ms/frame):
+`App::serve()` uses `tokio::select!` to wait for input, popups, actual task completion, log changes, terminal handoff, exit, and business or display deadlines. It has no fixed frame tick. API refresh deadlines exist only while their pages are visible; active file updates request spinner frames every 160 ms.
 
-```
-Per-frame flow:
-1. Handle resize (atomic flag, processed at frame top to avoid races)
-2. terminal.draw(render) — render current frame
-3. sync() — advance completed async tasks
-4. tokio::select! wait for next event (key/tick/resize)
-5. Handle key event
-```
+Business owns CoreBusiness and LogCollector. Each command or core completion commits state, invalidates dependent queries and log sessions, advances pending work, and updates the collector before returning. Service commands start only after log invalidation. App then synchronizes the visible ordinary page directly through a read-only view and draws when dirty and holding the terminal. There is no component ID, subscription table, or local notification queue. Resize arrives through the input worker.
+
+On exit, App stops Business before leaving the visible page, then asks popup and terminal owners to stop. It continues receiving completions until tasks, log capture, terminal work, and input have actually exited. A terminal lease waits for the input worker to acknowledge its pause before an external program can read the terminal.
 
 ### Effective Binding Maps and Input State
 
@@ -137,9 +134,11 @@ App owns the only mutable pending-chord state. Tab changes, focus changes, and p
 
 `TuiWidget` provides the UI lifecycle:
 
-- `render(&mut self, f, area)` — draw UI
-- `sync(&mut self)` — advance async tasks
-- `on_enter(&mut self)` / `on_leave(&mut self)` — tab switch callbacks
+- `render(&mut self, f, area, view)` — draw from a read-only business view
+- `on_enter(&mut self, business)` / `on_leave(&mut self, business)` — ordered lifecycle commands
+- `sync_from(&mut self, view)` — update local display caches without starting work
+- `advance` — let the visible Files owner advance its two loads
+- `poll_tasks` / `finish_task` — wake on completion and apply valid visible-page callbacks
 
 `TuiTab` additionally exposes `title`, `input_scope`, and `handle_action`. Page containers receive resolved actions. Text popups handle raw keys through their own `handle_key_event` methods.
 
@@ -149,12 +148,14 @@ App owns the only mutable pending-chord state. Tab changes, focus changes, and p
 
 `Tab<C>` is a generic container. `C` must implement two traits:
 
-- `BasicTabContent` — defines the `Action` and `State` types and title
+- `BasicTabContent` — defines `Action`, `State`, title, lifecycle hooks, and read-only synchronization
 - `TabContent` — defines `init`, `handle_action`, `render`
 
 #### Dual Panel (DualTab)
 
 `DualTab<C1, C2>` is used for scenarios needing two panel switching (e.g. Files tab with Profile and Template). The two content types reference each other via `DualTabContent` / `DualTabContentMate` traits.
+
+Both visible panes synchronize directly, regardless of keyboard focus. Focus only chooses the action target. FileTab owns a separate actual load slot for each pane.
 
 #### Tab Enum
 
@@ -162,11 +163,21 @@ The `enum_dispatch!` macro unifies all tabs into a single `Tab` enum. Each varia
 
 ### Async Task Model
 
-Async I/O operations are managed via `FutureSet<C>` (i.e. `tokio::task::JoinSet`):
+`init` initializes local state. `on_enter` activates resource demand; `on_leave` stops demand and discards page data while preserving preferences. `sync_from` and `render` receive read-only BusinessView values. Status and Settings read shared configuration directly; Proxies and Connections retain revision-based derived caches.
 
-- Spawn async tasks in `handle_action` or `init` via `task_set.spawn(async { ... })`
-- Completed tasks produce `Callback<C>` (i.e. `Box<dyn FnOnce(&mut C)>`)
-- `sync()` advances completed callbacks each frame; state changes happen here uniformly
+`CoreBusiness` owns service/API state, request handles, and accepted page data. The system service's core process provides the API: Stopped means unavailable, while Running still requires API confirmation. Unknown retains the service probe diagnostic. API checks wait for confirmed Running and for pending or actual checks of that service to finish. A new service check discards an older API reply while retaining one confirmation request; API success never rewrites the service observation. API pages reuse confirmed Running, but recheck Stopped or Unknown on entry or refresh. Startup retries are bounded and confirm service before API; external service changes have no immediate detection guarantee.
+
+A request may commit only while its ownership remains valid. Service changes invalidate incompatible requests and log connections within the same business commit. Multi-step writes hold a revocable API permit and recheck it before configuration reloads or each batch request; restored access does not revive an old permit.
+
+Each QuerySlot owns one InFlight task returning its actual result, plus result acceptance, pending demand, and a deadline. Invalidating an active resource preserves demand while retaining its actual task. Every core completion advances pending requests, including discarded results. Status and Proxies refresh five seconds after success; Connections uses one second; Settings has no periodic refresh. Errors stop periodic refresh until an explicit request. Paused Connections remain paused through manual refresh or API recovery.
+
+`FutureSet<C>` owns a `JoinSet` of actual page operations plus weak identities for their visible-page callbacks. Tasks return `CallBack<C>` (`Box<dyn FnOnce(&mut C) + Send>`). Leaving invalidates callbacks, while operations still finish, clear activity, and deliver feedback. App polls their completion even when the page is hidden. Files mutations and explicit refreshes advance a shared data revision; the Files owner loads each unattempted revision while visible. Load slots retain actual JoinHandles across leave/enter, reject old results, and immediately chase a newer revision after completion. Errors count as attempts; only a new revision or enter retries them.
+
+Selecting a profile in Files validates and merges the local configuration, writes it, and records the selection before checking API permission. Permission gates only the online reload. Without a valid permit, the configuration is saved and the user is prompted to start or restart the core. Updating the selected profile uses the same apply path and reports update and apply outcomes separately.
+
+`LogCollector` belongs to Business and keeps up to 300 records in a `VecDeque<Arc<LogEntry>>`, including while the Logs view is hidden. A full buffer evicts its oldest record. WebSocket messages and frames are each limited to 256 KiB. Snapshots share records without copying their strings. Records are freed when their last reference is dropped. Core invalidation and pause/resume replace the connection identity, rejecting old records and diagnostics. Capture checks pause before parsing JSON, then rechecks pause and connection identity before appending.
+
+Background capture changes use a coalesced Notify. When Logs is visible, the first change schedules a display deadline 34 ms later; subsequent notifications do not postpone it. Each loop checks the deadline before drawing or waiting, even when input or tasks win the select. Only this deadline and entering or controlling Logs copy snapshots. Local pause, clear, and level changes update immediately and cancel the old deadline. Hidden logs never request ordinary-page redraws; leaving or exiting clears the deadline. Records do not enter the general popup queue. Connection attempts have finite timeouts and interruptible reconnect backoff; the worker handle is retained until it exits. System hostname resolution remains subject to the platform resolver.
 
 Error handling:
 - `tri!()` macro — capture errors and display a popup to the user
@@ -174,10 +185,9 @@ Error handling:
 
 ### Popups
 
-Popups use a `oneshot` channel pattern:
-- Call `Input::new().with_title(...).build_and_send().await` to block and wait for user input
-- Popup events are managed by `PopUp::check()` and `PopUp::handle_key_event()`
-- Use popups only when user input is required; simple confirm/error uses inline state display
+Background tasks submit popups through a bounded channel: `let reply = Input::new().with_title(...).build_and_send_async().await;` then `reply.await` waits for the user's answer. Full channels apply backpressure. Synchronous App callbacks collect their popups locally so they cannot block on App's own queue.
+
+`PopUp::check()` and `PopUp::handle_key_event()` manage display and input. Confirm/error messages use the same inbox. Shutdown closes pending replies so waiting operations can finish.
 
 ## Core Macros
 
@@ -208,7 +218,7 @@ Use `#[cfg(feature = "tui")]` rather than `#[cfg(feature = "customized-theme")]`
 
 ## Business Logic
 
-The `functions/` directory contains all business logic, divided into three modules:
+The `functions/` directory provides command, file, and REST operations. `tui/core.rs` owns their TUI state and request lifecycle.
 
 | Module | Responsibility |
 |--------|----------------|
@@ -233,3 +243,4 @@ The `functions/` directory contains all business logic, divided into three modul
 3. Declare defaults with `key_map!`, generate the wrapper with `newtype_tab!(MyTab(Tab<MyContent>), MyScope)`, and register it in `tab/mod.rs`'s `enum_dispatch!`.
 4. Add the tab to `App::new()` and update `TabTarget` and default navigation bindings. Keep their order consistent with the tab list.
 5. Dual panels expose separate actions and scopes; `input_scope` selects the effective map by focus.
+6. Keep `init` local. Submit lifecycle commands through Business; read committed data in `sync_from` and `render` without starting work. Keep operation cleanup and feedback outside disposable page callbacks.

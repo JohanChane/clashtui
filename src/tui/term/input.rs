@@ -176,7 +176,6 @@ impl InputReader {
         self.control.changed.notify_all();
     }
 
-    #[allow(dead_code)] // shutdown waits on this after the event-loop refactor
     pub(in crate::tui) fn has_worker(&self) -> bool {
         self.worker.is_some()
     }

@@ -107,7 +107,6 @@ impl TerminalCoordinator {
         self.active.is_none()
     }
 
-    #[allow(dead_code)] // shutdown uses this after the event-loop refactor
     pub(in crate::tui) fn is_idle(&self) -> bool {
         self.active.is_none() && self.bridge.slot.lock().unwrap().owner.is_none()
     }
@@ -309,7 +308,6 @@ pub fn terminal_lease() -> Result<TerminalLease> {
     }
 }
 
-#[allow(dead_code)] // command cancellation starts using this in the following refactor
 pub(crate) fn shutdown_requested() -> bool {
     COORDINATOR
         .lock()
@@ -327,25 +325,6 @@ pub fn setup() -> Result<()> {
 
 pub fn teardown() {
     let _ = raw_mode::restore();
-}
-
-std::thread_local! {
-    static HELD_LEASE: std::cell::RefCell<Option<TerminalLease>> =
-        const { std::cell::RefCell::new(None) };
-}
-
-/// Lend the terminal to sudo or another foreground program.
-/// Returns only after App has stopped the input reader.
-pub fn hold(on: bool) -> Result<()> {
-    if on {
-        let lease = terminal_lease()?;
-        HELD_LEASE.with(|slot| *slot.borrow_mut() = Some(lease));
-        Ok(())
-    } else if let Some(lease) = HELD_LEASE.with(|slot| slot.borrow_mut().take()) {
-        lease.release()
-    } else {
-        Ok(())
-    }
 }
 
 #[cfg(test)]

@@ -12,9 +12,23 @@ pub trait Wrapper {
     fn handle_key_event(&mut self, kv: &Key) -> Route;
     fn render(&mut self, f: &mut Frame);
     fn send(self: Box<Self>);
+    fn log_undelivered(&self);
 }
 
 impl<C: Msg> Wrapper for Instance<C> {
+    fn log_undelivered(&self) {
+        if self.content.is_notification() {
+            match &self.prompt {
+                Some(prompt) => log::warn!(
+                    "Undisplayed notification: {}: {}",
+                    self.title,
+                    prompt.prompt
+                ),
+                None => log::warn!("Undisplayed notification: {}", self.title),
+            }
+        }
+    }
+
     fn handle_key_event(&mut self, kv: &Key) -> Route {
         if matches!(kv.code, KeyCode::Tab) {
             self.is_focus_prompt = (!self.is_focus_prompt) && self.prompt.is_some();

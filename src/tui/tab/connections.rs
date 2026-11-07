@@ -1,5 +1,9 @@
 use super::dev::*;
-use crate::functions::restful::connection::{self, Conn};
+use crate::functions::restful::connection::Conn;
+use crate::tui::{
+    business::{Business, BusinessView},
+    core::ApiResource,
+};
 use ratatui::text::Line;
 use ratatui::widgets::{Cell, Row, Table};
 use std::collections::HashMap;
@@ -87,34 +91,6 @@ impl Document for Action {
     }
 }
 
-macro_rules! tri {
-    ($e:expr) => {
-        match $e {
-            Ok(v) => v,
-            Err(e) => {
-                crate::tui::widget::popmsg::Confirm::err(e);
-                return do_nothing();
-            }
-        }
-    };
-    ($e:expr, or_cancel) => {
-        match $e {
-            Ok(v) => v,
-            Err(_) => return do_nothing(),
-        }
-    };
-    ($e:expr, or_set) => {
-        match $e {
-            Ok(v) => v,
-            Err(e) => {
-                return wrapper(move |content: &mut Self| {
-                    content.error = Some(e.to_string());
-                });
-            }
-        }
-    };
-}
-
 #[derive_aliases::derive(..Action, Debug)]
 pub(in crate::tui) enum SortColumn {
     #[serde(rename = "SortByHost")]
@@ -167,6 +143,7 @@ struct Connections {
     sort_state: SortState,
     filter: Option<String>,
     paused: bool,
+    revision: u64,
 }
 
 fn human_bytes(bytes: u64) -> String {
@@ -270,70 +247,62 @@ fn sort_header(sort_state: SortState, column: SortColumn, base: &str) -> String 
     }
 }
 
-impl BasicTabContent for Connections {
-    type Action = Action;
-    type State = ();
-
-    const TITLE: &str = "Connections";
-
-    fn after_sync(&self, task_set: &mut FutureSet<Self>) {
+impl Connections {
+    fn read_state(&mut self, view: BusinessView<'_>) {
+        if !view.core.api_allowed() {
+            self.conns.clear();
+            self.display_rows.clear();
+            self.last_bytes.clear();
+            self.error = view.core.diagnostic();
+            return;
+        }
         if self.paused {
             return;
         }
-        if crate::config::is_core_mismatch() {
+        let slot = &view.core.queries.connections;
+        if self.revision == slot.revision() {
             return;
         }
-        async {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            let info = tri!(
-                tokio::task::spawn_blocking(connection::get_connections)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-            wrapper(|content: &mut Self| {
-                let conns = info.connections.unwrap_or_default();
-                content.conns = conns;
-                content.error = None;
-                content.refresh_display_rows();
-            })
+        self.revision = slot.revision();
+        self.error = slot.error.clone();
+        if let Some(info) = &slot.data {
+            self.conns = info.connections.clone().unwrap_or_default();
+            self.refresh_display_rows();
+            if self.row.is_some_and(|row| row >= self.display_rows.len()) {
+                self.row = self.display_rows.len().checked_sub(1);
+            }
+        } else {
+            self.conns.clear();
+            self.display_rows.clear();
+            self.last_bytes.clear();
         }
-        .spawn_at(task_set);
     }
-
-    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = false;
-        if crate::config::is_core_mismatch() {
-            self.conns = Vec::new();
-            self.display_rows = Vec::new();
-            self.error = Some("API data mismatch with configured core".to_owned());
-            return;
-        }
-        async {
-            let info = tri!(
-                tokio::task::spawn_blocking(connection::get_connections)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-            wrapper(|content: &mut Self| {
-                let conns = info.connections.unwrap_or_default();
-                content.conns = conns;
-                content.error = None;
-                content.refresh_display_rows();
-            })
-        }
-        .spawn_at(task_set);
+}
+impl BasicTabContent for Connections {
+    type Action = Action;
+    type State = ();
+    const TITLE: &str = "Connections";
+    fn sync_from(&mut self, view: BusinessView<'_>, _: &mut ()) {
+        self.read_state(view);
     }
-
-    fn on_leave(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = true;
+    fn on_enter(&mut self, _: &mut FutureSet<Self>, _: &mut (), cx: &mut Business) {
+        if self.paused {
+            cx.confirm_api();
+        } else {
+            cx.enter(ApiResource::Connections);
+        }
+        self.read_state(cx.view());
+    }
+    fn on_leave(&mut self, _: &mut FutureSet<Self>, _: &mut (), cx: &mut Business) {
+        cx.leave(ApiResource::Connections);
+        self.conns.clear();
+        self.display_rows.clear();
+        self.last_bytes.clear();
     }
 }
 
 impl TabContent for Connections {
     fn init(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = true;
         self.error = Some("Loading connections...".to_owned());
     }
 
@@ -342,6 +311,7 @@ impl TabContent for Connections {
         action: Action,
         task_set: &mut FutureSet<Self>,
         _state: &mut Self::State,
+        cx: &mut Business,
     ) {
         match action {
             Action::MoveUp => {
@@ -378,24 +348,7 @@ impl TabContent for Connections {
                     return;
                 };
                 let id = display_row.id.clone();
-                async move {
-                    let result = tokio::task::spawn_blocking(move || {
-                        let _ = connection::terminate_connection(Some(id));
-                        connection::get_connections()
-                    })
-                    .await
-                    .unwrap();
-                    let info = tri!(result, or_cancel);
-                    wrapper(move |content: &mut Connections| {
-                        content.conns = info.connections.unwrap_or_default();
-                        content.error = None;
-                        content.refresh_display_rows();
-                        if content.row.unwrap_or(0) >= content.display_rows.len() {
-                            content.row = content.display_rows.len().checked_sub(1);
-                        }
-                    })
-                }
-                .spawn_at(task_set);
+                cx.close_connections(Some(vec![id]));
             }
             Action::TerminateAll => {
                 let (use_bulk, ids): (bool, Vec<String>) = if let Some(ref pat) = self.filter {
@@ -424,29 +377,7 @@ impl TabContent for Connections {
                 if count == 0 {
                     return;
                 }
-
-                async move {
-                    let result = tokio::task::spawn_blocking(move || {
-                        if use_bulk {
-                            let _ = connection::terminate_all_connections();
-                        } else {
-                            for id in &ids {
-                                let _ = connection::terminate_connection(Some(id.clone()));
-                            }
-                        }
-                        connection::get_connections()
-                    })
-                    .await
-                    .unwrap();
-                    let info = tri!(result, or_cancel);
-                    wrapper(move |content: &mut Connections| {
-                        content.conns = info.connections.unwrap_or_default();
-                        content.error = None;
-                        content.refresh_display_rows();
-                        content.row = None;
-                    })
-                }
-                .spawn_at(task_set);
+                cx.close_connections((!use_bulk).then_some(ids));
             }
             Action::SortBy(col) => self.toggle_sort(col),
             Action::SortReset => {
@@ -458,7 +389,8 @@ impl TabContent for Connections {
                     let filter = tri!(
                         Input::new()
                             .with_title("Filter".to_owned())
-                            .build_and_send()
+                            .build_and_send_async()
+                            .await
                             .await,
                         or_cancel
                     );
@@ -470,9 +402,16 @@ impl TabContent for Connections {
             }
             Action::TogglePause => {
                 self.paused = !self.paused;
+                if self.paused {
+                    cx.leave(ApiResource::Connections);
+                } else {
+                    self.last_bytes.clear();
+                    cx.enter(ApiResource::Connections);
+                }
             }
             Action::FzfFind => {
                 self.paused = true;
+                cx.leave(ApiResource::Connections);
                 let names: Vec<String> = self
                     .display_rows
                     .iter()
@@ -481,7 +420,8 @@ impl TabContent for Connections {
                 async move {
                     let selected = FzfFinder::new(names)
                         .with_title("Find Connection")
-                        .build_and_send()
+                        .build_and_send_async()
+                        .await
                         .await
                         .unwrap_or_default();
                     wrapper(move |content: &mut Connections| {
@@ -493,7 +433,7 @@ impl TabContent for Connections {
         }
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State) {
+    fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State, _view: BusinessView<'_>) {
         let theme = Theme::get();
         let section = theme.section("connections");
         let block = Block::bordered()
