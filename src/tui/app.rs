@@ -4,13 +4,11 @@ use super::*;
 pub(in crate::tui) use actions::{AppAction, TabTarget, km};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use tab::prelude::*;
-use tokio::sync::Notify;
 use widget::help::HelpPanel;
 use widget::popmsg::PopUp;
 
 // 50fps
 const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
-pub(super) static FULL_RENDER: Notify = Notify::const_new();
 pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
 
@@ -45,50 +43,72 @@ impl App {
     }
     #[tokio::main]
     pub async fn serve() -> anyhow::Result<()> {
+        let mut coordinator = term::TerminalCoordinator::install();
         signals::Signals::start()?;
         let mut app = Self::new();
-        let mut events = crossterm::event::EventStream::new();
+        let mut input = term::InputReader::start();
         let mut invt = tokio::time::interval(TICK_RATE);
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
+        let mut pause_ack: Option<tokio::sync::oneshot::Receiver<()>> = None;
+        let mut pending_control = None;
 
         while !QUIT.load(Ordering::Relaxed) {
-            terminal.draw(|f| app.render(f))?;
-            app.sync();
+            if coordinator.owns_terminal() {
+                terminal.draw(|f| app.render(f))?;
+                app.sync();
+            }
 
-            let ev = {
-                use futures_lite::StreamExt as _;
-                // this tick here ensures that fps is stable
-                let mut tick = Box::pin(invt.tick());
-                let ev = tokio::select! {
-                    Some(ev) = events.next() => ev?,
-                    _ = &mut tick => continue,
-                    // if we switch between screens
-                    _ = FULL_RENDER.notified() => {
-                        // first we hold tui for output
-                        FULL_RENDER.notified().await;
-                        // then we tell ratatui to re-render everything
-                        terminal.clear()?;
-                        continue
-                    },
-                };
-                tick.await;
-                ev
-            };
-
-            use crossterm::event::Event;
-            match ev {
-                Event::Key(key_event) if key_event.kind.is_press() => {
-                    #[cfg(debug_assertions)]
-                    the_egg(key_event.code);
-                    let key = key_event.into();
-                    app.handle_key_event(&key);
+            let mut tick = Box::pin(invt.tick());
+            tokio::select! {
+                event = input.next_event() => {
+                    let Some(event) = event else {
+                        break;
+                    };
+                    let event = event?;
+                    use crossterm::event::Event;
+                    match event {
+                        Event::Key(key_event) if key_event.kind.is_press() => {
+                            #[cfg(debug_assertions)]
+                            the_egg(key_event.code);
+                            let key = key_event.into();
+                            app.handle_key_event(&key);
+                        }
+                        Event::Resize(..) => terminal.autoresize()?,
+                        _ => {}
+                    }
                 }
-                Event::Resize(..) => terminal.autoresize()?,
-                _ => (),
+                control = coordinator.recv() => match control {
+                    Some(control) if control.is_suspend() => {
+                        pause_ack = Some(input.request_pause());
+                        pending_control = Some(control);
+                    }
+                    Some(control) => {
+                        let clear = coordinator.handle(control)?;
+                        if coordinator.owns_terminal() {
+                            input.resume();
+                            if clear {
+                                terminal.clear()?;
+                            }
+                        }
+                    }
+                    None => break,
+                },
+                result = async { pause_ack.as_mut().unwrap().await }, if pause_ack.is_some() => {
+                    pause_ack = None;
+                    if result.is_err() {
+                        anyhow::bail!("Terminal input stopped before confirming suspension");
+                    }
+                    if let Some(control) = pending_control.take() {
+                        coordinator.handle(control)?;
+                    }
+                }
+                _ = &mut tick, if coordinator.owns_terminal() && pause_ack.is_none() => {}
             }
         }
 
+        input.begin_shutdown();
+        coordinator.begin_shutdown();
         log::trace!("App Exit");
         Ok(())
     }
