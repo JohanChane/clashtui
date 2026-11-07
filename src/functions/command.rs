@@ -10,6 +10,7 @@ use anyhow::Result;
 use std::{path::Path, process::Command};
 
 pub use platform::*;
+pub(crate) use utils::probe;
 use utils::*;
 
 pub fn test_config(profile_path: Option<&Path>, enable_geodata_mode: bool) -> String {
@@ -98,72 +99,6 @@ pub fn check_config(profile_path: &Path) -> anyhow::Result<()> {
             }
         }
     }
-}
-
-pub fn is_core_service_running() -> Option<bool> {
-    let ct = CONFIG.core_type();
-    let (service_name, is_user, csc) = match ct {
-        CoreType::Mihomo => (
-            &CONFIG.cfg_file.mihomo.core_service.service_name,
-            CONFIG.cfg_file.mihomo.core_service.is_user,
-            &CONFIG.cfg_file.mihomo.core_service,
-        ),
-        CoreType::Singbox => (
-            &CONFIG.cfg_file.singbox.core_service.service_name,
-            CONFIG.cfg_file.singbox.core_service.is_user,
-            &CONFIG.cfg_file.singbox.core_service,
-        ),
-    };
-    let host = &ServiceController::from_config(csc);
-
-    if service_name.is_empty() {
-        return None;
-    }
-
-    #[cfg(target_os = "windows")]
-    if matches!(host, ServiceController::Nssm) {
-        let s = nssm_status(service_name);
-        return Some(s == "active");
-    }
-
-    if matches!(host, ServiceController::OpenRc) {
-        let mut args = vec![];
-        if is_user {
-            args.push("--user");
-        }
-        args.push(service_name.as_str());
-        args.push("status");
-        return std::process::Command::new(host.bin_name())
-            .args(&args)
-            .output()
-            .map(|o| Some(String::from_utf8_lossy(&o.stdout).contains("started")))
-            .unwrap_or(None);
-    }
-
-    if matches!(host, ServiceController::Systemd) {
-        let mut args = vec!["is-active"];
-        if is_user {
-            args.push("--user");
-        }
-        args.push(service_name);
-        return std::process::Command::new(host.bin_name())
-            .args(&args)
-            .output()
-            .map(|o| Some(String::from_utf8_lossy(&o.stdout).trim() == "active"))
-            .unwrap_or(None);
-    }
-
-    #[cfg(target_os = "macos")]
-    if matches!(host, ServiceController::Launchd) && is_user {
-        let uid = unsafe { libc::getuid() };
-        return std::process::Command::new("launchctl")
-            .args(["print", &format!("gui/{uid}/{service_name}")])
-            .output()
-            .map(|o| Some(String::from_utf8_lossy(&o.stdout).contains("state = running")))
-            .unwrap_or(None);
-    }
-
-    None
 }
 
 fn svc_operation(op: &str, core_type: Option<CoreType>) -> Result<String> {

@@ -704,7 +704,8 @@ The `core_type` in `clashtui.db` takes precedence. If the API returns core data 
 
 - The user started another core's service outside of Clashtui
 - Both cores happen to listen on the same port, and API requests return data from the wrong core
-- CoreSrvCtl switched cores but Clashtui was not restarted (current design)
+
+CoreSrvCtl's core switch saves the selection and exits Clashtui after its result is acknowledged; the next launch uses the selected core.
 
 ### Detection Method
 
@@ -717,31 +718,42 @@ The `core_type` in `clashtui.db` takes precedence. If the API returns core data 
 
 ### Architecture
 
+`CoreBusiness` owns service observations, API qualification, and actual request handles. Service state and API state are separate: an HTTP failure does not prove that a service stopped, and an active service does not prove that its API is ready or belongs to the configured core.
+
 **Two-layer defense**:
 
 | Layer | Location | Mechanism |
 |-------|----------|-----------|
-| Panel layer | Each Tab's `on_enter` / `after_sync` | Block spawning async tasks or clear existing data |
+| Business/page layer | `CoreBusiness::api_allowed()` and page lifecycle | Start API work only while qualified; invalidate data, replies, and log connections before notifying pages |
 | API layer | Entry of `request()` function | Uniformly reject non-`/version` requests, return `"core mismatch"` |
 
-**Global flag**:
+**Compatibility flag**:
 
 `config.rs` maintains `static CORE_MISMATCH: AtomicBool`:
 
-- `set_core_mismatch(bool)` — write (only StatusTab)
-- `is_core_mismatch() -> bool` — read (all panels + `request()`)
+- `CoreBusiness::set_api` derives `set_core_mismatch(bool)` from the same committed `ApiState::Mismatch` value.
+- `is_core_mismatch()` remains available to `request()` and unmigrated callers. It is not a second source of TUI state. CLI retains its own execution context.
 
 **Detection timing**:
 
-`StatusTab.on_enter()` **synchronously** calls `detect_core_type()` (localhost HTTP, <10ms), setting `CORE_MISMATCH` before other panels fetch data for the first time. `after_sync` continues async polling detection (`or_set` silently).
+Entering an API page or Logs, completing a service operation, or manually refreshing requests an asynchronous `/version` check. The result supplies both core identity and version. Hidden pages do not create API queries. Starting or restarting a service opens a ten-second confirmation window: a failed check completed within that window schedules another attempt after 250 ms. An already scheduled check still uses its own timeout. This is bounded startup confirmation, not permanent polling.
 
-**Popup**:
+Page data refreshes separately from identity checks:
 
-On first detection of a mismatch (when `detected_core_type` changes from `None` to a non-matching value), a Confirm popup is shown to the user. Subsequent mismatches do not trigger popups.
+| Page | Refresh policy while visible |
+|------|------------------------------|
+| Status / Proxies | 5 seconds after a successful query |
+| Connections | 1 second after a successful query |
+| Settings | On entry, explicit refresh, or user operation |
+| CoreSrvCtl | On entry, explicit refresh, or service-operation completion |
+
+`Ctrl-l` refreshes the current API page and rechecks identity; on CoreSrvCtl it checks service state, on Logs it rechecks identity, and on Files it reloads local lists. A query error is displayed without creating an immediate retry loop. API diagnostics appear in page state; user operations still deliver their individual success or failure feedback after leaving the page.
+
+`LogCollector` has its own component ID and subscribes to core changes independently of the Logs view. Hiding Logs preserves capture and its bounded buffer. Only the visible view subscribes to `LogsUpdated`. Pause discards new records; pause boundaries and core invalidation reject late records and diagnostics from old connections. Core recovery preserves the user's pause choice. App wakes on diagnostic changes even when no log arrives and retains the capture worker until shutdown finishes.
 
 ### Returning to Normal
 
-`after_sync` keeps detecting. When `detected == configured`, the `CORE_MISMATCH` flag is automatically cleared. When the user switches to each panel, API requests resume normally and data is displayed again.
+A successful explicit check for the configured core commits `ApiState::Ready`, clears the derived mismatch flag, and notifies subscribers. Visible pages can then request current data. Hidden pages read the latest state on their next entry. External service changes have no immediate synchronization guarantee; use manual refresh to confirm them. Late results from invalidated requests cannot restore old data or clear ownership of a newer request.
 
 ## Support macOS
 

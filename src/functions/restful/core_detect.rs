@@ -11,36 +11,21 @@ struct VersionResponse {
     version: String,
 }
 
-/// Detect which core is actually running by querying `/version`.
-///
-/// Checks the `version` field: sing-box reports e.g. `"sing-box 1.13.11"`,
-/// mihomo reports e.g. `"v1.18.10"`.
-pub fn detect_core_type() -> Result<crate::config::CoreType> {
-    request(Method::Get, "/version", None).and_then(|r| {
-        let v: VersionResponse = r.json()?;
-        if v.version.contains("sing-box") {
-            Ok(crate::config::CoreType::Singbox)
-        } else {
-            Ok(crate::config::CoreType::Mihomo)
-        }
-    })
+/// A single identity check supplies both the detected core and its version.
+pub struct CoreVersion {
+    pub core: crate::config::CoreType,
+    pub version: String,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn detect_singbox_from_version_string() {
-        let json = r#"{"meta": true, "premium": true, "version": "sing-box 1.13.11"}"#;
-        let v: VersionResponse = serde_json::from_str(json).unwrap();
-        assert!(v.version.contains("sing-box"));
-    }
-
-    #[test]
-    fn detect_mihomo_from_version_string() {
-        let json = r#"{"meta": true, "version": "v1.18.10"}"#;
-        let v: VersionResponse = serde_json::from_str(json).unwrap();
-        assert!(!v.version.contains("sing-box"));
-    }
+pub fn fetch_version() -> Result<CoreVersion> {
+    let response: VersionResponse = request(Method::Get, "/version", None)?.json()?;
+    let core = if response.version.contains("sing-box") {
+        crate::config::CoreType::Singbox
+    } else {
+        crate::config::CoreType::Mihomo
+    };
+    Ok(CoreVersion {
+        core,
+        version: response.version,
+    })
 }

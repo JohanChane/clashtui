@@ -32,14 +32,14 @@ pub const CONFIG: Wrapper = Wrapper;
 
 static CORE_MISMATCH: AtomicBool = AtomicBool::new(false);
 
-/// Set when StatusTab detects the API is serving data from a different core
-/// than the configured one.
+/// Compatibility guard derived from CoreBusiness's accepted API identity.
+/// Page request eligibility is managed by CoreBusiness, not by this flag alone.
 pub fn set_core_mismatch(mismatch: bool) {
     CORE_MISMATCH.store(mismatch, Ordering::Release);
 }
 
 /// True when the running core does not match the configured core type.
-/// Tabs should skip displaying API data when this returns true.
+/// REST operations retain this identity check; TUI pages also check current API eligibility.
 pub fn is_core_mismatch() -> bool {
     CORE_MISMATCH.load(Ordering::Acquire)
 }
@@ -378,19 +378,6 @@ load_save!(ProfileManager, defs::DATA_FILE);
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn core_mismatch_flag_defaults_false() {
-        assert!(!is_core_mismatch());
-    }
-
-    #[test]
-    fn core_mismatch_flag_toggle() {
-        set_core_mismatch(true);
-        assert!(is_core_mismatch());
-        set_core_mismatch(false);
-        assert!(!is_core_mismatch());
-    }
 
     #[test]
     fn core_data_dir_returns_correct_subdir_per_core_type() {

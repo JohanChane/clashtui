@@ -1,4 +1,5 @@
 mod dev {
+    pub(in crate::tui) use crate::tui::business::{Business, BusinessView};
     pub(in crate::tui) use crate::tui::key::DefaultBindings;
     pub use crate::tui::key::Document;
     pub use crate::tui::widget::dualtab::*;
@@ -17,7 +18,7 @@ macro_rules! tri {
         match $e {
             Ok(v) => v,
             Err(e) => {
-                Confirm::err(e);
+                Confirm::err_async(e).await;
                 return do_nothing();
             }
         }
@@ -53,11 +54,11 @@ macro_rules! newtype_tab {
             fn input_scope(&self) -> crate::tui::key::Scope {
                 crate::tui::key::Scope::$scope
             }
-            fn handle_action(&mut self, action: crate::tui::key::Action) {
+            fn handle_action(&mut self, action: crate::tui::key::Action, cx: &mut crate::tui::business::Business) {
                 let crate::tui::key::Action::$scope(action) = action else {
                     unreachable!("action routed to the wrong page");
                 };
-                self.0.handle_action(action);
+                self.0.handle_action(action, cx);
             }
         }
     };
@@ -69,7 +70,7 @@ macro_rules! newtype_tab {
         impl crate::tui::tab::TuiTab for $tab {
             fn title(&self) -> &'static str { $inner::TITLE }
             fn input_scope(&self) -> crate::tui::key::Scope { crate::tui::key::Scope::App }
-            fn handle_action(&mut self, _: crate::tui::key::Action) {
+            fn handle_action(&mut self, _: crate::tui::key::Action, _cx: &mut crate::tui::business::Business) {
                 unreachable!("this page has no local actions");
             }
         }
@@ -79,7 +80,11 @@ macro_rules! newtype_tab {
 pub(in crate::tui) trait TuiTab: super::TuiWidget {
     fn title(&self) -> &'static str;
     fn input_scope(&self) -> crate::tui::key::Scope;
-    fn handle_action(&mut self, action: crate::tui::key::Action);
+    fn handle_action(
+        &mut self,
+        action: crate::tui::key::Action,
+        cx: &mut crate::tui::business::Business,
+    );
 }
 
 pub(super) mod connections;
@@ -106,28 +111,35 @@ macro_rules! enum_dispatch {
     })+
 
     impl crate::tui::TuiWidget for Tab {
-        fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
+        fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect, view: crate::tui::business::BusinessView<'_>) {
             match self {
-                $(Self::$item(inner) => inner.render(f, area),)+
+                $(Self::$item(inner) => inner.render(f, area, view),)+
             }
         }
 
-        fn sync(&mut self) {
-            match self {
-                $(Self::$item(inner) => inner.sync(),)+
-            }
+        fn on_enter(&mut self, business: &mut crate::tui::business::Business) {
+            match self { $(Self::$item(inner) => inner.on_enter(business),)+ }
         }
-
-        fn on_enter(&mut self) {
-            match self {
-                $(Self::$item(inner) => inner.on_enter(),)+
-            }
+        fn on_leave(&mut self, business: &mut crate::tui::business::Business) {
+            match self { $(Self::$item(inner) => inner.on_leave(business),)+ }
         }
-
-        fn on_leave(&mut self) {
-            match self {
-                $(Self::$item(inner) => inner.on_leave(),)+
-            }
+        fn sync_from(&mut self, view: crate::tui::business::BusinessView<'_>) {
+            match self { $(Self::$item(inner) => inner.sync_from(view),)+ }
+        }
+        fn advance(&mut self) {
+            match self { $(Self::$item(inner) => inner.advance(),)+ }
+        }
+        fn poll_tasks(&mut self, cx: &mut std::task::Context<'_>) -> std::task::Poll<()> {
+            match self { $(Self::$item(inner) => inner.poll_tasks(cx),)+ }
+        }
+        fn finish_task(&mut self, visible: bool) -> bool {
+            match self { $(Self::$item(inner) => inner.finish_task(visible),)+ }
+        }
+        fn has_tasks(&self) -> bool {
+            match self { $(Self::$item(inner) => inner.has_tasks(),)+ }
+        }
+        fn needs_animation(&self) -> bool {
+            match self { $(Self::$item(inner) => inner.needs_animation(),)+ }
         }
     }
 
@@ -143,9 +155,9 @@ macro_rules! enum_dispatch {
                 $(Self::$item(inner) => inner.input_scope(),)+
             }
         }
-        fn handle_action(&mut self, action: crate::tui::key::Action) {
+        fn handle_action(&mut self, action: crate::tui::key::Action, cx: &mut crate::tui::business::Business) {
             match self {
-                $(Self::$item(inner) => inner.handle_action(action),)+
+                $(Self::$item(inner) => inner.handle_action(action, cx),)+
             }
         }
     }

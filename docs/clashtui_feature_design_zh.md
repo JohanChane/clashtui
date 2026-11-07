@@ -704,7 +704,8 @@ App 持有唯一的组合键等待状态。执行、Which、帮助和标签栏�
 
 - 用户在 clashtui 外部启动了另一内核的 service
 - 两个内核恰好监听同一端口，API 请求返回的数据来自错误内核
-- CoreSrvCtl 切换内核后未重启 clashtui（当前设计）
+
+CoreSrvCtl 切换核心后保存选择，用户确认结果后退出 Clashtui；下次启动使用新核心。
 
 ### 检测方案
 
@@ -717,32 +718,42 @@ App 持有唯一的组合键等待状态。执行、Which、帮助和标签栏�
 
 ### 架构
 
+`CoreBusiness` 持有服务观测、API 资格和实际请求句柄。服务状态与 API 状态分开：HTTP 失败不能证明服务已停止，服务运行也不能证明 API 可用或属于配置中的核心。
+
 **两层防护**：
 
 | 层 | 位置 | 机制 |
 |----|------|------|
-| 面板层 | 各 Tab 的 `on_enter` / `after_sync` | 阻止 spawn async task 或清空已有数据 |
+| 业务/面板层 | `CoreBusiness::api_allowed()` 和页面生命周期 | 仅在资格有效时启动 API 操作；先使数据、回复和日志连接失效，再通知页面 |
 | API 层 | `request()` 函数入口 | 统一拒绝非 `/version` 的请求，返回 `"core mismatch"` |
 
-**全局标志**：
+**兼容标志**：
 
 `config.rs` 中维护 `static CORE_MISMATCH: AtomicBool`：
 
-- `set_core_mismatch(bool)` — 写入（仅 StatusTab）
-- `is_core_mismatch() -> bool` — 读取（所有面板 + `request()`）
+- `CoreBusiness::set_api` 从同次提交的 `ApiState::Mismatch` 派生 `set_core_mismatch(bool)`。
+- `is_core_mismatch()` 继续供 `request()` 和未迁移调用点使用，不是第二套 TUI 状态来源。CLI 保留自己的执行上下文。
 
 **检测时机**：
 
-`StatusTab.on_enter()` 中**同步**调用 `detect_core_type()`（localhost HTTP，<10ms），
-在其他面板首次取数据前设置好 `CORE_MISMATCH`。`after_sync` 中继续异步轮询检测（`or_set` 静默）。
+进入 API 页面或 Logs、服务操作完成、手动刷新时，异步请求 `/version`，一次结果同时提供核心身份和版本。隐藏页不发起 API 查询。启动或重启服务后设十秒确认窗口：窗口内收到失败结果时，250 ms 后再检查；已排定的检查仍按自身超时结束。这是有限的启动确认，不是持续轮询。
 
-**弹窗**：
+页面数据查询与身份检查分开：
 
-首次检测到 mismatch 时（`detected_core_type` 从 `None` 变为非匹配值），弹出 Confirm 提示用户。后续不再弹窗。
+| 页面 | 可见时的刷新规则 |
+|------|------------------|
+| Status / Proxies | 上次查询成功后 5 秒 |
+| Connections | 上次查询成功后 1 秒 |
+| Settings | 进入页面、手动刷新或用户操作时 |
+| CoreSrvCtl | 进入页面、手动刷新或服务操作完成时 |
+
+`Ctrl-l` 刷新当前 API 页并重新确认身份；在 CoreSrvCtl 检查服务状态，在 Logs 重新确认身份，在 Files 重载本地列表。查询错误显示在页面上，不立即无限重试。API 诊断保存在页面状态；用户操作的成功或失败反馈在离页后仍逐条交付。
+
+`LogCollector` 有独立组件 ID，独立于 Logs 视图订阅核心变化。隐藏 Logs 仍持续采集并保留有界缓冲，只有可见视图订阅 `LogsUpdated`。暂停期间丢弃新记录；跨暂停边界或核心失效的旧记录、旧诊断均不接收。核心恢复保留用户的暂停选择。没有日志时，诊断变化也会唤醒 App；退出时保留采集线程句柄直到实际回收。
 
 ### 恢复正常
 
-`after_sync` 持续检测，当 `detected == configured` 时自动清空 `CORE_MISMATCH` 标志。用户切换到各面板时正常发起 API 请求，数据恢复展示。
+显式检查确认 API 属于配置中的核心后，提交 `ApiState::Ready`、清除派生的 mismatch 标志并通知订阅者。可见页可以请求最新数据；隐藏页在下次进入时读取最新状态。外部启停没有即时同步保证，可用手动刷新重新确认。失效请求的迟到结果不能恢复旧数据，也不能清掉新请求的所有权。
 
 ## Support macOS
 

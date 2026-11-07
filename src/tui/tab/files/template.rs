@@ -94,12 +94,15 @@ impl BasicTabContent for Template {
 impl DualTabContentMate for Template {
     type Mate = super::profile::Profile;
 
-    fn init(&mut self, task_set: &mut FutureSet<(Self::Mate, Self)>, _: &mut Self::State) {
-        async {
-            let templates = tri!(get_all_templates());
-            wrapper(|(_, content): &mut (Self::Mate, Self)| content.items = templates)
-        }
-        .spawn_at(task_set);
+    fn init(&mut self, _: &mut FutureSet<(Self::Mate, Self)>, _: &mut Self::State) {}
+
+    fn on_leave(
+        &mut self,
+        _: &mut FutureSet<(Self::Mate, Self)>,
+        _: &mut Self::State,
+        _business: &mut Business,
+    ) {
+        self.items.clear();
     }
 
     fn handle_action(
@@ -107,6 +110,7 @@ impl DualTabContentMate for Template {
         action: Self::Action,
         task_set: &mut FutureSet<(Self::Mate, Self)>,
         state: &mut Self::State,
+        _cx: &mut Business,
     ) -> bool {
         log::debug!(
             "Template::handle_action: action={action:?} items.len={}",
@@ -145,7 +149,14 @@ impl DualTabContentMate for Template {
         false
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, is_focused: bool) {
+    fn render(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        state: &mut Self::State,
+        is_focused: bool,
+        _view: BusinessView<'_>,
+    ) {
         if let Some(idx) = self.jump_target.take() {
             state.select(Some(idx));
         }
@@ -201,6 +212,12 @@ impl DualTabContentMate for Template {
     }
 }
 
+impl Template {
+    pub(super) fn apply_loaded(&mut self, items: Vec<String>) {
+        self.items = items;
+    }
+}
+
 mod actions {
     use super::*;
 
@@ -235,7 +252,8 @@ mod actions {
     async fn delete(name: String) -> CB {
         let rx = Confirm::title("Delete template?".to_string())
             .with_prompt(format!("Delete {name}?\nEnter to confirm, Esc to cancel"))
-            .build_and_send();
+            .build_and_send_async()
+            .await;
         if rx.await.is_err() {
             return do_nothing();
         }
@@ -245,15 +263,12 @@ mod actions {
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => {
-                Confirm::err(e);
+                Confirm::err_async(e).await;
                 return do_nothing();
             }
         }
 
-        let templates = tri!(get_all_templates());
-        wrapper(move |(_, content): &mut C| {
-            content.items = templates;
-        })
+        sync!(C)
     }
 
     async fn _edit(name: String) -> CB {
@@ -284,7 +299,8 @@ mod actions {
         let filter = tri!(
             Input::new()
                 .with_title("Filter".to_owned())
-                .build_and_send()
+                .build_and_send_async()
+                .await
                 .await,
             or_cancel
         );
@@ -297,7 +313,8 @@ mod actions {
     pub(super) async fn fzf_find(items: Vec<String>) -> CB {
         let selected = FzfFinder::new(items)
             .with_title("Find Template")
-            .build_and_send()
+            .build_and_send_async()
+            .await
             .await
             .unwrap_or_default();
 

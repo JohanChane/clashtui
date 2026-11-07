@@ -311,17 +311,3 @@ fn broadcast_settings_change() {
         )
     };
 }
-
-/// Retrieve the mixed inbound port from the core REST API (`GET /configs`).
-pub fn get_mixed_port() -> Result<u16> {
-    use crate::functions::restful::config_struct::ClashConfig;
-    let resp = minreq::get(format!("{}/configs", CONFIG.controller_for_core()))
-        .with_timeout(5)
-        .send()
-        .map_err(|e| anyhow::anyhow!("Failed to fetch /configs: {e}"))?;
-    let cfg: ClashConfig = serde_json::from_str(resp.as_str().map_err(|e| anyhow::anyhow!("{e}"))?)
-        .map_err(|e| anyhow::anyhow!("Failed to parse /configs: {e}"))?;
-    cfg.mixed_port
-        .or(cfg.port)
-        .ok_or_else(|| anyhow::anyhow!("No mixed_port or port found in /configs"))
-}

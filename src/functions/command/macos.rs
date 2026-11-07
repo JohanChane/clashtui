@@ -113,14 +113,7 @@ pub fn repair_file_permissions(dir: &Path, group_name: &str) -> Result<String> {
     }
 
     let script = commands.join(" && ");
-    crate::tui::hold(true)?;
-    let opt = std::process::Command::new("sudo")
-        .arg("sh")
-        .arg("-c")
-        .arg(&script)
-        .output()?;
-    crate::tui::hold(false)?;
-    Ok(stringify_output(opt))
+    super::utils::exec_sudo("sh", vec!["-c", &script])
 }
 
 pub(super) fn stringify_output(output: std::process::Output) -> String {

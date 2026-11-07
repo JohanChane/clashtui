@@ -1,13 +1,19 @@
+use super::operations::{FileOperations, UpdateBatch};
 use crate::functions::command::{check_config, edit, test_config};
-use crate::functions::file::profile::{db, select, update_profile};
+use crate::functions::file::profile::{
+    SelectionOutcome, UpdateResult, db, select_with_check, update_profile_with_check,
+};
 use crate::functions::restful::download;
+use crate::tui::core::ApiPermit;
 use std::cell::Cell;
-use std::collections::{HashMap, HashSet};
-use std::sync::{Mutex, atomic::Ordering};
+use std::collections::HashMap;
+use std::sync::Mutex;
 
 use ratatui::style::Style;
 
 use super::*;
+
+const SAVED_NOTICE: &str = "Configuration saved. Start or restart the core to apply it.";
 
 /// Traffic usage info parsed from subscription-userinfo header.
 #[derive(Debug, Clone, Default)]
@@ -41,14 +47,15 @@ fn parse_traffic_info(header_value: &str) -> TrafficInfo {
     info
 }
 
-pub fn fetch_traffic_for_url(url: &str, with_proxy: bool) {
+pub async fn fetch_traffic_for_url(url: &str, with_proxy: bool) {
     let url = url.to_owned();
-    std::thread::spawn(move || {
+    let _ = tokio::task::spawn_blocking(move || {
         if let Ok(Some(userinfo)) = download::fetch_subscription_userinfo(&url, with_proxy) {
             let info = parse_traffic_info(&userinfo);
             TRAFFIC_CACHE.lock().unwrap().insert(url, info);
         }
-    });
+    })
+    .await;
 }
 
 fn human_bytes(bytes: u64) -> String {
@@ -171,7 +178,7 @@ pub(super) struct Profile {
     items: Vec<String>,
     atime: Vec<String>,
     filter: Option<String>,
-    updating: HashSet<String>,
+    operations: FileOperations,
     jump_target: Cell<Option<usize>>,
 }
 
@@ -180,13 +187,24 @@ impl BasicTabContent for Profile {
     type State = ListState;
 
     const TITLE: &str = "Profile";
+    fn needs_animation(&self) -> bool {
+        self.operations.is_active()
+    }
 }
 
 impl DualTabContent for Profile {
     type Mate = super::template::Template;
 
-    fn init(&mut self, task_set: &mut FutureSet<(Self, Self::Mate)>, _: &mut Self::State) {
-        async { sync!((Self, Self::Mate)) }.spawn_at(task_set);
+    fn init(&mut self, _: &mut FutureSet<(Self, Self::Mate)>, _: &mut Self::State) {}
+
+    fn on_leave(
+        &mut self,
+        _: &mut FutureSet<(Self, Self::Mate)>,
+        _: &mut Self::State,
+        _business: &mut Business,
+    ) {
+        self.items.clear();
+        self.atime.clear();
     }
 
     fn handle_action(
@@ -194,6 +212,7 @@ impl DualTabContent for Profile {
         action: Self::Action,
         task_set: &mut FutureSet<(Self, Self::Mate)>,
         state: &mut Self::State,
+        cx: &mut Business,
     ) -> bool {
         match action {
             Action::Switch => return true,
@@ -202,11 +221,24 @@ impl DualTabContent for Profile {
 
             Action::Select => {
                 let name = get_name!(self, state);
+                let permit = cx.api_permit();
                 async move {
-                    let pf = tri!(db::get(&name).unwrap().load_local_profile());
+                    let profile = tri!(
+                        db::get(&name)
+                            .ok_or_else(|| anyhow::anyhow!("Profile no longer exists: {name}"))
+                    );
+                    let pf = tri!(profile.clone().load_local_profile());
                     tri!(check_config(&pf.path));
-                    tri!(select(db::get(&name).unwrap()).await);
-                    sync!((Self, Self::Mate))
+                    let result = select_with_check(profile, move || {
+                        permit.as_ref().is_some_and(ApiPermit::is_valid)
+                    })
+                    .await;
+                    // Reload can fail after the local selection has already changed.
+                    super::operations::mark_changed();
+                    if tri!(result) == SelectionOutcome::Saved {
+                        Confirm::message_async("Profile saved".into(), SAVED_NOTICE.into()).await;
+                    }
+                    do_nothing()
                 }
                 .spawn_at(task_set);
             }
@@ -223,24 +255,35 @@ impl DualTabContent for Profile {
                 }
                 Operation::Add => action.act(String::new()).spawn_at(task_set),
                 Operation::UpdateAll => {
-                    for name in &self.items {
-                        self.updating.insert(name.clone());
+                    let batch = self.operations.begin(self.items.clone());
+                    if !batch.names.is_empty() {
+                        actions::update_all(batch, cx.api_permit()).spawn_at(task_set);
                     }
-                    actions::update_all(self.items.clone()).spawn_at(task_set)
                 }
                 _ => {
                     let name = get_name!(self, state);
                     if matches!(action, Operation::Update) {
-                        self.updating.insert(name.clone());
+                        let batch = self.operations.begin([name]);
+                        if !batch.names.is_empty() {
+                            actions::update(batch, cx.api_permit()).spawn_at(task_set);
+                        }
+                    } else {
+                        action.act(name).spawn_at(task_set);
                     }
-                    action.act(name).spawn_at(task_set)
                 }
             },
         }
         false
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, is_focused: bool) {
+    fn render(
+        &self,
+        f: &mut Frame,
+        area: Rect,
+        state: &mut Self::State,
+        is_focused: bool,
+        _view: BusinessView<'_>,
+    ) {
         if let Some(idx) = self.jump_target.take() {
             state.select(Some(idx));
         }
@@ -283,7 +326,6 @@ impl DualTabContent for Profile {
             .map(|pf| pf.name)
             .unwrap_or_default();
         let spinner_chars = ['/', '-', '\\', '|'];
-        let spinner_idx = (crate::tui::app::SPINNER_FRAME.load(Ordering::Relaxed) as usize / 8) % 4;
 
         let iter = self
             .items
@@ -293,7 +335,7 @@ impl DualTabContent for Profile {
             .map(|(value, extra)| {
                 let mut spans = Vec::with_capacity(5);
 
-                if self.updating.contains(value.as_str()) {
+                if let Some(spinner_idx) = self.operations.frame_for(value.as_str()) {
                     spans.push(Span::raw(format!("{} ", spinner_chars[spinner_idx])));
                 } else if value == current.as_str() {
                     spans.push(Span::raw("* ").style(section.border));
@@ -329,7 +371,7 @@ mod actions {
                 Self::Edit => _edit(name).await,
                 Self::Delete => delete(name).await,
                 Self::Preview => preview(name).await,
-                Self::Update => update(name).await,
+                Self::Update => unreachable!("Update handled with its operation owner"),
                 Self::Test => test(name).await,
                 Self::Check => check(name).await,
                 Self::ToggleNoPp => toggle_no_pp(name).await,
@@ -350,7 +392,8 @@ mod actions {
         let filter = tri!(
             Input::new()
                 .with_title("Filter".to_owned())
-                .build_and_send()
+                .build_and_send_async()
+                .await
                 .await,
             or_cancel
         );
@@ -363,7 +406,8 @@ mod actions {
     pub(super) async fn fzf_find(items: Vec<String>) -> CB {
         let selected = FzfFinder::new(items)
             .with_title("Find Profile")
-            .build_and_send()
+            .build_and_send_async()
+            .await
             .await
             .unwrap_or_default();
 
@@ -376,14 +420,16 @@ mod actions {
         let name = tri!(
             Input::new()
                 .with_title("Name".to_owned())
-                .build_and_send()
+                .build_and_send_async()
+                .await
                 .await,
             or_cancel
         );
         let source = tri!(
             Input::new()
                 .with_title("URL or File Path".to_owned())
-                .build_and_send()
+                .build_and_send_async()
+                .await
                 .await,
             or_cancel
         );
@@ -411,7 +457,7 @@ mod actions {
                 let file = tri!(std::fs::File::create(&path));
                 tri!(serde_json::to_writer(file, &content));
             }
-            {
+            let saved = {
                 let mut pm = crate::config::CONFIG.data.lock().unwrap();
                 let dtype = if is_url {
                     crate::config::database::ProfileType::Url(source.clone())
@@ -419,8 +465,9 @@ mod actions {
                     crate::config::database::ProfileType::Singbox
                 };
                 pm.insert(&name, dtype);
-                tri!(pm.to_file());
-            }
+                pm.to_file()
+            };
+            tri!(saved);
         } else if is_url {
             let path = crate::functions::file::PROFILE_YAMLS_PATH.join(format!("{name}.yaml"));
             {
@@ -453,40 +500,36 @@ mod actions {
     async fn toggle_no_pp(name: String) -> CB {
         {
             let pf = tri!(db::get(&name).ok_or_else(|| anyhow::anyhow!("Profile not found")));
-            if pf.dtype == crate::config::database::ProfileType::Singbox
+            let is_singbox = pf.dtype == crate::config::database::ProfileType::Singbox
                 || crate::config::CONFIG
                     .data
                     .lock()
                     .unwrap()
-                    .contains_in_singbox(&pf.name)
-            {
-                Confirm::err(anyhow::anyhow!(
+                    .contains_in_singbox(&pf.name);
+            if is_singbox {
+                Confirm::err_async(anyhow::anyhow!(
                     "no_pp is not applicable for sing-box profiles (proxy-provider not supported)"
-                ));
+                ))
+                .await;
                 return do_nothing();
             }
         }
         tri!(db::toggle_no_pp(&name));
 
-        let (names, atime) = get_profiles_with_readable_atime();
-        wrapper(move |(content, _): &mut C| {
-            sync_helper(content, names, atime);
-        })
+        sync!(C)
     }
 
     async fn toggle_update_with_proxy(name: String) -> CB {
         tri!(db::toggle_update_with_proxy(&name));
 
-        let (names, atime) = get_profiles_with_readable_atime();
-        wrapper(move |(content, _): &mut C| {
-            sync_helper(content, names, atime);
-        })
+        sync!(C)
     }
 
     async fn delete(name: String) -> CB {
         let rx = Confirm::title("Delete profile?".to_string())
             .with_prompt(format!("Delete {name}?\nEnter to confirm, Esc to cancel"))
-            .build_and_send();
+            .build_and_send_async()
+            .await;
         if rx.await.is_err() {
             return do_nothing();
         }
@@ -516,12 +559,37 @@ mod actions {
 
         Confirm::title("Preview".to_owned())
             .with_prompt(lines.join("\n"))
-            .build_and_send();
+            .build_and_send_async()
+            .await;
 
         do_nothing()
     }
 
-    async fn update(name: String) -> CB {
+    fn update_message(updated: UpdateResult) -> (String, bool) {
+        let mut message = format!("Updated: {}", updated.name);
+        if !updated.net_updates.is_empty() {
+            message.push('\n');
+            message.push_str(&crate::functions::file::net_resource::format_net_updates(
+                &updated.net_updates,
+            ));
+        }
+        let mut failed = false;
+        match updated.selection {
+            Some(Ok(SelectionOutcome::Saved)) => {
+                message.push('\n');
+                message.push_str(SAVED_NOTICE);
+            }
+            Some(Err(error)) => {
+                failed = true;
+                message.push_str(&format!("\nCould not apply updated profile: {error}"));
+            }
+            _ => {}
+        }
+        (message, failed)
+    }
+
+    pub(super) async fn update(batch: UpdateBatch, permit: Option<ApiPermit>) -> CB {
+        let name = batch.names[0].clone();
         let with_proxy = db::get(&name)
             .map(|pf| pf.update_with_proxy)
             .unwrap_or(false);
@@ -529,74 +597,67 @@ mod actions {
         if let Some(pf) = db::get(&name)
             && let crate::config::database::ProfileType::Url(ref url) = pf.dtype
         {
-            fetch_traffic_for_url(url, with_proxy);
+            fetch_traffic_for_url(url, with_proxy).await;
         }
-        let result = update_profile(db::get(&name).unwrap(), with_proxy).await;
-
-        let (names, atime) = get_profiles_with_readable_atime();
-        wrapper(move |(content, _): &mut C| {
-            content.updating.remove(&name);
-            match result {
-                Ok(upd) => {
-                    sync_helper(content, names, atime);
-                    let mut msg = format!("Updated: {}", upd.name);
-                    if !upd.net_updates.is_empty() {
-                        msg.push('\n');
-                        msg.push_str(&crate::functions::file::net_resource::format_net_updates(
-                            &upd.net_updates,
-                        ));
-                    }
-                    Confirm::title("Updated".to_owned())
-                        .with_prompt(msg)
-                        .build_and_send();
-                }
-                Err(e) => Confirm::err(e),
+        let result = match db::get(&name) {
+            Some(profile) => {
+                update_profile_with_check(profile, with_proxy, || {
+                    permit.as_ref().is_some_and(ApiPermit::is_valid)
+                })
+                .await
             }
-        })
+            None => Err(anyhow::anyhow!("Profile no longer exists: {name}")),
+        };
+        drop(batch);
+        match result {
+            Ok(upd) => {
+                let (message, failed) = update_message(upd);
+                let title = if failed {
+                    "Updated; apply failed"
+                } else {
+                    "Updated"
+                };
+                Confirm::message_async(title.into(), message).await;
+            }
+            Err(error) => Confirm::err_async(error).await,
+        }
+        sync!(C)
     }
 
-    pub(super) async fn update_all(names: Vec<String>) -> CB {
-        let mut results = Vec::with_capacity(names.len());
-        for name in &names {
-            let with_proxy = db::get(name)
-                .map(|pf| pf.update_with_proxy)
-                .unwrap_or(false);
-            let result = update_profile(db::get(name).unwrap(), with_proxy).await;
-            results.push((name.clone(), result));
-        }
-
-        let (new_names, new_atime) = get_profiles_with_readable_atime();
-        wrapper(move |(content, _): &mut C| {
-            let mut msgs = Vec::with_capacity(results.len());
-            for (name, result) in results {
-                content.updating.remove(&name);
-                match result {
-                    Ok(upd) => {
-                        let mut msg = format!("Updated: {}", upd.name);
-                        if !upd.net_updates.is_empty() {
-                            msg.push('\n');
-                            msg.push_str(
-                                &crate::functions::file::net_resource::format_net_updates(
-                                    &upd.net_updates,
-                                ),
-                            );
-                        }
-                        msgs.push(msg);
-                    }
-                    Err(e) => msgs.push(format!("{name}: {e}")),
+    pub(super) async fn update_all(batch: UpdateBatch, permit: Option<ApiPermit>) -> CB {
+        let mut messages = Vec::with_capacity(batch.names.len());
+        let mut failed = false;
+        for name in &batch.names {
+            let result = match db::get(name) {
+                Some(profile) => {
+                    let with_proxy = profile.update_with_proxy;
+                    update_profile_with_check(profile, with_proxy, || {
+                        permit.as_ref().is_some_and(ApiPermit::is_valid)
+                    })
+                    .await
+                }
+                None => Err(anyhow::anyhow!("Profile no longer exists")),
+            };
+            match result {
+                Ok(upd) => {
+                    let (message, apply_failed) = update_message(upd);
+                    failed |= apply_failed;
+                    messages.push(message);
+                }
+                Err(error) => {
+                    failed = true;
+                    messages.push(format!("{name}: {error}"));
                 }
             }
-            sync_helper(content, new_names, new_atime);
-            let has_errors = msgs.iter().any(|m| m.contains(':') && !m.contains(": ok"));
-            let title = if has_errors {
-                "Updated (some failed)"
-            } else {
-                "All Updated"
-            };
-            Confirm::title(title.to_owned())
-                .with_prompt(msgs.join("\n"))
-                .build_and_send();
-        })
+        }
+        drop(batch);
+        let title = if failed {
+            "Updated (some failed)"
+        } else {
+            "All Updated"
+        };
+        Confirm::message_async(title.into(), messages.join("\n")).await;
+        sync!(C)
     }
 
     pub(super) async fn show_traffic(name: String) -> CB {
@@ -728,7 +789,8 @@ mod actions {
 
         Confirm::dismiss_any("Traffic".to_owned())
             .with_prompt(lines.join("\n"))
-            .build_and_send();
+            .build_and_send_async()
+            .await;
 
         do_nothing()
     }
@@ -736,9 +798,10 @@ mod actions {
     async fn test(name: String) -> CB {
         let pf = tri!(db::get(name).unwrap().load_local_profile());
         let result = test_config(Some(&pf.path), false);
-        Confirm::title("Test Result".to_owned())
+        Confirm::notification("Test Result".to_owned())
             .with_prompt(result)
-            .build_and_send();
+            .build_and_send_async()
+            .await;
 
         do_nothing()
     }
@@ -747,11 +810,12 @@ mod actions {
         let pf = tri!(db::get(name).unwrap().load_local_profile());
         match check_config(&pf.path) {
             Ok(()) => {
-                Confirm::title("Check Passed".to_owned())
+                Confirm::notification("Check Passed".to_owned())
                     .with_prompt("Configuration is valid.".to_owned())
-                    .build_and_send();
+                    .build_and_send_async()
+                    .await;
             }
-            Err(e) => Confirm::err(e),
+            Err(e) => Confirm::err_async(e).await,
         }
 
         do_nothing()
@@ -802,9 +866,11 @@ pub(super) fn get_profiles_with_readable_atime() -> (Vec<String>, Vec<String>) {
     (name, atime)
 }
 
-pub(super) fn sync_helper(content: &mut Profile, name: Vec<String>, atime: Vec<String>) {
-    content.atime = atime;
-    content.items = name;
+impl Profile {
+    pub(super) fn apply_loaded(&mut self, (items, atime): (Vec<String>, Vec<String>)) {
+        self.items = items;
+        self.atime = atime;
+    }
 }
 
 fn display_duration(t: std::time::Duration) -> String {

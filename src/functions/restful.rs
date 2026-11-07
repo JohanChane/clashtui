@@ -261,7 +261,7 @@ pub mod connection {
     use serde::Deserialize;
 
     #[cfg_attr(test, derive(Debug))]
-    #[derive(Deserialize, Default)]
+    #[derive(Deserialize, Default, Clone)]
     #[serde(rename_all = "camelCase", default)]
     pub struct ConnInfo {
         pub download_total: u64,
@@ -269,8 +269,8 @@ pub mod connection {
         pub connections: Option<Vec<Conn>>,
     }
 
-    #[cfg_attr(test, derive(Debug, Clone))]
-    #[derive(Deserialize)]
+    #[cfg_attr(test, derive(Debug))]
+    #[derive(Deserialize, Clone)]
     pub struct Conn {
         pub id: String,
         pub metadata: ConnMetaData,
@@ -286,8 +286,8 @@ pub mod connection {
         pub rule_payload: Option<String>,
     }
 
-    #[cfg_attr(test, derive(Debug, Clone))]
-    #[derive(Deserialize)]
+    #[cfg_attr(test, derive(Debug))]
+    #[derive(Deserialize, Clone)]
     #[serde(rename_all = "camelCase")]
     pub struct ConnMetaData {
         #[cfg_attr(not(test), allow(dead_code))]
