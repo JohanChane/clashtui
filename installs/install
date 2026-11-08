@@ -16,23 +16,27 @@ Without options, ask for choices using the defaults below.
   -h, --help                 Show help
   -y, --yes, --no-prompt      Use defaults without asking; sudo must already work
   -u, --uninstall            Stop and remove the selected cores and ClashTui
-  --is-user                 Install under ~/.local/clashtui (default: system)
-  --core TYPE               mihomo, sing-box, all (default: all)
-  --service-controller TYPE auto-detect, systemd, openrc, launchd (default: auto-detect)
-  --templates yes|no        Install templates for selected cores (default: yes)
-  --rules-dat yes|no        Download mihomo GeoIP/GeoSite data (default: yes)
-  --contrib-dir PATH        Use this contrib directory (relative or absolute)
-  --repo OWNER/REPO         Download repository (default: JohanChane/clashtui)
+  --service-controller TYPE  auto-detect, systemd, openrc, launchd (default: auto-detect)
+  --contrib-dir PATH         Use this contrib directory (relative or absolute)
+  --repo OWNER/REPO          Download repository (default: JohanChane/clashtui)
   --version TAG             Release tag for downloads (default: latest)
 
-Resources: --contrib-dir first, then the script's adjacent contrib/ or ../contrib/,
-then contrib.tar.gz from the selected release. An invalid explicit directory
-fails without fallback. The directory must contain scripts/, default_configs/,
-and templates/. Missing ClashTui binaries come from that same release.
---version does not override local contrib/.
-Existing binaries are reused; files replaced by the installer get .bak.N backups.
-User mode uses no-TUN configs. Services are not started or enabled on install.
-Uninstall preserves user config, backups, logs, and system accounts.
+  --is-user                 Install under ~/.local/clashtui (default: system) [interactive]
+  --core TYPE               mihomo, sing-box, all (default: all) [interactive]
+  --templates yes|no         Install templates for selected cores (default: yes) [interactive]
+  --rules-dat yes|no         Download mihomo GeoIP/GeoSite data (default: yes) [interactive]
+
+[interactive]: Prompt when applicable unless supplied or --no-prompt is used.
+
+Examples:
+  bash installs/install                              # Interactive install
+  bash installs/install --yes                        # Install with defaults
+  bash installs/install --is-user --core sing-box     # User install, sing-box only
+  bash installs/install --version TAG                # Download from release TAG
+  bash installs/install --uninstall --core all        # Uninstall both cores and ClashTui
+
+  # Local resources with OpenRC
+  bash installs/install --contrib-dir ./contrib --service-controller openrc
 EOF
 }
 
