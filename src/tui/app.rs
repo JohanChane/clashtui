@@ -27,6 +27,7 @@ pub struct App {
     popup: PopUp,
     help: HelpPanel,
     input: key::Matcher<'static>,
+    switched_core: Option<crate::config::CoreType>,
 }
 
 impl App {
@@ -40,6 +41,7 @@ impl App {
             popup: PopUp::default(),
             help: HelpPanel::default(),
             input: key::Matcher::new(key::keymaps()),
+            switched_core: None,
         }
     }
     #[tokio::main]
@@ -122,6 +124,11 @@ impl App {
     /// Help can start a global-only chord, which retains its candidates until completion.
     fn handle_key_event(&mut self, kv: &Key) {
         log::debug!("K: {kv:?}");
+        // This final notice owns every key, including Tab, Esc and Ctrl-C.
+        if self.switched_core.is_some() {
+            QUIT.store(true, Ordering::Relaxed);
+            return;
+        }
         if kv.code == crossterm::event::KeyCode::Char('c')
             && kv
                 .modifiers
@@ -189,6 +196,9 @@ impl App {
         if self.popup.check() {
             self.popup.render(f, Default::default());
         }
+        if let Some(core) = self.switched_core {
+            render_core_switched(core, f);
+        }
     }
 
     fn switch_tab(&mut self, new_index: u8) {
@@ -200,7 +210,9 @@ impl App {
     }
 
     fn on_event(&mut self, event: event::Event) {
-        self.hub.dispatch(&event);
+        if self.switched_core.is_none() {
+            self.hub.dispatch(&event);
+        }
     }
 
     fn handle_action(&mut self, action: AppAction) {
@@ -227,11 +239,17 @@ impl App {
         }
     }
     fn sync(&mut self) {
+        if self.switched_core.is_some() {
+            return;
+        }
         SPINNER_FRAME.fetch_add(1, Ordering::Relaxed);
         while let Some(event) = self.commands.poll() {
             use commands::CommandEvent;
             self.hub.command_done(&event);
             match &event {
+                CommandEvent::CoreSwitched {
+                    src, dst, result, ..
+                } => self.core_switch_done(*src, *dst, result),
                 CommandEvent::Script { target, result, .. } => {
                     if target.changes_service {
                         self.status_due[target.core.index()] = std::time::Instant::now();
@@ -291,6 +309,9 @@ impl App {
             }
             self.commands.acknowledge(event.task());
         }
+        if self.switched_core.is_some() {
+            return;
+        }
         if !self.commands.is_busy() {
             let now = std::time::Instant::now();
             if let Some(core) = (0..2)
@@ -313,6 +334,58 @@ impl App {
         }
         self.hub.sync();
     }
+
+    fn core_switch_done(
+        &mut self,
+        src: crate::config::CoreType,
+        dst: crate::config::CoreType,
+        result: &anyhow::Result<()>,
+    ) {
+        self.status_due[src.index()] = std::time::Instant::now();
+        monitor::set_service_status(src, None);
+        event::emit(event::CoreEvent::ServiceCommandDone);
+        match result {
+            Ok(()) => {
+                self.switched_core = Some(dst);
+                self.input.cancel();
+                self.commands.begin_shutdown();
+            }
+            Err(error) => popmsg::prelude::Confirm::err(format!(
+                "Failed to switch core to {dst}: {}",
+                commands::error_text(error)
+            )),
+        }
+    }
+}
+
+fn render_core_switched(core: crate::config::CoreType, f: &mut ratatui::Frame) {
+    use ratatui::{
+        layout::{Constraint, Layout},
+        widgets::{Block, Clear, Paragraph, Wrap},
+    };
+    let [_, row, _] = Layout::vertical([
+        Constraint::Fill(1),
+        Constraint::Length(7),
+        Constraint::Fill(1),
+    ])
+    .areas(f.area());
+    let [_, area, _] = Layout::horizontal([
+        Constraint::Fill(1),
+        Constraint::Length(54),
+        Constraint::Fill(1),
+    ])
+    .areas(row);
+    f.render_widget(Clear, area);
+    f.render_widget(
+        Paragraph::new(format!(
+            "Switched to {core}.\n\nPress any key to exit clashtui.\nOpen clashtui again to use {core}."
+        ))
+        .centered()
+        .wrap(Wrap { trim: false })
+        .block(Block::bordered().title("Core Switched")
+            .border_style(theme::Theme::get().popup.border)),
+        area,
+    );
 }
 
 fn tab_titles(titles: impl IntoIterator<Item = &'static str>) -> Vec<String> {

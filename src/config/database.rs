@@ -204,7 +204,7 @@ pub struct CoreProfileData {
 }
 
 #[cfg_attr(test, derive(PartialEq))]
-#[derive(serde::Serialize, serde::Deserialize, Debug, Default)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default, Clone)]
 /// manage profiles with mihomo/singbox sections
 pub struct ProfileManager {
     #[serde(default)]
@@ -213,8 +213,70 @@ pub struct ProfileManager {
     pub mihomo: CoreProfileData,
     #[serde(default)]
     pub singbox: CoreProfileData,
+    /// Persist this selection while the current session keeps using its original core.
+    #[serde(skip)]
+    next_core_type: Option<crate::config::CoreType>,
 }
 impl ProfileManager {
+    pub fn to_file(&self) -> anyhow::Result<()> {
+        self.save_to(&super::config_dir_path().join(super::defs::DATA_FILE))
+    }
+
+    pub fn switch_core(&mut self, core: crate::config::CoreType) -> anyhow::Result<()> {
+        self.switch_core_at(core, &super::config_dir_path().join(super::defs::DATA_FILE))
+    }
+
+    fn switch_core_at(
+        &mut self,
+        core: crate::config::CoreType,
+        path: &std::path::Path,
+    ) -> anyhow::Result<()> {
+        let mut next = self.clone();
+        next.next_core_type = Some(core);
+        next.save_to(path)?;
+        // Background saves and the final exit save must retain the new selection.
+        self.next_core_type = Some(core);
+        Ok(())
+    }
+
+    fn save_to(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        use anyhow::Context;
+        use std::io::Write;
+
+        // Preserve databases stored behind a symlink when replacing the file atomically.
+        let resolved;
+        let path = if std::fs::symlink_metadata(path).is_ok_and(|meta| meta.is_symlink()) {
+            resolved = std::fs::canonicalize(path)
+                .with_context(|| format!("Failed to resolve {}", path.display()))?;
+            resolved.as_path()
+        } else {
+            path
+        };
+        let mut snapshot = self.clone();
+        snapshot.core_type = self.next_core_type.unwrap_or(self.core_type);
+        let text = serde_yml::to_string(&snapshot)?;
+        let temp = path.with_extension(format!("{}.tmp", fastrand::u64(..)));
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temp)
+            .with_context(|| format!("Failed to create {}", temp.display()))?;
+        let result = (|| -> anyhow::Result<()> {
+            if let Ok(metadata) = std::fs::metadata(path) {
+                file.set_permissions(metadata.permissions())?;
+            }
+            file.write_all(text.as_bytes())?;
+            file.sync_all()?;
+            drop(file);
+            std::fs::rename(&temp, path)?;
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = std::fs::remove_file(&temp);
+        }
+        result.with_context(|| format!("Failed to save {}", path.display()))
+    }
+
     pub fn contains_in_singbox(&self, name: &str) -> bool {
         self.singbox.profiles.contains_key(name)
     }
@@ -321,6 +383,61 @@ impl ProfileManager {
 
 #[cfg(test)]
 mod test {
+    #[test]
+    fn switch_core_persists_without_changing_runtime_and_survives_later_saves() {
+        use super::*;
+        use crate::config::CoreType;
+        let root = std::env::temp_dir().join(format!("clashtui-switch-{}", fastrand::u64(..)));
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("clashtui.db");
+        for (src, dst) in [
+            (CoreType::Mihomo, CoreType::Singbox),
+            (CoreType::Singbox, CoreType::Mihomo),
+        ] {
+            let mut db = ProfileManager {
+                core_type: src,
+                ..Default::default()
+            };
+            db.mihomo.cur_profile = Some("mihomo.yaml".into());
+            db.singbox.cur_profile = Some("singbox.json".into());
+            db.save_to(&path).unwrap();
+            db.switch_core_at(dst, &path).unwrap();
+            assert_eq!(db.core_type, src);
+            db.insert("later-save.yaml", ProfileType::File);
+            db.save_to(&path).unwrap();
+            let saved: ProfileManager =
+                serde_yml::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+            assert_eq!(saved.core_type, dst);
+            assert_eq!(saved.mihomo, db.mihomo);
+            assert_eq!(saved.singbox, db.singbox);
+            assert!(saved.next_core_type.is_none());
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn failed_switch_does_not_commit_selection_or_leave_temporary_files() {
+        use super::*;
+        use crate::config::CoreType;
+        let root = std::env::temp_dir().join(format!("clashtui-switch-fail-{}", fastrand::u64(..)));
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("clashtui.db");
+        let mut db = ProfileManager::default();
+        db.save_to(&path).unwrap();
+        let before = std::fs::read(&path).unwrap();
+        // Force rename failure after writing the temporary file, on every platform.
+        let blocked = root.join("blocked");
+        std::fs::create_dir(&blocked).unwrap();
+        assert!(db.switch_core_at(CoreType::Singbox, &blocked).is_err());
+        assert_eq!(db.core_type, CoreType::Mihomo);
+        assert!(db.next_core_type.is_none());
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        assert_eq!(std::fs::read_dir(&root).unwrap().count(), 2);
+        db.save_to(&path).unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), before);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
     use super::*;
     #[test]
     fn serde_template_deserialized_as_template() {

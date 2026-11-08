@@ -372,7 +372,7 @@ pub fn keymap_path() -> PathBuf {
 
 load_save!(BasicInfo, defs::CORE_OVERRIDE_FILE, no_save, "mihomo");
 load_save!(ConfigFile, defs::CONFIG_FILE);
-load_save!(ProfileManager, defs::DATA_FILE);
+load_save!(ProfileManager, defs::DATA_FILE, no_save);
 
 #[cfg(test)]
 mod tests {

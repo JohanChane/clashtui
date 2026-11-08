@@ -60,6 +60,7 @@ impl Page for SrvCtlContent {
             CommandEvent::Script { target, .. } if target.changes_service => {
                 self.statuses[target.core.index()] = None
             }
+            CommandEvent::CoreSwitched { src, .. } => self.statuses[src.index()] = None,
             _ => (),
         }
     }
@@ -75,23 +76,27 @@ impl Page for SrvCtlContent {
     }
     fn on_action(&mut self, action: Action, cx: &mut Cx<Self>, state: &mut ListState) {
         let commands = cx.commands();
-        if state.selected().is_none() && !self.entries.is_empty() {
+        if state.selected().is_none() {
             state.select(Some(0));
         }
         match action {
             Action::Esc => {}
             Action::MoveUp => {
-                if !self.entries.is_empty() {
-                    state.select(Some(state.selected().unwrap_or(0).saturating_sub(1)));
-                }
+                state.select(Some(state.selected().unwrap_or(0).saturating_sub(1)));
             }
             Action::MoveDown => {
-                if state.selected().unwrap_or(0) + 1 < self.entries.len() {
+                if state.selected().unwrap_or(0) < self.entries.len() {
                     state.select(Some(state.selected().unwrap_or(0) + 1));
                 }
             }
             Action::Execute => {
-                if let Some(entry) = state.selected().and_then(|index| self.entries.get(index))
+                if state.selected() == Some(self.entries.len()) {
+                    let dst = CoreType::ALL[1 - self.core.index()];
+                    if let Err(error) = commands.switch_core(self.core, dst) {
+                        Confirm::err(format!("Failed to switch core to {dst}: {error:#}"));
+                    }
+                } else if let Some(entry) =
+                    state.selected().and_then(|index| self.entries.get(index))
                     && let Err(error) =
                         commands.submit(self.core, ActionRequest::Run(entry.id.clone()))
                 {
@@ -105,7 +110,7 @@ impl Page for SrvCtlContent {
             text::{Line, Span},
             widgets::Paragraph,
         };
-        if state.selected().is_none() && !self.entries.is_empty() {
+        if state.selected().is_none() {
             state.select(Some(0));
         }
         let theme = Theme::get();
@@ -143,13 +148,6 @@ impl Page for SrvCtlContent {
             );
             return;
         }
-        if self.entries.is_empty() {
-            frame.render_widget(
-                Paragraph::new("未配置服务动作 / No service actions configured").block(block),
-                area,
-            );
-            return;
-        }
         let inner = block.inner(area);
         frame.render_widget(block, area);
         let items: Vec<_> = self
@@ -158,6 +156,7 @@ impl Page for SrvCtlContent {
             .map(|entry| {
                 ListItem::new(format!("  {}", entry.label.as_deref().unwrap_or(&entry.id)))
             })
+            .chain(std::iter::once(ListItem::new("  Switch Core")))
             .collect();
         frame.render_stateful_widget(
             List::new(items).highlight_style(section.highlight),

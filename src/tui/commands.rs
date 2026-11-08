@@ -4,7 +4,7 @@ use crate::{
     config::CoreType,
     scripts::{self, ActionRequest, ActionResult, OutputMode, StatusReport},
 };
-use anyhow::{Result, bail, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -58,6 +58,12 @@ pub enum CommandEvent {
         purpose: CheckPurpose,
         result: Result<()>,
     },
+    CoreSwitched {
+        task: TaskId,
+        src: CoreType,
+        dst: CoreType,
+        result: Result<()>,
+    },
     Failed {
         task: TaskId,
         error: String,
@@ -70,6 +76,7 @@ impl CommandEvent {
             | Self::Status { task, .. }
             | Self::Tested { task, .. }
             | Self::Checked { task, .. }
+            | Self::CoreSwitched { task, .. }
             | Self::Failed { task, .. } => *task,
         }
     }
@@ -78,6 +85,7 @@ enum Job {
     Script(CoreType, ActionRequest),
     Test(ProfileTarget, bool),
     Check(ProfileTarget, CheckPurpose),
+    SwitchCore(CoreType, CoreType),
 }
 impl Job {
     fn is_query(&self) -> bool {
@@ -88,6 +96,23 @@ impl Job {
     }
     fn execute(self, task: TaskId, cancel: &AtomicBool) -> CommandEvent {
         match self {
+            Self::SwitchCore(src, dst) => {
+                let result = scripts::get().and_then(|config| {
+                    switch_core(
+                        cancel,
+                        |request| {
+                            config.execute(src, request, cancel, |spec| run(task, spec, cancel))
+                        },
+                        || crate::config::CONFIG.data.lock().unwrap().switch_core(dst),
+                    )
+                });
+                CommandEvent::CoreSwitched {
+                    task,
+                    src,
+                    dst,
+                    result,
+                }
+            }
             Self::Script(core, request) => {
                 let query = matches!(request, ActionRequest::Status);
                 let target = ScriptTarget {
@@ -175,6 +200,10 @@ impl Commands {
     }
     pub fn submit(&mut self, core: CoreType, request: ActionRequest) -> Result<()> {
         self.enqueue(Job::Script(core, request))
+    }
+    pub fn switch_core(&mut self, src: CoreType, dst: CoreType) -> Result<()> {
+        ensure!(src != dst, "Already using {dst}");
+        self.enqueue(Job::SwitchCore(src, dst))
     }
     pub fn test_config(&mut self, target: ProfileTarget, geodata: bool) -> Result<()> {
         ensure!(
@@ -274,6 +303,46 @@ impl Drop for Commands {
         }
     }
 }
+fn switch_core(
+    cancel: &AtomicBool,
+    mut execute: impl FnMut(ActionRequest) -> Result<ActionResult>,
+    persist: impl FnOnce() -> Result<()>,
+) -> Result<()> {
+    // Always stop: status protocols may report transitional states as inactive.
+    let stopped =
+        execute(ActionRequest::Run("stop_core".into())).context("Failed to stop source core")?;
+    let ActionResult::Completed { display, process } = stopped else {
+        bail!("Invalid stop_core result");
+    };
+    let output = process.context("Failed to stop source core")?;
+    ensure!(
+        output.status.success(),
+        "stop_core failed: {}{}",
+        output.status,
+        if display == OutputMode::Silent {
+            String::new()
+        } else {
+            format!("\n{}", output.captured.diagnostic())
+        }
+    );
+    let report = execute(ActionRequest::Status).context("Failed to verify source core stopped")?;
+    let ActionResult::Status(report) = report else {
+        bail!("Invalid status_core result");
+    };
+    ensure!(
+        matches!(
+            report.state,
+            scripts::ServiceState::Inactive | scripts::ServiceState::Missing
+        ),
+        "Source core is not confirmed stopped: {}",
+        report.state.as_str()
+    );
+    if cancel.load(Ordering::Acquire) {
+        return Err(command::CommandError::cancelled().into());
+    }
+    persist().context("Failed to save destination core")
+}
+
 fn run(task: TaskId, spec: CommandSpec, cancel: &AtomicBool) -> CommandResult<ProcessOutput> {
     if matches!(spec.output, ProcessOutputMode::Inherit) {
         super::term::with_terminal(task, cancel, || {
@@ -382,6 +451,118 @@ mod tests {
         sync::mpsc,
         time::{Duration, Instant},
     };
+    fn stop_result(success: bool) -> ActionResult {
+        #[cfg(unix)]
+        use std::os::unix::process::ExitStatusExt;
+        #[cfg(windows)]
+        use std::os::windows::process::ExitStatusExt;
+        ActionResult::Completed {
+            display: OutputMode::Popup,
+            process: Ok(ProcessOutput {
+                status: std::process::ExitStatus::from_raw(if success { 0 } else { 256 }),
+                captured: command::CapturedOutput::default(),
+            }),
+        }
+    }
+    fn status_result(state: scripts::ServiceState) -> ActionResult {
+        ActionResult::Status(StatusReport {
+            state,
+            diagnostic: None,
+        })
+    }
+    #[test]
+    fn switch_core_stops_then_verifies_then_persists() {
+        for state in [
+            scripts::ServiceState::Inactive,
+            scripts::ServiceState::Missing,
+        ] {
+            let calls = std::cell::RefCell::new(Vec::new());
+            switch_core(
+                &AtomicBool::new(false),
+                |request| {
+                    calls.borrow_mut().push(request.id().to_owned());
+                    Ok(match request {
+                        ActionRequest::Run(id) if id == "stop_core" => stop_result(true),
+                        ActionRequest::Status => status_result(state),
+                        _ => panic!("unexpected request"),
+                    })
+                },
+                || {
+                    calls.borrow_mut().push("persist".into());
+                    Ok(())
+                },
+            )
+            .unwrap();
+            assert_eq!(*calls.borrow(), ["stop_core", "status_core", "persist"]);
+        }
+    }
+    #[test]
+    fn switch_core_failures_and_cancellation_never_persist() {
+        let scenarios = [
+            vec![Err(anyhow::anyhow!("stop unavailable"))],
+            vec![Ok(stop_result(false))],
+            vec![Ok(ActionResult::Completed {
+                display: OutputMode::Popup,
+                process: Err(command::CommandError::cancelled()),
+            })],
+            vec![Ok(stop_result(true)), Err(anyhow::anyhow!("status failed"))],
+            vec![
+                Ok(stop_result(true)),
+                Ok(status_result(scripts::ServiceState::Active)),
+            ],
+            vec![
+                Ok(stop_result(true)),
+                Ok(status_result(scripts::ServiceState::Unsupported)),
+            ],
+        ];
+        for results in scenarios {
+            let mut results = results.into_iter();
+            assert!(
+                switch_core(
+                    &AtomicBool::new(false),
+                    |_| results.next().unwrap(),
+                    || panic!("must not persist")
+                )
+                .is_err()
+            );
+            assert!(results.next().is_none());
+        }
+        let cancel = AtomicBool::new(false);
+        assert!(
+            switch_core(
+                &cancel,
+                |request| {
+                    Ok(if matches!(request, ActionRequest::Status) {
+                        cancel.store(true, Ordering::Release);
+                        status_result(scripts::ServiceState::Inactive)
+                    } else {
+                        stop_result(true)
+                    })
+                },
+                || panic!("must not persist after cancellation")
+            )
+            .is_err()
+        );
+    }
+    #[test]
+    fn switch_core_reports_persistence_failure() {
+        let error = switch_core(
+            &AtomicBool::new(false),
+            |request| {
+                Ok(if matches!(request, ActionRequest::Status) {
+                    status_result(scripts::ServiceState::Inactive)
+                } else {
+                    stop_result(true)
+                })
+            },
+            || bail!("disk full"),
+        )
+        .unwrap_err();
+        assert_eq!(
+            format!("{error:#}"),
+            "Failed to save destination core: disk full"
+        );
+    }
     fn fake_query(commands: &mut Commands) -> mpsc::Sender<()> {
         let (send, receive) = mpsc::channel();
         commands.next = 1;
