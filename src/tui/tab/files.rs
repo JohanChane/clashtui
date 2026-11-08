@@ -5,29 +5,16 @@ use ratatui::{
 
 use super::dev::*;
 
-/// The Only reason why I use two functions to `sync` is that
-/// I except modifying Self (what we do in `wrapper`) is
-/// fast and infallable
-///
-/// Tasks should be done in async{} and left only values that
-/// apply to Self
-macro_rules! sync {
-    ($ident: ty) => {{
-        let (name, atime) = super::profile::get_profiles_with_readable_atime();
-        wrapper(|(content, _): &mut $ident| super::profile::sync_helper(content, name, atime))
-    }};
-}
-
 macro_rules! get_name {
     ($self:expr, $state:expr) => {
         if let Some(idx) = $state.selected() {
             if idx < $self.items.len() {
                 $self.items[idx].clone()
             } else {
-                return false;
+                return;
             }
         } else {
-            return false;
+            return;
         }
     };
 }
@@ -35,14 +22,9 @@ macro_rules! get_name {
 pub(crate) mod profile;
 pub(crate) mod template;
 
-/// This can only be [DualTab], because [Template] needs to update [Profile]
-///
-/// [Template]: template::Template
-/// [Profile]: profile::Profile
+/// Profile and Template. Focus switch stays at the tab, not inside either page.
 #[derive(Default)]
-pub struct FileTab(DualTab<profile::Profile, template::Template>);
-
-crate::new_type_impl_tuiwidget!(FileTab);
+pub struct FileTab(crate::tui::page::Split<profile::Profile, template::Template>);
 
 impl crate::tui::tab::TuiTab for FileTab {
     fn title(&self) -> &'static str {
@@ -50,19 +32,34 @@ impl crate::tui::tab::TuiTab for FileTab {
     }
 
     fn input_scope(&self) -> crate::tui::key::Scope {
-        if self.0.is_focused_on_left() {
-            crate::tui::key::Scope::Profile
-        } else {
-            crate::tui::key::Scope::Template
+        match self.0.focus() {
+            crate::tui::page::Side::Left => crate::tui::key::Scope::Profile,
+            crate::tui::page::Side::Right => crate::tui::key::Scope::Template,
         }
     }
 
     fn handle_action(&mut self, action: crate::tui::key::Action) {
+        use crate::tui::key::Action::{Profile, Template};
         match action {
-            crate::tui::key::Action::Profile(action) => self.0.handle_left_action(action),
-            crate::tui::key::Action::Template(action) => self.0.handle_right_action(action),
+            Profile(profile::Action::Switch) | Template(template::Action::Switch) => {
+                self.0.toggle_focus()
+            }
+            Profile(action) => self.0.left_action(action),
+            Template(action) => self.0.right_action(action),
             _ => unreachable!("action routed to the wrong page"),
         }
+    }
+
+    fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
+        self.0.render(f, area);
+    }
+
+    fn deliver(&mut self, event: &crate::tui::event::Event) {
+        self.0.deliver(event);
+    }
+
+    fn sync(&mut self, now: std::time::Instant) {
+        self.0.sync(now);
     }
 }
 

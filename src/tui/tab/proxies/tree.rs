@@ -39,6 +39,7 @@ pub struct ProxyTree {
 }
 
 impl ProxyTree {
+    #[cfg(test)]
     pub fn build(response: ProxyCatalog) -> Self {
         let proxies = response;
         let mut tree = ProxyTree::default();

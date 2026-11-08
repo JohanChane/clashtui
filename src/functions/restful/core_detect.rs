@@ -11,18 +11,19 @@ struct VersionResponse {
     version: String,
 }
 
-/// Detect which core is actually running by querying `/version`.
+/// One `GET /version`: the running core and its version string.
 ///
-/// Checks the `version` field: sing-box reports e.g. `"sing-box 1.13.11"`,
-/// mihomo reports e.g. `"v1.18.10"`.
-pub fn detect_core_type() -> Result<crate::config::CoreType> {
+/// sing-box reports e.g. `"sing-box 1.13.11"`, mihomo reports e.g. `"v1.18.10"`.
+/// `/version` is not rejected by the mismatch guard in `request()`.
+pub fn probe() -> Result<(crate::config::CoreType, String)> {
     request(Method::Get, "/version", None).and_then(|r| {
         let v: VersionResponse = r.json()?;
-        if v.version.contains("sing-box") {
-            Ok(crate::config::CoreType::Singbox)
+        let core = if v.version.contains("sing-box") {
+            crate::config::CoreType::Singbox
         } else {
-            Ok(crate::config::CoreType::Mihomo)
-        }
+            crate::config::CoreType::Mihomo
+        };
+        Ok((core, v.version))
     })
 }
 

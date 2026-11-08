@@ -1,0 +1,72 @@
+use ratatui::layout::{Constraint::Ratio, Layout};
+use ratatui::prelude::{Frame, Rect};
+
+use super::{Host, Page};
+use crate::tui::event::Event;
+
+/// 双面板容器。事件同时投给两侧，动作只投给焦点侧。
+pub struct Split<L: Page, R: Page> {
+    left: Host<L>,
+    right: Host<R>,
+    focus: Side,
+}
+
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub enum Side {
+    #[default]
+    Left,
+    Right,
+}
+
+impl<L: Page + Default, R: Page + Default> Default for Split<L, R> {
+    fn default() -> Self {
+        Self {
+            left: Host::default(),
+            right: Host::default(),
+            focus: Side::Left,
+        }
+    }
+}
+
+impl<L: Page, R: Page> Split<L, R> {
+    pub fn deliver(&mut self, event: &Event) {
+        self.left.deliver(event);
+        self.right.deliver(event);
+    }
+
+    pub fn sync(&mut self, now: std::time::Instant) {
+        self.left.sync(now);
+        self.right.sync(now);
+    }
+
+    /// 焦点侧占 7/10，另一侧占 3/10。
+    pub fn render(&mut self, f: &mut Frame, area: Rect) {
+        let cons = if self.focus == Side::Left {
+            [Ratio(7, 10), Ratio(3, 10)]
+        } else {
+            [Ratio(3, 10), Ratio(7, 10)]
+        };
+        let hori = Layout::horizontal(cons).split(area);
+        self.left.render(f, hori[0], self.focus == Side::Left);
+        self.right.render(f, hori[1], self.focus == Side::Right);
+    }
+
+    pub fn left_action(&mut self, action: L::Action) {
+        self.left.handle_action(action);
+    }
+
+    pub fn right_action(&mut self, action: R::Action) {
+        self.right.handle_action(action);
+    }
+
+    pub fn toggle_focus(&mut self) {
+        self.focus = match self.focus {
+            Side::Left => Side::Right,
+            Side::Right => Side::Left,
+        };
+    }
+
+    pub fn focus(&self) -> Side {
+        self.focus
+    }
+}

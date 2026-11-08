@@ -3,18 +3,18 @@ use crate::functions::restful::proxies::{self};
 use std::time::{Duration, Instant};
 
 use super::content::Proxies;
-use super::tree::NodeType;
+use super::tree::{NodeType, ProxyTree};
 
 impl Proxies {
-    pub fn fzf_find(&mut self, items: Vec<(String, usize)>, task_set: &mut FutureSet<Self>) {
-        self.fzf_find_with_prompt(items, "Find Proxy", task_set);
+    pub fn fzf_find(&mut self, items: Vec<(String, usize)>, cx: &mut Cx<Self>) {
+        self.fzf_find_with_prompt(items, "Find Proxy", cx);
     }
 
     pub fn fzf_find_with_prompt(
         &mut self,
         items: Vec<(String, usize)>,
         prompt: impl Into<String> + Send + 'static,
-        task_set: &mut FutureSet<Self>,
+        cx: &mut Cx<Self>,
     ) {
         let names: Vec<String> = items.iter().map(|(name, _)| name.clone()).collect();
         async move {
@@ -29,12 +29,15 @@ impl Proxies {
                 content.jump_target.set(target);
             })
         }
-        .spawn_at(task_set);
+        .spawn_at(cx);
     }
 }
 
 impl Proxies {
-    pub fn select_inline(&mut self, group: String, node: String, task_set: &mut FutureSet<Self>) {
+    pub fn select_inline(&mut self, group: String, node: String, cx: &mut Cx<Self>) {
+        if self.unavailable() {
+            return;
+        }
         let t_secs = crate::config::CONFIG.cfg_file.timeout.unwrap_or(5).max(1) + 3;
         self.error = Some(format!("Switching to {node}..."));
         self.testing_since = Some(Instant::now());
@@ -66,10 +69,13 @@ impl Proxies {
                 content.testing_since = None;
             })
         }
-        .spawn_at(task_set);
+        .spawn_at(cx);
     }
 
-    pub fn test_delay(&mut self, name: String, ntype: NodeType, task_set: &mut FutureSet<Self>) {
+    pub fn test_delay(&mut self, name: String, ntype: NodeType, cx: &mut Cx<Self>) {
+        if self.unavailable() {
+            return;
+        }
         let timeout = crate::config::CONFIG.cfg_file.timeout.unwrap_or(5) * 1000;
         let t_secs = crate::config::CONFIG.cfg_file.timeout.unwrap_or(5).max(1) + 3;
 
@@ -121,7 +127,7 @@ impl Proxies {
                         content.testing_since = None;
                     })
                 }
-                .spawn_at(task_set);
+                .spawn_at(cx);
             }
             _ => {
                 let resolved = match self.proxies.resolve(&name) {
@@ -175,12 +181,15 @@ impl Proxies {
                         content.testing_since = None;
                     })
                 }
-                .spawn_at(task_set);
+                .spawn_at(cx);
             }
         }
     }
 
-    pub fn test_all_delay(&mut self, task_set: &mut FutureSet<Self>) {
+    pub fn test_all_delay(&mut self, cx: &mut Cx<Self>) {
+        if self.unavailable() {
+            return;
+        }
         let folders: Vec<String> = self
             .tree
             .nodes
@@ -269,10 +278,25 @@ impl Proxies {
                 content.testing_since = None;
             })
         }
-        .spawn_at(task_set);
+        .spawn_at(cx);
     }
 
-    pub fn refresh(&mut self, task_set: &mut FutureSet<Self>) {
+    fn unavailable(&mut self) -> bool {
+        match monitor::status().ready() {
+            Ok(()) => false,
+            Err(reason) => {
+                self.proxies = proxies::ProxyCatalog::default();
+                self.tree = ProxyTree::default();
+                self.error = Some(reason);
+                true
+            }
+        }
+    }
+
+    pub fn reload(&mut self, cx: &mut Cx<Self>) {
+        if self.unavailable() {
+            return;
+        }
         async {
             let response = tri!(
                 tokio::task::spawn_blocking(proxies::fetch_proxies)
@@ -286,6 +310,6 @@ impl Proxies {
                 content.error = None;
             })
         }
-        .spawn_at(task_set);
+        .spawn_at(cx);
     }
 }

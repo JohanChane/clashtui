@@ -135,38 +135,32 @@ src/
 
 ### TuiWidget Trait
 
-`TuiWidget` 负责界面生命周期：
+`TuiWidget` 只给弹窗用：
 
 - `render(&mut self, f, area)` — 绘制界面
-- `sync(&mut self)` — 推进异步任务
-- `on_enter(&mut self)` / `on_leave(&mut self)` — 标签页切换回调
+- `sync(&mut self)` — 取回已完成的弹窗结果
 
-`TuiTab` 另外提供 `title`、`input_scope` 和 `handle_action`。页面容器接收已解析的动作；文本弹窗通过自身的 `handle_key_event` 处理原始按键。
+`TuiTab` 是标签页接口：`title`、`input_scope`、`handle_action`、`render`、`deliver`、`sync(now)`。页面容器接收已解析的动作；文本弹窗通过自身的 `handle_key_event` 处理原始按键。
 
 ### Tab 体系
 
-#### 单面板（Tab）
+`Page` 是页面 trait：`on_event`、`on_action`、`render`，以及可选的 `TICK`。`Host<P>` 运行一个页面。事件任务和动作任务分开。下一次 `Tick` 只在页面显示、事件任务全部完成、并且再过 `TICK` 之后发出。动作任务（弹窗、测速）不推迟 `Tick`。
 
-`Tab<C>` 是泛型容器，`C` 需实现两个 trait：
+`Split<L, R>` 放两个页面（Profile 和 Template）。两侧都收到事件，只有焦点侧收到动作。焦点切换由 File 标签页处理。
 
-- `BasicTabContent` — 定义 `Action`、`State` 类型和标题
-- `TabContent` — 定义 `init`、`handle_action`、`render`
+`Hub` 持有 7 个标签页和 `CoreMonitor`。启动时每个标签页收到 `Init`，然后第一个收到 `Shown`。切页时先 `Hidden` 再 `Shown`。广播事件交给 `CoreMonitor` 和每一个标签页，包括隐藏的。
 
-#### 双面板（DualTab）
-
-`DualTab<C1, C2>` 用于需要两个面板切换的场景（如 Files 标签页的 Profile 和 Template）。两个内容类型通过 `DualTabContent` / `DualTabContentMate` trait 互相引用。
-
-#### Tab 枚举
-
-通过 `enum_dispatch!` 宏将所有标签页统一为一个 `Tab` 枚举。每个变体用 `newtype_tab!` 宏生成包装器并实现 `TuiWidget` 和 `TuiTab`。
+`enum_dispatch!` 把各标签页新类型收成一个 `Tab` 枚举。`newtype_tab!` 用 `Host<P>` 包一层并实现 `TuiTab`。
 
 ### 异步任务模型
 
-异步 I/O 操作通过 `FutureSet<C>`（即 `tokio::task::JoinSet`）管理：
+异步工作用 `FutureSet<P>`（即 `tokio::task::JoinSet`）：
 
-- 在 `handle_action` 或 `init` 中通过 `task_set.spawn(async { ... })` 生成异步任务
-- 任务完成后产生 `Callback<C>`（即 `Box<dyn FnOnce(&mut C)>`）
-- `sync()` 会在每帧推进已完成的回调，状态变更统一在此发生
+- 页面用 `async { ... }.spawn_at(cx)` 派生任务
+- 完成的任务返回 `Box<dyn FnOnce(&mut P) + Send>`
+- `Host::sync(now)` 在 UI 线程应用这些回调，然后检查 `Tick`
+
+`emit` 只把广播放进队列。`App::serve` 持有 `Inbox`，在 UI 线程上一次处理一个事件。生命周期事件不广播，由 `Hub` 和 `Host` 直接投递。
 
 错误处理：
 - `tri!()` 宏 — 捕获错误并弹窗提示用户
@@ -185,9 +179,8 @@ src/
 |-----|------|------|
 | `tri!` | `tab/mod.rs` | 异步回调中的错误处理 |
 | `key_map!` | `key.rs` | 声明默认绑定和配置解析器；无运行时可变状态 |
-| `newtype_tab!` | `tab/mod.rs` | 生成 Tab 包装器，实现 `TuiWidget` + `TuiTab` |
+| `newtype_tab!` | `tab/mod.rs` | 生成包住 `Host` 的标签页包装器，实现 `TuiTab` |
 | `enum_dispatch!` | `tab/mod.rs` | 将各 Tab 枚举变体分发到 trait 方法 |
-| `new_type_impl_tuiwidget!` | `widget/mod.rs` | 为新类型包装器自动实现 `TuiWidget` |
 | `load_save!` | `config/util.rs` | 为 YAML 配置类型生成 `from_file()` / `to_file()` |
 
 ### key_map! 宏

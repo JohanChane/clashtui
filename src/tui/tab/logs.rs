@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-newtype_tab!(LogsTab(Tab<Logs>), Logs);
+newtype_tab!(LogsTab(Logs), Logs);
 
 key_map!(
     Logs,
@@ -170,11 +170,16 @@ fn queue_log_message(text: &str, pending: &Mutex<Vec<LogEntry>>, paused: &Atomic
             .and_then(|p| p.as_str())
             .unwrap_or("")
             .to_owned();
-        pending.lock().unwrap().push(LogEntry {
+        let mut queue = pending.lock().unwrap();
+        queue.push(LogEntry {
             type_,
             payload,
             time: api_log::timestamp(),
         });
+        if queue.len() > LOG_BUFFER_SIZE {
+            let overflow = queue.len() - LOG_BUFFER_SIZE;
+            queue.drain(..overflow);
+        }
     }
 }
 
@@ -248,110 +253,25 @@ fn spawn_ws_logs(
     });
 }
 
-impl BasicTabContent for Logs {
+impl Page for Logs {
     type Action = Action;
     type State = ();
-
     const TITLE: &str = "Logs";
+    const TICK: Option<Duration> = Some(Duration::from_secs(1));
 
-    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        if crate::config::is_core_mismatch() {
-            self.buffer.clear();
-            self.error = Some("API data mismatch with configured core".to_owned());
-            self.paused.store(true, Ordering::Relaxed);
-            return;
-        }
-        // Refresh log level from core on every re-entry
-        async {
-            let cfg = tri!(
-                tokio::task::spawn_blocking(config::fetch).await.unwrap(),
-                or_set
-            );
-            wrapper(move |content: &mut Self| {
-                if crate::config::is_core_mismatch() {
-                    return;
-                }
-                let level = cfg
-                    .log_level
-                    .as_ref()
-                    .map(|l| l.to_string())
-                    .unwrap_or_else(|| "unknown".to_owned());
-                content.current_log_level = level.clone();
-                *content.ws_level.lock().unwrap() = level;
-            })
-        }
-        .spawn_at(task_set);
-    }
-
-    fn after_sync(&self, task_set: &mut FutureSet<Self>) {
-        if self.paused.load(Ordering::Relaxed) {
-            return;
-        }
-        if crate::config::is_core_mismatch() {
-            return;
-        }
-        if let Some(ref pending) = self.ws_pending {
-            let pending = Arc::clone(pending);
-            async move {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                let entries: Vec<LogEntry> = pending.lock().unwrap().drain(..).collect();
-                wrapper(move |content: &mut Self| {
-                    for entry in entries {
-                        content.buffer.push(entry);
-                    }
-                    if content.buffer.count() > 0
-                        && content.scroll + 1 >= content.buffer.count().saturating_sub(1)
-                    {
-                        content.scroll = content.buffer.count().saturating_sub(1);
-                    }
-                })
+    fn on_event(&mut self, event: &Event, cx: &mut Cx<Self>) {
+        match event {
+            Event::Init => self.connect(),
+            Event::Tick => self.drain(),
+            Event::Shown | Event::Core(CoreEvent::StatusChanged(_) | CoreEvent::ConfigChanged) => {
+                self.drain();
+                self.check_core(cx);
             }
-            .spawn_at(task_set);
+            _ => {}
         }
     }
-}
 
-impl TabContent for Logs {
-    fn init(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        let pending = Arc::new(Mutex::new(Vec::new()));
-        self.ws_pending = Some(Arc::clone(&pending));
-        let controller = CONFIG.controller_for_core().to_owned();
-        let secret = CONFIG.secret_for_core().map(|s| s.to_owned());
-        let level = Arc::clone(&self.ws_level);
-        let reconnect = Arc::clone(&self.ws_reconnect);
-        let paused = Arc::clone(&self.paused);
-        spawn_ws_logs(controller, secret, pending, level, reconnect, paused);
-
-        self.error = Some("Log capture is paused".to_owned());
-        // Fetch initial log level
-        async {
-            let cfg = tri!(
-                tokio::task::spawn_blocking(config::fetch).await.unwrap(),
-                or_set
-            );
-            wrapper(move |content: &mut Self| {
-                if crate::config::is_core_mismatch() {
-                    return;
-                }
-                let level = cfg
-                    .log_level
-                    .as_ref()
-                    .map(|l| l.to_string())
-                    .unwrap_or_else(|| "unknown".to_owned());
-                content.current_log_level = level.clone();
-                *content.ws_level.lock().unwrap() = level;
-                content.error = None;
-            })
-        }
-        .spawn_at(task_set);
-    }
-
-    fn handle_action(
-        &mut self,
-        action: Action,
-        task_set: &mut FutureSet<Self>,
-        _state: &mut Self::State,
-    ) {
+    fn on_action(&mut self, action: Action, cx: &mut Cx<Self>, _state: &mut Self::State) {
         match action {
             Action::MoveUp => {
                 self.scroll = self.scroll.saturating_sub(1);
@@ -382,14 +302,10 @@ impl TabContent for Logs {
                         content.filter = (!filter.is_empty()).then_some(filter);
                     })
                 }
-                .spawn_at(task_set);
+                .spawn_at(cx);
             }
             Action::TogglePause => {
-                let was_paused = self.paused.fetch_xor(true, Ordering::Relaxed);
-                if was_paused {
-                    // Kickstart the after_sync poll chain
-                    async { wrapper(|_content: &mut Logs| {}) }.spawn_at(task_set);
-                }
+                self.paused.fetch_xor(true, Ordering::Relaxed);
             }
             Action::FzfFind => {
                 self.paused.store(true, Ordering::Relaxed);
@@ -410,21 +326,21 @@ impl TabContent for Logs {
                         }
                     })
                 }
-                .spawn_at(task_set);
+                .spawn_at(cx);
             }
             Action::Clear => {
                 self.buffer.clear();
                 self.scroll = 0;
                 self.filter = None;
             }
-            Action::ToggleDebug => self.toggle_log_level("debug", task_set),
-            Action::ToggleInfo => self.toggle_log_level("info", task_set),
-            Action::ToggleWarning => self.toggle_log_level("warning", task_set),
-            Action::ToggleError => self.toggle_log_level("error", task_set),
+            Action::ToggleDebug => self.toggle_log_level("debug"),
+            Action::ToggleInfo => self.toggle_log_level("info"),
+            Action::ToggleWarning => self.toggle_log_level("warning"),
+            Action::ToggleError => self.toggle_log_level("error"),
         }
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State) {
+    fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State, _focused: bool) {
         let block = Block::bordered()
             .border_style(Theme::get().section("logs").border)
             .title(Self::TITLE);
@@ -470,8 +386,66 @@ impl TabContent for Logs {
 }
 
 impl Logs {
-    fn toggle_log_level(&mut self, level: &str, _task_set: &mut FutureSet<Self>) {
-        if crate::config::is_core_mismatch() {
+    fn connect(&mut self) {
+        if self.ws_pending.is_some() {
+            return;
+        }
+        let pending = Arc::new(Mutex::new(Vec::new()));
+        self.ws_pending = Some(Arc::clone(&pending));
+        let controller = CONFIG.controller_for_core().to_owned();
+        let secret = CONFIG.secret_for_core().map(|s| s.to_owned());
+        let level = Arc::clone(&self.ws_level);
+        let reconnect = Arc::clone(&self.ws_reconnect);
+        let paused = Arc::clone(&self.paused);
+        spawn_ws_logs(controller, secret, pending, level, reconnect, paused);
+        self.error = Some("Log capture is paused".to_owned());
+    }
+
+    fn drain(&mut self) {
+        let Some(pending) = &self.ws_pending else {
+            return;
+        };
+        let entries: Vec<LogEntry> = pending.lock().unwrap().drain(..).collect();
+        for entry in entries {
+            self.buffer.push(entry);
+        }
+        if self.buffer.count() > 0 && self.scroll + 1 >= self.buffer.count().saturating_sub(1) {
+            self.scroll = self.buffer.count().saturating_sub(1);
+        }
+    }
+
+    /// ready：取日志级别；否则清空并暂停。
+    fn check_core(&mut self, cx: &mut Cx<Self>) {
+        if let Err(reason) = monitor::status().ready() {
+            self.buffer.clear();
+            self.error = Some(reason);
+            self.paused.store(true, Ordering::Relaxed);
+            return;
+        }
+        async {
+            let cfg = tri!(
+                tokio::task::spawn_blocking(config::fetch).await.unwrap(),
+                or_set
+            );
+            wrapper(move |content: &mut Self| {
+                if monitor::status().ready().is_err() {
+                    return;
+                }
+                let level = cfg
+                    .log_level
+                    .as_ref()
+                    .map(|l| l.to_string())
+                    .unwrap_or_else(|| "unknown".to_owned());
+                content.current_log_level = level.clone();
+                *content.ws_level.lock().unwrap() = level;
+                content.error = None;
+            })
+        }
+        .spawn_at(cx);
+    }
+
+    fn toggle_log_level(&mut self, level: &str) {
+        if monitor::status().ready().is_err() {
             return;
         }
         let level = level.to_owned();
@@ -515,38 +489,40 @@ mod tests {
         assert_eq!(entries[0].payload, "after resume");
     }
 
-    #[tokio::test]
-    async fn pause_key_keeps_the_batch_already_scheduled_for_display() {
+    #[test]
+    fn tick_drain_keeps_entries_queued_before_pause() {
         let pending = Arc::new(Mutex::new(Vec::new()));
         let mut logs = Logs {
             ws_pending: Some(Arc::clone(&pending)),
             ..Logs::default()
         };
-        let receiver_paused = Arc::clone(&logs.paused);
-        let mut tasks = FutureSet::new();
-
-        logs.handle_action(Action::TogglePause, &mut tasks, &mut ());
-        let kickstart = tasks.join_next().await.unwrap().unwrap();
-        kickstart(&mut logs);
-        assert!(!receiver_paused.load(Ordering::Relaxed));
-        queue("before pause", &pending, &receiver_paused);
-        logs.after_sync(&mut tasks);
-        let callback = tokio::time::timeout(Duration::from_secs(3), tasks.join_next())
-            .await
-            .unwrap()
-            .unwrap()
-            .unwrap();
-
-        logs.handle_action(Action::TogglePause, &mut tasks, &mut ());
-        assert!(receiver_paused.load(Ordering::Relaxed));
-        queue("during pause", &pending, &receiver_paused);
-        callback(&mut logs);
+        logs.paused.store(false, Ordering::Relaxed);
+        queue("before pause", &pending, &logs.paused);
+        logs.drain();
+        logs.paused.store(true, Ordering::Relaxed);
+        queue("during pause", &pending, &logs.paused);
 
         assert!(pending.lock().unwrap().is_empty());
         assert_eq!(logs.buffer.count(), 1);
         assert_eq!(
             logs.buffer.iter_from_head().next().unwrap().payload,
             "before pause"
+        );
+    }
+
+    #[test]
+    fn pending_queue_keeps_only_the_latest_entries() {
+        let pending = Mutex::new(Vec::new());
+        let paused = AtomicBool::new(false);
+        for i in 0..(LOG_BUFFER_SIZE + 25) {
+            queue(&format!("m{i}"), &pending, &paused);
+        }
+        let entries = pending.lock().unwrap();
+        assert_eq!(entries.len(), LOG_BUFFER_SIZE);
+        assert_eq!(entries[0].payload, "m25");
+        assert_eq!(
+            entries.last().unwrap().payload,
+            format!("m{}", LOG_BUFFER_SIZE + 24)
         );
     }
 }

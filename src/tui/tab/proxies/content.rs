@@ -1,7 +1,7 @@
 use super::super::dev::*;
 use crate::functions::restful::proxies::{self};
 use std::cell::Cell;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::tree::{NodeItem, NodeType, ProxyTree, SortMode};
 
@@ -13,7 +13,6 @@ pub(super) struct Proxies {
     pub testing_since: Option<Instant>,
     pub jump_target: Cell<Option<usize>>,
     pub filter: Option<String>,
-    pub paused: bool,
 }
 
 type SelectionKey = (String, Option<String>, NodeType);
@@ -172,76 +171,24 @@ impl Proxies {
     }
 }
 
-impl BasicTabContent for Proxies {
+impl Page for Proxies {
     type Action = super::Action;
     type State = ListState;
-
     const TITLE: &str = "Proxies";
+    const TICK: Option<Duration> = Some(Duration::from_secs(5));
 
-    fn after_sync(&self, task_set: &mut FutureSet<Self>) {
-        if self.paused {
-            return;
+    fn on_event(&mut self, event: &Event, cx: &mut Cx<Self>) {
+        match event {
+            Event::Shown
+            | Event::Tick
+            | Event::Core(CoreEvent::StatusChanged(_) | CoreEvent::ConfigChanged) => {
+                self.reload(cx)
+            }
+            _ => {}
         }
-        if crate::config::is_core_mismatch() {
-            return;
-        }
-        async {
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            let response = tri!(
-                tokio::task::spawn_blocking(proxies::fetch_proxies)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-            wrapper(|content: &mut Self| {
-                content.proxies = response;
-                content.tree.rebuild_from_proxies(&content.proxies);
-                content.error = None;
-            })
-        }
-        .spawn_at(task_set);
     }
 
-    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = false;
-        if crate::config::is_core_mismatch() {
-            self.proxies = proxies::ProxyCatalog::default();
-            self.tree = ProxyTree::default();
-            self.error = Some("API data mismatch with configured core".to_owned());
-            return;
-        }
-        async {
-            let response = tri!(
-                tokio::task::spawn_blocking(proxies::fetch_proxies)
-                    .await
-                    .unwrap()
-            );
-            wrapper(|content: &mut Self| {
-                content.proxies = response.clone();
-                content.tree = ProxyTree::build(response);
-                content.error = None;
-            })
-        }
-        .spawn_at(task_set);
-    }
-
-    fn on_leave(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = true;
-    }
-}
-
-impl TabContent for Proxies {
-    fn init(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = true;
-        self.error = Some("Loading proxies...".to_owned());
-    }
-
-    fn handle_action(
-        &mut self,
-        action: super::Action,
-        task_set: &mut FutureSet<Self>,
-        state: &mut Self::State,
-    ) {
+    fn on_action(&mut self, action: super::Action, cx: &mut Cx<Self>, state: &mut Self::State) {
         let current = state.selected().unwrap_or(0);
 
         match action {
@@ -302,7 +249,7 @@ impl TabContent for Proxies {
                         }
                         NodeType::Link | NodeType::File => {
                             if let Some(ref parent) = parent {
-                                self.select_inline(parent.clone(), name, task_set);
+                                self.select_inline(parent.clone(), name, cx);
                             }
                         }
                     }
@@ -318,7 +265,7 @@ impl TabContent for Proxies {
                 self.tree.expand_all(&self.proxies);
                 self.restore_selection(key, state);
             }
-            super::Action::Refresh => self.refresh(task_set),
+            super::Action::Refresh => self.reload(cx),
             super::Action::Sort(sort_mode) => self.handle_sort(current, sort_mode, state),
             super::Action::TestDelay => {
                 let info = self
@@ -326,10 +273,10 @@ impl TabContent for Proxies {
                     .node_at(current)
                     .map(|n| (n.name.clone(), n.node_type.clone()));
                 if let Some((name, ntype)) = info {
-                    self.test_delay(name, ntype, task_set);
+                    self.test_delay(name, ntype, cx);
                 }
             }
-            super::Action::TestAllDelay => self.test_all_delay(task_set),
+            super::Action::TestAllDelay => self.test_all_delay(cx),
             super::Action::Search => {
                 async move {
                     let filter = tri!(
@@ -343,7 +290,7 @@ impl TabContent for Proxies {
                         content.filter = (!filter.is_empty()).then_some(filter);
                     })
                 }
-                .spawn_at(task_set);
+                .spawn_at(cx);
             }
             super::Action::FzfFind => {
                 let items: Vec<(String, usize)> = self
@@ -353,7 +300,7 @@ impl TabContent for Proxies {
                     .enumerate()
                     .map(|(i, n)| (Self::fzf_display(n), i))
                     .collect();
-                self.fzf_find(items, task_set);
+                self.fzf_find(items, cx);
             }
             super::Action::GroupSelect => {
                 let node = self.tree.node_at(current);
@@ -369,13 +316,13 @@ impl TabContent for Proxies {
                     .map(|(i, n)| (Self::fzf_display(n), i))
                     .collect();
                 if !items.is_empty() {
-                    self.fzf_find_with_prompt(items, prompt, task_set);
+                    self.fzf_find_with_prompt(items, prompt, cx);
                 }
             }
         }
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State) {
+    fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, _focused: bool) {
         if let Some(idx) = self.jump_target.take()
             && idx < self.tree.len()
         {

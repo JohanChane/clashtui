@@ -2,10 +2,11 @@ use ratatui::{text::Text, widgets::Paragraph};
 
 use super::dev::*;
 
-newtype_tab!(@no_action StatusTab(Tab<Status>));
+newtype_tab!(@no_action StatusTab(Status));
+
+use std::time::Duration;
 
 use crate::config::CONFIG;
-use crate::config::CoreType;
 use crate::functions::restful::{self, config_struct::*};
 
 macro_rules! tri {
@@ -34,170 +35,83 @@ macro_rules! tri {
 struct Status {
     config: Option<ClashConfig>,
     version: Option<String>,
-    detected_core_type: Option<CoreType>,
     error: Option<String>,
-    paused: bool,
 }
 
-impl BasicTabContent for Status {
+impl Page for Status {
     type Action = std::convert::Infallible;
-
     type State = ();
-
     const TITLE: &str = "Status";
+    const TICK: Option<Duration> = Some(Duration::from_secs(1));
 
-    fn after_sync(&self, task_set: &mut FutureSet<Self>) {
-        if self.paused {
-            return;
-        }
-        async {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-
-            let version = tri!(
-                tokio::task::spawn_blocking(restful::control::version)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-            let config = tri!(
-                tokio::task::spawn_blocking(restful::config::fetch)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-            let detected = tri!(
-                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-
-            wrapper(move |content: &mut Self| {
-                let configured = CONFIG.core_type();
-                content.detected_core_type = Some(detected);
-                if detected == configured {
-                    content.version = Some(version);
-                    content.config = Some(config);
-                    crate::config::set_core_mismatch(false);
-                } else {
-                    content.error = Some(format!(
-                        "API returned {detected} data, but {configured} is configured"
-                    ));
-                    crate::config::set_core_mismatch(true);
-                }
-            })
-        }
-        .spawn_at(task_set);
-    }
-
-    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = false;
-
-        let was_unknown = self.detected_core_type.is_none();
-        if was_unknown {
-            match crate::functions::command::is_core_service_running() {
-                Some(false) => {
-                    self.error = Some("Core service is not running".to_owned());
-                    return;
-                }
-                _ => {
-                    self.error = Some("Detecting...".to_owned());
+    fn on_event(&mut self, event: &Event, cx: &mut Cx<Self>) {
+        match event {
+            Event::Shown
+            | Event::Tick
+            | Event::Core(CoreEvent::StatusChanged(_) | CoreEvent::ConfigChanged) => {
+                match monitor::status() {
+                    CoreStatus::Ready { version } => {
+                        self.version = Some(version);
+                        self.error = None;
+                        self.fetch_config(cx);
+                    }
+                    status => self.show(status),
                 }
             }
+            _ => {}
         }
-
-        async {
-            let detected = tri!(
-                tokio::task::spawn_blocking(restful::core_detect::detect_core_type)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-            let version = tri!(
-                tokio::task::spawn_blocking(restful::control::version)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-            let config = tri!(
-                tokio::task::spawn_blocking(restful::config::fetch)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-
-            wrapper(move |content: &mut Self| {
-                let configured = CONFIG.core_type();
-                content.detected_core_type = Some(detected);
-                let mismatch = detected != configured;
-                crate::config::set_core_mismatch(mismatch);
-                if mismatch {
-                    let msg =
-                        format!("API returned {detected} data, but {configured} is configured");
-                    content.error = Some(msg);
-                } else {
-                    content.version = Some(version);
-                    content.config = Some(config);
-                    content.error = None;
-                }
-            })
-        }
-        .spawn_at(task_set);
     }
 
-    fn on_leave(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = true;
-    }
-}
-
-impl TabContent for Status {
-    fn init(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = true;
-        self.error = Some("Waiting".to_owned());
-    }
-
-    fn handle_action(
-        &mut self,
-        action: Self::Action,
-        _task_set: &mut FutureSet<Self>,
-        _state: &mut Self::State,
-    ) {
+    fn on_action(&mut self, action: Self::Action, _cx: &mut Cx<Self>, _state: &mut Self::State) {
         match action {}
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State) {
+    fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State, _focused: bool) {
         let block = Block::bordered()
             .border_style(Theme::get().section("status").border)
             .title(Self::TITLE);
         let mut lines: Vec<String> = vec![];
-        let configured = CONFIG.core_type();
-        if let Some(detected) = self.detected_core_type {
-            if detected == configured {
-                lines.push(format!("core: {detected}"));
-            } else {
-                lines.push(format!(
-                    "core: {detected} (configured: {configured}, MISMATCH)"
-                ));
-            }
+        if let Some(ref ver) = self.version {
+            lines.push(format!("core: {}", CONFIG.core_type()));
+            lines.push(format!("version: {ver}"));
         }
-        let matched = self.detected_core_type.is_none_or(|d| d == configured);
-        if matched {
-            if let Some(ref ver) = self.version {
-                lines.push(format!("version: {ver}"));
-            }
-            if let Some(cfg) = self.config.as_ref() {
-                lines.extend(cfg.build());
-            }
+        if let Some(cfg) = self.config.as_ref() {
+            lines.extend(cfg.build());
         }
         if lines.is_empty() {
             lines.push(
                 self.error
-                    .as_deref()
-                    .map(|s| s.to_owned())
-                    .expect("if there is not content, there should be an error"),
+                    .clone()
+                    .unwrap_or_else(|| "Detecting core...".to_owned()),
             );
+        } else if let Some(err) = &self.error {
+            lines.push(err.clone());
         }
         let widget = Paragraph::new(Text::from_iter(lines)).block(block);
         f.render_widget(widget, area);
+    }
+}
+
+impl Status {
+    fn show(&mut self, status: CoreStatus) {
+        self.version = None;
+        self.config = None;
+        self.error = status.ready().err();
+    }
+
+    fn fetch_config(&mut self, cx: &mut Cx<Self>) {
+        async {
+            let config = tri!(
+                tokio::task::spawn_blocking(restful::config::fetch)
+                    .await
+                    .unwrap(),
+                or_set
+            );
+            wrapper(move |content: &mut Self| {
+                content.config = Some(config);
+                content.error = None;
+            })
+        }
+        .spawn_at(cx);
     }
 }

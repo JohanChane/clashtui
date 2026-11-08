@@ -1,6 +1,10 @@
 #[macro_use]
 mod key;
 mod app;
+mod event;
+mod monitor;
+mod ops;
+mod page;
 mod popmsg;
 mod signals;
 mod tab;
@@ -18,8 +22,6 @@ pub(crate) use theme::Theme;
 trait TuiWidget {
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect);
     fn sync(&mut self);
-    fn on_enter(&mut self) {}
-    fn on_leave(&mut self) {}
 }
 
 pub fn init() -> anyhow::Result<()> {

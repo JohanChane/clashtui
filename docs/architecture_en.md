@@ -135,38 +135,32 @@ App owns the only mutable pending-chord state. Tab changes, focus changes, and p
 
 ### TuiWidget Trait
 
-`TuiWidget` provides the UI lifecycle:
+`TuiWidget` is what popups implement:
 
 - `render(&mut self, f, area)` — draw UI
-- `sync(&mut self)` — advance async tasks
-- `on_enter(&mut self)` / `on_leave(&mut self)` — tab switch callbacks
+- `sync(&mut self)` — take completed popup work
 
-`TuiTab` additionally exposes `title`, `input_scope`, and `handle_action`. Page containers receive resolved actions. Text popups handle raw keys through their own `handle_key_event` methods.
+`TuiTab` is the tab surface: `title`, `input_scope`, `handle_action`, `render`, `deliver`, and `sync(now)`. Page containers receive resolved actions. Text popups handle raw keys through their own `handle_key_event` methods.
 
 ### Tab System
 
-#### Single Panel (Tab)
+`Page` is the content trait: `on_event`, `on_action`, `render`, and an optional `TICK`. `Host<P>` runs one page. Event tasks and action tasks are separate. The next `Tick` is sent only while the page is shown, after its event tasks have finished, and then after `TICK`. Action tasks (popups, delay tests) do not delay `Tick`.
 
-`Tab<C>` is a generic container. `C` must implement two traits:
+`Split<L, R>` holds two pages (Profile and Template). Both receive each event. Only the focused side receives actions. The File tab switches focus itself.
 
-- `BasicTabContent` — defines the `Action` and `State` types and title
-- `TabContent` — defines `init`, `handle_action`, `render`
+`Hub` owns the seven tabs and `CoreMonitor`. Startup delivers `Init` to every tab, then `Shown` to the first. Changing tabs delivers `Hidden`, then `Shown`. Broadcast events go to `CoreMonitor` and every tab, including hidden ones.
 
-#### Dual Panel (DualTab)
-
-`DualTab<C1, C2>` is used for scenarios needing two panel switching (e.g. Files tab with Profile and Template). The two content types reference each other via `DualTabContent` / `DualTabContentMate` traits.
-
-#### Tab Enum
-
-The `enum_dispatch!` macro unifies all tabs into a single `Tab` enum. Each variant uses the `newtype_tab!` macro to generate a wrapper and implement `TuiWidget` and `TuiTab`.
+`enum_dispatch!` unifies the tab newtypes into one `Tab` enum. `newtype_tab!` wraps `Host<P>` and implements `TuiTab`.
 
 ### Async Task Model
 
-Async I/O operations are managed via `FutureSet<C>` (i.e. `tokio::task::JoinSet`):
+Async work uses `FutureSet<P>` (`tokio::task::JoinSet`):
 
-- Spawn async tasks in `handle_action` or `init` via `task_set.spawn(async { ... })`
-- Completed tasks produce `Callback<C>` (i.e. `Box<dyn FnOnce(&mut C)>`)
-- `sync()` advances completed callbacks each frame; state changes happen here uniformly
+- Pages spawn with `async { ... }.spawn_at(cx)`
+- A finished task returns `Box<dyn FnOnce(&mut P) + Send>`
+- `Host::sync(now)` applies those callbacks on the UI thread, then checks `Tick`
+
+`emit` queues a broadcast. `App::serve` owns the `Inbox` and handles one event at a time on the UI thread. Lifecycle events are not broadcast; `Hub` and `Host` deliver them directly.
 
 Error handling:
 - `tri!()` macro — capture errors and display a popup to the user
@@ -185,9 +179,8 @@ Popups use a `oneshot` channel pattern:
 |-------|----------|---------|
 | `tri!` | `tab/mod.rs` | Error handling in async callbacks |
 | `key_map!` | `key.rs` | Declare default bindings and parsers, without mutable runtime state |
-| `newtype_tab!` | `tab/mod.rs` | Generate Tab wrapper, implement `TuiWidget` + `TuiTab` |
+| `newtype_tab!` | `tab/mod.rs` | Generate a tab wrapper around `Host`, implement `TuiTab` |
 | `enum_dispatch!` | `tab/mod.rs` | Dispatch Tab enum variants to trait methods |
-| `new_type_impl_tuiwidget!` | `widget/mod.rs` | Auto-implement `TuiWidget` for newtype wrappers |
 | `load_save!` | `config/util.rs` | Generate `from_file()` / `to_file()` for YAML config types |
 
 ### key_map! Macro

@@ -84,65 +84,48 @@ pub(super) struct Template {
     jump_target: Cell<Option<usize>>,
 }
 
-impl BasicTabContent for Template {
+impl Page for Template {
     type Action = Action;
     type State = ListState;
-
     const TITLE: &str = "Template";
-}
 
-impl DualTabContentMate for Template {
-    type Mate = super::profile::Profile;
-
-    fn init(&mut self, task_set: &mut FutureSet<(Self::Mate, Self)>, _: &mut Self::State) {
-        async {
-            let templates = tri!(get_all_templates());
-            wrapper(|(_, content): &mut (Self::Mate, Self)| content.items = templates)
+    fn on_event(&mut self, event: &Event, cx: &mut Cx<Self>) {
+        match event {
+            Event::Init | Event::Shown => self.reload(cx),
+            _ => {}
         }
-        .spawn_at(task_set);
     }
 
-    fn handle_action(
-        &mut self,
-        action: Self::Action,
-        task_set: &mut FutureSet<(Self::Mate, Self)>,
-        state: &mut Self::State,
-    ) -> bool {
+    fn on_action(&mut self, action: Self::Action, cx: &mut Cx<Self>, state: &mut Self::State) {
         log::debug!(
-            "Template::handle_action: action={action:?} items.len={}",
+            "Template::on_action: action={action:?} items.len={}",
             self.items.len()
         );
         match action {
-            Action::Switch => return true,
+            Action::Switch => {}
             Action::MoveDown => state.select_next(),
             Action::MoveUp => state.select_previous(),
             Action::GoTop => state.select_first(),
             Action::GoEnd => state.select_last(),
-
             Action::Select => todo!(),
-
             Action::Operation(action) => {
                 log::debug!("Template::Operation: {action:?}");
                 match action {
                     Operation::FzfFind => {
                         let items = self.items.clone();
-                        actions::fzf_find(items).spawn_at(task_set);
-                        return false;
+                        actions::fzf_find(items).spawn_at(cx);
                     }
                     Operation::EditProviders => {
-                        action.act(String::new()).spawn_at(task_set);
-                        return false;
+                        action.act(String::new()).spawn_at(cx);
                     }
                     _ => {
                         let name = get_name!(self, state);
                         log::debug!("Template::Operation name={name}");
-                        action.act(name).spawn_at(task_set);
-                        return false;
+                        action.act(name).spawn_at(cx);
                     }
                 }
             }
         }
-        false
     }
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, is_focused: bool) {
@@ -201,6 +184,16 @@ impl DualTabContentMate for Template {
     }
 }
 
+impl Template {
+    fn reload(&mut self, cx: &mut Cx<Self>) {
+        async {
+            let templates = tri!(get_all_templates());
+            wrapper(move |content: &mut Self| content.items = templates)
+        }
+        .spawn_at(cx);
+    }
+}
+
 mod actions {
     use super::*;
 
@@ -219,7 +212,7 @@ mod actions {
     }
 
     type CB = Box<dyn for<'a> FnOnce(&'a mut C) + Send + 'static>;
-    type C = (<Template as DualTabContentMate>::Mate, Template);
+    type C = Template;
 
     async fn generate(name: String) -> CB {
         let profile_name = format!("{name}.tpl");
@@ -229,7 +222,8 @@ mod actions {
         } else {
             tri!(apply_template(&name, &profile_name));
         }
-        sync!(C)
+        emit(FileEvent::ProfilesChanged);
+        do_nothing()
     }
 
     async fn delete(name: String) -> CB {
@@ -251,7 +245,7 @@ mod actions {
         }
 
         let templates = tri!(get_all_templates());
-        wrapper(move |(_, content): &mut C| {
+        wrapper(move |content: &mut C| {
             content.items = templates;
         })
     }
@@ -289,7 +283,7 @@ mod actions {
             or_cancel
         );
 
-        wrapper(|(_, content): &mut C| {
+        wrapper(|content: &mut C| {
             content.filter = (!filter.is_empty()).then_some(filter);
         })
     }
@@ -301,7 +295,7 @@ mod actions {
             .await
             .unwrap_or_default();
 
-        wrapper(move |(_, content): &mut C| {
+        wrapper(move |content: &mut C| {
             content.jump_target.set(selected);
         })
     }

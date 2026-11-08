@@ -704,7 +704,6 @@ The `core_type` in `clashtui.db` takes precedence. If the API returns core data 
 
 - The user started another core's service outside of Clashtui
 - Both cores happen to listen on the same port, and API requests return data from the wrong core
-- CoreSrvCtl switched cores but Clashtui was not restarted (current design)
 
 ### Detection Method
 
@@ -717,31 +716,27 @@ The `core_type` in `clashtui.db` takes precedence. If the API returns core data 
 
 ### Architecture
 
-**Two-layer defense**:
+`CoreMonitor` probes in the background and publishes one `CoreStatus`:
 
-| Layer | Location | Mechanism |
-|-------|----------|-----------|
-| Panel layer | Each Tab's `on_enter` / `after_sync` | Block spawning async tasks or clear existing data |
-| API layer | Entry of `request()` function | Uniformly reject non-`/version` requests, return `"core mismatch"` |
+| Value | Meaning |
+|-------|---------|
+| `Unknown` | No confirmed result yet (startup, or just after a service command) |
+| `Stopped` | The configured core's service is not running. The API cannot be reached |
+| `Unreachable` | The service is running or its state is unknown, but the API is not reachable |
+| `Mismatch` | `/version` belongs to a different core |
+| `Ready` | The API is up and belongs to the configured core |
 
-**Global flag**:
+The probe calls `GET /version` first. Success does not start a service-manager process. Failure then checks the service, to tell `Stopped` from `Unreachable`.
 
-`config.rs` maintains `static CORE_MISMATCH: AtomicBool`:
+On each change, `CoreMonitor` updates `monitor::status()`, sets `CORE_MISMATCH` when the status is `Mismatch`, and broadcasts `StatusChanged`. Pages call `monitor::status().ready()` before using the API and clear stale data when it is not ready. `request()` still rejects non-`/version` calls while `CORE_MISMATCH` is set. `CoreMonitor` is the only writer.
 
-- `set_core_mismatch(bool)` — write (only StatusTab)
-- `is_core_mismatch() -> bool` — read (all panels + `request()`)
+Pages do not call the API before the first `Ready`. A later `Ready` makes them load again.
 
-**Detection timing**:
-
-`StatusTab.on_enter()` **synchronously** calls `detect_core_type()` (localhost HTTP, <10ms), setting `CORE_MISMATCH` before other panels fetch data for the first time. `after_sync` continues async polling detection (`or_set` silently).
-
-**Popup**:
-
-On first detection of a mismatch (when `detected_core_type` changes from `None` to a non-matching value), a Confirm popup is shown to the user. Subsequent mismatches do not trigger popups.
+Switching cores in CoreSrvCtl saves the new core type and emits `Switched`. The app exits. Start Clashtui again so key bindings and pages load for that core.
 
 ### Returning to Normal
 
-`after_sync` keeps detecting. When `detected == configured`, the `CORE_MISMATCH` flag is automatically cleared. When the user switches to each panel, API requests resume normally and data is displayed again.
+When the probe again sees the configured core, `CoreMonitor` clears `CORE_MISMATCH` and broadcasts `StatusChanged(Ready)`. Pages load on that event, including pages that are not currently shown.
 
 ## Support macOS
 

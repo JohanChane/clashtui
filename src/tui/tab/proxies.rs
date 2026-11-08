@@ -6,7 +6,7 @@ pub mod tree;
 use super::dev::*;
 use content::Proxies;
 
-newtype_tab!(ProxiesTab(Tab<Proxies>), Proxies);
+newtype_tab!(ProxiesTab(Proxies), Proxies);
 
 key_map!(
     Proxies,
