@@ -4,13 +4,11 @@ use super::*;
 pub(in crate::tui) use actions::{AppAction, TabTarget, km};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use tab::prelude::*;
-use tokio::sync::Notify;
 use widget::help::HelpPanel;
 use widget::popmsg::PopUp;
 
 // 50fps
 const TICK_RATE: std::time::Duration = std::time::Duration::from_millis(20);
-pub(super) static FULL_RENDER: Notify = Notify::const_new();
 pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
 
@@ -45,50 +43,99 @@ impl App {
     }
     #[tokio::main]
     pub async fn serve() -> anyhow::Result<()> {
-        signals::Signals::start()?;
+        let mut coordinator = term::TerminalCoordinator::install();
+        let signals = signals::Signals::start()?;
         let mut app = Self::new();
-        let mut events = crossterm::event::EventStream::new();
+        let mut input = term::InputReader::start();
         let mut invt = tokio::time::interval(TICK_RATE);
         let mut terminal =
             ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
+        let mut pause_ack: Option<tokio::sync::oneshot::Receiver<()>> = None;
+        let mut pending_control = None;
+        let mut quitting = false;
 
-        while !QUIT.load(Ordering::Relaxed) {
-            terminal.draw(|f| app.render(f))?;
-            app.sync();
+        loop {
+            if QUIT.load(Ordering::Relaxed) && !quitting {
+                quitting = true;
+                signals.close();
+                input.begin_shutdown();
+                coordinator.begin_shutdown();
+            }
+            if quitting && coordinator.is_idle() && !input.has_worker() && pending_control.is_none()
+            {
+                break;
+            }
+            if !quitting && coordinator.owns_terminal() && pause_ack.is_none() {
+                terminal.draw(|f| app.render(f))?;
+                app.sync();
+            }
 
-            let ev = {
-                use futures_lite::StreamExt as _;
-                // this tick here ensures that fps is stable
-                let mut tick = Box::pin(invt.tick());
-                let ev = tokio::select! {
-                    Some(ev) = events.next() => ev?,
-                    _ = &mut tick => continue,
-                    // if we switch between screens
-                    _ = FULL_RENDER.notified() => {
-                        // first we hold tui for output
-                        FULL_RENDER.notified().await;
-                        // then we tell ratatui to re-render everything
-                        terminal.clear()?;
-                        continue
-                    },
-                };
-                tick.await;
-                ev
-            };
-
-            use crossterm::event::Event;
-            match ev {
-                Event::Key(key_event) if key_event.kind.is_press() => {
-                    #[cfg(debug_assertions)]
-                    the_egg(key_event.code);
-                    let key = key_event.into();
-                    app.handle_key_event(&key);
+            tokio::select! {
+                event = async {
+                    if quitting {
+                        std::future::poll_fn(|cx| input.poll_finished(cx)).await;
+                        None
+                    } else {
+                        input.next_event().await
+                    }
+                }, if (quitting && input.has_worker()) || (!quitting && coordinator.owns_terminal() && pause_ack.is_none()) => {
+                    let Some(event) = event else {
+                        QUIT.store(true, Ordering::Relaxed);
+                        continue;
+                    };
+                    use crossterm::event::Event;
+                    match event? {
+                        Event::Key(key_event) if key_event.kind.is_press() => {
+                            #[cfg(debug_assertions)]
+                            the_egg(key_event.code);
+                            let key = key_event.into();
+                            app.handle_key_event(&key);
+                        }
+                        Event::Resize(..) => terminal.autoresize()?,
+                        _ => {}
+                    }
                 }
-                Event::Resize(..) => terminal.autoresize()?,
-                _ => (),
+                // if we switch between screens
+                control = coordinator.recv() => match control {
+                    Some(control) if control.is_suspend() && !quitting => {
+                        // first we hold tui for output
+                        pause_ack = Some(input.request_pause());
+                        pending_control = Some(control);
+                    }
+                    Some(control) => {
+                        let clear = coordinator.handle(control)?;
+                        if !quitting && coordinator.owns_terminal() {
+                            input.resume();
+                            if clear {
+                                // then we tell ratatui to re-render everything
+                                terminal.clear()?;
+                            }
+                        }
+                    }
+                    None => break,
+                },
+                result = async { pause_ack.as_mut().unwrap().await }, if pause_ack.is_some() => {
+                    pause_ack = None;
+                    if result.is_err() && !quitting {
+                        anyhow::bail!("Terminal input stopped before confirming suspension");
+                    }
+                    if let Some(control) = pending_control.take() {
+                        let clear = coordinator.handle(control)?;
+                        if !quitting && coordinator.owns_terminal() {
+                            input.resume();
+                            if clear {
+                                terminal.clear()?;
+                            }
+                        }
+                    }
+                }
+                // this tick here ensures that fps is stable
+                // Keep polling QUIT even while a worker owns the terminal.
+                _ = invt.tick() => {}
             }
         }
 
+        signals.shutdown().await;
         log::trace!("App Exit");
         Ok(())
     }

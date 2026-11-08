@@ -11,7 +11,7 @@ pub fn exec(pgm: &str, args: Vec<&str>) -> Result<String> {
 pub fn exec_sudo(pgm: &str, args: Vec<&str>) -> Result<String> {
     use crate::tui;
     log::debug!("IPC: sudo -S {:?}", args);
-    tui::hold(true)?;
+    let lease = tui::terminal_lease()?;
     let mut child = Command::new("sudo")
         .arg(pgm)
         .args(args)
@@ -40,7 +40,7 @@ pub fn exec_sudo(pgm: &str, args: Vec<&str>) -> Result<String> {
     let mut output = child.wait_with_output()?;
     output.stderr = output_copy;
 
-    tui::hold(false)?;
+    lease.release()?;
     Ok(stringify_output(output))
 }
 

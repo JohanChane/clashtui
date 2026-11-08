@@ -8,7 +8,6 @@ license = "MIT OR Apache-2.0"
 keywords = ["tui", "clash", "mihomo", "sing-box", "terminal"]
 categories = ["command-line-utilities", "terminal"]
 readme = "README.md"
-homepage = "https://github.com/JohanChane/clashtui"
 repository = "https://github.com/JohanChane/clashtui"
 
 [package.metadata.release]
