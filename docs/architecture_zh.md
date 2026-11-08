@@ -47,7 +47,12 @@ src/
 │       ├── page/
 │       │   └── split.rs # 双页面容器（Profile 和 Template）
 │       ├── monitor.rs   # CoreMonitor 和状态快照
-│       ├── ops.rs       # 会改核心或文件的共享操作；成功后 emit
+│       ├── ops.rs       # 操作模块声明与统一事件约定
+│       ├── ops/
+│       │   ├── service.rs     # 核心服务生命周期与完成事件
+│       │   ├── profile.rs     # Profile 选择与更新
+│       │   ├── config.rs      # 核心运行时配置修改
+│       │   └── connections.rs # 连接关闭与事件
 │       ├── key.rs       # 按键、类型化序列、默认绑定宏和统一加载入口
 │       ├── key/
 │       │   ├── defaults.rs  # 类型化单键和双键声明

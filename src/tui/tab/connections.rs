@@ -375,7 +375,7 @@ impl Page for Connections {
                 if use_bulk {
                     async move {
                         tri!(
-                            tokio::task::spawn_blocking(ops::close_all_connections)
+                            tokio::task::spawn_blocking(ops::connections::close_all)
                                 .await
                                 .unwrap()
                         );

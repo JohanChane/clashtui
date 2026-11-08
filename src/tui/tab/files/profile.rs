@@ -200,7 +200,7 @@ impl Page for Profile {
                 async move {
                     let pf = tri!(db::get(&name).unwrap().load_local_profile());
                     tri!(check_config(&pf.path));
-                    tri!(ops::select_profile(db::get(&name).unwrap()).await);
+                    tri!(ops::profile::select(db::get(&name).unwrap()).await);
                     do_nothing()
                 }
                 .spawn_at(cx);
@@ -521,7 +521,7 @@ mod actions {
         {
             fetch_traffic_for_url(url, with_proxy);
         }
-        let result = ops::update_profile(db::get(&name).unwrap(), with_proxy).await;
+        let result = ops::profile::update(db::get(&name).unwrap(), with_proxy).await;
 
         wrapper(move |content: &mut C| {
             content.updating.remove(&name);
@@ -549,7 +549,7 @@ mod actions {
             let with_proxy = db::get(name)
                 .map(|pf| pf.update_with_proxy)
                 .unwrap_or(false);
-            let result = ops::update_profile(db::get(name).unwrap(), with_proxy).await;
+            let result = ops::profile::update(db::get(name).unwrap(), with_proxy).await;
             results.push((name.clone(), result));
         }
 

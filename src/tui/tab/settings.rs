@@ -132,7 +132,7 @@ impl Page for SettingsContent {
                             }
                             let payload = serde_json::json!({"mode": mode.to_string()}).to_string();
                             let result =
-                                tokio::task::spawn_blocking(move || ops::patch_config(payload))
+                                tokio::task::spawn_blocking(move || ops::config::patch(payload))
                                     .await
                                     .unwrap();
                             match result {
@@ -182,7 +182,7 @@ impl Page for SettingsContent {
                             let payload = serde_json::json!({"tun": {"stack": stack.to_string()}})
                                 .to_string();
                             let result =
-                                tokio::task::spawn_blocking(move || ops::patch_config(payload))
+                                tokio::task::spawn_blocking(move || ops::config::patch(payload))
                                     .await
                                     .unwrap();
                             match result {
@@ -232,7 +232,7 @@ impl Page for SettingsContent {
                             }
                             let payload = serde_json::json!({"allow-lan": new_val}).to_string();
                             let result =
-                                tokio::task::spawn_blocking(move || ops::patch_config(payload))
+                                tokio::task::spawn_blocking(move || ops::config::patch(payload))
                                     .await
                                     .unwrap();
                             match result {
@@ -259,7 +259,7 @@ impl Page for SettingsContent {
                             let payload =
                                 serde_json::json!({"tun": {"enable": new_val}}).to_string();
                             let result =
-                                tokio::task::spawn_blocking(move || ops::patch_config(payload))
+                                tokio::task::spawn_blocking(move || ops::config::patch(payload))
                                     .await
                                     .unwrap();
                             match result {

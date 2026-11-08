@@ -73,8 +73,8 @@ impl GlobalAction {
                 let dir = std::path::Path::new(dir);
                 command::open_dir(dir.parent().unwrap_or(dir))
             }
-            Self::RestartCoreService => crate::tui::ops::restart_core().map(drop),
-            Self::CloseAllConnections => crate::tui::ops::close_all_connections(),
+            Self::RestartCoreService => crate::tui::ops::service::restart().map(drop),
+            Self::CloseAllConnections => crate::tui::ops::connections::close_all(),
         }
     }
 }

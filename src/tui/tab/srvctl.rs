@@ -298,21 +298,21 @@ impl Page for SrvCtlContent {
                 async move {
                     match op {
                         SrvCtlOp::Stop => {
-                            let out = tri!(run_blocking(ops::stop_core).await);
+                            let out = tri!(run_blocking(ops::service::stop).await);
                             Confirm::title("OK".to_owned())
                                 .with_prompt(out)
                                 .build_and_send();
                             do_nothing()
                         }
                         SrvCtlOp::Restart => {
-                            let out = tri!(run_blocking(ops::restart_core).await);
+                            let out = tri!(run_blocking(ops::service::restart).await);
                             Confirm::title("OK".to_owned())
                                 .with_prompt(out)
                                 .build_and_send();
                             do_nothing()
                         }
                         SrvCtlOp::StopAll => {
-                            let out = tri!(run_blocking(ops::stop_all_cores).await);
+                            let out = tri!(run_blocking(ops::service::stop_all).await);
                             Confirm::title("OK".to_owned())
                                 .with_prompt(out)
                                 .build_and_send();
@@ -324,8 +324,9 @@ impl Page for SrvCtlContent {
                                 CoreType::Mihomo => CoreType::Singbox,
                                 CoreType::Singbox => CoreType::Mihomo,
                             };
-                            let report =
-                                tri!(run_blocking(move || ops::switch_core(new_type)).await);
+                            let report = tri!(
+                                run_blocking(move || ops::service::switch_core(new_type)).await
+                            );
                             let _ = Confirm::dismiss_any("Core Switched".to_owned())
                                 .with_prompt(report)
                                 .build_and_send()
@@ -336,7 +337,7 @@ impl Page for SrvCtlContent {
                         #[cfg(windows)]
                         SrvCtlOp::Install => {
                             let core = crate::config::CONFIG.core_type();
-                            let out = tri!(run_blocking(move || ops::install_core(core)).await);
+                            let out = tri!(run_blocking(move || ops::service::install(core)).await);
                             Confirm::title("OK".to_owned())
                                 .with_prompt(out)
                                 .build_and_send();
@@ -345,7 +346,8 @@ impl Page for SrvCtlContent {
                         #[cfg(windows)]
                         SrvCtlOp::Uninstall => {
                             let core = crate::config::CONFIG.core_type();
-                            let out = tri!(run_blocking(move || ops::uninstall_core(core)).await);
+                            let out =
+                                tri!(run_blocking(move || ops::service::uninstall(core)).await);
                             Confirm::title("OK".to_owned())
                                 .with_prompt(out)
                                 .build_and_send();

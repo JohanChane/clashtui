@@ -47,7 +47,12 @@ src/
 │       ├── page/
 │       │   └── split.rs # Two-page container (Profile and Template)
 │       ├── monitor.rs   # CoreMonitor and the status snapshot
-│       ├── ops.rs       # Shared core and file operations; emit after success
+│       ├── ops.rs       # Operation modules and shared event contracts
+│       ├── ops/
+│       │   ├── service.rs     # Core service lifecycle and completion events
+│       │   ├── profile.rs     # Profile selection and updates
+│       │   ├── config.rs      # Core runtime configuration changes
+│       │   └── connections.rs # Connection closing and events
 │       ├── key.rs       # Keys, typed sequences, default-binding macro, and loading entry point
 │       ├── key/
 │       │   ├── defaults.rs  # Typed single-key and chord declarations
