@@ -736,7 +736,7 @@ App 持有唯一的组合键等待状态。执行、Which、帮助和标签栏�
 
 ### 恢复正常
 
-探测再次看到配置的核心时，`CoreMonitor` 清除 `CORE_MISMATCH` 并广播 `StatusChanged(Ready)`。页面在这个事件上重新加载，包括当前没有显示的页面。
+探测再次看到配置的核心时，`CoreMonitor` 清除 `CORE_MISMATCH` 并广播 `StatusChanged(Ready)`。当前显示的页面在此事件上立即重新加载，隐藏页面在切入（`Shown`）时重新加载。
 
 ## Support macOS
 

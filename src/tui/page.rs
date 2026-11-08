@@ -32,19 +32,11 @@ pub trait Page: Sized + 'static {
 /// Handler context, created by Host before each handler call.
 pub struct Cx<'a, P> {
     tasks: &'a mut FutureSet<P>,
-    /// Whether the containing tab is visible. Pages can read is_shown; none currently do.
-    #[allow(dead_code)]
-    shown: bool,
 }
 
 impl<P: 'static> Cx<'_, P> {
     pub fn spawn(&mut self, task: impl Future<Output = CallBack<P>> + Send + 'static) {
         self.tasks.spawn(task);
-    }
-
-    #[allow(dead_code)]
-    pub fn is_shown(&self) -> bool {
-        self.shown
     }
 }
 
@@ -104,9 +96,11 @@ impl<P: Page> Host<P> {
             self.shown = *event == Event::Shown;
             self.next_tick = None;
         }
+        if !self.shown && matches!(event, Event::Core(_) | Event::File(_)) {
+            return;
+        }
         let mut cx = Cx {
             tasks: &mut self.event_tasks,
-            shown: self.shown,
         };
         self.page.on_event(event, &mut cx);
     }
@@ -114,7 +108,6 @@ impl<P: Page> Host<P> {
     pub fn handle_action(&mut self, action: P::Action) {
         let mut cx = Cx {
             tasks: &mut self.action_tasks,
-            shown: self.shown,
         };
         self.page.on_action(action, &mut cx, &mut self.state);
     }
@@ -206,19 +199,22 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hidden_pages_receive_broadcasts_without_ticking() {
+    async fn hidden_pages_ignore_broadcasts_and_ticks() {
         use crate::tui::event::{CoreEvent, FileEvent};
 
         let now = Instant::now();
         let mut host = Host::<Probe>::default();
         host.deliver(&Event::Shown);
+        host.deliver(&Event::Core(CoreEvent::ConnectionsClosed));
+        assert_eq!(host.page().broadcasts, 1);
+
         host.sync(now);
         host.deliver(&Event::Hidden);
         host.deliver(&Event::Core(CoreEvent::ConnectionsClosed));
         host.deliver(&Event::File(FileEvent::ProfilesChanged));
         host.sync(now + Duration::from_secs(10));
 
-        assert_eq!(host.page().broadcasts, 2);
+        assert_eq!(host.page().broadcasts, 1);
         assert_eq!(host.page().ticks, 0);
     }
 

@@ -160,7 +160,7 @@ App owns the only mutable pending-chord state. Tab changes, focus changes, and p
 
 `Split<L, R>` holds two pages (Profile and Template). Both receive each event. Only the focused side receives actions. The File tab switches focus itself.
 
-`Hub` owns the seven tabs and `CoreMonitor`. Startup delivers `Init` to every tab, then `Shown` to the first. Changing tabs delivers `Hidden`, then `Shown`. Broadcast events go to `CoreMonitor` and every tab, including hidden ones.
+`Hub` owns the seven tabs and `CoreMonitor`. Startup delivers `Init` to every tab, then `Shown` to the first. Changing tabs delivers `Hidden`, then `Shown`. Broadcast events go to `CoreMonitor` and the visible tab; hidden tabs reload on `Shown`.
 
 `enum_dispatch!` unifies the tab newtypes into one `Tab` enum. `newtype_tab!` wraps `Host<P>` and implements `TuiTab`.
 

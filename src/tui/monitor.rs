@@ -93,11 +93,12 @@ fn publish(status: CoreStatus) {
 
 /// Run on a blocking thread. The mismatch guard in request() does not affect /version.
 /// Probe the API first. On success, skip the service check and avoid spawning a process.
-/// Check the service only on failure, since a stopped service means the API is unreachable.
+/// Check the service only on failure when not already confirmed Stopped.
 fn probe() -> CoreStatus {
     match core_detect::probe() {
         Ok((running, _)) if running != CONFIG.core_type() => CoreStatus::Mismatch { running },
         Ok((_, version)) => CoreStatus::Ready { version },
+        Err(_) if matches!(status(), CoreStatus::Stopped) => CoreStatus::Stopped,
         Err(error) => match command::is_core_service_running() {
             Some(false) => CoreStatus::Stopped,
             // The service is running, or its state is unknown (e.g. system-level launchd on macOS).

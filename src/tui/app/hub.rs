@@ -47,13 +47,11 @@ impl Hub {
         self.tabs[self.shown].deliver(&Event::Shown);
     }
 
-    /// Broadcast to CoreMonitor first, then every tab in tab-bar order, including hidden tabs.
+    /// Broadcast to CoreMonitor first, then the visible tab. Hidden tabs reload on Shown.
     pub fn dispatch(&mut self, event: &Event) {
         debug_assert!(matches!(event, Event::Core(_) | Event::File(_)));
         self.monitor.on_event(event);
-        for tab in &mut self.tabs {
-            tab.deliver(event);
-        }
+        self.tabs[self.shown].deliver(event);
     }
 
     /// Each frame, all tabs apply callbacks and visible pages check Tick.

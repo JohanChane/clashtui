@@ -13,12 +13,12 @@ pub enum Event {
     Init,
     /// The tab becomes visible. Both sides of Split receive this event.
     Shown,
-    /// The tab becomes hidden and stops receiving Tick.
+    /// The tab becomes hidden and stops receiving Tick and broadcasts.
     Hidden,
     /// Delivered at the Page::TICK interval while visible.
     Tick,
 
-    // Broadcasts: emit from anywhere; delivered to all tabs and CoreMonitor.
+    // Broadcasts: emit from anywhere; delivered to CoreMonitor and the visible tab.
     Core(CoreEvent),
     File(FileEvent),
 }

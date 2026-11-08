@@ -224,7 +224,9 @@ fn spawn_ws_logs(
                     loop {
                         match ws.read() {
                             Ok(tungstenite::Message::Text(text)) => {
-                                queue_log_message(&text, &pending, &paused);
+                                if monitor::status().ready().is_ok() {
+                                    queue_log_message(&text, &pending, &paused);
+                                }
                             }
                             Ok(tungstenite::Message::Close(_)) => break,
                             Err(tungstenite::Error::Io(ref e))
@@ -264,7 +266,9 @@ impl Page for Logs {
             Event::Init => self.connect(),
             Event::Tick => self.drain(),
             Event::Shown | Event::Core(CoreEvent::StatusChanged(_) | CoreEvent::ConfigChanged) => {
-                self.drain();
+                if monitor::status().ready().is_ok() {
+                    self.drain();
+                }
                 self.check_core(cx);
             }
             _ => {}
@@ -417,6 +421,9 @@ impl Logs {
     /// When ready, fetch the log level; otherwise clear logs and pause.
     fn check_core(&mut self, cx: &mut Cx<Self>) {
         if let Err(reason) = monitor::status().ready() {
+            if let Some(pending) = &self.ws_pending {
+                pending.lock().unwrap().clear();
+            }
             self.buffer.clear();
             self.error = Some(reason);
             self.paused.store(true, Ordering::Relaxed);

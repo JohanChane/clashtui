@@ -736,7 +736,7 @@ Switching cores in CoreSrvCtl saves the new core type and emits `Switched`. The 
 
 ### Returning to Normal
 
-When the probe again sees the configured core, `CoreMonitor` clears `CORE_MISMATCH` and broadcasts `StatusChanged(Ready)`. Pages load on that event, including pages that are not currently shown.
+When the probe again sees the configured core, `CoreMonitor` clears `CORE_MISMATCH` and broadcasts `StatusChanged(Ready)`. The visible page reloads immediately, and hidden pages reload when shown.
 
 ## Support macOS
 

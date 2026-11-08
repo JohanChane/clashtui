@@ -160,7 +160,7 @@ src/
 
 `Split<L, R>` 放两个页面（Profile 和 Template）。两侧都收到事件，只有焦点侧收到动作。焦点切换由 File 标签页处理。
 
-`Hub` 持有 7 个标签页和 `CoreMonitor`。启动时每个标签页收到 `Init`，然后第一个收到 `Shown`。切页时先 `Hidden` 再 `Shown`。广播事件交给 `CoreMonitor` 和每一个标签页，包括隐藏的。
+`Hub` 持有 7 个标签页和 `CoreMonitor`。启动时每个标签页收到 `Init`，然后第一个收到 `Shown`。切页时先 `Hidden` 再 `Shown`。广播事件交给 `CoreMonitor` 和当前显示的标签页；隐藏标签页在 `Shown` 时重新加载。
 
 `enum_dispatch!` 把各标签页新类型收成一个 `Tab` 枚举。`newtype_tab!` 用 `Host<P>` 包一层并实现 `TuiTab`。
 
