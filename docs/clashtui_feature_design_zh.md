@@ -704,7 +704,6 @@ App 持有唯一的组合键等待状态。执行、Which、帮助和标签栏�
 
 - 用户在 clashtui 外部启动了另一内核的 service
 - 两个内核恰好监听同一端口，API 请求返回的数据来自错误内核
-- CoreSrvCtl 切换内核后未重启 clashtui（当前设计）
 
 ### 检测方案
 
@@ -717,32 +716,27 @@ App 持有唯一的组合键等待状态。执行、Which、帮助和标签栏�
 
 ### 架构
 
-**两层防护**：
+`CoreMonitor` 在后台探测，并发布一个 `CoreStatus`：
 
-| 层 | 位置 | 机制 |
-|----|------|------|
-| 面板层 | 各 Tab 的 `on_enter` / `after_sync` | 阻止 spawn async task 或清空已有数据 |
-| API 层 | `request()` 函数入口 | 统一拒绝非 `/version` 的请求，返回 `"core mismatch"` |
+| 值 | 含义 |
+|----|------|
+| `Unknown` | 还没有确认结果（启动时，或刚执行完服务命令） |
+| `Stopped` | 配置的核心的服务没有运行，API 必然不可达 |
+| `Unreachable` | 服务在运行或无法判断，但 API 不可达 |
+| `Mismatch` | `/version` 属于另一个核心 |
+| `Ready` | API 可用，且属于配置的核心 |
 
-**全局标志**：
+探测先请求 `GET /version`。成功就不再查服务，也不启动进程。失败时才查服务，用来区分 `Stopped` 和 `Unreachable`。
 
-`config.rs` 中维护 `static CORE_MISMATCH: AtomicBool`：
+状态变化时，`CoreMonitor` 更新 `monitor::status()`，在 `Mismatch` 时设置 `CORE_MISMATCH`，并广播 `StatusChanged`。页面请求 API 前调用 `monitor::status().ready()`，不可用时清空旧数据。`request()` 在 `CORE_MISMATCH` 为真时仍拒绝非 `/version` 请求。唯一写入者是 `CoreMonitor`。
 
-- `set_core_mismatch(bool)` — 写入（仅 StatusTab）
-- `is_core_mismatch() -> bool` — 读取（所有面板 + `request()`）
+页面在第一次 `Ready` 之前不请求 API。之后再次 `Ready` 时页面会重新加载。
 
-**检测时机**：
-
-`StatusTab.on_enter()` 中**同步**调用 `detect_core_type()`（localhost HTTP，<10ms），
-在其他面板首次取数据前设置好 `CORE_MISMATCH`。`after_sync` 中继续异步轮询检测（`or_set` 静默）。
-
-**弹窗**：
-
-首次检测到 mismatch 时（`detected_core_type` 从 `None` 变为非匹配值），弹出 Confirm 提示用户。后续不再弹窗。
+在 CoreSrvCtl 切换核心会保存新的核心类型并发出 `Switched`。程序随即退出。重新启动 clashtui 后，按键和页面按新核心加载。
 
 ### 恢复正常
 
-`after_sync` 持续检测，当 `detected == configured` 时自动清空 `CORE_MISMATCH` 标志。用户切换到各面板时正常发起 API 请求，数据恢复展示。
+探测再次看到配置的核心时，`CoreMonitor` 清除 `CORE_MISMATCH` 并广播 `StatusChanged(Ready)`。当前显示的页面在此事件上立即重新加载，隐藏页面在切入（`Shown`）时重新加载。
 
 ## Support macOS
 

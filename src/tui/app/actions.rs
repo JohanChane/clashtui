@@ -58,7 +58,7 @@ impl GlobalAction {
     pub(super) fn execute(self) -> anyhow::Result<()> {
         use crate::{
             config::{CONFIG, CoreType},
-            functions::{command, restful::connection},
+            functions::command,
         };
         match self {
             Self::OpenCoreDataDir => {
@@ -73,12 +73,8 @@ impl GlobalAction {
                 let dir = std::path::Path::new(dir);
                 command::open_dir(dir.parent().unwrap_or(dir))
             }
-            Self::RestartCoreService => {
-                let output = command::restart_service()?;
-                anyhow::ensure!(!output.starts_with("Error"), "{output}");
-                Ok(())
-            }
-            Self::CloseAllConnections => Ok(connection::terminate_all_connections()?),
+            Self::RestartCoreService => crate::tui::ops::service::restart().map(drop),
+            Self::CloseAllConnections => crate::tui::ops::connections::close_all(),
         }
     }
 }

@@ -3,8 +3,9 @@ use crate::functions::restful::connection::{self, Conn};
 use ratatui::text::Line;
 use ratatui::widgets::{Cell, Row, Table};
 use std::collections::HashMap;
+use std::time::Duration;
 
-newtype_tab!(ConnectionsTab(Tab<Connections>), Connections);
+newtype_tab!(ConnectionsTab(Connections), Connections);
 
 key_map!(
     Connections,
@@ -92,7 +93,7 @@ macro_rules! tri {
         match $e {
             Ok(v) => v,
             Err(e) => {
-                crate::tui::widget::popmsg::Confirm::err(e);
+                crate::tui::popmsg::prelude::Confirm::err(e);
                 return do_nothing();
             }
         }
@@ -270,79 +271,25 @@ fn sort_header(sort_state: SortState, column: SortColumn, base: &str) -> String 
     }
 }
 
-impl BasicTabContent for Connections {
+impl Page for Connections {
     type Action = Action;
     type State = ();
-
     const TITLE: &str = "Connections";
+    const TICK: Option<Duration> = Some(Duration::from_secs(1));
 
-    fn after_sync(&self, task_set: &mut FutureSet<Self>) {
-        if self.paused {
-            return;
+    fn on_event(&mut self, event: &Event, cx: &mut Cx<Self>) {
+        match event {
+            Event::Tick if self.paused => {}
+            Event::Shown
+            | Event::Tick
+            | Event::Core(CoreEvent::StatusChanged(_) | CoreEvent::ConnectionsClosed) => {
+                self.reload(cx)
+            }
+            _ => {}
         }
-        if crate::config::is_core_mismatch() {
-            return;
-        }
-        async {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            let info = tri!(
-                tokio::task::spawn_blocking(connection::get_connections)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-            wrapper(|content: &mut Self| {
-                let conns = info.connections.unwrap_or_default();
-                content.conns = conns;
-                content.error = None;
-                content.refresh_display_rows();
-            })
-        }
-        .spawn_at(task_set);
     }
 
-    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = false;
-        if crate::config::is_core_mismatch() {
-            self.conns = Vec::new();
-            self.display_rows = Vec::new();
-            self.error = Some("API data mismatch with configured core".to_owned());
-            return;
-        }
-        async {
-            let info = tri!(
-                tokio::task::spawn_blocking(connection::get_connections)
-                    .await
-                    .unwrap(),
-                or_set
-            );
-            wrapper(|content: &mut Self| {
-                let conns = info.connections.unwrap_or_default();
-                content.conns = conns;
-                content.error = None;
-                content.refresh_display_rows();
-            })
-        }
-        .spawn_at(task_set);
-    }
-
-    fn on_leave(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = true;
-    }
-}
-
-impl TabContent for Connections {
-    fn init(&mut self, _task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.paused = true;
-        self.error = Some("Loading connections...".to_owned());
-    }
-
-    fn handle_action(
-        &mut self,
-        action: Action,
-        task_set: &mut FutureSet<Self>,
-        _state: &mut Self::State,
-    ) {
+    fn on_action(&mut self, action: Action, cx: &mut Cx<Self>, _state: &mut Self::State) {
         match action {
             Action::MoveUp => {
                 if let Some(r) = self.row {
@@ -395,7 +342,7 @@ impl TabContent for Connections {
                         }
                     })
                 }
-                .spawn_at(task_set);
+                .spawn_at(cx);
             }
             Action::TerminateAll => {
                 let (use_bulk, ids): (bool, Vec<String>) = if let Some(ref pat) = self.filter {
@@ -425,28 +372,36 @@ impl TabContent for Connections {
                     return;
                 }
 
-                async move {
-                    let result = tokio::task::spawn_blocking(move || {
-                        if use_bulk {
-                            let _ = connection::terminate_all_connections();
-                        } else {
+                if use_bulk {
+                    async move {
+                        tri!(
+                            tokio::task::spawn_blocking(ops::connections::close_all)
+                                .await
+                                .unwrap()
+                        );
+                        do_nothing()
+                    }
+                    .spawn_at(cx);
+                } else {
+                    async move {
+                        let result = tokio::task::spawn_blocking(move || {
                             for id in &ids {
                                 let _ = connection::terminate_connection(Some(id.clone()));
                             }
-                        }
-                        connection::get_connections()
-                    })
-                    .await
-                    .unwrap();
-                    let info = tri!(result, or_cancel);
-                    wrapper(move |content: &mut Connections| {
-                        content.conns = info.connections.unwrap_or_default();
-                        content.error = None;
-                        content.refresh_display_rows();
-                        content.row = None;
-                    })
+                            connection::get_connections()
+                        })
+                        .await
+                        .unwrap();
+                        let info = tri!(result, or_cancel);
+                        wrapper(move |content: &mut Connections| {
+                            content.conns = info.connections.unwrap_or_default();
+                            content.error = None;
+                            content.refresh_display_rows();
+                            content.row = None;
+                        })
+                    }
+                    .spawn_at(cx);
                 }
-                .spawn_at(task_set);
             }
             Action::SortBy(col) => self.toggle_sort(col),
             Action::SortReset => {
@@ -466,13 +421,12 @@ impl TabContent for Connections {
                         content.filter = (!filter.is_empty()).then_some(filter);
                     })
                 }
-                .spawn_at(task_set);
+                .spawn_at(cx);
             }
             Action::TogglePause => {
                 self.paused = !self.paused;
             }
             Action::FzfFind => {
-                self.paused = true;
                 let names: Vec<String> = self
                     .display_rows
                     .iter()
@@ -488,12 +442,12 @@ impl TabContent for Connections {
                         content.row = selected;
                     })
                 }
-                .spawn_at(task_set);
+                .spawn_at(cx);
             }
         }
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State) {
+    fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State, _focused: bool) {
         let theme = Theme::get();
         let section = theme.section("connections");
         let block = Block::bordered()
@@ -640,6 +594,30 @@ impl TabContent for Connections {
 }
 
 impl Connections {
+    fn reload(&mut self, cx: &mut Cx<Self>) {
+        if let Err(reason) = monitor::status().ready() {
+            self.conns.clear();
+            self.display_rows.clear();
+            self.error = Some(reason);
+            return;
+        }
+        async {
+            let info = tri!(
+                tokio::task::spawn_blocking(connection::get_connections)
+                    .await
+                    .unwrap(),
+                or_set
+            );
+            wrapper(|content: &mut Self| {
+                let conns = info.connections.unwrap_or_default();
+                content.conns = conns;
+                content.error = None;
+                content.refresh_display_rows();
+            })
+        }
+        .spawn_at(cx);
+    }
+
     fn refresh_display_rows(&mut self) {
         self.display_rows = make_display_rows(&self.conns, &mut self.last_bytes);
         // Store original order index in a separate field would be ideal,

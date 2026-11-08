@@ -5,7 +5,7 @@ use crate::tui::term::run_blocking;
 use ratatui::style::Color;
 use ratatui::widgets::ListItem;
 
-newtype_tab!(CoreSrvCtlTab(Tab<SrvCtlContent>), Srvctl);
+newtype_tab!(CoreSrvCtlTab(SrvCtlContent), Srvctl);
 
 key_map!(
     Srvctl,
@@ -101,7 +101,58 @@ struct SrvCtlContent {
 }
 
 impl SrvCtlContent {
-    fn spawn_status_check(&self, task_set: &mut FutureSet<Self>, target: CoreType) {
+    fn setup(&mut self) {
+        self.ops = SrvCtlOp::all();
+        let cfg = &crate::config::CONFIG.cfg_file;
+
+        self.mihomo_service_name = cfg.mihomo.core_service.service_name.clone();
+        if self.mihomo_service_name.is_empty() {
+            self.mihomo_service_name = "clashtui_mihomo".to_owned();
+        }
+        self.mihomo_is_user = cfg.mihomo.core_service.is_user;
+
+        self.singbox_service_name = cfg.singbox.core_service.service_name.clone();
+        if self.singbox_service_name.is_empty() {
+            self.singbox_service_name = "clashtui_singbox".to_owned();
+        }
+        self.singbox_is_user = cfg.singbox.core_service.is_user;
+
+        match crate::config::CONFIG.core_type() {
+            CoreType::Mihomo => {
+                self.service_name = self.mihomo_service_name.clone();
+                self.bin_path = cfg.mihomo.core.bin_path.clone();
+                if self.bin_path.is_empty() {
+                    self.bin_path = "/usr/bin/mihomo".to_owned();
+                }
+                self.is_user = self.mihomo_is_user;
+                self.core_label = "mihomo".to_owned();
+            }
+            CoreType::Singbox => {
+                self.service_name = self.singbox_service_name.clone();
+                self.bin_path = cfg.singbox.core.bin_path.clone();
+                if self.bin_path.is_empty() {
+                    self.bin_path = "/usr/bin/sing-box".to_owned();
+                }
+                self.is_user = self.singbox_is_user;
+                self.core_label = "sing-box".to_owned();
+            }
+        }
+        self.status = "...".to_owned();
+        self.mihomo_status = "...".to_owned();
+        self.singbox_status = "...".to_owned();
+        #[cfg(windows)]
+        {
+            self.proxy_enabled =
+                crate::functions::command::get_system_proxy_state().unwrap_or(false);
+        }
+    }
+
+    fn check_services(&self, cx: &mut Cx<Self>) {
+        self.spawn_status_check(cx, CoreType::Mihomo);
+        self.spawn_status_check(cx, CoreType::Singbox);
+    }
+
+    fn spawn_status_check(&self, cx: &mut Cx<Self>, target: CoreType) {
         let (service_name, is_user, csc) = match target {
             CoreType::Mihomo => (
                 self.mihomo_service_name.clone(),
@@ -158,7 +209,7 @@ impl SrvCtlContent {
                 CoreType::Singbox => c.singbox_status = status,
             })
         }
-        .spawn_at(task_set);
+        .spawn_at(cx);
     }
 }
 
@@ -208,77 +259,24 @@ fn launchd_status(service_name: &str, is_user: bool) -> String {
     }
 }
 
-impl BasicTabContent for SrvCtlContent {
+impl Page for SrvCtlContent {
     type Action = Action;
-
     type State = ListState;
-
     const TITLE: &str = "CoreSrvCtl";
 
-    fn on_enter(&mut self, task_set: &mut FutureSet<Self>, _state: &mut Self::State) {
-        self.spawn_status_check(task_set, CoreType::Mihomo);
-        self.spawn_status_check(task_set, CoreType::Singbox);
-    }
-}
-
-impl TabContent for SrvCtlContent {
-    fn init(&mut self, task_set: &mut FutureSet<Self>, state: &mut Self::State) {
-        self.ops = SrvCtlOp::all();
-        let cfg = &crate::config::CONFIG.cfg_file;
-
-        self.mihomo_service_name = cfg.mihomo.core_service.service_name.clone();
-        if self.mihomo_service_name.is_empty() {
-            self.mihomo_service_name = "clashtui_mihomo".to_owned();
+    fn on_event(&mut self, event: &Event, cx: &mut Cx<Self>) {
+        if let Event::Init = event {
+            self.setup();
         }
-        self.mihomo_is_user = cfg.mihomo.core_service.is_user;
-
-        self.singbox_service_name = cfg.singbox.core_service.service_name.clone();
-        if self.singbox_service_name.is_empty() {
-            self.singbox_service_name = "clashtui_singbox".to_owned();
-        }
-        self.singbox_is_user = cfg.singbox.core_service.is_user;
-
-        match crate::config::CONFIG.core_type() {
-            CoreType::Mihomo => {
-                self.service_name = self.mihomo_service_name.clone();
-                self.bin_path = cfg.mihomo.core.bin_path.clone();
-                if self.bin_path.is_empty() {
-                    self.bin_path = "/usr/bin/mihomo".to_owned();
-                }
-                self.is_user = self.mihomo_is_user;
-                self.core_label = "mihomo".to_owned();
+        match event {
+            Event::Init | Event::Shown | Event::Core(CoreEvent::ServiceCommandDone) => {
+                self.check_services(cx)
             }
-            CoreType::Singbox => {
-                self.service_name = self.singbox_service_name.clone();
-                self.bin_path = cfg.singbox.core.bin_path.clone();
-                if self.bin_path.is_empty() {
-                    self.bin_path = "/usr/bin/sing-box".to_owned();
-                }
-                self.is_user = self.singbox_is_user;
-                self.core_label = "sing-box".to_owned();
-            }
+            _ => {}
         }
-        self.status = "...".to_owned();
-        self.mihomo_status = "...".to_owned();
-        self.singbox_status = "...".to_owned();
-        #[cfg(windows)]
-        {
-            self.proxy_enabled =
-                crate::functions::command::get_system_proxy_state().unwrap_or(false);
-        }
-        if !self.ops.is_empty() {
-            state.select(Some(0));
-        }
-        self.spawn_status_check(task_set, CoreType::Mihomo);
-        self.spawn_status_check(task_set, CoreType::Singbox);
     }
 
-    fn handle_action(
-        &mut self,
-        action: Action,
-        task_set: &mut FutureSet<Self>,
-        state: &mut Self::State,
-    ) {
+    fn on_action(&mut self, action: Action, cx: &mut Cx<Self>, state: &mut Self::State) {
         // ---- main list routing ----
         match action {
             Action::Esc => {}
@@ -297,74 +295,28 @@ impl TabContent for SrvCtlContent {
                 let Some(op) = self.ops.get(idx) else { return };
                 let op = *op;
 
-                let _bin_path = self.bin_path.clone();
-
                 async move {
-                    macro_rules! handle {
-                        ($result:expr, $new_status:expr) => {
-                            match $result {
-                                Ok(out) => {
-                                    if out.starts_with("Error") {
-                                        Confirm::err(out);
-                                        do_nothing()
-                                    } else {
-                                        Confirm::title("OK".to_owned())
-                                            .with_prompt(out)
-                                            .build_and_send();
-                                        wrapper(move |c: &mut SrvCtlContent| {
-                                            let s = $new_status.to_owned();
-                                            c.status = s.clone();
-                                            match crate::config::CONFIG.core_type() {
-                                                CoreType::Mihomo => c.mihomo_status = s,
-                                                CoreType::Singbox => c.singbox_status = s,
-                                            }
-                                        })
-                                    }
-                                }
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        };
-                        ($result:expr) => {
-                            match $result {
-                                Ok(out) => {
-                                    if out.starts_with("Error") {
-                                        Confirm::err(out);
-                                    } else {
-                                        Confirm::title("OK".to_owned())
-                                            .with_prompt(out)
-                                            .build_and_send();
-                                    }
-                                    do_nothing()
-                                }
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        };
-                    }
-
                     match op {
                         SrvCtlOp::Stop => {
-                            handle!(
-                                run_blocking(crate::functions::command::stop_service).await,
-                                "inactive"
-                            )
+                            let out = tri!(run_blocking(ops::service::stop).await);
+                            Confirm::title("OK".to_owned())
+                                .with_prompt(out)
+                                .build_and_send();
+                            do_nothing()
                         }
                         SrvCtlOp::Restart => {
-                            handle!(
-                                run_blocking(crate::functions::command::restart_service).await,
-                                "active"
-                            )
+                            let out = tri!(run_blocking(ops::service::restart).await);
+                            Confirm::title("OK".to_owned())
+                                .with_prompt(out)
+                                .build_and_send();
+                            do_nothing()
                         }
                         SrvCtlOp::StopAll => {
-                            handle!(
-                                run_blocking(crate::functions::command::stop_all_services).await,
-                                "inactive"
-                            )
+                            let out = tri!(run_blocking(ops::service::stop_all).await);
+                            Confirm::title("OK".to_owned())
+                                .with_prompt(out)
+                                .build_and_send();
+                            do_nothing()
                         }
                         SrvCtlOp::SwitchCore => {
                             let old_type = crate::config::CONFIG.core_type();
@@ -372,101 +324,34 @@ impl TabContent for SrvCtlContent {
                                 CoreType::Mihomo => CoreType::Singbox,
                                 CoreType::Singbox => CoreType::Mihomo,
                             };
-                            let new_label = match new_type {
-                                CoreType::Mihomo => "mihomo",
-                                CoreType::Singbox => "sing-box",
-                            };
-
-                            // stop all core services first
-                            let stop_result =
-                                run_blocking(crate::functions::command::stop_all_services).await;
-
-                            let res = {
-                                crate::config::CONFIG.data.lock().unwrap().core_type = new_type;
-                                crate::config::CONFIG.save()
-                            };
-                            match res {
-                                Ok(()) => {
-                                    // start the target core
-                                    let start_result = run_blocking(move || {
-                                        crate::functions::command::start_core_service(new_type)
-                                    })
-                                    .await;
-
-                                    let status_msg = format!(
-                                        "Core switched to {new_label}\n\n\
-                                         Stop all services: {stop}\n\
-                                         Start {new_label}: {start}",
-                                        stop = stop_result
-                                            .as_ref()
-                                            .map(|s| s.as_str())
-                                            .unwrap_or("?")
-                                            .trim(),
-                                        start = start_result
-                                            .as_ref()
-                                            .map(|s| s.as_str())
-                                            .unwrap_or("?")
-                                            .trim(),
-                                    );
-
-                                    let update_label = wrapper(move |c: &mut SrvCtlContent| {
-                                        c.core_label = new_label.to_owned();
-                                        if start_result.is_ok() {
-                                            match new_type {
-                                                CoreType::Mihomo => {
-                                                    c.mihomo_status = "active".to_owned();
-                                                    c.singbox_status = "inactive".to_owned();
-                                                }
-                                                CoreType::Singbox => {
-                                                    c.mihomo_status = "inactive".to_owned();
-                                                    c.singbox_status = "active".to_owned();
-                                                }
-                                            }
-                                        }
-                                        c.status = match new_type {
-                                            CoreType::Mihomo => c.mihomo_status.clone(),
-                                            CoreType::Singbox => c.singbox_status.clone(),
-                                        };
-                                    });
-
-                                    let _ = Confirm::dismiss_any("Core Switched".to_owned())
-                                        .with_prompt(status_msg)
-                                        .build_and_send()
-                                        .await;
-
-                                    crate::tui::app::QUIT
-                                        .store(true, std::sync::atomic::Ordering::Relaxed);
-                                    update_label
-                                }
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
+                            let report = tri!(
+                                run_blocking(move || ops::service::switch_core(new_type)).await
+                            );
+                            let _ = Confirm::dismiss_any("Core Switched".to_owned())
+                                .with_prompt(report)
+                                .build_and_send()
+                                .await;
+                            emit(CoreEvent::Switched(new_type));
+                            do_nothing()
                         }
                         #[cfg(windows)]
                         SrvCtlOp::Install => {
-                            handle!(
-                                run_blocking(|| {
-                                    crate::functions::command::install_core_service(
-                                        crate::config::CONFIG.core_type(),
-                                    )
-                                })
-                                .await,
-                                "installed"
-                            )
+                            let core = crate::config::CONFIG.core_type();
+                            let out = tri!(run_blocking(move || ops::service::install(core)).await);
+                            Confirm::title("OK".to_owned())
+                                .with_prompt(out)
+                                .build_and_send();
+                            do_nothing()
                         }
                         #[cfg(windows)]
                         SrvCtlOp::Uninstall => {
-                            handle!(
-                                run_blocking(|| {
-                                    crate::functions::command::uninstall_core_service(
-                                        crate::config::CONFIG.core_type(),
-                                    )
-                                })
-                                .await,
-                                "uninstalled"
-                            )
+                            let core = crate::config::CONFIG.core_type();
+                            let out =
+                                tri!(run_blocking(move || ops::service::uninstall(core)).await);
+                            Confirm::title("OK".to_owned())
+                                .with_prompt(out)
+                                .build_and_send();
+                            do_nothing()
                         }
                         #[cfg(windows)]
                         SrvCtlOp::ToggleSysProxy => {
@@ -499,12 +384,15 @@ impl TabContent for SrvCtlContent {
                         }
                     }
                 }
-                .spawn_at(task_set);
+                .spawn_at(cx);
             }
         }
     }
 
-    fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State) {
+    fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, _focused: bool) {
+        if state.selected().is_none() && !self.ops.is_empty() {
+            state.select(Some(0));
+        }
         let user_tag = if self.is_user { " (user)" } else { "" };
         let theme = Theme::get();
         let section = theme.section("srvctl");

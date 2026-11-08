@@ -377,7 +377,7 @@ Non-`is_user` installations enable TUN by default, which may prevent the core fr
 Make sure the Mihomo or sing-box core has been started. Go to the CoreSrvCtl tab (press `7`) to start the service.
 
 **Seeing "core mismatch" warning?**
-This means the running core doesn't match Clashtui's configured core. Go to the CoreSrvCtl tab to confirm which core you actually want to use, switch to it, then restart Clashtui.
+This means the running core does not match the core Clashtui is configured to use. Open the CoreSrvCtl tab, switch to the core you want, and start Clashtui again after it exits.
 
 **How do I add a subscription?**
 Go to the Files tab (press `2`), press `?` to see shortcuts. Typically press `a` to add a new Profile, then enter the subscription URL. Clashtui will automatically download and update.

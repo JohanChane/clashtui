@@ -1,5 +1,5 @@
 use crate::functions::command::{check_config, edit, test_config};
-use crate::functions::file::profile::{db, select, update_profile};
+use crate::functions::file::profile::db;
 use crate::functions::restful::download;
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
@@ -175,28 +175,23 @@ pub(super) struct Profile {
     jump_target: Cell<Option<usize>>,
 }
 
-impl BasicTabContent for Profile {
+impl Page for Profile {
     type Action = Action;
     type State = ListState;
-
     const TITLE: &str = "Profile";
-}
 
-impl DualTabContent for Profile {
-    type Mate = super::template::Template;
-
-    fn init(&mut self, task_set: &mut FutureSet<(Self, Self::Mate)>, _: &mut Self::State) {
-        async { sync!((Self, Self::Mate)) }.spawn_at(task_set);
+    fn on_event(&mut self, event: &Event, cx: &mut Cx<Self>) {
+        match event {
+            Event::Init | Event::Shown | Event::File(FileEvent::ProfilesChanged) => {
+                self.reload_list(cx)
+            }
+            _ => {}
+        }
     }
 
-    fn handle_action(
-        &mut self,
-        action: Self::Action,
-        task_set: &mut FutureSet<(Self, Self::Mate)>,
-        state: &mut Self::State,
-    ) -> bool {
+    fn on_action(&mut self, action: Self::Action, cx: &mut Cx<Self>, state: &mut Self::State) {
         match action {
-            Action::Switch => return true,
+            Action::Switch => {}
             Action::MoveUp => state.select_previous(),
             Action::MoveDown => state.select_next(),
 
@@ -205,39 +200,38 @@ impl DualTabContent for Profile {
                 async move {
                     let pf = tri!(db::get(&name).unwrap().load_local_profile());
                     tri!(check_config(&pf.path));
-                    tri!(select(db::get(&name).unwrap()).await);
-                    sync!((Self, Self::Mate))
+                    tri!(ops::profile::select(db::get(&name).unwrap()).await);
+                    do_nothing()
                 }
-                .spawn_at(task_set);
+                .spawn_at(cx);
             }
             Action::GoTop => state.select_first(),
             Action::GoEnd => state.select_last(),
             Action::Operation(action) => match action {
                 Operation::Traffic => {
                     let name = get_name!(self, state);
-                    actions::show_traffic(name).spawn_at(task_set);
+                    actions::show_traffic(name).spawn_at(cx);
                 }
                 Operation::FzfFind => {
                     let items = self.items.clone();
-                    actions::fzf_find(items).spawn_at(task_set)
+                    actions::fzf_find(items).spawn_at(cx)
                 }
-                Operation::Add => action.act(String::new()).spawn_at(task_set),
+                Operation::Add => action.act(String::new()).spawn_at(cx),
                 Operation::UpdateAll => {
                     for name in &self.items {
                         self.updating.insert(name.clone());
                     }
-                    actions::update_all(self.items.clone()).spawn_at(task_set)
+                    actions::update_all(self.items.clone()).spawn_at(cx)
                 }
                 _ => {
                     let name = get_name!(self, state);
                     if matches!(action, Operation::Update) {
                         self.updating.insert(name.clone());
                     }
-                    action.act(name).spawn_at(task_set)
+                    action.act(name).spawn_at(cx)
                 }
             },
         }
-        false
     }
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, is_focused: bool) {
@@ -344,7 +338,7 @@ mod actions {
     }
 
     type CB = Box<dyn for<'a> FnOnce(&'a mut C) + Send + 'static>;
-    type C = (Profile, <Profile as DualTabContent>::Mate);
+    type C = Profile;
 
     async fn search() -> CB {
         let filter = tri!(
@@ -355,7 +349,7 @@ mod actions {
             or_cancel
         );
 
-        wrapper(|(content, _): &mut C| {
+        wrapper(|content: &mut C| {
             content.filter = (!filter.is_empty()).then_some(filter);
         })
     }
@@ -367,7 +361,7 @@ mod actions {
             .await
             .unwrap_or_default();
 
-        wrapper(move |(content, _): &mut C| {
+        wrapper(move |content: &mut C| {
             content.jump_target.set(selected);
         })
     }
@@ -440,7 +434,8 @@ mod actions {
             ));
         }
 
-        sync!(C)
+        emit(FileEvent::ProfilesChanged);
+        do_nothing()
     }
 
     async fn _edit(name: String) -> CB {
@@ -467,20 +462,14 @@ mod actions {
             }
         }
         tri!(db::toggle_no_pp(&name));
-
-        let (names, atime) = get_profiles_with_readable_atime();
-        wrapper(move |(content, _): &mut C| {
-            sync_helper(content, names, atime);
-        })
+        emit(FileEvent::ProfilesChanged);
+        do_nothing()
     }
 
     async fn toggle_update_with_proxy(name: String) -> CB {
         tri!(db::toggle_update_with_proxy(&name));
-
-        let (names, atime) = get_profiles_with_readable_atime();
-        wrapper(move |(content, _): &mut C| {
-            sync_helper(content, names, atime);
-        })
+        emit(FileEvent::ProfilesChanged);
+        do_nothing()
     }
 
     async fn delete(name: String) -> CB {
@@ -494,7 +483,8 @@ mod actions {
         let pf = db::get(name).unwrap();
         tri!(db::remove(pf));
 
-        sync!(C)
+        emit(FileEvent::ProfilesChanged);
+        do_nothing()
     }
 
     async fn preview(name: String) -> CB {
@@ -531,14 +521,12 @@ mod actions {
         {
             fetch_traffic_for_url(url, with_proxy);
         }
-        let result = update_profile(db::get(&name).unwrap(), with_proxy).await;
+        let result = ops::profile::update(db::get(&name).unwrap(), with_proxy).await;
 
-        let (names, atime) = get_profiles_with_readable_atime();
-        wrapper(move |(content, _): &mut C| {
+        wrapper(move |content: &mut C| {
             content.updating.remove(&name);
             match result {
                 Ok(upd) => {
-                    sync_helper(content, names, atime);
                     let mut msg = format!("Updated: {}", upd.name);
                     if !upd.net_updates.is_empty() {
                         msg.push('\n');
@@ -561,12 +549,11 @@ mod actions {
             let with_proxy = db::get(name)
                 .map(|pf| pf.update_with_proxy)
                 .unwrap_or(false);
-            let result = update_profile(db::get(name).unwrap(), with_proxy).await;
+            let result = ops::profile::update(db::get(name).unwrap(), with_proxy).await;
             results.push((name.clone(), result));
         }
 
-        let (new_names, new_atime) = get_profiles_with_readable_atime();
-        wrapper(move |(content, _): &mut C| {
+        wrapper(move |content: &mut C| {
             let mut msgs = Vec::with_capacity(results.len());
             for (name, result) in results {
                 content.updating.remove(&name);
@@ -586,7 +573,6 @@ mod actions {
                     Err(e) => msgs.push(format!("{name}: {e}")),
                 }
             }
-            sync_helper(content, new_names, new_atime);
             let has_errors = msgs.iter().any(|m| m.contains(':') && !m.contains(": ok"));
             let title = if has_errors {
                 "Updated (some failed)"
@@ -805,6 +791,16 @@ pub(super) fn get_profiles_with_readable_atime() -> (Vec<String>, Vec<String>) {
 pub(super) fn sync_helper(content: &mut Profile, name: Vec<String>, atime: Vec<String>) {
     content.atime = atime;
     content.items = name;
+}
+
+impl Profile {
+    fn reload_list(&mut self, cx: &mut Cx<Self>) {
+        async {
+            let (name, atime) = get_profiles_with_readable_atime();
+            wrapper(move |content: &mut Self| sync_helper(content, name, atime))
+        }
+        .spawn_at(cx);
+    }
 }
 
 fn display_duration(t: std::time::Duration) -> String {

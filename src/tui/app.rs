@@ -1,9 +1,12 @@
 mod actions;
+mod hub;
+
+use hub::Hub;
 
 use super::*;
 pub(in crate::tui) use actions::{AppAction, TabTarget, km};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use tab::prelude::*;
+use tab::TuiTab;
 use widget::help::HelpPanel;
 use widget::popmsg::PopUp;
 
@@ -13,39 +16,29 @@ pub(super) static SPINNER_FRAME: AtomicU8 = AtomicU8::new(0);
 pub(crate) static QUIT: AtomicBool = AtomicBool::new(false);
 
 pub struct App {
-    tabs: Vec<Tab>,
+    hub: Hub,
     popup: PopUp,
     help: HelpPanel,
     input: key::Matcher<'static>,
-
-    tab_index: u8,
 }
 
 impl App {
     fn new() -> Self {
-        let mut app = Self {
-            tabs: vec![
-                StatusTab::default().into(),
-                FileTab::default().into(),
-                ProxiesTab::default().into(),
-                ConnectionsTab::default().into(),
-                LogsTab::default().into(),
-                SettingsTab::default().into(),
-                CoreSrvCtlTab::default().into(),
-            ],
+        Self {
+            hub: Hub::new(),
             popup: PopUp::default(),
             help: HelpPanel::default(),
             input: key::Matcher::new(key::keymaps()),
-            tab_index: 0,
-        };
-        app.tabs[0].on_enter();
-        app
+        }
     }
     #[tokio::main]
     pub async fn serve() -> anyhow::Result<()> {
         let mut coordinator = term::TerminalCoordinator::install();
         let signals = signals::Signals::start()?;
+        // Open before constructing Hub: CoreMonitor may emit as soon as it starts.
+        let mut inbox = event::Inbox::open();
         let mut app = Self::new();
+        app.hub.start();
         let mut input = term::InputReader::start();
         let mut invt = tokio::time::interval(TICK_RATE);
         let mut terminal =
@@ -129,6 +122,8 @@ impl App {
                         }
                     }
                 }
+                // Keep events queued while the terminal is lent out.
+                Some(event) = inbox.recv(), if !quitting && coordinator.owns_terminal() && pause_ack.is_none() => app.on_event(event),
                 // this tick here ensures that fps is stable
                 // Keep polling QUIT even while a worker owns the terminal.
                 _ = invt.tick() => {}
@@ -149,7 +144,7 @@ impl App {
             self.popup.handle_key_event(kv);
             return;
         }
-        let scope = self.tabs[self.tab_index as usize].input_scope();
+        let scope = self.hub.shown().input_scope();
         let map_scope = if self.help.is_active() {
             self.input.cancel();
             if !self.input.starts_chord(key::Scope::App, kv) {
@@ -164,7 +159,7 @@ impl App {
         if let key::Match::Execute(action) = self.input.feed(kv, scope, map_scope) {
             match action {
                 key::Action::App(action) => self.handle_action(action),
-                action => self.tabs[self.tab_index as usize].handle_action(action),
+                action => self.hub.shown().handle_action(action),
             }
         }
     }
@@ -175,24 +170,19 @@ impl App {
             .constraints([Constraint::Length(3), Constraint::Fill(1)])
             .split(f.area());
 
-        let scope = self.tabs[self.tab_index as usize].input_scope();
+        let scope = self.hub.shown().input_scope();
         let maps = key::keymaps();
         let hints = self.input.hints(scope);
-        render_tabbar(
-            tab_titles(self.tabs.iter().map(|tab| tab.title()), maps),
-            self.tab_index,
-            f,
-            chunks[0],
-        );
+        let shown = self.hub.shown_index() as u8;
+        render_tabbar(tab_titles(self.hub.titles(), maps), shown, f, chunks[0]);
 
-        self.tabs[self.tab_index as usize].render(f, chunks[1]);
+        self.hub.shown().render(f, chunks[1]);
 
         if let Some(hints) = hints {
             widget::which::render(f, &hints);
         }
         if self.help.is_active() {
-            self.help
-                .render(f, self.tabs[self.tab_index as usize].title(), maps, scope);
+            self.help.render(f, self.hub.shown().title(), maps, scope);
         }
 
         if self.popup.check() {
@@ -201,25 +191,32 @@ impl App {
     }
 
     fn switch_tab(&mut self, new_index: u8) {
-        if new_index != self.tab_index {
-            self.input.cancel();
-            self.tabs[self.tab_index as usize].on_leave();
-            self.tab_index = new_index;
-            self.tabs[self.tab_index as usize].on_enter();
+        if new_index as usize == self.hub.shown_index() {
+            return;
         }
+        self.input.cancel();
+        self.hub.show(new_index as usize);
+    }
+
+    fn on_event(&mut self, event: event::Event) {
+        if let event::Event::Core(event::CoreEvent::Switched(_)) = event {
+            // Key bindings and pages depend on the core type; switching cores requires restarting clashtui.
+            QUIT.store(true, Ordering::Relaxed);
+        }
+        self.hub.dispatch(&event);
     }
 
     fn handle_action(&mut self, action: AppAction) {
         match action {
             AppAction::Tab(target) => self.switch_tab(target as u8),
             AppAction::TabNext | AppAction::TabPrev => {
-                let count = self.tabs.len();
+                let count = self.hub.len();
                 let offset = if action == AppAction::TabPrev {
                     count - 1
                 } else {
                     1
                 };
-                self.switch_tab(((self.tab_index as usize + offset) % count) as u8);
+                self.switch_tab(((self.hub.shown_index() + offset) % count) as u8);
             }
             AppAction::Quit => {
                 QUIT.store(true, Ordering::Relaxed);
@@ -240,7 +237,7 @@ impl App {
         if self.popup.check() {
             self.input.cancel();
         }
-        self.tabs.iter_mut().for_each(|tab| tab.sync());
+        self.hub.sync();
     }
 }
 

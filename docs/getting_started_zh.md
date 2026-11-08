@@ -377,7 +377,7 @@ clashtui -vv    # 显示调试信息
 请确保 Mihomo 或 sing-box 核心已启动。到 CoreSrvCtl 标签页（按 `7`）可以启动服务。
 
 **提示 "core mismatch"？**
-说明正在运行的核心和 Clashtui 设置的不一致。到 CoreSrvCtl 标签页确认你实际想用的是哪个核心，切换后重启 Clashtui。
+说明正在运行的核心和 Clashtui 设置的不一致。到 CoreSrvCtl 标签页切换到要用的核心。Clashtui 会退出，再启动一次即可。
 
 **怎么添加订阅？**
 进入 Files 标签页（按 `2`），按 `?` 查看快捷键，通常用 `a` 添加新 Profile，输入订阅 URL 即可。Clashtui 会自动下载和更新。

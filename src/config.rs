@@ -32,8 +32,7 @@ pub const CONFIG: Wrapper = Wrapper;
 
 static CORE_MISMATCH: AtomicBool = AtomicBool::new(false);
 
-/// Set when StatusTab detects the API is serving data from a different core
-/// than the configured one.
+/// API-layer guard. CoreMonitor is the only writer: true while status is Mismatch.
 pub fn set_core_mismatch(mismatch: bool) {
     CORE_MISMATCH.store(mismatch, Ordering::Release);
 }
