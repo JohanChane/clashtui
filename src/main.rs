@@ -1,6 +1,8 @@
 mod cli;
+mod command;
 mod config;
 mod functions;
+mod scripts;
 mod tui;
 
 mod derive_alias {

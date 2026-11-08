@@ -1,5 +1,4 @@
 use super::*;
-use crate::functions::command::edit;
 use crate::functions::file::template::*;
 use ratatui::style::Style;
 use std::cell::Cell;
@@ -30,10 +29,12 @@ key_map!(
             (KeyCode::Char('/'), Action::Operation(Operation::Search)),
         ])
         .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
+        .with_chords(KeyCode::Char('y'), [(KeyCode::Char('p'), Action::CopyPath)])
 );
 
 #[derive_aliases::derive(..Action, Debug)]
 pub(in crate::tui) enum Action {
+    CopyPath,
     Switch,
     MoveUp,
     MoveDown,
@@ -49,6 +50,7 @@ impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
+            Self::CopyPath => "Copy template path",
             Self::Switch => "Switch panel",
             Self::MoveUp => MOVE_UP,
             Self::MoveDown => MOVE_DOWN,
@@ -97,26 +99,51 @@ impl Page for Template {
     }
 
     fn on_action(&mut self, action: Self::Action, cx: &mut Cx<Self>, state: &mut Self::State) {
-        log::debug!(
-            "Template::on_action: action={action:?} items.len={}",
-            self.items.len()
-        );
+        let commands = cx.commands();
         match action {
+            Action::CopyPath | Action::Operation(Operation::Edit | Operation::EditProviders) => {
+                use crate::scripts::ActionRequest;
+                let result = (|| -> anyhow::Result<()> {
+                    let core = crate::config::CONFIG.core_type();
+                    let path = if matches!(action, Action::Operation(Operation::EditProviders)) {
+                        crate::config::core_data_dir(core).join("template_proxy_providers.yaml")
+                    } else {
+                        let name = super::selected(
+                            self.items.iter().filter(|name| {
+                                self.filter.as_deref().is_none_or(|pat| name.contains(pat))
+                            }),
+                            state.selected(),
+                        )
+                        .ok_or_else(|| anyhow::anyhow!("Nothing selected"))?;
+                        crate::functions::file::TEMPLATE_PATH.join(name)
+                    };
+                    commands.submit(
+                        core,
+                        if matches!(action, Action::CopyPath) {
+                            ActionRequest::Copy(super::path_text(&path))
+                        } else {
+                            ActionRequest::EditFile(path)
+                        },
+                    )
+                })();
+                if let Err(error) = result {
+                    Confirm::err(format!("{error:#}"));
+                }
+            }
             Action::Switch => {}
             Action::MoveDown => state.select_next(),
             Action::MoveUp => state.select_previous(),
             Action::GoTop => state.select_first(),
             Action::GoEnd => state.select_last(),
+
             Action::Select => todo!(),
+
             Action::Operation(action) => {
                 log::debug!("Template::Operation: {action:?}");
                 match action {
                     Operation::FzfFind => {
                         let items = self.items.clone();
                         actions::fzf_find(items).spawn_at(cx);
-                    }
-                    Operation::EditProviders => {
-                        action.act(String::new()).spawn_at(cx);
                     }
                     _ => {
                         let name = get_name!(self, state);
@@ -204,8 +231,8 @@ mod actions {
             match self {
                 Self::Generate => generate(name).await,
                 Self::Delete => delete(name).await,
-                Self::Edit => _edit(name).await,
-                Self::EditProviders => _edit_providers(name).await,
+                Self::Edit => unreachable!("Edit is submitted through Commands"),
+                Self::EditProviders => unreachable!("Edit is submitted through Commands"),
                 Self::Preview => preview(name).await,
                 Self::Search => search().await,
                 Self::FzfFind => unreachable!("FzfFind handled directly"),
@@ -250,26 +277,6 @@ mod actions {
         wrapper(move |content: &mut C| {
             content.items = templates;
         })
-    }
-
-    async fn _edit(name: String) -> CB {
-        let path = crate::functions::file::TEMPLATE_PATH.join(&name);
-        log::debug!("template::_edit: path={}", path.display());
-        tri!(edit(path.to_str().unwrap()));
-        do_nothing()
-    }
-
-    async fn _edit_providers(_name: String) -> CB {
-        let subdir = match crate::config::CONFIG.core_type() {
-            crate::config::CoreType::Mihomo => "mihomo",
-            crate::config::CoreType::Singbox => "sing-box",
-        };
-        let path = crate::config::config_dir_path()
-            .join(subdir)
-            .join("template_proxy_providers.yaml");
-        log::debug!("template::_edit_providers: path={}", path.display());
-        tri!(edit(path.to_str().unwrap()));
-        do_nothing()
     }
 
     async fn preview(_name: String) -> CB {

@@ -32,8 +32,6 @@ pub enum CoreEvent {
     /// This is not a status: CoreMonitor rechecks CoreStatus and CoreSrvCtl refreshes its service display.
     /// Other pages do not handle it.
     ServiceCommandDone,
-    /// The configured core type changed. App exits on receiving this event.
-    Switched(CoreType),
     /// Runtime configuration was reloaded (profile selection or current-profile update) or changed (Settings).
     ConfigChanged,
     /// All connections were closed outside the Connections page.

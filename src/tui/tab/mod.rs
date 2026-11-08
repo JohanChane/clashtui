@@ -54,11 +54,11 @@ macro_rules! newtype_tab {
             fn input_scope(&self) -> crate::tui::key::Scope {
                 crate::tui::key::Scope::$scope
             }
-            fn handle_action(&mut self, action: crate::tui::key::Action) {
+            fn handle_action(&mut self, action: crate::tui::key::Action, commands: &mut crate::tui::commands::Commands) {
                 let crate::tui::key::Action::$scope(action) = action else {
                     unreachable!("action routed to the wrong page");
                 };
-                self.0.handle_action(action);
+                self.0.handle_action(action, commands);
             }
             fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
                 self.0.render(f, area, true);
@@ -66,6 +66,7 @@ macro_rules! newtype_tab {
             fn deliver(&mut self, event: &crate::tui::event::Event) {
                 self.0.deliver(event);
             }
+            fn command_done(&mut self, event: &crate::tui::commands::CommandEvent) { self.0.command_done(event); }
             fn sync(&mut self, now: std::time::Instant) {
                 self.0.sync(now);
             }
@@ -78,7 +79,7 @@ macro_rules! newtype_tab {
         impl crate::tui::tab::TuiTab for $tab {
             fn title(&self) -> &'static str { $inner::TITLE }
             fn input_scope(&self) -> crate::tui::key::Scope { crate::tui::key::Scope::App }
-            fn handle_action(&mut self, _: crate::tui::key::Action) {
+            fn handle_action(&mut self, _: crate::tui::key::Action, _: &mut crate::tui::commands::Commands) {
                 unreachable!("this page has no local actions");
             }
             fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
@@ -87,6 +88,7 @@ macro_rules! newtype_tab {
             fn deliver(&mut self, event: &crate::tui::event::Event) {
                 self.0.deliver(event);
             }
+            fn command_done(&mut self, event: &crate::tui::commands::CommandEvent) { self.0.command_done(event); }
             fn sync(&mut self, now: std::time::Instant) {
                 self.0.sync(now);
             }
@@ -97,9 +99,14 @@ macro_rules! newtype_tab {
 pub(in crate::tui) trait TuiTab {
     fn title(&self) -> &'static str;
     fn input_scope(&self) -> crate::tui::key::Scope;
-    fn handle_action(&mut self, action: crate::tui::key::Action);
+    fn handle_action(
+        &mut self,
+        action: crate::tui::key::Action,
+        commands: &mut crate::tui::commands::Commands,
+    );
     fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect);
     fn deliver(&mut self, event: &crate::tui::event::Event);
+    fn command_done(&mut self, event: &crate::tui::commands::CommandEvent);
     fn sync(&mut self, now: std::time::Instant);
 }
 
@@ -138,9 +145,9 @@ macro_rules! enum_dispatch {
                 $(Self::$item(inner) => inner.input_scope(),)+
             }
         }
-        fn handle_action(&mut self, action: crate::tui::key::Action) {
+        fn handle_action(&mut self, action: crate::tui::key::Action, commands: &mut crate::tui::commands::Commands) {
             match self {
-                $(Self::$item(inner) => inner.handle_action(action),)+
+                $(Self::$item(inner) => inner.handle_action(action, commands),)+
             }
         }
         fn render(&mut self, f: &mut ratatui::Frame, area: ratatui::layout::Rect) {
@@ -152,6 +159,9 @@ macro_rules! enum_dispatch {
             match self {
                 $(Self::$item(inner) => inner.deliver(event),)+
             }
+        }
+        fn command_done(&mut self, event: &crate::tui::commands::CommandEvent) {
+            match self { $(Self::$item(inner) => inner.command_done(event),)+ }
         }
         fn sync(&mut self, now: std::time::Instant) {
             match self {

@@ -1,4 +1,3 @@
-use crate::functions::command::{check_config, edit, test_config};
 use crate::functions::file::profile::db;
 use crate::functions::restful::download;
 use std::cell::Cell;
@@ -106,10 +105,19 @@ key_map!(
             (KeyCode::Char('n'), Action::Operation(Operation::Traffic)),
         ])
         .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
+        .with_chords(
+            KeyCode::Char('y'),
+            [
+                (KeyCode::Char('s'), Action::CopySubscription),
+                (KeyCode::Char('p'), Action::CopyPath),
+            ]
+        )
 );
 
 #[derive_aliases::derive(..Action, Debug)]
 pub(in crate::tui) enum Action {
+    CopySubscription,
+    CopyPath,
     Switch,
     MoveUp,
     MoveDown,
@@ -126,6 +134,8 @@ impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
+            Self::CopySubscription => "Copy subscription URL",
+            Self::CopyPath => "Copy profile path",
             Self::Switch => "Switch panel",
             Self::MoveUp => MOVE_UP,
             Self::MoveDown => MOVE_DOWN,
@@ -175,10 +185,57 @@ pub(super) struct Profile {
     jump_target: Cell<Option<String>>,
 }
 
+impl Profile {
+    fn selected_name(&self, state: &ListState) -> Option<&String> {
+        super::selected(
+            self.items
+                .iter()
+                .zip(&self.atime)
+                .filter(|(name, _)| self.filter.as_deref().is_none_or(|pat| name.contains(pat))),
+            state.selected(),
+        )
+        .map(|(name, _)| name)
+    }
+}
+
+fn subscription_url(dtype: &crate::config::database::ProfileType) -> anyhow::Result<&str> {
+    match dtype {
+        crate::config::database::ProfileType::Url(url) if !url.is_empty() => Ok(url),
+        _ => anyhow::bail!("Selected profile has no subscription URL"),
+    }
+}
+
 impl Page for Profile {
     type Action = Action;
     type State = ListState;
     const TITLE: &str = "Profile";
+
+    fn command_done(&mut self, event: &crate::tui::commands::CommandEvent, cx: &mut Cx<Self>) {
+        use crate::tui::commands::{CheckPurpose, CommandEvent};
+        let CommandEvent::Checked {
+            target,
+            purpose: CheckPurpose::Apply,
+            result: Ok(()),
+            ..
+        } = event
+        else {
+            return;
+        };
+        let target = target.clone();
+        async move {
+            let profile = tri!(
+                db::get(&target.name)
+                    .filter(|profile| profile.local_path() == target.path
+                        && crate::config::CONFIG.core_type() == target.core)
+                    .ok_or_else(|| anyhow::anyhow!(
+                        "Checked profile no longer matches its submitted target"
+                    ))
+            );
+            tri!(ops::profile::select(profile).await);
+            do_nothing()
+        }
+        .spawn_at(cx);
+    }
 
     fn on_event(&mut self, event: &Event, cx: &mut Cx<Self>) {
         match event {
@@ -190,21 +247,57 @@ impl Page for Profile {
     }
 
     fn on_action(&mut self, action: Self::Action, cx: &mut Cx<Self>, state: &mut Self::State) {
+        let commands = cx.commands();
         match action {
+            Action::CopySubscription
+            | Action::CopyPath
+            | Action::Select
+            | Action::Operation(Operation::Edit | Operation::Test | Operation::Check) => {
+                use crate::{
+                    scripts::ActionRequest,
+                    tui::commands::{CheckPurpose, ProfileTarget},
+                };
+                let result = (|| -> anyhow::Result<()> {
+                    let name = self
+                        .selected_name(state)
+                        .ok_or_else(|| anyhow::anyhow!("Nothing selected"))?
+                        .clone();
+                    let profile = db::get(&name)
+                        .ok_or_else(|| anyhow::anyhow!("Profile no longer exists"))?;
+                    let core = crate::config::CONFIG.core_type();
+                    let path = profile.local_path();
+                    let target = ProfileTarget {
+                        core,
+                        name,
+                        path: path.clone(),
+                    };
+                    match action {
+                        Action::CopySubscription => commands.submit(
+                            core,
+                            ActionRequest::Copy(subscription_url(&profile.dtype)?.to_owned()),
+                        ),
+                        Action::CopyPath => {
+                            commands.submit(core, ActionRequest::Copy(super::path_text(&path)))
+                        }
+                        Action::Select => commands.check_config(target, CheckPurpose::Apply),
+                        Action::Operation(Operation::Edit) => {
+                            commands.submit(core, ActionRequest::EditFile(path))
+                        }
+                        Action::Operation(Operation::Test) => commands.test_config(target, false),
+                        Action::Operation(Operation::Check) => {
+                            commands.check_config(target, CheckPurpose::Inspect)
+                        }
+                        _ => unreachable!(),
+                    }
+                })();
+                if let Err(error) = result {
+                    Confirm::err(format!("{error:#}"));
+                }
+            }
             Action::Switch => {}
             Action::MoveUp => state.select_previous(),
             Action::MoveDown => state.select_next(),
 
-            Action::Select => {
-                let name = get_name!(self, state);
-                async move {
-                    let pf = tri!(db::get(&name).unwrap().load_local_profile());
-                    tri!(check_config(&pf.path));
-                    tri!(ops::profile::select(db::get(&name).unwrap()).await);
-                    do_nothing()
-                }
-                .spawn_at(cx);
-            }
             Action::GoTop => state.select_first(),
             Action::GoEnd => state.select_last(),
             Action::Operation(action) => match action {
@@ -322,12 +415,12 @@ mod actions {
             match self {
                 Self::Search => search().await,
                 Self::Add => import().await,
-                Self::Edit => _edit(name).await,
+                Self::Edit => unreachable!("Edit is submitted through Commands"),
                 Self::Delete => delete(name).await,
                 Self::Preview => preview(name).await,
                 Self::Update => update(name).await,
-                Self::Test => test(name).await,
-                Self::Check => check(name).await,
+                Self::Test => unreachable!("Test is submitted through Commands"),
+                Self::Check => unreachable!("Check is submitted through Commands"),
                 Self::ToggleNoPp => toggle_no_pp(name).await,
                 Self::ToggleUpdateWithProxy => toggle_update_with_proxy(name).await,
                 Self::Traffic => {
@@ -441,13 +534,6 @@ mod actions {
         }
 
         emit(FileEvent::ProfilesChanged);
-        do_nothing()
-    }
-
-    async fn _edit(name: String) -> CB {
-        let pf = tri!(db::get(name).unwrap().load_local_profile());
-        tri!(edit(pf.path.to_str().unwrap()));
-
         do_nothing()
     }
 
@@ -724,30 +810,6 @@ mod actions {
 
         do_nothing()
     }
-
-    async fn test(name: String) -> CB {
-        let pf = tri!(db::get(name).unwrap().load_local_profile());
-        let result = test_config(Some(&pf.path), false);
-        Confirm::title("Test Result".to_owned())
-            .with_prompt(result)
-            .build_and_send();
-
-        do_nothing()
-    }
-
-    async fn check(name: String) -> CB {
-        let pf = tri!(db::get(name).unwrap().load_local_profile());
-        match check_config(&pf.path) {
-            Ok(()) => {
-                Confirm::title("Check Passed".to_owned())
-                    .with_prompt("Configuration is valid.".to_owned())
-                    .build_and_send();
-            }
-            Err(e) => Confirm::err(e),
-        }
-
-        do_nothing()
-    }
 }
 
 pub(super) fn get_profiles_with_readable_atime() -> (Vec<String>, Vec<String>) {
@@ -827,6 +889,52 @@ fn display_duration(t: std::time::Duration) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn copy_selection_matches_filtered_display_and_clamps_cursor() {
+        let mut profile = Profile {
+            items: ["first", "selected", "last"].map(String::from).to_vec(),
+            atime: vec![String::new(); 3],
+            filter: Some("selected".into()),
+            ..Default::default()
+        };
+        let state = ListState::default().with_selected(Some(99));
+        assert_eq!(
+            profile.selected_name(&state).map(String::as_str),
+            Some("selected")
+        );
+        profile.filter = Some("no matches".into());
+        assert!(profile.selected_name(&state).is_none());
+        profile.filter = None;
+        assert!(profile.selected_name(&ListState::default()).is_none());
+        assert_eq!(
+            profile.selected_name(&state).map(String::as_str),
+            Some("last")
+        );
+    }
+    #[test]
+    fn subscription_copy_preserves_url_and_rejects_profiles_without_one() {
+        use crate::config::database::ProfileType;
+        let url = "https://example.test/订阅?token=a%2Fb&next=$literal#fragment";
+        assert_eq!(
+            subscription_url(&ProfileType::Url(url.into())).unwrap(),
+            url
+        );
+        for dtype in [
+            ProfileType::File,
+            ProfileType::Singbox,
+            ProfileType::Template {
+                template: "test.yaml".into(),
+            },
+            ProfileType::Url(String::new()),
+        ] {
+            assert!(
+                subscription_url(&dtype)
+                    .unwrap_err()
+                    .to_string()
+                    .contains("no subscription URL")
+            );
+        }
+    }
     use super::*;
 
     #[test]

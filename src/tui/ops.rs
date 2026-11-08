@@ -5,4 +5,3 @@
 pub(in crate::tui) mod config;
 pub(in crate::tui) mod connections;
 pub(in crate::tui) mod profile;
-pub(in crate::tui) mod service;

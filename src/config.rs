@@ -23,7 +23,7 @@ mod core;
 #[macro_use]
 mod util;
 
-pub use core::{CoreType, ServiceController};
+pub use core::CoreType;
 pub use util::check_startup_perms;
 pub mod database;
 

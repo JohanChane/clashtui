@@ -17,7 +17,7 @@ fn default_global_chords_execute_and_clear_pending_state() {
         (
             "f",
             GlobalAction::RestartCoreService,
-            "Start/restart core service",
+            "Restart core service",
         ),
         (
             "t",

@@ -34,6 +34,11 @@ impl<L: Page, R: Page> Split<L, R> {
         self.right.deliver(event);
     }
 
+    pub fn command_done(&mut self, event: &crate::tui::commands::CommandEvent) {
+        self.left.command_done(event);
+        self.right.command_done(event);
+    }
+
     pub fn sync(&mut self, now: std::time::Instant) {
         self.left.sync(now);
         self.right.sync(now);
@@ -51,12 +56,20 @@ impl<L: Page, R: Page> Split<L, R> {
         self.right.render(f, hori[1], self.focus == Side::Right);
     }
 
-    pub fn left_action(&mut self, action: L::Action) {
-        self.left.handle_action(action);
+    pub fn left_action(
+        &mut self,
+        action: L::Action,
+        commands: &mut crate::tui::commands::Commands,
+    ) {
+        self.left.handle_action(action, commands);
     }
 
-    pub fn right_action(&mut self, action: R::Action) {
-        self.right.handle_action(action);
+    pub fn right_action(
+        &mut self,
+        action: R::Action,
+        commands: &mut crate::tui::commands::Commands,
+    ) {
+        self.right.handle_action(action, commands);
     }
 
     pub fn toggle_focus(&mut self) {

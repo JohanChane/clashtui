@@ -113,7 +113,7 @@ backup_dir() {
   while [ -d "${1}_$i" ]; do
     ((i++))
   done
-  cp -r "$1" "${1}_$i"
+  cp -r "$1" "${1}_$i" || return 1
   log_info "Backed up directory: $1 -> ${1}_$i"
   BACKED_UP_LIST+=("$1 -> ${1}_$i")
 }
@@ -139,7 +139,6 @@ resolve_paths() {
     MIHOMO_CONFIG_DIR="$INSTALL_DIR_MIHOMO/config"
     SINGBOX_CONFIG_DIR="$INSTALL_DIR_SINGBOX/config"
     SUDO=""
-    SERVICE_IS_USER=true
     if $IS_MACOS; then
       UNIT_DIR="$HOME/Library/LaunchAgents"
       SERVICE_LOAD_CMD=""
@@ -189,7 +188,6 @@ resolve_paths() {
     INSTALL_DIR_SINGBOX="$INSTALL_DIR/sing-box"
     MIHOMO_CONFIG_DIR="$INSTALL_DIR_MIHOMO/config"
     SINGBOX_CONFIG_DIR="$INSTALL_DIR_SINGBOX/config"
-    SERVICE_IS_USER=false
   fi
 
   CLASHTUI_CONFIG_DIR="${CLASHTUI_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/clashtui}"
@@ -230,7 +228,7 @@ copy_contrib() {
       else
           cp "$src" "$dest"
       fi
-      return 0
+      return $?
     fi
     log_warn "Local file not found: $src, falling back to remote"
   fi
@@ -878,12 +876,44 @@ create_core_configs() {
   fi
 }
 
+# --- Service commands: select a backend and materialize its scope at install time ---
+create_service_scripts() {
+  local backend="$SERVICE_CONTROLLER" scope=system stage target
+  if $IS_MACOS; then backend=launchd; fi
+  if $IS_USER; then scope=user; fi
+  case "$backend" in
+    systemd | openrc | launchd) ;;
+    *) log_error "Unsupported service backend: $backend"; return 1 ;;
+  esac
+
+  mkdir -p "$CLASHTUI_CONFIG_DIR" || return 1
+  stage=$(mktemp -d "$CLASHTUI_CONFIG_DIR/.service-scripts.XXXXXX") || return 1
+  target="$CLASHTUI_CONFIG_DIR/scripts/coresrvctrl/$backend"
+  # Download all inputs before publishing a configuration that references them.
+  if ! copy_contrib "scripts/coresrvctrl/$backend/service.sh" "$stage/service.sh" ||
+     ! copy_contrib "scripts/coresrvctrl/$backend/default.json" "$stage/default.json" ||
+     ! copy_contrib "scripts/clipboard/copy.sh" "$stage/copy.sh" ||
+     ! copy_contrib "scripts/files/open.sh" "$stage/open.sh" ||
+     ! sed 's/"${scope}"/"'"$scope"'"/g' "$stage/default.json" > "$stage/scripts.json" ||
+     ! mkdir -p "$target" "$CLASHTUI_CONFIG_DIR/scripts/clipboard" "$CLASHTUI_CONFIG_DIR/scripts/files" ||
+     ! mv -f "$stage/service.sh" "$target/service.sh" ||
+     ! mv -f "$stage/copy.sh" "$CLASHTUI_CONFIG_DIR/scripts/clipboard/copy.sh" ||
+     ! mv -f "$stage/open.sh" "$CLASHTUI_CONFIG_DIR/scripts/files/open.sh" ||
+     ! mv -f "$stage/scripts.json" "$CLASHTUI_CONFIG_DIR/scripts.json"; then
+    rm -rf "$stage"
+    log_error "Failed to install service scripts ($backend/$scope)"
+    return 1
+  fi
+  rm -rf "$stage"
+  log_info "Service scripts installed: $CLASHTUI_CONFIG_DIR/scripts.json ($backend/$scope)"
+}
+
 # --- Clashtui user config generation ---
 create_clashtui_config() {
   local core_type="$1"
   log_info "Creating clashtui config..."
 
-  backup_dir "$CLASHTUI_CONFIG_DIR"
+  backup_dir "$CLASHTUI_CONFIG_DIR" || return 1
   mkdir -p "$CLASHTUI_CONFIG_DIR"
 
   # Copy contrib default_keymap.yaml and default_theme.yaml
@@ -892,9 +922,7 @@ create_clashtui_config() {
   log_info "Copied default configs to: $CLASHTUI_CONFIG_DIR"
 
   # Generate single config.yaml with both core sections
-  # On non-Linux platforms, omit service_controller (platform default is used)
-  if $IS_MACOS; then
-    cat >"$CLASHTUI_CONFIG_DIR/config.yaml" <<EOF
+  cat >"$CLASHTUI_CONFIG_DIR/config.yaml" <<EOF
 mihomo:
   core:
     config_dir: ${MIHOMO_CONFIG_DIR}
@@ -902,7 +930,6 @@ mihomo:
     config_path: ${MIHOMO_CONFIG_DIR}/config.yaml
   core_service:
     service_name: clashtui_mihomo
-    is_user: ${SERVICE_IS_USER}
 singbox:
   core:
     bin_path: ${INSTALL_DIR_SINGBOX}/sing-box
@@ -910,40 +937,11 @@ singbox:
     config_path: ${SINGBOX_CONFIG_DIR}/config.json
   core_service:
     service_name: clashtui_singbox
-    is_user: ${SERVICE_IS_USER}
 timeout:
-extra:
-  edit_cmd:
-  open_dir_cmd:
 EOF
-  else
-    cat >"$CLASHTUI_CONFIG_DIR/config.yaml" <<EOF
-mihomo:
-  core:
-    config_dir: ${MIHOMO_CONFIG_DIR}
-    bin_path: ${INSTALL_DIR_MIHOMO}/mihomo
-    config_path: ${MIHOMO_CONFIG_DIR}/config.yaml
-  core_service:
-    service_name: clashtui_mihomo
-    is_user: ${SERVICE_IS_USER}
-    service_controller: ${SERVICE_CONTROLLER}
-singbox:
-  core:
-    bin_path: ${INSTALL_DIR_SINGBOX}/sing-box
-    config_dir: ${SINGBOX_CONFIG_DIR}
-    config_path: ${SINGBOX_CONFIG_DIR}/config.json
-  core_service:
-    service_name: clashtui_singbox
-    is_user: ${SERVICE_IS_USER}
-    service_controller: ${SERVICE_CONTROLLER}
-timeout:
-extra:
-  edit_cmd:
-  open_dir_cmd:
-EOF
-  fi
 
   log_info "Config written to: $CLASHTUI_CONFIG_DIR/config.yaml"
+  create_service_scripts || return 1
 
   # Generate per-core template_proxy_providers.yaml and directories
   if [ "$core_type" = "mihomo" ] || [ "$core_type" = "all" ]; then
@@ -1368,7 +1366,7 @@ main() {
   esac
 
   # Install clashtui (binary + config)
-  install_clashtui "$CORE_TYPE"
+  install_clashtui "$CORE_TYPE" || { log_error "Failed to install clashtui"; return 1; }
 
   # Create core configs (no-TUN when is-user)
   create_core_configs "$CORE_TYPE"

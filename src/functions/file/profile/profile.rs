@@ -4,16 +4,20 @@ use std::{fs::File, path::PathBuf};
 use crate::config::database::{Profile, ProfileType};
 
 impl Profile {
-    pub fn load_local_profile(self) -> anyhow::Result<LocalProfile> {
+    pub fn local_path(&self) -> PathBuf {
         use super::super::PROFILE_JSONS_PATH;
         use super::PROFILE_YAMLS_PATH;
-        let path = if matches!(self.dtype, ProfileType::Singbox)
+        if matches!(self.dtype, ProfileType::Singbox)
             || crate::config::CONFIG.core_type() == crate::config::CoreType::Singbox
         {
             PROFILE_JSONS_PATH.join(format!("{}.json", self.name))
         } else {
             PROFILE_YAMLS_PATH.join(format!("{}.yaml", self.name))
-        };
+        }
+    }
+
+    pub fn load_local_profile(self) -> anyhow::Result<LocalProfile> {
+        let path = self.local_path();
         let mut lpf = LocalProfile::from_pf(self, path);
         lpf.sync_from_disk()?;
         Ok(lpf)

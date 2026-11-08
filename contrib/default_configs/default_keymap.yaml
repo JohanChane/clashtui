@@ -87,6 +87,8 @@ connections:
 
 file:
   profile:
+    - {on: [y, s], action: CopySubscription, desc: Copy subscription URL}
+    - {on: [y, p], action: CopyPath, desc: Copy profile path}
     - on: "<Left>"
       action: Switch
       desc: Switch panel
@@ -158,6 +160,7 @@ file:
       desc: Show traffic
 
   template:
+    - {on: [y, p], action: CopyPath, desc: Copy template path}
     - on: "<Left>"
       action: Switch
       desc: Switch panel

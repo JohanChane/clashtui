@@ -533,7 +533,10 @@ mod tests {
     async fn subscription_level_survives_tab_and_core_config_events() {
         let mut host = crate::tui::page::Host::<Logs>::default();
         assert_eq!(*host.page().subscription_level.lock().unwrap(), "info");
-        host.handle_action(Action::ToggleDebug);
+        host.handle_action(
+            Action::ToggleDebug,
+            &mut crate::tui::commands::Commands::default(),
+        );
         for event in [
             Event::Hidden,
             Event::Shown,
