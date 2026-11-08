@@ -1,70 +1,71 @@
-//! 页面能收到的全部事件。在 `on_event` 中 match 某个变体，就是订阅它。
+//! All events a page can receive. Match a variant in `on_event` to subscribe to it.
 
 use crate::config::{CONFIG, CoreType};
 
 mod bus;
 pub(in crate::tui) use bus::{Inbox, emit};
 
-/// 页面能收到的全部事件。在 on_event 中 match 某个变体，就是订阅它。
+/// All events a page can receive. Match a variant in on_event to subscribe to it.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
-    // —— 生命周期：Hub 或 Host 定向投递给一个标签页，不能 emit ——
-    /// 启动时每个标签页收到一次，早于任何 Shown。
+    // Lifecycle: Hub or Host delivers to a specific tab; these events cannot be emitted.
+    /// Delivered once to each tab at startup, before any Shown event.
     Init,
-    /// 标签页切入。Split 的两侧同时收到。
+    /// The tab becomes visible. Both sides of Split receive this event.
     Shown,
-    /// 标签页切出。此后不再收到 Tick。
+    /// The tab becomes hidden and stops receiving Tick.
     Hidden,
-    /// 显示期间按 Page::TICK 发出。
+    /// Delivered at the Page::TICK interval while visible.
     Tick,
 
-    // —— 广播：任何地方 emit，投递给所有标签页和 CoreMonitor ——
+    // Broadcasts: emit from anywhere; delivered to all tabs and CoreMonitor.
     Core(CoreEvent),
     File(FileEvent),
 }
 
-/// 核心（mihomo / sing-box）的变化。
+/// Changes to the core (mihomo / sing-box).
 #[derive(Clone, Debug, PartialEq)]
 pub enum CoreEvent {
-    /// 核心可用性变化。只由 CoreMonitor 发出；状态不变时不发。
+    /// Core availability changed. Only CoreMonitor emits this, and only when the status changes.
     StatusChanged(CoreStatus),
-    /// clashtui 执行了服务命令（启动、停止、重启、安装、卸载）。执行完就发，无论成败。
-    /// 它不是状态：CoreMonitor 据此重新确认 CoreStatus，CoreSrvCtl 据此刷新服务显示；页面不处理它。
+    /// clashtui completed a service command (start, stop, restart, install, or uninstall), successfully or not.
+    /// This is not a status: CoreMonitor rechecks CoreStatus and CoreSrvCtl refreshes its service display.
+    /// Other pages do not handle it.
     ServiceCommandDone,
-    /// 配置的核心类型已切换。App 收到后退出。
+    /// The configured core type changed. App exits on receiving this event.
     Switched(CoreType),
-    /// 运行时配置被重载（选择或更新当前 profile）或修改（Settings）。
+    /// Runtime configuration was reloaded (profile selection or current-profile update) or changed (Settings).
     ConfigChanged,
-    /// Connections 页之外关闭了全部连接。
+    /// All connections were closed outside the Connections page.
     ConnectionsClosed,
 }
 
-/// clashtui 管理的文件的变化。
+/// Changes to files managed by clashtui.
 #[derive(Clone, Debug, PartialEq)]
 pub enum FileEvent {
-    /// profile 列表或元数据变化：导入、删除、更新、选择、切换选项、由模板生成。
+    /// Profile list or metadata changed: import, delete, update, select, toggle options, or generate from a template.
     ProfilesChanged,
 }
 
-/// 配置的核心走到了哪一步。服务状态和 API 状态合成这一个值：
-/// 服务没运行，API 必然不可达；服务在运行，API 仍可能不可达。
+/// Current state of the configured core, combining service and API status:
+/// a stopped service means the API is unreachable; a running service does not guarantee API access.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum CoreStatus {
-    /// 尚无确认的结果：启动时，或服务命令执行后等待确认。
+    /// No confirmed result yet: at startup or awaiting confirmation after a service command.
     #[default]
     Unknown,
-    /// 配置的核心的服务没有运行，API 必然不可达。
+    /// The configured core service is stopped, so its API is unreachable.
     Stopped,
-    /// 服务在运行或无法判断，但 API 不可达。reason 直接显示给用户。
+    /// The service is running or its state is unknown, but the API is unreachable. Display reason to the user.
     Unreachable { reason: String },
-    /// API 返回的是另一个核心的数据。
+    /// The API returned data from a different core.
     Mismatch { running: CoreType },
-    /// API 可用，且属于配置的核心。
+    /// The API is available and belongs to the configured core.
     Ready { version: String },
 }
 
 impl CoreStatus {
-    /// Ok 表示可以请求 API；Err 是页面应显示的原因。
+    /// Ok permits API requests; Err contains the reason the page should display.
     pub fn ready(&self) -> Result<(), String> {
         match self {
             Self::Ready { .. } => Ok(()),
@@ -79,7 +80,7 @@ impl CoreStatus {
     }
 }
 
-/// 可以广播的事件组。生命周期事件没有实现它，所以 emit(Event::Shown) 无法编译。
+/// Events that can be broadcast. Lifecycle events do not implement this, so emit(Event::Shown) cannot compile.
 pub trait Broadcast: Into<Event> + Send + 'static {}
 impl Broadcast for CoreEvent {}
 impl Broadcast for FileEvent {}

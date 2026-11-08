@@ -4,7 +4,7 @@ use ratatui::prelude::{Frame, Rect};
 use super::{Host, Page};
 use crate::tui::event::Event;
 
-/// 双面板容器。事件同时投给两侧，动作只投给焦点侧。
+/// Two-pane container. Deliver events to both panes and actions only to the focused pane.
 pub struct Split<L: Page, R: Page> {
     left: Host<L>,
     right: Host<R>,
@@ -39,7 +39,7 @@ impl<L: Page, R: Page> Split<L, R> {
         self.right.sync(now);
     }
 
-    /// 焦点侧占 7/10，另一侧占 3/10。
+    /// Give the focused pane 7/10 of the space and the other pane 3/10.
     pub fn render(&mut self, f: &mut Frame, area: Rect) {
         let cons = if self.focus == Side::Left {
             [Ratio(7, 10), Ratio(3, 10)]

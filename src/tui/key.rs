@@ -37,10 +37,10 @@ impl Key {
             _ => return self,
         };
         if c.is_ascii_uppercase() {
-            // 大写字母 → 自动加上 SHIFT modifier
+            // Automatically add the SHIFT modifier for uppercase letters.
             self.modifiers.insert(KeyModifiers::SHIFT);
         } else if self.modifiers.contains(KeyModifiers::SHIFT) {
-            // SHIFT + 小写字母 → 转为大写字母
+            // Convert SHIFT plus a lowercase letter to uppercase.
             self.code = KeyCode::Char(c.to_ascii_uppercase())
         }
         // Preserve Shift on other characters; do not infer a keyboard layout.

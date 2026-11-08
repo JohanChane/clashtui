@@ -35,7 +35,7 @@ impl App {
     pub async fn serve() -> anyhow::Result<()> {
         let mut coordinator = term::TerminalCoordinator::install();
         let signals = signals::Signals::start()?;
-        // 先于 Hub：CoreMonitor 一启动就可能 emit。
+        // Open before constructing Hub: CoreMonitor may emit as soon as it starts.
         let mut inbox = event::Inbox::open();
         let mut app = Self::new();
         app.hub.start();
@@ -122,7 +122,7 @@ impl App {
                         }
                     }
                 }
-                // 终端借出期间不分发，事件留在通道里。
+                // Keep events queued while the terminal is lent out.
                 Some(event) = inbox.recv(), if !quitting && coordinator.owns_terminal() && pause_ack.is_none() => app.on_event(event),
                 // this tick here ensures that fps is stable
                 // Keep polling QUIT even while a worker owns the terminal.
@@ -200,7 +200,7 @@ impl App {
 
     fn on_event(&mut self, event: event::Event) {
         if let event::Event::Core(event::CoreEvent::Switched(_)) = event {
-            // 键位和页面按核心类型加载，切换核心后需要重启 clashtui。
+            // Key bindings and pages depend on the core type; switching cores requires restarting clashtui.
             QUIT.store(true, Ordering::Relaxed);
         }
         self.hub.dispatch(&event);

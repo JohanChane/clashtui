@@ -1,4 +1,4 @@
-//! 页面运行时。Host 持有页面、组件状态、任务集和 Tick 计划。
+//! Page runtime. Host owns the page, widget state, task sets, and Tick schedule.
 
 mod split;
 
@@ -14,25 +14,25 @@ use crate::tui::event::Event;
 type CallBack<P> = Box<dyn FnOnce(&mut P) + Send>;
 pub(in crate::tui) type FutureSet<P> = tokio::task::JoinSet<CallBack<P>>;
 
-/// 页面：有自己的 Action、按键作用域和事件处理。
+/// A page with its own Action, key scope, and event handling.
 pub trait Page: Sized + 'static {
     type Action: Copy;
-    /// 渲染用的组件状态，如 ListState。
+    /// Widget state used for rendering, such as ListState.
     type State: Default;
     const TITLE: &'static str;
-    /// 显示期间的 Tick 周期。None 表示不需要定时刷新。
+    /// Tick interval while visible. None disables periodic refreshes.
     const TICK: Option<Duration> = None;
 
     fn on_event(&mut self, _event: &Event, _cx: &mut Cx<Self>) {}
     fn on_action(&mut self, action: Self::Action, cx: &mut Cx<Self>, state: &mut Self::State);
-    /// 单页面标签页总是传 focused = true。
+    /// Single-page tabs always pass focused = true.
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, focused: bool);
 }
 
-/// 处理函数的上下文。Host 在每次调用处理函数前创建。
+/// Handler context, created by Host before each handler call.
 pub struct Cx<'a, P> {
     tasks: &'a mut FutureSet<P>,
-    /// 所在标签页是否显示。页面通过 is_shown 读取；当前没有页面调用它。
+    /// Whether the containing tab is visible. Pages can read is_shown; none currently do.
     #[allow(dead_code)]
     shown: bool,
 }
@@ -48,7 +48,7 @@ impl<P: 'static> Cx<'_, P> {
     }
 }
 
-/// 沿用现有的后缀写法：async { .. }.spawn_at(cx)
+/// Preserve the existing suffix syntax: async { .. }.spawn_at(cx)
 pub trait FutureSetExt<P: 'static>: Future<Output = CallBack<P>> + Send + Sized + 'static {
     fn spawn_at(self, cx: &mut Cx<P>) {
         cx.spawn(self);
@@ -71,20 +71,20 @@ pub fn do_nothing<P>() -> CallBack<P> {
     wrapper(|_| ())
 }
 
-/// 页面运行时。
+/// Page runtime.
 pub struct Host<P: Page> {
     page: P,
     state: P::State,
-    /// on_event 派生的任务。下一次 Tick 等它们全部完成。
+    /// Tasks spawned by on_event. The next Tick waits for all of them to finish.
     event_tasks: FutureSet<P>,
-    /// on_action 派生的任务（弹窗、测速等）。不影响 Tick。
+    /// Tasks spawned by on_action (popups, latency tests, etc.). They do not affect Tick.
     action_tasks: FutureSet<P>,
     shown: bool,
     next_tick: Option<Instant>,
 }
 
 impl<P: Page + Default> Default for Host<P> {
-    /// 只构造，不派生任务。Init 由 Hub 投递。
+    /// Construct without spawning tasks. Hub delivers Init.
     fn default() -> Self {
         Self {
             page: P::default(),
@@ -98,7 +98,7 @@ impl<P: Page + Default> Default for Host<P> {
 }
 
 impl<P: Page> Host<P> {
-    /// 投递生命周期事件或广播事件。
+    /// Deliver a lifecycle or broadcast event.
     pub fn deliver(&mut self, event: &Event) {
         if let Event::Shown | Event::Hidden = event {
             self.shown = *event == Event::Shown;
@@ -123,19 +123,19 @@ impl<P: Page> Host<P> {
         self.page.render(f, area, &mut self.state, focused);
     }
 
-    /// 每帧调用：应用已完成任务的回调，再检查 Tick 是否到期。
+    /// Called each frame: apply completed task callbacks, then check whether Tick is due.
     pub fn sync(&mut self, now: Instant) {
         for tasks in [&mut self.event_tasks, &mut self.action_tasks] {
             while let Some(done) = tasks.try_join_next() {
-                // 只有任务被取消或 panic 时才会出错，与现状相同
+                // As before, only cancellation or panic causes a task error.
                 done.unwrap()(&mut self.page);
             }
         }
         self.poll_tick(now);
     }
 
-    /// 固定延迟：显示中、且 on_event 派生的任务全部完成后，再过 TICK 发出 Tick。
-    /// 用两个任务集而不是给任务打标签：Tick 只需看 event_tasks 是否为空。
+    /// Fixed delay: while visible, wait TICK after all on_event tasks finish before delivering Tick.
+    /// Use two task sets instead of tagging tasks: Tick only checks whether event_tasks is empty.
     fn poll_tick(&mut self, now: Instant) {
         let Some(period) = P::TICK else { return };
         if !self.shown || !self.event_tasks.is_empty() {

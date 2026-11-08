@@ -414,7 +414,7 @@ impl Logs {
         }
     }
 
-    /// ready：取日志级别；否则清空并暂停。
+    /// When ready, fetch the log level; otherwise clear logs and pause.
     fn check_core(&mut self, cx: &mut Cx<Self>) {
         if let Err(reason) = monitor::status().ready() {
             self.buffer.clear();

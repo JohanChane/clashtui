@@ -4,13 +4,13 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use super::{Broadcast, Event};
 
-/// 当前 Inbox 的发送端。没有 Inbox 时（CLI、单元测试）emit 为空操作。
+/// Sender for the current Inbox. Without an Inbox (CLI or unit tests), emit is a no-op.
 static SENDER: Mutex<Option<UnboundedSender<Event>>> = Mutex::new(None);
 
-/// 广播通道的接收端，由 App::serve 持有。
+/// Receiver for the broadcast channel, owned by App::serve.
 pub struct Inbox(UnboundedReceiver<Event>);
 
-/// 广播一个事件。只入队，可在任意线程调用。
+/// Enqueue a broadcast event. Safe to call from any thread.
 pub fn emit(event: impl Broadcast) {
     let event = event.into();
     log::debug!("emit {event:?}");
@@ -20,7 +20,7 @@ pub fn emit(event: impl Broadcast) {
 }
 
 impl Inbox {
-    /// 安装全局发送端。必须在任何生产者启动前调用。
+    /// Install the global sender before starting any producers.
     pub fn open() -> Self {
         let (sender, receiver) = unbounded_channel();
         *SENDER.lock().unwrap() = Some(sender);

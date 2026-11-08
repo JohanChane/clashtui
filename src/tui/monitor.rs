@@ -1,4 +1,4 @@
-//! 常驻探测。把服务状态和 API 状态合成一个 CoreStatus，变化时广播。
+//! Continuously probe service and API status, combine them into CoreStatus, and broadcast changes.
 
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
@@ -11,27 +11,27 @@ use crate::functions::restful::core_detect;
 use crate::tui::event::{CoreEvent, CoreStatus, Event, emit};
 
 const PERIOD: Duration = Duration::from_secs(2);
-/// 服务命令之后的确认窗口：窗口内快速探测，且不把 Unreachable 当作结论。
+/// Confirmation window after a service command: probe rapidly without treating Unreachable as final.
 const SETTLE: Duration = Duration::from_secs(3);
 const SETTLE_PERIOD: Duration = Duration::from_millis(300);
 
-/// 最新的核心状态。只有 run 任务写。
+/// Latest core status. Only the run task writes it.
 static STATUS: RwLock<CoreStatus> = RwLock::new(CoreStatus::Unknown);
 
-/// 核心状态快照。在 StatusChanged 发出前已更新。
+/// Core status snapshot, updated before StatusChanged is emitted.
 pub fn status() -> CoreStatus {
     STATUS.read().unwrap().clone()
 }
 
-/// 唤醒后台任务的原因。
+/// Reasons to wake the background task.
 enum Wake {
-    /// 执行了服务命令：发布 Unknown，进入确认窗口。
+    /// A service command ran: publish Unknown and enter the confirmation window.
     Service,
-    /// 运行时配置变化：立即探测。
+    /// Runtime configuration changed: probe immediately.
     Config,
 }
 
-/// CoreMonitor 的前台句柄，由 Hub 持有。探测循环在后台任务 run 中运行。
+/// Foreground handle for CoreMonitor, owned by Hub. The run task probes in the background.
 pub(in crate::tui) struct CoreMonitor {
     wake: UnboundedSender<Wake>,
 }
@@ -43,7 +43,7 @@ impl CoreMonitor {
         Self { wake }
     }
 
-    /// Hub 转发每个广播事件；这里只做转发，状态只由 run 任务写，避免与进行中的探测竞争。
+    /// Hub forwards every broadcast here. Only the run task writes status, avoiding races with active probes.
     pub fn on_event(&self, event: &Event) {
         let reason = match event {
             Event::Core(CoreEvent::ServiceCommandDone) => Wake::Service,
@@ -59,7 +59,7 @@ async fn run(mut woken: UnboundedReceiver<Wake>) {
     loop {
         let status = tokio::task::spawn_blocking(probe).await.unwrap();
         let settling = settle_until.is_some_and(|until| Instant::now() < until);
-        // 确认窗口内，服务在运行但 API 还不可达，视为仍在启动，不发布
+        // During confirmation, treat a running service with an unreachable API as still starting; do not publish.
         if !(settling && matches!(status, CoreStatus::Unreachable { .. })) {
             publish(status);
         }
@@ -68,8 +68,8 @@ async fn run(mut woken: UnboundedReceiver<Wake>) {
             _ = tokio::time::sleep(period) => {}
             Some(reason) = woken.recv() => {
                 if let Wake::Service = reason {
-                    // 服务刚被操作过，旧结论作废：页面立即停用旧数据。
-                    // 之后必有一次 Unknown → 新状态的变化，快速重启也会让页面刷新。
+                    // A service command invalidates the previous result; pages immediately stop using stale data.
+                    // The next transition from Unknown refreshes pages even after a quick restart.
                     publish(CoreStatus::Unknown);
                     settle_until = Some(Instant::now() + SETTLE);
                 }
@@ -78,7 +78,7 @@ async fn run(mut woken: UnboundedReceiver<Wake>) {
     }
 }
 
-/// 边沿触发：状态不变时什么也不做。
+/// Publish only on transitions; do nothing if the status is unchanged.
 fn publish(status: CoreStatus) {
     {
         let mut current = STATUS.write().unwrap();
@@ -91,15 +91,16 @@ fn publish(status: CoreStatus) {
     emit(CoreEvent::StatusChanged(status));
 }
 
-/// 在阻塞线程中运行。/version 不受 request() 的 mismatch 防护影响。
-/// 先查 API：成功就不查服务，不启动进程。失败时才查服务，因为服务没运行时 API 必然不可达。
+/// Run on a blocking thread. The mismatch guard in request() does not affect /version.
+/// Probe the API first. On success, skip the service check and avoid spawning a process.
+/// Check the service only on failure, since a stopped service means the API is unreachable.
 fn probe() -> CoreStatus {
     match core_detect::probe() {
         Ok((running, _)) if running != CONFIG.core_type() => CoreStatus::Mismatch { running },
         Ok((_, version)) => CoreStatus::Ready { version },
         Err(error) => match command::is_core_service_running() {
             Some(false) => CoreStatus::Stopped,
-            // 服务在运行，或无法判断（如 macOS 系统级 launchd）
+            // The service is running, or its state is unknown (e.g. system-level launchd on macOS).
             _ => CoreStatus::Unreachable {
                 reason: error.to_string(),
             },
