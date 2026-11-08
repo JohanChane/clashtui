@@ -4,7 +4,9 @@ mod hub;
 use hub::Hub;
 
 use super::*;
-pub(in crate::tui) use actions::{AppAction, TabTarget, km};
+#[cfg(test)]
+pub(in crate::tui) use actions::TabTarget;
+pub(in crate::tui) use actions::{AppAction, km};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use tab::TuiTab;
 use widget::help::HelpPanel;
@@ -174,7 +176,7 @@ impl App {
         let maps = key::keymaps();
         let hints = self.input.hints(scope);
         let shown = self.hub.shown_index() as u8;
-        render_tabbar(tab_titles(self.hub.titles(), maps), shown, f, chunks[0]);
+        render_tabbar(tab_titles(self.hub.titles()), shown, f, chunks[0]);
 
         self.hub.shown().render(f, chunks[1]);
 
@@ -241,22 +243,11 @@ impl App {
     }
 }
 
-fn tab_titles(titles: impl IntoIterator<Item = &'static str>, maps: &key::Keymaps) -> Vec<String> {
-    TabTarget::ALL
+fn tab_titles(titles: impl IntoIterator<Item = &'static str>) -> Vec<String> {
+    titles
         .into_iter()
-        .zip(titles)
-        .map(|(target, title)| {
-            let keys: Vec<_> = maps
-                .tab_bindings(target)
-                .iter()
-                .map(|binding| binding.key_text.as_str())
-                .collect();
-            if keys.is_empty() {
-                title.to_owned()
-            } else {
-                format!("{} {title}", keys.join("/"))
-            }
-        })
+        .enumerate()
+        .map(|(index, title)| format!("{} {title}", index + 1))
         .collect()
 }
 

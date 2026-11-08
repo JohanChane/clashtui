@@ -11,13 +11,24 @@ pub(super) struct Proxies {
     pub proxies: proxies::ProxyCatalog,
     pub error: Option<String>,
     pub testing_since: Option<Instant>,
-    pub jump_target: Cell<Option<usize>>,
+    pub jump_target: Cell<Option<SelectionKey>>,
     pub filter: Option<String>,
 }
 
 type SelectionKey = (String, Option<String>, NodeType);
 
 impl Proxies {
+    fn apply_finder_target(&self, state: &mut ListState) {
+        if let Some(target) = self.jump_target.take() {
+            let mut found = ListState::default();
+            self.restore_selection(Some(target), &mut found);
+            // A removed target cancels the jump; keep the current page selection.
+            if let Some(index) = found.selected() {
+                state.select(Some(index));
+            }
+        }
+    }
+
     fn resolve_group_for_sort(&self, cursor: usize) -> Option<String> {
         let node = self.tree.node_at(cursor)?;
         match node.node_type {
@@ -323,11 +334,7 @@ impl Page for Proxies {
     }
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, _focused: bool) {
-        if let Some(idx) = self.jump_target.take()
-            && idx < self.tree.len()
-        {
-            state.select(Some(idx));
-        }
+        self.apply_finder_target(state);
         super::render::render(self, f, area, state);
     }
 }
@@ -403,6 +410,35 @@ mod tests {
         let (content, mut state) = load_fixture();
         content.restore_selection(None, &mut state);
         assert!(state.selected().is_none());
+    }
+
+    #[test]
+    fn finder_identity_survives_reordering_and_does_not_match_another_group() {
+        let (mut content, mut state) = load_fixture();
+        let mut node = content.tree.nodes[0].clone();
+        node.parent = Some("first group".into());
+        let mut other = node.clone();
+        other.parent = Some("second group".into());
+        let mut third = node.clone();
+        third.name = "third node".into();
+        content.tree.nodes = vec![node, other, third];
+        state.select(Some(0));
+        let target = content.selection_key(&state);
+
+        content.jump_target.set(target.clone());
+        content.tree.nodes.swap(0, 2);
+        content.apply_finder_target(&mut state);
+        assert_eq!(state.selected(), Some(2));
+
+        state.select(Some(1));
+        content.jump_target.set(target);
+        content.tree.nodes.pop();
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(60, 10)).unwrap();
+        terminal
+            .draw(|frame| content.render(frame, frame.area(), &mut state, true))
+            .unwrap();
+        assert_eq!(state.selected(), Some(1));
     }
 
     #[test]
