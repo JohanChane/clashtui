@@ -16,7 +16,7 @@ pub struct FzfFinder {
 
 impl FzfFinder {
     pub fn new(items: Vec<String>) -> Self {
-        let cfg = simsearch::Options::new().separators(['_']);
+        let cfg = simsearch::Options::new().separators(['_', ':', '.']);
         let mut idx = simsearch::Index::with_options(cfg);
         for (id, content) in items.iter().enumerate() {
             idx.insert(id, content);
@@ -189,6 +189,20 @@ mod tests {
         // Moving the text cursor must not reset the selected result.
         press(&mut finder, KeyCode::Left);
         assert_eq!(confirm(finder), Some(3));
+    }
+
+    #[test]
+    fn log_ports_and_domain_tokens_match_the_original_items() {
+        let log = "26-11-08 17:25:50 info [TCP] 198.18.0.1:50180 --> api2.cursor.sh:443 match GeoSite(geolocation-!cn) using Entry[ba]";
+        for query in ["443", "cursor", "CURSOR", "api2.cursor.sh:443"] {
+            let mut finder = finder(&["unrelated", log, log]);
+            for ch in query.chars() {
+                press(&mut finder, KeyCode::Char(ch));
+            }
+            assert_eq!(finder.matches, vec![1, 2], "query: {query}");
+            press(&mut finder, KeyCode::Up);
+            assert_eq!(confirm(finder), Some(2));
+        }
     }
 
     #[test]
