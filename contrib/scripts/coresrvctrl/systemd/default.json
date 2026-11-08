@@ -29,7 +29,6 @@
     },
     {
       "id": "restart_core",
-      "label": "Restart Core",
       "cmd": {
         "program": "/bin/sh",
         "args": [
