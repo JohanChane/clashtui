@@ -205,10 +205,8 @@ fn read_log_messages(
             return;
         }
         match read() {
-            Ok(tungstenite::Message::Text(text)) => {
-                if monitor::status().ready().is_ok() {
-                    queue_log_message(&text, pending, paused);
-                }
+            Ok(tungstenite::Message::Text(text)) if monitor::status().ready().is_ok() => {
+                queue_log_message(&text, pending, paused);
             }
             Ok(tungstenite::Message::Close(_)) => return,
             Err(tungstenite::Error::Io(ref e))

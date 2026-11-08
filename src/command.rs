@@ -160,6 +160,7 @@ pub fn capture(
     )
 }
 
+#[cfg(unix)]
 pub fn inherit(
     program: &OsStr,
     args: &[OsString],

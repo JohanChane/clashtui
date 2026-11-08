@@ -30,6 +30,7 @@ pub fn teardown() {
     let _ = raw_mode::restore();
 }
 
+#[cfg(unix)]
 pub(crate) fn is_external() -> bool {
     EXTERNAL.load(Ordering::SeqCst)
 }
