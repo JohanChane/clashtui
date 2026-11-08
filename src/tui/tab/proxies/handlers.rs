@@ -17,6 +17,10 @@ impl Proxies {
         cx: &mut Cx<Self>,
     ) {
         let names: Vec<String> = items.iter().map(|(name, _)| name.clone()).collect();
+        let targets: Vec<_> = items
+            .iter()
+            .map(|(_, index)| self.selection_key(&ListState::default().with_selected(Some(*index))))
+            .collect();
         async move {
             let selected = FzfFinder::new(names)
                 .with_title(prompt.into())
@@ -24,8 +28,12 @@ impl Proxies {
                 .await
                 .unwrap_or_default();
             // Map fzf positional index back to tree index
-            let target = selected.and_then(|pos| items.get(pos).map(|(_, idx)| *idx));
+            // Resolve by identity because page refreshes continue while the finder is open.
+            let target = selected.and_then(|pos| targets.get(pos).cloned().flatten());
             wrapper(move |content: &mut Self| {
+                if target.is_some() {
+                    content.filter = None;
+                }
                 content.jump_target.set(target);
             })
         }

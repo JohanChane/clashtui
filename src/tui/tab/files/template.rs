@@ -81,7 +81,7 @@ pub(in crate::tui) enum Operation {
 pub(super) struct Template {
     items: Vec<String>,
     filter: Option<String>,
-    jump_target: Cell<Option<usize>>,
+    jump_target: Cell<Option<String>>,
 }
 
 impl Page for Template {
@@ -129,8 +129,10 @@ impl Page for Template {
     }
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, is_focused: bool) {
-        if let Some(idx) = self.jump_target.take() {
-            state.select(Some(idx));
+        if let Some(name) = self.jump_target.take()
+            && let Some(index) = self.items.iter().position(|item| item == &name)
+        {
+            state.select(Some(index));
         }
 
         // Clamp cursor to valid range
@@ -289,14 +291,45 @@ mod actions {
     }
 
     pub(super) async fn fzf_find(items: Vec<String>) -> CB {
-        let selected = FzfFinder::new(items)
+        let selected = FzfFinder::new(items.clone())
             .with_title("Find Template")
             .build_and_send()
             .await
             .unwrap_or_default();
 
         wrapper(move |content: &mut C| {
-            content.jump_target.set(selected);
+            let target = selected.and_then(|pos| items.get(pos).cloned());
+            if target.is_some() {
+                content.filter = None;
+            }
+            content.jump_target.set(target);
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::{Terminal, backend::TestBackend};
+
+    #[test]
+    fn finder_target_is_resolved_at_render_and_a_removed_target_does_not_jump() {
+        let content = Template {
+            items: vec!["first".into(), "second".into()],
+            ..Template::default()
+        };
+        let mut state = ListState::default().with_selected(Some(0));
+        let mut terminal = Terminal::new(TestBackend::new(60, 10)).unwrap();
+        content.jump_target.set(Some("second".into()));
+        terminal
+            .draw(|frame| content.render(frame, frame.area(), &mut state, true))
+            .unwrap();
+        assert_eq!(state.selected(), Some(1));
+
+        content.jump_target.set(Some("removed".into()));
+        terminal
+            .draw(|frame| content.render(frame, frame.area(), &mut state, true))
+            .unwrap();
+        assert_eq!(state.selected(), Some(1));
     }
 }

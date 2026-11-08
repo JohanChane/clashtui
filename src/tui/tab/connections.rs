@@ -2,6 +2,7 @@ use super::dev::*;
 use crate::functions::restful::connection::{self, Conn};
 use ratatui::text::Line;
 use ratatui::widgets::{Cell, Row, Table};
+use std::cell::Cell as SelectionCell;
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -162,7 +163,8 @@ struct DisplayRow {
 struct Connections {
     conns: Vec<Conn>,
     display_rows: Vec<DisplayRow>,
-    row: Option<usize>,
+    row: SelectionCell<Option<usize>>,
+    jump_target: SelectionCell<Option<String>>,
     error: Option<String>,
     last_bytes: HashMap<String, (u64, u64)>,
     sort_state: SortState,
@@ -292,35 +294,36 @@ impl Page for Connections {
     fn on_action(&mut self, action: Action, cx: &mut Cx<Self>, _state: &mut Self::State) {
         match action {
             Action::MoveUp => {
-                if let Some(r) = self.row {
+                if let Some(r) = self.row.get() {
                     if r > 0 {
-                        self.row = Some(r - 1);
+                        self.row.set(Some(r - 1));
                     }
                 } else if !self.display_rows.is_empty() {
-                    self.row = Some(self.display_rows.len() - 1);
+                    self.row.set(Some(self.display_rows.len() - 1));
                 }
             }
             Action::MoveDown => {
-                if let Some(r) = self.row {
+                if let Some(r) = self.row.get() {
                     if r + 1 < self.display_rows.len() {
-                        self.row = Some(r + 1);
+                        self.row.set(Some(r + 1));
                     }
                 } else if !self.display_rows.is_empty() {
-                    self.row = Some(0);
+                    self.row.set(Some(0));
                 }
             }
             Action::GoTop => {
                 if !self.display_rows.is_empty() {
-                    self.row = Some(0);
+                    self.row.set(Some(0));
                 }
             }
             Action::GoBottom => {
                 if !self.display_rows.is_empty() {
-                    self.row = Some(self.display_rows.len().saturating_sub(1));
+                    self.row
+                        .set(Some(self.display_rows.len().saturating_sub(1)));
                 }
             }
             Action::Terminate => {
-                let Some(row) = self.row else { return };
+                let Some(row) = self.row.get() else { return };
                 let Some(display_row) = self.display_rows.get(row) else {
                     return;
                 };
@@ -337,8 +340,8 @@ impl Page for Connections {
                         content.conns = info.connections.unwrap_or_default();
                         content.error = None;
                         content.refresh_display_rows();
-                        if content.row.unwrap_or(0) >= content.display_rows.len() {
-                            content.row = content.display_rows.len().checked_sub(1);
+                        if content.row.get().unwrap_or(0) >= content.display_rows.len() {
+                            content.row.set(content.display_rows.len().checked_sub(1));
                         }
                     })
                 }
@@ -397,7 +400,7 @@ impl Page for Connections {
                             content.conns = info.connections.unwrap_or_default();
                             content.error = None;
                             content.refresh_display_rows();
-                            content.row = None;
+                            content.row.set(None);
                         })
                     }
                     .spawn_at(cx);
@@ -427,6 +430,7 @@ impl Page for Connections {
                 self.paused = !self.paused;
             }
             Action::FzfFind => {
+                let ids: Vec<_> = self.display_rows.iter().map(|r| r.id.clone()).collect();
                 let names: Vec<String> = self
                     .display_rows
                     .iter()
@@ -439,7 +443,10 @@ impl Page for Connections {
                         .await
                         .unwrap_or_default();
                     wrapper(move |content: &mut Connections| {
-                        content.row = selected;
+                        if let Some(id) = selected.and_then(|pos| ids.get(pos)) {
+                            content.jump_target.set(Some(id.clone()));
+                            content.filter = None;
+                        }
                     })
                 }
                 .spawn_at(cx);
@@ -448,6 +455,7 @@ impl Page for Connections {
     }
 
     fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State, _focused: bool) {
+        self.apply_finder_target();
         let theme = Theme::get();
         let section = theme.section("connections");
         let block = Block::bordered()
@@ -575,7 +583,7 @@ impl Page for Connections {
             .block(block.title_bottom(Line::raw(count_text).right_aligned()))
             .row_highlight_style(highlight_style);
 
-        if let Some(selected) = self.row {
+        if let Some(selected) = self.row.get() {
             f.render_stateful_widget(
                 table,
                 area,
@@ -594,6 +602,14 @@ impl Page for Connections {
 }
 
 impl Connections {
+    fn apply_finder_target(&self) {
+        // Resolve after all callbacks, immediately before rendering the current list.
+        if let Some(id) = self.jump_target.take() {
+            self.row
+                .set(self.display_rows.iter().position(|row| row.id == id));
+        }
+    }
+
     fn reload(&mut self, cx: &mut Cx<Self>) {
         if let Err(reason) = monitor::status().ready() {
             self.conns.clear();
@@ -625,13 +641,14 @@ impl Connections {
         self.apply_sort();
         // Clamp cursor to valid range
         if self.display_rows.is_empty() {
-            self.row = None;
-        } else if let Some(r) = self.row {
+            self.row.set(None);
+        } else if let Some(r) = self.row.get() {
             if r >= self.display_rows.len() {
-                self.row = Some(self.display_rows.len().saturating_sub(1));
+                self.row
+                    .set(Some(self.display_rows.len().saturating_sub(1)));
             }
         } else {
-            self.row = Some(0);
+            self.row.set(Some(0));
         }
     }
 
@@ -717,5 +734,41 @@ impl Connections {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(id: &str) -> DisplayRow {
+        DisplayRow {
+            id: id.into(),
+            host: "same host".into(),
+            rule: String::new(),
+            chains: String::new(),
+            download: 0,
+            upload: 0,
+            dl_speed: 0,
+            ul_speed: 0,
+        }
+    }
+
+    #[test]
+    fn finder_selection_tracks_connection_identity_after_refresh() {
+        let mut content = Connections {
+            display_rows: vec![row("first"), row("second")],
+            ..Connections::default()
+        };
+        let selected_id = content.display_rows[0].id.clone();
+        content.jump_target.set(Some(selected_id.clone()));
+        content.display_rows.swap(0, 1);
+        content.apply_finder_target();
+        assert_eq!(content.row.get(), Some(1));
+
+        content.jump_target.set(Some(selected_id));
+        content.display_rows.pop();
+        content.apply_finder_target();
+        assert_eq!(content.row.get(), None);
     }
 }

@@ -172,7 +172,7 @@ pub(super) struct Profile {
     atime: Vec<String>,
     filter: Option<String>,
     updating: HashSet<String>,
-    jump_target: Cell<Option<usize>>,
+    jump_target: Cell<Option<String>>,
 }
 
 impl Page for Profile {
@@ -235,8 +235,10 @@ impl Page for Profile {
     }
 
     fn render(&self, f: &mut Frame, area: Rect, state: &mut Self::State, is_focused: bool) {
-        if let Some(idx) = self.jump_target.take() {
-            state.select(Some(idx));
+        if let Some(name) = self.jump_target.take()
+            && let Some(index) = self.items.iter().position(|item| item == &name)
+        {
+            state.select(Some(index));
         }
 
         // Clamp cursor to valid range
@@ -355,14 +357,18 @@ mod actions {
     }
 
     pub(super) async fn fzf_find(items: Vec<String>) -> CB {
-        let selected = FzfFinder::new(items)
+        let selected = FzfFinder::new(items.clone())
             .with_title("Find Profile")
             .build_and_send()
             .await
             .unwrap_or_default();
 
         wrapper(move |content: &mut C| {
-            content.jump_target.set(selected);
+            let target = selected.and_then(|pos| items.get(pos).cloned());
+            if target.is_some() {
+                content.filter = None;
+            }
+            content.jump_target.set(target);
         })
     }
 
