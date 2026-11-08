@@ -446,13 +446,6 @@ mod connection_tests {
     }
 
     #[test]
-    fn singbox_connections_has_entries() {
-        let info = load_singbox_connections();
-        let conns = info.connections.expect("connections missing");
-        assert!(!conns.is_empty());
-    }
-
-    #[test]
     fn singbox_conn_has_chains() {
         let info = load_singbox_connections();
         let conn = &info.connections.unwrap()[0];

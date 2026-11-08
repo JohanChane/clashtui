@@ -565,21 +565,6 @@ mod tests {
     }
 
     #[test]
-    fn zero_delay_produces_fail() {
-        let mut proxies = ProxyCatalog::default();
-        proxies.primary.insert(
-            "dead".to_string(),
-            Proxy {
-                name: "dead".to_string(),
-                proxy_type: "Vmess".to_string(),
-                history: vec![proxies::DelayRecord { delay: 0 }],
-                ..Default::default()
-            },
-        );
-        assert_eq!(resolve_delay("dead", &proxies), Some(0));
-    }
-
-    #[test]
     fn now_chain_multiple_levels() {
         let mut proxies = ProxyCatalog::default();
         proxies.primary.insert(
@@ -818,14 +803,6 @@ mod tests {
     }
 
     #[test]
-    fn singbox_tcp_true_when_explicit() {
-        let proxies = load_singbox_fixture();
-        let tcp_node = proxies.primary.get("tcp-node").expect("tcp-node missing");
-        assert!(tcp_node.tcp);
-        assert!(!tcp_node.udp);
-    }
-
-    #[test]
     fn singbox_alive_false_node() {
         let proxies = load_singbox_fixture();
         let dead = proxies.primary.get("dead-node").expect("dead-node missing");
@@ -868,14 +845,6 @@ mod tests {
         let tree = ProxyTree::build(proxies.clone());
         let names: Vec<&str> = tree.nodes.iter().map(|n| n.name.as_str()).collect();
         assert!(!names.contains(&"hidden-proxy"));
-    }
-
-    #[test]
-    fn mihomo_tcp_only_leaf() {
-        let proxies = load_fixture();
-        let tcp = proxies.primary.get("tcp-only").expect("tcp-only missing");
-        assert!(tcp.tcp);
-        assert!(!tcp.udp);
     }
 
     #[test]

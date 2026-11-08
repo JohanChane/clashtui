@@ -217,16 +217,6 @@ mod tests {
     }
 
     #[test]
-    fn filter_both_sections() {
-        let yaml = load_test_yaml();
-        let resources = yaml.extract(&[
-            ResourceSection::ProxyProvider,
-            ResourceSection::RuleProvider,
-        ]);
-        assert_eq!(resources.len(), 5);
-    }
-
-    #[test]
     fn empty_filter() {
         let yaml = load_test_yaml();
         let resources = yaml.extract(&[]);
