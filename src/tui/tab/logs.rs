@@ -4,6 +4,7 @@ use crate::functions::restful::api_log::{self, LogEntry};
 use crate::functions::restful::config;
 use ratatui::text::Line;
 use ratatui::widgets::{List, ListItem};
+use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -76,16 +77,18 @@ impl Document for Action {
 const LOG_BUFFER_SIZE: usize = 300;
 
 struct LogBuffer {
-    entries: [Option<LogEntry>; LOG_BUFFER_SIZE],
+    entries: [Option<(u64, LogEntry)>; LOG_BUFFER_SIZE],
+    next_id: u64,
     tail: isize,
     len: usize,
 }
 
 impl LogBuffer {
     fn new() -> Self {
-        const NONE: Option<LogEntry> = None;
+        const NONE: Option<(u64, LogEntry)> = None;
         Self {
             entries: [NONE; LOG_BUFFER_SIZE],
+            next_id: 0,
             tail: -1,
             len: 0,
         }
@@ -93,13 +96,15 @@ impl LogBuffer {
 
     fn push(&mut self, entry: LogEntry) {
         self.tail = (self.tail + 1) % LOG_BUFFER_SIZE as isize;
-        self.entries[self.tail as usize] = Some(entry);
+        self.entries[self.tail as usize] = Some((self.next_id, entry));
+        self.next_id = self.next_id.wrapping_add(1);
         if self.len < LOG_BUFFER_SIZE {
             self.len += 1;
         }
     }
 
     fn clear(&mut self) {
+        // Keep IDs unique across clears so an open finder cannot target a replacement log.
         self.tail = -1;
         self.len = 0;
     }
@@ -113,6 +118,10 @@ impl LogBuffer {
     }
 
     fn iter_from_head(&self) -> impl Iterator<Item = &LogEntry> {
+        self.iter_with_ids().map(|(_, entry)| entry)
+    }
+
+    fn iter_with_ids(&self) -> impl Iterator<Item = (u64, &LogEntry)> {
         let start = if self.len < LOG_BUFFER_SIZE {
             0
         } else {
@@ -121,7 +130,7 @@ impl LogBuffer {
         let count = self.len;
         (0..count).filter_map(move |i| {
             let idx = (start + i) % LOG_BUFFER_SIZE;
-            self.entries[idx].as_ref()
+            self.entries[idx].as_ref().map(|(id, entry)| (*id, entry))
         })
     }
 }
@@ -130,7 +139,8 @@ impl Default for Logs {
     fn default() -> Self {
         Self {
             buffer: LogBuffer::new(),
-            scroll: 0,
+            scroll: Cell::new(0),
+            jump_target: Cell::new(None),
             error: None,
             filter: None,
             paused: Arc::new(AtomicBool::new(true)),
@@ -144,7 +154,8 @@ impl Default for Logs {
 
 struct Logs {
     buffer: LogBuffer,
-    scroll: usize,
+    scroll: Cell<usize>,
+    jump_target: Cell<Option<u64>>,
     error: Option<String>,
     filter: Option<String>,
     paused: Arc<AtomicBool>,
@@ -171,6 +182,9 @@ fn queue_log_message(text: &str, pending: &Mutex<Vec<LogEntry>>, paused: &Atomic
             .unwrap_or("")
             .to_owned();
         let mut queue = pending.lock().unwrap();
+        if paused.load(Ordering::Relaxed) {
+            return;
+        }
         queue.push(LogEntry {
             type_,
             payload,
@@ -278,19 +292,19 @@ impl Page for Logs {
     fn on_action(&mut self, action: Action, cx: &mut Cx<Self>, _state: &mut Self::State) {
         match action {
             Action::MoveUp => {
-                self.scroll = self.scroll.saturating_sub(1);
+                self.scroll.set(self.scroll.get().saturating_sub(1));
             }
             Action::MoveDown => {
-                if self.scroll + 1 < self.buffer.count() {
-                    self.scroll += 1;
+                if self.scroll.get() + 1 < self.buffer.count() {
+                    self.scroll.set(self.scroll.get() + 1);
                 }
             }
             Action::GoTop => {
-                self.scroll = 0;
+                self.scroll.set(0);
             }
             Action::GoBottom => {
                 if !self.buffer.is_empty() {
-                    self.scroll = self.buffer.count().saturating_sub(1);
+                    self.scroll.set(self.buffer.count().saturating_sub(1));
                 }
             }
             Action::Search => {
@@ -312,12 +326,7 @@ impl Page for Logs {
                 self.paused.fetch_xor(true, Ordering::Relaxed);
             }
             Action::FzfFind => {
-                self.paused.store(true, Ordering::Relaxed);
-                let names: Vec<String> = self
-                    .buffer
-                    .iter_from_head()
-                    .map(|e| format!("{} {} {}", e.time, e.type_, e.payload))
-                    .collect();
+                let (names, ids) = self.finder_snapshot();
                 async move {
                     let selected = FzfFinder::new(names)
                         .with_title("Find Log")
@@ -325,16 +334,15 @@ impl Page for Logs {
                         .await
                         .unwrap_or_default();
                     wrapper(move |content: &mut Logs| {
-                        if let Some(idx) = selected {
-                            content.scroll = idx;
-                        }
+                        content
+                            .set_finder_target(selected.and_then(|index| ids.get(index).copied()));
                     })
                 }
                 .spawn_at(cx);
             }
             Action::Clear => {
                 self.buffer.clear();
-                self.scroll = 0;
+                self.scroll.set(0);
                 self.filter = None;
             }
             Action::ToggleDebug => self.toggle_log_level("debug"),
@@ -345,6 +353,15 @@ impl Page for Logs {
     }
 
     fn render(&self, f: &mut Frame, area: Rect, _state: &mut Self::State, _focused: bool) {
+        // Tick and other callbacks may have changed the buffer after confirmation.
+        if let Some(id) = self.jump_target.take()
+            && let Some(index) = self
+                .buffer
+                .iter_with_ids()
+                .position(|(candidate, _)| candidate == id)
+        {
+            self.scroll.set(index);
+        }
         let block = Block::bordered()
             .border_style(Theme::get().section("logs").border)
             .title(Self::TITLE);
@@ -384,12 +401,33 @@ impl Page for Logs {
             .highlight_style(highlight_style);
 
         let mut list_state =
-            ratatui::widgets::ListState::default().with_selected(Some(self.scroll));
+            ratatui::widgets::ListState::default().with_selected(Some(self.scroll.get()));
         f.render_stateful_widget(list, area, &mut list_state);
     }
 }
 
 impl Logs {
+    fn finder_snapshot(&mut self) -> (Vec<String>, Vec<u64>) {
+        // Include pending logs without changing the user's capture state.
+        self.drain();
+        self.buffer
+            .iter_with_ids()
+            .map(|(id, entry)| {
+                (
+                    format!("{} {} {}", entry.time, entry.type_, entry.payload),
+                    id,
+                )
+            })
+            .unzip()
+    }
+
+    fn set_finder_target(&mut self, id: Option<u64>) {
+        self.jump_target.set(id);
+        if id.is_some() {
+            self.filter = None;
+        }
+    }
+
     fn connect(&mut self) {
         if self.ws_pending.is_some() {
             return;
@@ -410,11 +448,15 @@ impl Logs {
             return;
         };
         let entries: Vec<LogEntry> = pending.lock().unwrap().drain(..).collect();
+        if entries.is_empty() {
+            return;
+        }
         for entry in entries {
             self.buffer.push(entry);
         }
-        if self.buffer.count() > 0 && self.scroll + 1 >= self.buffer.count().saturating_sub(1) {
-            self.scroll = self.buffer.count().saturating_sub(1);
+        if self.buffer.count() > 0 && self.scroll.get() + 1 >= self.buffer.count().saturating_sub(1)
+        {
+            self.scroll.set(self.buffer.count().saturating_sub(1));
         }
     }
 
@@ -514,6 +556,118 @@ mod tests {
         assert_eq!(
             logs.buffer.iter_from_head().next().unwrap().payload,
             "before pause"
+        );
+    }
+
+    #[test]
+    fn empty_tick_preserves_the_finder_selection_while_paused() {
+        let pending = Arc::new(Mutex::new(Vec::new()));
+        let mut logs = Logs {
+            ws_pending: Some(Arc::clone(&pending)),
+            ..Logs::default()
+        };
+        logs.paused.store(false, Ordering::Relaxed);
+        queue("first", &pending, &logs.paused);
+        queue("second", &pending, &logs.paused);
+        logs.paused.store(true, Ordering::Relaxed);
+        logs.finder_snapshot();
+        logs.scroll.set(0);
+        logs.drain();
+        assert_eq!(logs.scroll.get(), 0);
+    }
+
+    fn draw(logs: &Logs) {
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(60, 10)).unwrap();
+        terminal
+            .draw(|frame| logs.render(frame, frame.area(), &mut (), true))
+            .unwrap();
+    }
+
+    #[test]
+    fn finder_preserves_capture_state_on_open_confirm_and_cancel() {
+        for paused in [false, true] {
+            let pending = Arc::new(Mutex::new(Vec::new()));
+            let mut logs = Logs {
+                ws_pending: Some(Arc::clone(&pending)),
+                ..Logs::default()
+            };
+            logs.paused.store(false, Ordering::Relaxed);
+            queue("before finder", &pending, &logs.paused);
+            logs.paused.store(paused, Ordering::Relaxed);
+            let (names, ids) = logs.finder_snapshot();
+            assert_eq!(names.len(), 1);
+            assert!(names[0].ends_with("before finder"));
+            assert_eq!(logs.paused.load(Ordering::Relaxed), paused);
+
+            queue("during finder", &pending, &logs.paused);
+            logs.drain();
+            assert_eq!(logs.buffer.count(), if paused { 1 } else { 2 });
+            logs.set_finder_target(Some(ids[0]));
+            draw(&logs);
+            assert_eq!(logs.scroll.get(), 0);
+            assert_eq!(logs.paused.load(Ordering::Relaxed), paused);
+
+            logs.set_finder_target(None);
+            draw(&logs);
+            assert_eq!(logs.scroll.get(), 0);
+            assert_eq!(logs.paused.load(Ordering::Relaxed), paused);
+        }
+    }
+
+    #[test]
+    fn finder_tracks_duplicate_logs_through_overflow_until_render() {
+        let mut logs = Logs::default();
+        for _ in 0..LOG_BUFFER_SIZE {
+            logs.buffer.push(LogEntry {
+                type_: "info".into(),
+                payload: "same message".into(),
+                time: "same time".into(),
+            });
+        }
+        let (_, ids) = logs.finder_snapshot();
+        logs.set_finder_target(Some(ids[20]));
+        // Simulate a Tick after the finder callback, before the next render.
+        for _ in 0..10 {
+            logs.buffer.push(LogEntry {
+                type_: "info".into(),
+                payload: "same message".into(),
+                time: "same time".into(),
+            });
+        }
+        draw(&logs);
+        assert_eq!(logs.scroll.get(), 10);
+        assert_eq!(logs.buffer.iter_with_ids().nth(10).unwrap().0, ids[20]);
+
+        // An evicted target must not redirect the cursor to a replacement row.
+        logs.set_finder_target(Some(ids[0]));
+        draw(&logs);
+        assert_eq!(logs.scroll.get(), 10);
+    }
+
+    #[test]
+    fn finder_target_does_not_survive_clear_and_refill() {
+        let pending = Arc::new(Mutex::new(Vec::new()));
+        let mut logs = Logs {
+            ws_pending: Some(Arc::clone(&pending)),
+            ..Logs::default()
+        };
+        logs.paused.store(false, Ordering::Relaxed);
+        queue("old first", &pending, &logs.paused);
+        queue("old second", &pending, &logs.paused);
+        let (_, ids) = logs.finder_snapshot();
+        logs.set_finder_target(Some(ids[1]));
+        logs.buffer.clear();
+        queue("new first", &pending, &logs.paused);
+        queue("new second", &pending, &logs.paused);
+        logs.drain();
+        logs.scroll.set(0);
+        draw(&logs);
+        assert_eq!(logs.scroll.get(), 0);
+        assert!(
+            logs.buffer
+                .iter_with_ids()
+                .all(|(id, _)| !ids.contains(&id))
         );
     }
 
