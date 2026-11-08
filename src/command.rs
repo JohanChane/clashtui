@@ -742,19 +742,48 @@ mod tests {
     }
     #[cfg(unix)]
     #[test]
-    fn terminal_sized_output_survives_but_overflow_cleans_children() {
-        let mut spec = command("printf '\\033]52;c;'; head -c 1500000 /dev/zero; printf '\\007'");
+    fn large_output_is_captured_without_truncation() {
+        let mut spec = command("head -c 1500000 /dev/zero");
         spec.output = ProcessOutputMode::Capture {
             stdout_limit: 2 * 1024 * 1024,
             stderr_limit: OUTPUT_LIMIT,
             fail_on_stdout_overflow: true,
         };
         let output = execute(spec).unwrap();
-        assert_eq!(output.captured.stdout.len(), 1500008);
-        assert!(output.captured.stdout.starts_with(b"\x1b]52;c;"));
-        let marker = std::env::temp_dir().join(format!("clashtui-overflow-{}", fastrand::u64(..)));
-        let mut spec = command("(sleep 0.6; touch \"$1\") & head -c 2200000 /dev/zero; wait");
-        spec.args.extend(["test".into(), marker.as_os_str().into()]);
+        assert!(output.status.success());
+        assert_eq!(output.captured.stdout.len(), 1500000);
+        assert!(output.captured.stdout.iter().all(|&byte| byte == 0));
+        assert!(!output.captured.stdout_truncated);
+    }
+    #[cfg(unix)]
+    #[test]
+    fn output_overflow_cleans_children() {
+        use std::{io::Read, os::unix::fs::OpenOptionsExt};
+
+        struct CleanupFifo(PathBuf);
+        impl Drop for CleanupFifo {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+        let fifo = std::env::temp_dir().join(format!("clashtui-overflow-{}", fastrand::u64(..)));
+        nix::unistd::mkfifo(
+            &fifo,
+            nix::sys::stat::Mode::S_IRUSR | nix::sys::stat::Mode::S_IWUSR,
+        )
+        .unwrap();
+        let fifo = CleanupFifo(fifo);
+        let mut reader = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NONBLOCK)
+            .open(&fifo.0)
+            .unwrap();
+        // Open before forking so the background child holds the FIFO throughout
+        // output collection. EOF then proves cleanup without racing a timer
+        // against the time needed to transfer more than 2 MiB on a busy runner.
+        let mut spec =
+            command("exec 3>\"$1\"; printf ready >&3; sleep 30 & head -c 2200000 /dev/zero; wait");
+        spec.args.extend(["test".into(), fifo.0.as_os_str().into()]);
         spec.keep_children_on_success = true;
         spec.output = ProcessOutputMode::Capture {
             stdout_limit: 2 * 1024 * 1024,
@@ -764,8 +793,23 @@ mod tests {
         let error = execute(spec).unwrap_err();
         assert_eq!(error.kind, CommandErrorKind::OutputLimit);
         assert!(error.captured.stdout_truncated);
-        thread::sleep(Duration::from_millis(650));
-        assert!(!marker.exists());
+        let mut ready = [0; 5];
+        reader.read_exact(&mut ready).unwrap();
+        assert_eq!(&ready, b"ready");
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            match reader.read(&mut [0]) {
+                Ok(0) => break,
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    assert!(
+                        Instant::now() < deadline,
+                        "child still holds the FIFO after cleanup"
+                    );
+                    thread::sleep(POLL_INTERVAL);
+                }
+                result => panic!("unexpected FIFO read after cleanup: {result:?}"),
+            }
+        }
     }
     #[test]
     fn writer_cancels_while_an_unmanaged_reader_keeps_the_pipe_open() {
