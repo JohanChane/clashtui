@@ -12,7 +12,7 @@ mod widget;
 pub use app::App;
 use key::Key;
 pub use key::init as keymap_init;
-pub use term::hold;
+pub use term::terminal_lease;
 pub(crate) use theme::Theme;
 
 trait TuiWidget {

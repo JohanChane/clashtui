@@ -113,13 +113,13 @@ pub fn repair_file_permissions(dir: &Path, group_name: &str) -> Result<String> {
     }
 
     let script = commands.join(" && ");
-    crate::tui::hold(true)?;
+    let lease = crate::tui::terminal_lease()?;
     let opt = std::process::Command::new("sudo")
         .arg("sh")
         .arg("-c")
         .arg(&script)
         .output()?;
-    crate::tui::hold(false)?;
+    lease.release()?;
     Ok(stringify_output(opt))
 }
 

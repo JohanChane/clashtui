@@ -1,5 +1,6 @@
 use super::dev::*;
 use crate::config::CoreType;
+use crate::tui::term::run_blocking;
 #[cfg(unix)]
 use ratatui::style::Color;
 use ratatui::widgets::ListItem;
@@ -348,13 +349,22 @@ impl TabContent for SrvCtlContent {
 
                     match op {
                         SrvCtlOp::Stop => {
-                            handle!(crate::functions::command::stop_service(), "inactive")
+                            handle!(
+                                run_blocking(crate::functions::command::stop_service).await,
+                                "inactive"
+                            )
                         }
                         SrvCtlOp::Restart => {
-                            handle!(crate::functions::command::restart_service(), "active")
+                            handle!(
+                                run_blocking(crate::functions::command::restart_service).await,
+                                "active"
+                            )
                         }
                         SrvCtlOp::StopAll => {
-                            handle!(crate::functions::command::stop_all_services(), "inactive")
+                            handle!(
+                                run_blocking(crate::functions::command::stop_all_services).await,
+                                "inactive"
+                            )
                         }
                         SrvCtlOp::SwitchCore => {
                             let old_type = crate::config::CONFIG.core_type();
@@ -368,7 +378,8 @@ impl TabContent for SrvCtlContent {
                             };
 
                             // stop all core services first
-                            let stop_result = crate::functions::command::stop_all_services();
+                            let stop_result =
+                                run_blocking(crate::functions::command::stop_all_services).await;
 
                             let res = {
                                 crate::config::CONFIG.data.lock().unwrap().core_type = new_type;
@@ -377,8 +388,10 @@ impl TabContent for SrvCtlContent {
                             match res {
                                 Ok(()) => {
                                     // start the target core
-                                    let start_result =
-                                        crate::functions::command::start_core_service(new_type);
+                                    let start_result = run_blocking(move || {
+                                        crate::functions::command::start_core_service(new_type)
+                                    })
+                                    .await;
 
                                     let status_msg = format!(
                                         "Core switched to {new_label}\n\n\
@@ -434,18 +447,24 @@ impl TabContent for SrvCtlContent {
                         #[cfg(windows)]
                         SrvCtlOp::Install => {
                             handle!(
-                                crate::functions::command::install_core_service(
-                                    crate::config::CONFIG.core_type(),
-                                ),
+                                run_blocking(|| {
+                                    crate::functions::command::install_core_service(
+                                        crate::config::CONFIG.core_type(),
+                                    )
+                                })
+                                .await,
                                 "installed"
                             )
                         }
                         #[cfg(windows)]
                         SrvCtlOp::Uninstall => {
                             handle!(
-                                crate::functions::command::uninstall_core_service(
-                                    crate::config::CONFIG.core_type(),
-                                ),
+                                run_blocking(|| {
+                                    crate::functions::command::uninstall_core_service(
+                                        crate::config::CONFIG.core_type(),
+                                    )
+                                })
+                                .await,
                                 "uninstalled"
                             )
                         }
