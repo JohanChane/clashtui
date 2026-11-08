@@ -20,7 +20,7 @@ CONFIG_ROOT/
     open.ps1                # Windows
 ```
 
-安装器根据平台和选项选择后端（Linux：systemd/OpenRC；macOS：launchd；Windows：NSSM），只安装对应脚本并生成 `scripts.json`。Unix 的 `--is-user` 选择 `user`，否则为 `system`。重装先按编号后缀备份配置目录，再替换所选默认脚本和配置；其他自定义文件保留。
+安装器根据平台和选项选择后端（Linux：systemd/OpenRC；macOS：launchd；Windows：NSSM），只安装对应脚本并生成 `scripts.json`。Unix 的 `--is-user` 选择 `user`，否则为 `system`。Unix 重装为每个被覆盖的文件创建 `.bak.N` 备份；Windows 备份整个配置目录。随后替换所选默认脚本和配置；其他自定义文件保留。
 
 每个 Unix 后端只有一个 `default.json`。安装器将独立的 `"${scope}"` 参数替换为 `"system"` 或 `"user"`，保留其余变量。`${scope}`、`${is_user}` 均不是运行期变量。Windows 直接使用 `windows/system.json`。不设模板索引，不做运行期迁移。`config.yaml` 只提供服务名和 core 路径，不再保存后端或 scope。
 

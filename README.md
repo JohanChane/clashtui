@@ -48,6 +48,35 @@ Linux and macOS:
 Windows:
 -   nssm
 
+### Shell installer (Linux/macOS)
+
+The installer prompts by default. Defaults are a system installation with both cores, their templates, and mihomo rules data. The default `--service-controller auto-detect` detects systemd or OpenRC on Linux, launchd on macOS. `--no-prompt` (or `-y` / `--yes`) uses the same defaults without asking.
+
+```sh
+# Interactive installation from a local checkout
+git clone https://github.com/JohanChane/clashtui.git
+cd clashtui
+bash installs/install
+
+# Use a specific contrib directory
+bash installs/install --contrib-dir /path/to/contrib
+
+# Install for the current user without prompts
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install) --is-user --no-prompt
+```
+
+Use `--core mihomo` or `--core sing-box` to select one core. `--templates no` skips templates; `--rules-dat no` skips mihomo rules data. User installations use `~/.local/clashtui` and disable TUN. See `bash installs/install --help` for all options.
+
+Scripts, default configs, and templates are selected in this order: `--contrib-dir PATH`, `contrib/` beside the installer or in its parent directory, then the release's `contrib.tar.gz`. `PATH` can be relative or absolute and must contain `scripts/`, `default_configs/`, and `templates/`. An explicit directory that is missing or incomplete causes an error without falling back. This option only selects resources; missing binaries and enabled rules data may still be downloaded.
+
+The installer reuses existing installed binaries, then checks `PATH`, and downloads only missing binaries. Downloaded clashtui and contrib use the same selected release. `--version <tag>` pins those downloads (default: `latest`); local contrib still takes precedence. Missing cores always use their latest releases. `--repo <owner/repo>` changes the ClashTui download repository.
+
+Reinstalling replaces `config.yaml`, `scripts.json`, core configs and overrides, and installed resources with the installer defaults. Previous contents are saved as `<filename>.bak.N`; identical files are not backed up again. The installer does not start services or enable autostart.
+
+Without prompts, privileged commands use `sudo -n` and fail if authorization is unavailable. For a system installation, run `sudo -v` beforehand or run as root. OpenRC user services are written to `${XDG_CONFIG_HOME:-$HOME/.config}/rc/init.d` without sudo.
+
+To uninstall without prompts, use `bash installs/install --uninstall --no-prompt`; add `--is-user` for a user installation. Uninstalling preserves configs, backups, logs, and system accounts.
+
 ### With root access (for TUN mode)
 
 #### Linux

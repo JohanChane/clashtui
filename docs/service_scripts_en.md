@@ -20,7 +20,7 @@ CONFIG_ROOT/
     open.ps1                # Windows
 ```
 
-The installer selects the backend (Linux: systemd/OpenRC, macOS: launchd, Windows: NSSM), installs only its scripts, and writes `scripts.json`. Unix `--is-user` selects `user`; otherwise the scope is `system`. Reinstallation backs up the config directory with a numbered suffix, then replaces the selected default scripts and configuration. Other custom files remain in place.
+The installer selects the backend (Linux: systemd/OpenRC, macOS: launchd, Windows: NSSM), installs only its scripts, and writes `scripts.json`. Unix `--is-user` selects `user`; otherwise the scope is `system`. On Unix, reinstallation backs up each replaced file as `.bak.N`; Windows backs up the configuration directory with a numbered suffix. The installer then replaces the selected default scripts and configuration. Other custom files remain in place.
 
 Each Unix backend has one `default.json`. The installer replaces standalone `"${scope}"` arguments with `"system"` or `"user"`; other variables stay intact. Neither `${scope}` nor `${is_user}` is a runtime variable. Windows uses `windows/system.json` directly. There is no template index or runtime migration. `config.yaml` supplies service names and core paths; it contains no backend or scope selector.
 
