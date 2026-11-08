@@ -38,7 +38,16 @@ src/
 │       ├── app.rs       # App struct, event loop (~50fps), key routing
 │       ├── app/
 │       │   ├── actions.rs   # Global actions, tab targets, and default bindings
+│       │   ├── hub.rs       # Tab list and CoreMonitor; Init, Shown, Hidden, broadcast
 │       │   └── tests.rs     # Global shortcut and tab-label regression tests
+│       ├── event.rs     # Event, CoreEvent, FileEvent, CoreStatus
+│       ├── event/
+│       │   └── bus.rs   # emit and Inbox
+│       ├── page.rs      # Page, Cx, Host, and Tick
+│       ├── page/
+│       │   └── split.rs # Two-page container (Profile and Template)
+│       ├── monitor.rs   # CoreMonitor and the status snapshot
+│       ├── ops.rs       # Shared core and file operations; emit after success
 │       ├── key.rs       # Keys, typed sequences, default-binding macro, and loading entry point
 │       ├── key/
 │       │   ├── defaults.rs  # Typed single-key and chord declarations
@@ -52,16 +61,14 @@ src/
 │       ├── utils.rs     # Utility functions
 │       ├── popmsg.rs    # Popup definitions (Confirm, Input, etc.)
 │       ├── widget/
-│       │   ├── mod.rs   # new_type_impl_tuiwidget! macro
-│       │   ├── dualtab.rs  # Dual-panel tab container
+│       │   ├── mod.rs   # help, which, and popmsg
 │       │   ├── help.rs  # Scrollable help panel
 │       │   ├── which.rs # Pending-chord hints
-│       │   ├── popmsg.rs   # Popup container (rendering + event dispatch)
-│       │   └── tab.rs   # Single-panel tab container + BasicTabContent/TabContent trait
+│       │   └── popmsg.rs   # Popup container (rendering + event dispatch)
 │       └── tab/
 │           ├── mod.rs   # Tab enum, newtype_tab!/enum_dispatch! macros
 │           ├── status.rs     # Status tab
-│           ├── files.rs      # FileTab (DualTab: Profile + Template)
+│           ├── files.rs      # FileTab (Split: Profile + Template)
 │           ├── proxies.rs    # Proxies tab
 │           ├── connections.rs # Connections tab
 │           ├── logs.rs       # Logs tab

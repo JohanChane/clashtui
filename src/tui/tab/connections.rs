@@ -93,7 +93,7 @@ macro_rules! tri {
         match $e {
             Ok(v) => v,
             Err(e) => {
-                crate::tui::widget::popmsg::Confirm::err(e);
+                crate::tui::popmsg::prelude::Confirm::err(e);
                 return do_nothing();
             }
         }
@@ -372,28 +372,36 @@ impl Page for Connections {
                     return;
                 }
 
-                async move {
-                    let result = tokio::task::spawn_blocking(move || {
-                        if use_bulk {
-                            let _ = connection::terminate_all_connections();
-                        } else {
+                if use_bulk {
+                    async move {
+                        tri!(
+                            tokio::task::spawn_blocking(ops::close_all_connections)
+                                .await
+                                .unwrap()
+                        );
+                        do_nothing()
+                    }
+                    .spawn_at(cx);
+                } else {
+                    async move {
+                        let result = tokio::task::spawn_blocking(move || {
                             for id in &ids {
                                 let _ = connection::terminate_connection(Some(id.clone()));
                             }
-                        }
-                        connection::get_connections()
-                    })
-                    .await
-                    .unwrap();
-                    let info = tri!(result, or_cancel);
-                    wrapper(move |content: &mut Connections| {
-                        content.conns = info.connections.unwrap_or_default();
-                        content.error = None;
-                        content.refresh_display_rows();
-                        content.row = None;
-                    })
+                            connection::get_connections()
+                        })
+                        .await
+                        .unwrap();
+                        let info = tri!(result, or_cancel);
+                        wrapper(move |content: &mut Connections| {
+                            content.conns = info.connections.unwrap_or_default();
+                            content.error = None;
+                            content.refresh_display_rows();
+                            content.row = None;
+                        })
+                    }
+                    .spawn_at(cx);
                 }
-                .spawn_at(cx);
             }
             Action::SortBy(col) => self.toggle_sort(col),
             Action::SortReset => {

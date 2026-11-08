@@ -38,7 +38,16 @@ src/
 │       ├── app.rs       # App 结构体、事件循环（~50fps）、按键路由
 │       ├── app/
 │       │   ├── actions.rs   # 全局动作、标签目标和默认绑定
+│       │   ├── hub.rs       # 标签页列表和 CoreMonitor；Init、Shown、Hidden、广播
 │       │   └── tests.rs     # 全局快捷键和标签标题回归测试
+│       ├── event.rs     # Event、CoreEvent、FileEvent、CoreStatus
+│       ├── event/
+│       │   └── bus.rs   # emit 和 Inbox
+│       ├── page.rs      # Page、Cx、Host、Tick
+│       ├── page/
+│       │   └── split.rs # 双页面容器（Profile 和 Template）
+│       ├── monitor.rs   # CoreMonitor 和状态快照
+│       ├── ops.rs       # 会改核心或文件的共享操作；成功后 emit
 │       ├── key.rs       # 按键、类型化序列、默认绑定宏和统一加载入口
 │       ├── key/
 │       │   ├── defaults.rs  # 类型化单键和双键声明
@@ -52,16 +61,14 @@ src/
 │       ├── utils.rs     # 工具函数
 │       ├── popmsg.rs    # 弹窗定义（Confirm、Input 等）
 │       ├── widget/
-│       │   ├── mod.rs   # new_type_impl_tuiwidget! 宏
-│       │   ├── dualtab.rs  # 双面板标签页容器
+│       │   ├── mod.rs   # help、which、popmsg
 │       │   ├── help.rs  # 可滚动帮助面板
 │       │   ├── which.rs # 后续按键提示
-│       │   ├── popmsg.rs   # 弹窗容器（渲染 + 事件分发）
-│       │   └── tab.rs   # 单面板标签页容器 + BasicTabContent/TabContent trait
+│       │   └── popmsg.rs   # 弹窗容器（渲染 + 事件分发）
 │       └── tab/
 │           ├── mod.rs   # Tab 枚举、newtype_tab!/enum_dispatch! 宏
 │           ├── status.rs     # 状态标签页
-│           ├── files.rs      # FileTab（DualTab: Profile + Template）
+│           ├── files.rs      # FileTab（Split: Profile + Template）
 │           ├── proxies.rs    # 代理标签页
 │           ├── connections.rs # 连接标签页
 │           ├── logs.rs       # 日志标签页
