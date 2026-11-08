@@ -1,9 +1,27 @@
 #!/usr/bin/env bash
 # Bash 3.2 compatible. Run directly or source the functions without installing.
 
-log_info() { printf '[INFO] %s\n' "$*" >&2; }
-log_warn() { printf '[WARN] %s\n' "$*" >&2; }
-die() { printf '[ERROR] %s\n' "$*" >&2; exit 1; }
+log_message() {
+  local level="$1" color="$2" colors=0
+  shift 2
+  if [ -t 2 ] && [ -z "${NO_COLOR+x}" ] && [ "${TERM:-dumb}" != dumb ]; then
+    if command -v tput >/dev/null 2>&1; then
+      colors=$(tput colors 2>/dev/null) || colors=0
+    else
+      # Minimal systems such as Alpine may not provide tput.
+      case "${TERM:-}" in xterm*|screen*|tmux*|rxvt*|linux|cygwin|ansi) colors=8 ;; esac
+    fi
+  fi
+  case "$colors" in ''|*[!0-9]*) colors=0 ;; esac
+  if [ "$colors" -ge 8 ]; then
+    printf '\033[%sm[%s] %s\033[0m\n' "$color" "$level" "$*" >&2
+  else
+    printf '[%s] %s\n' "$level" "$*" >&2
+  fi
+}
+log_info() { log_message INFO 32 "$@"; }
+log_warn() { log_message WARN 33 "$@"; }
+die() { log_message ERROR 31 "$@"; exit 1; }
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
 show_help() {
@@ -808,7 +826,7 @@ main() (
   set -eEuo pipefail
   # Bash clears errexit in command substitutions. Every unexpected command
   # failure must also terminate the substitution, before its result is published.
-  trap 'printf "[ERROR] Installer failed at line %s\n" "$LINENO" >&2; exit 1' ERR
+  trap 'die "Installer failed at line $LINENO"' ERR
   export LC_ALL=C
   local action=install scope=system selection=all backend=auto-detect
   local repo=JohanChane/clashtui version=latest templates=yes rules_dat=yes no_prompt=false
