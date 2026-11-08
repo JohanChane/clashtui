@@ -773,7 +773,8 @@ install_project() {
   log_info "Config: $(user_config_dir)"
   log_info 'Open CoreSrvCtl in ClashTui to start one core and enable autostart.'
   if [ "$scope" = system ] && [ "$backend" != launchd ]; then
-    log_info 'Log out and back in to apply core group permissions.'
+    log_warn 'Log out and back in to apply core group permissions (recommended).'
+    log_warn 'Alternatively, run: su - "$(id -un)" (updates groups in the new shell only).'
   fi
 }
 
