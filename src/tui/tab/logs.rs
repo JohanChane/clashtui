@@ -1,7 +1,6 @@
 use super::dev::*;
 use crate::config::CONFIG;
 use crate::functions::restful::api_log::{self, LogEntry};
-use crate::functions::restful::config;
 use ratatui::text::Line;
 use ratatui::widgets::{List, ListItem};
 use std::cell::Cell;
@@ -144,10 +143,8 @@ impl Default for Logs {
             error: None,
             filter: None,
             paused: Arc::new(AtomicBool::new(true)),
-            current_log_level: String::new(),
             ws_pending: None,
-            ws_level: Arc::new(Mutex::new(String::new())),
-            ws_reconnect: Arc::new(AtomicBool::new(false)),
+            subscription_level: Arc::new(Mutex::new("info".to_owned())),
         }
     }
 }
@@ -159,10 +156,8 @@ struct Logs {
     error: Option<String>,
     filter: Option<String>,
     paused: Arc<AtomicBool>,
-    current_log_level: String,
     ws_pending: Option<Arc<Mutex<Vec<LogEntry>>>>,
-    ws_level: Arc<Mutex<String>>,
-    ws_reconnect: Arc<AtomicBool>,
+    subscription_level: Arc<Mutex<String>>,
 }
 
 fn queue_log_message(text: &str, pending: &Mutex<Vec<LogEntry>>, paused: &AtomicBool) {
@@ -197,12 +192,42 @@ fn queue_log_message(text: &str, pending: &Mutex<Vec<LogEntry>>, paused: &Atomic
     }
 }
 
+fn read_log_messages(
+    mut read: impl FnMut() -> tungstenite::Result<tungstenite::Message>,
+    level: &Mutex<String>,
+    connected_level: &str,
+    pending: &Mutex<Vec<LogEntry>>,
+    paused: &AtomicBool,
+) {
+    loop {
+        // Compare desired and connected levels on busy streams as well as read timeouts.
+        if *level.lock().unwrap() != connected_level {
+            return;
+        }
+        match read() {
+            Ok(tungstenite::Message::Text(text)) => {
+                if monitor::status().ready().is_ok() {
+                    queue_log_message(&text, pending, paused);
+                }
+            }
+            Ok(tungstenite::Message::Close(_)) => return,
+            Err(tungstenite::Error::Io(ref e))
+                if e.kind() == std::io::ErrorKind::WouldBlock
+                    || e.kind() == std::io::ErrorKind::TimedOut => {}
+            Err(e) => {
+                log::warn!("WebSocket read error: {e}");
+                return;
+            }
+            _ => {}
+        }
+    }
+}
+
 fn spawn_ws_logs(
     controller: String,
     secret: Option<String>,
     pending: Arc<Mutex<Vec<LogEntry>>>,
     level: Arc<Mutex<String>>,
-    reconnect: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
 ) {
     std::thread::spawn(move || {
@@ -220,7 +245,6 @@ fn spawn_ws_logs(
 
         loop {
             let current_level = level.lock().unwrap().clone();
-            reconnect.store(false, Ordering::Relaxed);
 
             let url_str = if let Some(ref s) = secret {
                 format!("{ws_scheme}://{addr}/logs?token={s}&level={current_level}")
@@ -235,34 +259,14 @@ fn spawn_ws_logs(
                         let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
                     }
 
-                    loop {
-                        match ws.read() {
-                            Ok(tungstenite::Message::Text(text)) => {
-                                if monitor::status().ready().is_ok() {
-                                    queue_log_message(&text, &pending, &paused);
-                                }
-                            }
-                            Ok(tungstenite::Message::Close(_)) => break,
-                            Err(tungstenite::Error::Io(ref e))
-                                if e.kind() == std::io::ErrorKind::WouldBlock
-                                    || e.kind() == std::io::ErrorKind::TimedOut =>
-                            {
-                                if reconnect.load(Ordering::Relaxed) {
-                                    break;
-                                }
-                                continue;
-                            }
-                            Err(e) => {
-                                log::warn!("WebSocket read error: {e}");
-                                break;
-                            }
-                            _ => {}
-                        }
-                    }
+                    read_log_messages(|| ws.read(), &level, &current_level, &pending, &paused);
                 }
                 Err(e) => {
                     log::warn!("WebSocket connect error: {e}");
                 }
+            }
+            if *level.lock().unwrap() != current_level {
+                continue;
             }
             std::thread::sleep(Duration::from_secs(2));
         }
@@ -275,7 +279,7 @@ impl Page for Logs {
     const TITLE: &str = "Logs";
     const TICK: Option<Duration> = Some(Duration::from_secs(1));
 
-    fn on_event(&mut self, event: &Event, cx: &mut Cx<Self>) {
+    fn on_event(&mut self, event: &Event, _cx: &mut Cx<Self>) {
         match event {
             Event::Init => self.connect(),
             Event::Tick => self.drain(),
@@ -283,7 +287,7 @@ impl Page for Logs {
                 if monitor::status().ready().is_ok() {
                     self.drain();
                 }
-                self.check_core(cx);
+                self.check_core();
             }
             _ => {}
         }
@@ -367,14 +371,14 @@ impl Page for Logs {
             .title(Self::TITLE);
 
         let mut title_parts = Vec::new();
-        title_parts.push(self.current_log_level.clone());
+        title_parts.push(self.subscription_level.lock().unwrap().clone());
         if let Some(ref filter) = self.filter {
             title_parts.push(format!(" / {filter} "));
         }
         if self.paused.load(Ordering::Relaxed) {
             title_parts.push(" [PAUSED]".to_owned());
         }
-        let block = if title_parts.len() > 1 {
+        let block = if !title_parts.is_empty() {
             block.title_bottom(Line::raw(title_parts.join(" ")).right_aligned().reversed())
         } else {
             block
@@ -436,10 +440,9 @@ impl Logs {
         self.ws_pending = Some(Arc::clone(&pending));
         let controller = CONFIG.controller_for_core().to_owned();
         let secret = CONFIG.secret_for_core().map(|s| s.to_owned());
-        let level = Arc::clone(&self.ws_level);
-        let reconnect = Arc::clone(&self.ws_reconnect);
+        let level = Arc::clone(&self.subscription_level);
         let paused = Arc::clone(&self.paused);
-        spawn_ws_logs(controller, secret, pending, level, reconnect, paused);
+        spawn_ws_logs(controller, secret, pending, level, paused);
         self.error = Some("Log capture is paused".to_owned());
     }
 
@@ -460,8 +463,9 @@ impl Logs {
         }
     }
 
-    /// When ready, fetch the log level; otherwise clear logs and pause.
-    fn check_core(&mut self, cx: &mut Cx<Self>) {
+    /// Keep the subscription level independent of core availability and configuration.
+    /// When unavailable, clear logs and pause; when ready, clear the error.
+    fn check_core(&mut self) {
         if let Err(reason) = monitor::status().ready() {
             if let Some(pending) = &self.ws_pending {
                 pending.lock().unwrap().clear();
@@ -469,44 +473,133 @@ impl Logs {
             self.buffer.clear();
             self.error = Some(reason);
             self.paused.store(true, Ordering::Relaxed);
-            return;
+        } else {
+            self.error = None;
         }
-        async {
-            let cfg = tri!(
-                tokio::task::spawn_blocking(config::fetch).await.unwrap(),
-                or_set
-            );
-            wrapper(move |content: &mut Self| {
-                if monitor::status().ready().is_err() {
-                    return;
-                }
-                let level = cfg
-                    .log_level
-                    .as_ref()
-                    .map(|l| l.to_string())
-                    .unwrap_or_else(|| "unknown".to_owned());
-                content.current_log_level = level.clone();
-                *content.ws_level.lock().unwrap() = level;
-                content.error = None;
-            })
-        }
-        .spawn_at(cx);
     }
 
     fn toggle_log_level(&mut self, level: &str) {
-        if monitor::status().ready().is_err() {
-            return;
-        }
-        let level = level.to_owned();
-        self.current_log_level = level.clone();
-        *self.ws_level.lock().unwrap() = level;
-        self.ws_reconnect.store(true, Ordering::Relaxed);
+        *self.subscription_level.lock().unwrap() = level.to_owned();
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unavailable_core_discards_stream_messages() {
+        assert!(monitor::status().ready().is_err());
+        let pending = Mutex::new(Vec::new());
+        let mut messages = [
+            tungstenite::Message::Text(r#"{"type":"info","payload":"stale"}"#.into()),
+            tungstenite::Message::Close(None),
+        ]
+        .into_iter();
+        read_log_messages(
+            || Ok(messages.next().expect("reader must stop on close")),
+            &Mutex::new("info".to_owned()),
+            "info",
+            &pending,
+            &AtomicBool::new(false),
+        );
+        assert!(pending.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn unavailable_core_clears_pending_logs_without_changing_subscription() {
+        assert!(monitor::status().ready().is_err());
+        let pending = Arc::new(Mutex::new(Vec::new()));
+        let mut logs = Logs {
+            ws_pending: Some(Arc::clone(&pending)),
+            ..Logs::default()
+        };
+        logs.paused.store(false, Ordering::Relaxed);
+        logs.toggle_log_level("debug");
+        queue("buffered", &pending, &logs.paused);
+        logs.drain();
+        queue("pending", &pending, &logs.paused);
+
+        logs.check_core();
+
+        assert!(logs.buffer.is_empty());
+        assert!(pending.lock().unwrap().is_empty());
+        assert!(logs.paused.load(Ordering::Relaxed));
+        assert!(logs.error.is_some());
+        assert_eq!(*logs.subscription_level.lock().unwrap(), "debug");
+    }
+
+    #[tokio::test]
+    async fn subscription_level_survives_tab_and_core_config_events() {
+        let mut host = crate::tui::page::Host::<Logs>::default();
+        assert_eq!(*host.page().subscription_level.lock().unwrap(), "info");
+        host.handle_action(Action::ToggleDebug);
+        for event in [
+            Event::Hidden,
+            Event::Shown,
+            Event::Core(CoreEvent::ConfigChanged),
+        ] {
+            host.deliver(&event);
+            assert_eq!(*host.page().subscription_level.lock().unwrap(), "debug");
+        }
+
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(60, 10)).unwrap();
+        terminal
+            .draw(|frame| host.render(frame, frame.area(), true))
+            .unwrap();
+        let footer: String = (0..60)
+            .map(|x| terminal.backend().buffer()[(x, 9)].symbol())
+            .collect();
+        assert!(footer.contains("debug"));
+        assert!(!footer.contains("silent"));
+    }
+
+    #[test]
+    fn stream_level_changes_are_detected_on_messages_and_timeouts() {
+        use tungstenite::{Error, Message};
+        for response in [
+            Ok(Message::Text(r#"{"type":"info","payload":"busy"}"#.into())),
+            Ok(Message::Ping(Vec::new().into())),
+            Err(Error::Io(std::io::ErrorKind::TimedOut.into())),
+            Err(Error::Io(std::io::ErrorKind::WouldBlock.into())),
+        ] {
+            let level = Mutex::new("info".to_owned());
+            let pending = Mutex::new(Vec::new());
+            let paused = AtomicBool::new(false);
+            let mut response = Some(response);
+            let mut reads = 0;
+            read_log_messages(
+                || {
+                    reads += 1;
+                    assert_eq!(
+                        reads, 1,
+                        "must reconnect before reading the old stream again"
+                    );
+                    *level.lock().unwrap() = "debug".into();
+                    response.take().unwrap()
+                },
+                &level,
+                "info",
+                &pending,
+                &paused,
+            );
+            assert_eq!(reads, 1);
+            assert!(!paused.load(Ordering::Relaxed));
+        }
+    }
+
+    #[test]
+    fn level_changed_during_connect_is_detected_before_reading() {
+        let level = Mutex::new("debug".to_owned());
+        read_log_messages(
+            || panic!("must reconnect using the new level before reading"),
+            &level,
+            "info",
+            &Mutex::new(Vec::new()),
+            &AtomicBool::new(true),
+        );
+    }
 
     fn queue(payload: &str, pending: &Mutex<Vec<LogEntry>>, paused: &AtomicBool) {
         let text = serde_json::json!({"type": "info", "payload": payload}).to_string();
