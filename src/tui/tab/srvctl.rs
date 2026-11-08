@@ -1,7 +1,7 @@
 use super::dev::*;
 use crate::{
     config::CoreType,
-    scripts::{self, ActionRequest, StatusReport, config::ActionDefinition},
+    scripts::{self, ActionRequest, ServiceState, config::ActionDefinition},
     tui::commands::CommandEvent,
 };
 use ratatui::widgets::ListItem;
@@ -44,7 +44,7 @@ impl Document for Action {
 struct SrvCtlContent {
     entries: Vec<&'static ActionDefinition>,
     core: CoreType,
-    statuses: [Option<Result<StatusReport, String>>; 2],
+    statuses: [Option<Result<ServiceState, ()>>; 2],
     error: Option<String>,
 }
 impl Page for SrvCtlContent {
@@ -54,12 +54,8 @@ impl Page for SrvCtlContent {
     fn command_done(&mut self, event: &CommandEvent, _: &mut Cx<Self>) {
         match event {
             CommandEvent::Status { core, result, .. } => {
-                self.statuses[core.index()] = Some(
-                    result
-                        .as_ref()
-                        .cloned()
-                        .map_err(super::super::commands::error_text),
-                )
+                self.statuses[core.index()] =
+                    Some(result.as_ref().map(|report| report.state).map_err(|_| ()))
             }
             CommandEvent::Script { target, .. } if target.changes_service => {
                 self.statuses[target.core.index()] = None
@@ -106,7 +102,7 @@ impl Page for SrvCtlContent {
     }
     fn render(&self, frame: &mut Frame, area: Rect, state: &mut Self::State, _: bool) {
         use ratatui::{
-            layout::{Constraint, Layout},
+            text::{Line, Span},
             widgets::Paragraph,
         };
         if state.selected().is_none() && !self.entries.is_empty() {
@@ -114,26 +110,30 @@ impl Page for SrvCtlContent {
         }
         let theme = Theme::get();
         let section = theme.section("srvctl");
-        let status = CoreType::ALL
-            .map(|core| {
-                let label = self.statuses[core.index()]
-                    .as_ref()
-                    .map_or("...", |report| {
-                        report
-                            .as_ref()
-                            .map_or("unknown", |report| report.state.as_str())
-                    });
-                format!(
-                    "{}{}: {label}",
-                    if core == self.core { "► " } else { "" },
-                    core
-                )
-            })
-            .join("   ");
+        let mut status = Vec::new();
+        for core in CoreType::ALL {
+            if !status.is_empty() {
+                status.push(Span::raw("   "));
+            }
+            let report = self.statuses[core.index()].as_ref();
+            let label = report.map_or("...", |report| {
+                report.as_ref().map_or("unknown", |state| state.as_str())
+            });
+            let text = Span::raw(format!(
+                "{}{}: {label}",
+                if core == self.core { "► " } else { "" },
+                core
+            ));
+            status.push(if matches!(report, Some(Ok(ServiceState::Inactive))) {
+                text.dark_gray()
+            } else {
+                text
+            });
+        }
         let block = Block::bordered()
             .border_style(section.border)
             .title(format!("{} — {}", Self::TITLE, self.core))
-            .title_bottom(status);
+            .title_bottom(Line::from(status).right_aligned());
         if let Some(error) = &self.error {
             frame.render_widget(
                 Paragraph::new(error.as_str())
@@ -150,25 +150,8 @@ impl Page for SrvCtlContent {
             );
             return;
         }
-        let diagnostics = CoreType::ALL
-            .iter()
-            .filter_map(|core| {
-                let report = self.statuses[core.index()].as_ref()?;
-                let text = match report {
-                    Ok(report) => report.diagnostic.as_deref()?,
-                    Err(error) => error.as_str(),
-                };
-                Some(format!("{core}: {text}"))
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
         let inner = block.inner(area);
         frame.render_widget(block, area);
-        let [list_area, info_area] = Layout::vertical([
-            Constraint::Min(0),
-            Constraint::Length(if diagnostics.is_empty() { 0 } else { 3 }),
-        ])
-        .areas(inner);
         let items: Vec<_> = self
             .entries
             .iter()
@@ -178,12 +161,8 @@ impl Page for SrvCtlContent {
             .collect();
         frame.render_stateful_widget(
             List::new(items).highlight_style(section.highlight),
-            list_area,
+            inner,
             state,
-        );
-        frame.render_widget(
-            Paragraph::new(diagnostics).wrap(ratatui::widgets::Wrap { trim: false }),
-            info_area,
         );
     }
 }

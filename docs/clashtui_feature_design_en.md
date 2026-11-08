@@ -1103,7 +1103,7 @@ Rationale: Windows' permission model is based on user/group ACLs — concepts li
 
 ### CoreSrvCtl execution
 
-The menu uses labeled actions from `scripts.json`, filtered by core. Windows service operations and proxy settings run through bundled PowerShell scripts. Rust owns a neutral process engine and a single TUI task slot; App consumes completion events. Internal status queries use the same scheduler and retain successful stderr diagnostics. See [script protocol](service_scripts_en.md) and [architecture](architecture_en.md).
+The menu uses labeled actions from `scripts.json`, filtered by core. Windows service operations and proxy settings run through bundled PowerShell scripts. Rust owns a neutral process engine and a single TUI task slot; App consumes completion events. Internal status queries use the same scheduler and write errors and stderr diagnostics to `CONFIG_ROOT/clashtui.log`, including stderr from successful queries. See [script protocol](service_scripts_en.md) and [architecture](architecture_en.md).
 
 ### Install Script
 

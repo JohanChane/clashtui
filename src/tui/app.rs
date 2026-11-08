@@ -272,10 +272,22 @@ impl App {
                     Err(error) => popmsg::prelude::Confirm::err(commands::error_text(error)),
                 },
                 CommandEvent::Failed { error, .. } => popmsg::prelude::Confirm::err(error.clone()),
-                CommandEvent::Status { core, result, .. } => monitor::set_service_status(
-                    *core,
-                    result.as_ref().ok().map(|report| report.state),
-                ),
+                CommandEvent::Status { core, result, .. } => {
+                    match result {
+                        Ok(report) => {
+                            if let Some(diagnostic) = &report.diagnostic {
+                                log::warn!("{core}: status_core: {diagnostic}");
+                            }
+                        }
+                        Err(error) => {
+                            log::warn!("{core}: status_core: {}", commands::error_text(error));
+                        }
+                    }
+                    monitor::set_service_status(
+                        *core,
+                        result.as_ref().ok().map(|report| report.state),
+                    );
+                }
             }
             self.commands.acknowledge(event.task());
         }
