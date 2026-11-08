@@ -6,7 +6,12 @@ use std::time::{Duration, Instant};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 
 use crate::config::CONFIG;
-use crate::functions::command;
+use crate::config::CoreType;
+use crate::scripts::ServiceState;
+static SERVICE_STATUS: RwLock<[Option<ServiceState>; 2]> = RwLock::new([None; 2]);
+pub(super) fn set_service_status(core: CoreType, status: Option<ServiceState>) {
+    SERVICE_STATUS.write().unwrap()[core.index()] = status;
+}
 use crate::functions::restful::core_detect;
 use crate::tui::event::{CoreEvent, CoreStatus, Event, emit};
 
@@ -92,15 +97,13 @@ fn publish(status: CoreStatus) {
 }
 
 /// Run on a blocking thread. The mismatch guard in request() does not affect /version.
-/// Probe the API first. On success, skip the service check and avoid spawning a process.
-/// Check the service only on failure when not already confirmed Stopped.
+/// Probe the API first; use the command scheduler's service snapshot on failure.
 fn probe() -> CoreStatus {
     match core_detect::probe() {
         Ok((running, _)) if running != CONFIG.core_type() => CoreStatus::Mismatch { running },
         Ok((_, version)) => CoreStatus::Ready { version },
-        Err(_) if matches!(status(), CoreStatus::Stopped) => CoreStatus::Stopped,
-        Err(error) => match command::is_core_service_running() {
-            Some(false) => CoreStatus::Stopped,
+        Err(error) => match SERVICE_STATUS.read().unwrap()[CONFIG.core_type().index()] {
+            Some(ServiceState::Inactive | ServiceState::Missing) => CoreStatus::Stopped,
             // The service is running, or its state is unknown (e.g. system-level launchd on macOS).
             _ => CoreStatus::Unreachable {
                 reason: error.to_string(),

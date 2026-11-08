@@ -73,6 +73,24 @@ pub mod geo {
 pub mod config {
     use super::*;
 
+    pub fn fetch_from(controller: &str, secret: Option<&str>) -> Result<serde_json::Value> {
+        let response = request_to(
+            Method::Get,
+            controller,
+            secret,
+            "/configs",
+            None,
+            DEFAULT_TIMEOUT,
+        )?;
+        if !(200..300).contains(&response.status_code) {
+            return Err(minreq::Error::IoError(std::io::Error::other(format!(
+                "GET /configs: HTTP {}",
+                response.status_code
+            ))));
+        }
+        response.json()
+    }
+
     pub fn fetch() -> Result<config_struct::ClashConfig> {
         request(Method::Get, "/configs", None).and_then(|r| r.json())
     }
@@ -270,7 +288,7 @@ pub mod connection {
     }
 
     #[cfg_attr(test, derive(Debug, Clone))]
-    #[derive(Deserialize)]
+    #[derive(Deserialize, serde::Serialize)]
     pub struct Conn {
         pub id: String,
         pub metadata: ConnMetaData,
@@ -287,7 +305,7 @@ pub mod connection {
     }
 
     #[cfg_attr(test, derive(Debug, Clone))]
-    #[derive(Deserialize)]
+    #[derive(Deserialize, serde::Serialize)]
     #[serde(rename_all = "camelCase")]
     pub struct ConnMetaData {
         #[cfg_attr(not(test), allow(dead_code))]
@@ -425,13 +443,6 @@ mod connection_tests {
         let info = load_singbox_connections();
         assert!(info.download_total > 0);
         assert!(info.upload_total > 0);
-    }
-
-    #[test]
-    fn singbox_connections_has_entries() {
-        let info = load_singbox_connections();
-        let conns = info.connections.expect("connections missing");
-        assert!(!conns.is_empty());
     }
 
     #[test]

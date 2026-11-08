@@ -1,0 +1,124 @@
+{
+  "root": "scripts/coresrvctrl",
+  "actions": [
+    {
+      "id": "start_core",
+      "label": "Start Core",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${root}/systemd/service.sh",
+          "start",
+          "${scope}",
+          "${service_name}"
+        ]
+      }
+    },
+    {
+      "id": "stop_core",
+      "label": "Stop Core",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${root}/systemd/service.sh",
+          "stop",
+          "${scope}",
+          "${service_name}"
+        ]
+      }
+    },
+    {
+      "id": "restart_core",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${root}/systemd/service.sh",
+          "restart",
+          "${scope}",
+          "${service_name}"
+        ]
+      }
+    },
+    {
+      "id": "status_core",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${root}/systemd/service.sh",
+          "status",
+          "${scope}",
+          "${service_name}"
+        ],
+        "interactive": false,
+        "output": "silent",
+        "timeout_secs": 5
+      }
+    },
+    {
+      "id": "enable_autostart_core",
+      "label": "Enable Autostart",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${root}/systemd/service.sh",
+          "enable-autostart",
+          "${scope}",
+          "${service_name}"
+        ]
+      }
+    },
+    {
+      "id": "disable_autostart_core",
+      "label": "Disable Autostart",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${root}/systemd/service.sh",
+          "disable-autostart",
+          "${scope}",
+          "${service_name}"
+        ]
+      }
+    },
+    {
+      "id": "copy",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${config_root}/scripts/clipboard/copy.sh",
+          "auto"
+        ],
+        "interactive": false,
+        "output": "terminal",
+        "keep_children_on_success": true,
+        "timeout_secs": 5
+      }
+    },
+    {
+      "id": "edit_file",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${config_root}/scripts/files/open.sh",
+          "${path}"
+        ],
+        "interactive": false,
+        "output": "silent",
+        "keep_children_on_success": true
+      }
+    },
+    {
+      "id": "open_dir",
+      "cmd": {
+        "program": "/bin/sh",
+        "args": [
+          "${config_root}/scripts/files/open.sh",
+          "${path}"
+        ],
+        "interactive": false,
+        "output": "silent",
+        "keep_children_on_success": true
+      }
+    }
+  ]
+}

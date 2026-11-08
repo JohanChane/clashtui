@@ -1,53 +1,56 @@
-#[cfg_attr(target_os = "linux", path = "command/linux.rs")]
-#[cfg_attr(target_os = "macos", path = "command/macos.rs")]
-#[cfg_attr(target_os = "windows", path = "command/windows.rs")]
-mod platform;
-mod utils;
+//! Internal core configuration checks. These do not use script actions.
+use crate::{
+    command,
+    config::{CONFIG, CoreType},
+};
+use anyhow::{Result, ensure};
+use std::{ffi::OsString, path::Path, sync::atomic::AtomicBool};
 
-use crate::config::CONFIG;
-use crate::config::{CoreType, ServiceController};
-use anyhow::Result;
-use std::{path::Path, process::Command};
-
-pub use platform::*;
-use utils::*;
-
-pub fn test_config(profile_path: Option<&Path>, enable_geodata_mode: bool) -> String {
+pub fn test_config(
+    profile_path: Option<&Path>,
+    enable_geodata_mode: bool,
+    cancel: &AtomicBool,
+) -> Result<String> {
     let cfg = &CONFIG.cfg_file.mihomo.core;
-
-    let mut cmd = Command::new(&cfg.bin_path);
-    cmd.args(["-t", "-d", &cfg.config_dir, "-f"]);
-    if let Some(path) = profile_path {
-        cmd.arg(path);
-    } else {
-        cmd.arg(&cfg.config_path);
-    }
-
+    let mut args: Vec<OsString> = vec![
+        "-t".into(),
+        "-d".into(),
+        cfg.config_dir.clone().into(),
+        "-f".into(),
+        profile_path
+            .unwrap_or_else(|| Path::new(&cfg.config_path))
+            .into(),
+    ];
     if enable_geodata_mode {
-        cmd.arg("-m");
+        args.push("-m".into());
     }
-
-    let opt = cmd.output().unwrap();
-    stringify_output(opt)
+    let output = command::capture(cfg.bin_path.as_ref(), &args, cancel)?;
+    Ok(format!(
+        "{}\n{}",
+        if output.status.success() {
+            "OK".into()
+        } else {
+            format!("Error({})", output.status)
+        },
+        output.captured.diagnostic()
+    ))
 }
 
-pub fn check_config(profile_path: &Path) -> anyhow::Result<()> {
-    match CONFIG.core_type() {
+pub fn check_config(core: CoreType, profile_path: &Path, cancel: &AtomicBool) -> Result<()> {
+    let output = match core {
         CoreType::Mihomo => {
             let cfg = &CONFIG.cfg_file.mihomo.core;
-            let output = Command::new(&cfg.bin_path)
-                .args(["-t", "-d", &cfg.config_dir, "-f"])
-                .arg(profile_path)
-                .output()
-                .map_err(|e| anyhow::anyhow!("Failed to run mihomo -t: {e}"))?;
-            if output.status.success() {
-                Ok(())
-            } else {
-                Err(anyhow::anyhow!(
-                    "mihomo -t failed:\n{}",
-                    stringify_output(output)
-                ))
-            }
+            command::capture(
+                cfg.bin_path.as_ref(),
+                &[
+                    "-t".into(),
+                    "-d".into(),
+                    cfg.config_dir.clone().into(),
+                    "-f".into(),
+                    profile_path.into(),
+                ],
+                cancel,
+            )?
         }
         CoreType::Singbox => {
             let cfg = &CONFIG.cfg_file.singbox.core;
@@ -79,289 +82,35 @@ pub fn check_config(profile_path: &Path) -> anyhow::Result<()> {
             } else {
                 profile_path.to_path_buf()
             };
-            let output = Command::new(&cfg.bin_path)
-                .args(["check", "-D", &cfg.config_dir, "-c"])
-                .arg(&check_path)
-                .output()
-                .map_err(|e| anyhow::anyhow!("Failed to run sing-box check: {e}"))?;
-            // Clean up temp file
+
+            let output = command::capture(
+                cfg.bin_path.as_ref(),
+                &[
+                    "check".into(),
+                    "-D".into(),
+                    cfg.config_dir.clone().into(),
+                    "-c".into(),
+                    check_path.as_os_str().into(),
+                ],
+                cancel,
+            );
             if check_path != profile_path {
                 let _ = std::fs::remove_file(&check_path);
             }
-            if output.status.success() {
-                Ok(())
-            } else {
-                Err(anyhow::anyhow!(
-                    "sing-box check failed:\n{}",
-                    stringify_output(output)
-                ))
-            }
-        }
-    }
-}
-
-pub fn is_core_service_running() -> Option<bool> {
-    let ct = CONFIG.core_type();
-    let (service_name, is_user, csc) = match ct {
-        CoreType::Mihomo => (
-            &CONFIG.cfg_file.mihomo.core_service.service_name,
-            CONFIG.cfg_file.mihomo.core_service.is_user,
-            &CONFIG.cfg_file.mihomo.core_service,
-        ),
-        CoreType::Singbox => (
-            &CONFIG.cfg_file.singbox.core_service.service_name,
-            CONFIG.cfg_file.singbox.core_service.is_user,
-            &CONFIG.cfg_file.singbox.core_service,
-        ),
-    };
-    let host = &ServiceController::from_config(csc);
-
-    if service_name.is_empty() {
-        return None;
-    }
-
-    #[cfg(target_os = "windows")]
-    if matches!(host, ServiceController::Nssm) {
-        let s = nssm_status(service_name);
-        return Some(s == "active");
-    }
-
-    if matches!(host, ServiceController::OpenRc) {
-        let mut args = vec![];
-        if is_user {
-            args.push("--user");
-        }
-        args.push(service_name.as_str());
-        args.push("status");
-        return std::process::Command::new(host.bin_name())
-            .args(&args)
-            .output()
-            .map(|o| Some(String::from_utf8_lossy(&o.stdout).contains("started")))
-            .unwrap_or(None);
-    }
-
-    if matches!(host, ServiceController::Systemd) {
-        let mut args = vec!["is-active"];
-        if is_user {
-            args.push("--user");
-        }
-        args.push(service_name);
-        return std::process::Command::new(host.bin_name())
-            .args(&args)
-            .output()
-            .map(|o| Some(String::from_utf8_lossy(&o.stdout).trim() == "active"))
-            .unwrap_or(None);
-    }
-
-    #[cfg(target_os = "macos")]
-    if matches!(host, ServiceController::Launchd) && is_user {
-        let uid = unsafe { libc::getuid() };
-        return std::process::Command::new("launchctl")
-            .args(["print", &format!("gui/{uid}/{service_name}")])
-            .output()
-            .map(|o| Some(String::from_utf8_lossy(&o.stdout).contains("state = running")))
-            .unwrap_or(None);
-    }
-
-    None
-}
-
-fn svc_operation(op: &str, core_type: Option<CoreType>) -> Result<String> {
-    let ct = core_type.unwrap_or(CONFIG.core_type());
-
-    let (service_name, is_user, csc) = match ct {
-        CoreType::Mihomo => (
-            &CONFIG.cfg_file.mihomo.core_service.service_name,
-            CONFIG.cfg_file.mihomo.core_service.is_user,
-            &CONFIG.cfg_file.mihomo.core_service,
-        ),
-        CoreType::Singbox => (
-            &CONFIG.cfg_file.singbox.core_service.service_name,
-            CONFIG.cfg_file.singbox.core_service.is_user,
-            &CONFIG.cfg_file.singbox.core_service,
-        ),
-    };
-    let host = &ServiceController::from_config(csc);
-
-    if matches!(host, ServiceController::Launchd) {
-        return launchd_operation(op, service_name, is_user);
-    }
-
-    #[cfg(target_os = "windows")]
-    if matches!(host, ServiceController::Nssm) {
-        return nssm_svc_operation(op, service_name, ct);
-    }
-
-    let svc_args = host.args(op, service_name, is_user);
-    if is_user {
-        exec(host.bin_name(), svc_args)
-    } else {
-        exec_sudo(host.bin_name(), svc_args)
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn nssm_svc_operation(op: &str, service_name: &str, ct: CoreType) -> Result<String> {
-    match op {
-        "start" | "stop" | "restart" | "reload" => {
-            let op = if op == "reload" { "restart" } else { op };
-            let args = [op, service_name];
-            platform::nssm_runas_or_direct(service_name, &args)
-        }
-        "install" => {
-            let bin_path = match ct {
-                CoreType::Mihomo => &CONFIG.cfg_file.mihomo.core.bin_path,
-                CoreType::Singbox => &CONFIG.cfg_file.singbox.core.bin_path,
-            };
-            let launch_args = platform::nssm_launch_args(ct);
-            let launch_strs: Vec<&str> = launch_args.iter().map(|s| s.as_str()).collect();
-            platform::nssm_install(service_name, bin_path, &launch_strs)
-        }
-        "remove" => platform::nssm_uninstall(service_name),
-        _ => Err(anyhow::anyhow!("Unknown nssm operation: {op}")),
-    }
-}
-
-fn launchd_plist_path(service_name: &str, is_user: bool) -> String {
-    if is_user {
-        let home = std::env::var("HOME").unwrap_or_default();
-        format!("{home}/Library/LaunchAgents/{service_name}.plist")
-    } else {
-        format!("/Library/LaunchDaemons/{service_name}.plist")
-    }
-}
-
-fn launchd_operation(op: &str, service_name: &str, is_user: bool) -> Result<String> {
-    let plist = launchd_plist_path(service_name, is_user);
-
-    let do_exec = |args: Vec<&str>| -> Result<String> {
-        if is_user {
-            exec("launchctl", args)
-        } else {
-            exec_sudo("launchctl", args)
+            output?
         }
     };
-
-    match op {
-        "start" => do_exec(vec!["load", &plist]),
-        "stop" => do_exec(vec!["unload", &plist]),
-        "restart" | "reload" => {
-            // Best-effort unload, then load
-            let _ = do_exec(vec!["unload", &plist]);
-            do_exec(vec!["load", &plist])
-        }
-        _ => Err(anyhow::anyhow!("Unknown launchd operation: {op}")),
-    }
+    ensure!(
+        output.status.success(),
+        "{core} configuration check failed ({}):\n{}",
+        output.status,
+        output.captured.diagnostic()
+    );
+    Ok(())
 }
-
-pub fn stop_core_service(core_type: CoreType) -> Result<String> {
-    svc_operation("stop", Some(core_type))
-}
-
-pub fn start_core_service(core_type: CoreType) -> Result<String> {
-    svc_operation("start", Some(core_type))
-}
-
-#[cfg(windows)]
-pub fn install_core_service(core_type: CoreType) -> Result<String> {
-    svc_operation("install", Some(core_type))
-}
-
-#[cfg(windows)]
-pub fn uninstall_core_service(core_type: CoreType) -> Result<String> {
-    svc_operation("remove", Some(core_type))
-}
-
 pub fn restart_service() -> Result<String> {
-    svc_operation("restart", None)
+    super::service::execute_current("restart_core")
 }
-
 pub fn stop_service() -> Result<String> {
-    svc_operation("stop", None)
-}
-
-pub fn stop_all_services() -> Result<String> {
-    let mut outputs = Vec::new();
-    let core_types = [CoreType::Mihomo, CoreType::Singbox];
-    for ct in &core_types {
-        match stop_core_service(*ct) {
-            Ok(out) => outputs.push(out),
-            Err(e) => {
-                log::warn!("Failed to stop {:?} service: {e}", ct);
-            }
-        }
-    }
-    Ok(outputs.join("\n"))
-}
-
-pub fn edit(path: &str) -> Result<()> {
-    let tpl = CONFIG.cfg_file.extra.edit_cmd.as_deref().unwrap_or("");
-    log::debug!("edit: path={path} template={tpl}");
-    shell_spawn(tpl, path)
-}
-
-pub fn open_dir(path: &Path) -> Result<()> {
-    let tpl = CONFIG.cfg_file.extra.open_dir_cmd.as_deref().unwrap_or("");
-    let path = path
-        .to_str()
-        .ok_or_else(|| anyhow::anyhow!("directory path is not valid UTF-8"))?;
-    log::debug!("open_dir: path={path} template={tpl}");
-    shell_spawn(tpl, path)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn test_launchd_plist_path_user() {
-        let path = launchd_plist_path("com.example.service", true);
-        assert!(path.contains("Library/LaunchAgents"));
-        assert!(path.contains("com.example.service.plist"));
-        assert!(
-            !path.starts_with("/Library/"),
-            "user path should use HOME, not system /Library: {path}"
-        );
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn test_launchd_plist_path_system() {
-        let path = launchd_plist_path("com.example.service", false);
-        assert_eq!(path, "/Library/LaunchDaemons/com.example.service.plist");
-    }
-
-    #[test]
-    fn test_service_controller_args_launchd() {
-        let args = ServiceController::Launchd.args("start", "my_service", false);
-        assert!(
-            args.is_empty(),
-            "Launchd args should be empty (handled inline)"
-        );
-    }
-
-    #[test]
-    fn test_service_controller_args_launchd_user() {
-        let args = ServiceController::Launchd.args("stop", "my_service", true);
-        assert!(args.is_empty(), "Launchd user args should also be empty");
-    }
-
-    #[test]
-    fn test_service_controller_bin_name_launchd() {
-        assert_eq!(ServiceController::Launchd.bin_name(), "launchctl");
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn test_service_controller_default_is_launchd_on_macos() {
-        assert_eq!(ServiceController::default(), ServiceController::Launchd);
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    #[test]
-    fn test_service_controller_default_not_macos() {
-        // On non-macOS, the default should NOT be Launchd
-        assert_ne!(ServiceController::default(), ServiceController::Launchd);
-    }
+    super::service::execute_current("stop_core")
 }

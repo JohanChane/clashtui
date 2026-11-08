@@ -867,6 +867,49 @@ mod contexts {
     }
 
     #[test]
+    fn file_copy_uses_only_subscription_and_path_chords() {
+        let maps = maps("{}").unwrap();
+        let mut input = Matcher::new(&maps);
+        for (second, expected) in [
+            (
+                "s",
+                Action::Profile(files::profile::Action::CopySubscription),
+            ),
+            ("p", Action::Profile(files::profile::Action::CopyPath)),
+        ] {
+            assert_eq!(press(&mut input, Scope::Profile, "y"), Match::Pending);
+            let hints = hint_rows(&input.hints(Scope::Profile).unwrap());
+            assert_eq!(hints.len(), 2);
+            assert!(hints.contains(&("s".into(), "Copy subscription URL".into())));
+            assert!(hints.contains(&("p".into(), "Copy profile path".into())));
+            assert_eq!(
+                press(&mut input, Scope::Profile, second),
+                Match::Execute(expected)
+            );
+        }
+        assert_eq!(press(&mut input, Scope::Template, "y"), Match::Pending);
+        assert_eq!(
+            hint_rows(&input.hints(Scope::Template).unwrap()),
+            [("p".into(), "Copy template path".into())]
+        );
+        assert_eq!(
+            press(&mut input, Scope::Template, "p"),
+            Match::Execute(Action::Template(files::template::Action::CopyPath))
+        );
+        for scope in [Scope::Connections, Scope::Logs, Scope::Proxies] {
+            assert_eq!(press(&mut input, scope, "y"), Match::Unmatched);
+        }
+        assert!(
+            docs(maps.page_bindings(Scope::Profile))
+                .contains(&("y s".into(), "Copy subscription URL".into()))
+        );
+        assert!(
+            docs(maps.page_bindings(Scope::Profile))
+                .contains(&("y p".into(), "Copy profile path".into()))
+        );
+    }
+
+    #[test]
     fn reference_configuration_matches_all_builtin_bindings() {
         fn bindings(maps: &Keymaps, scope: Scope) -> Vec<(KeySequence, Action, &str)> {
             maps.effective_bindings(scope)

@@ -23,6 +23,8 @@ pub trait Page: Sized + 'static {
     /// Tick interval while visible. None disables periodic refreshes.
     const TICK: Option<Duration> = None;
 
+    fn command_done(&mut self, _event: &crate::tui::commands::CommandEvent, _cx: &mut Cx<Self>) {}
+
     fn on_event(&mut self, _event: &Event, _cx: &mut Cx<Self>) {}
     fn on_action(&mut self, action: Self::Action, cx: &mut Cx<Self>, state: &mut Self::State);
     /// Single-page tabs always pass focused = true.
@@ -32,9 +34,15 @@ pub trait Page: Sized + 'static {
 /// Handler context, created by Host before each handler call.
 pub struct Cx<'a, P> {
     tasks: &'a mut FutureSet<P>,
+    commands: Option<&'a mut crate::tui::commands::Commands>,
 }
 
 impl<P: 'static> Cx<'_, P> {
+    pub fn commands(&mut self) -> &mut crate::tui::commands::Commands {
+        self.commands
+            .as_deref_mut()
+            .expect("commands are only submitted from actions")
+    }
     pub fn spawn(&mut self, task: impl Future<Output = CallBack<P>> + Send + 'static) {
         self.tasks.spawn(task);
     }
@@ -101,15 +109,29 @@ impl<P: Page> Host<P> {
         }
         let mut cx = Cx {
             tasks: &mut self.event_tasks,
+            commands: None,
         };
         self.page.on_event(event, &mut cx);
     }
 
-    pub fn handle_action(&mut self, action: P::Action) {
+    pub fn handle_action(
+        &mut self,
+        action: P::Action,
+        commands: &mut crate::tui::commands::Commands,
+    ) {
         let mut cx = Cx {
             tasks: &mut self.action_tasks,
+            commands: Some(commands),
         };
         self.page.on_action(action, &mut cx, &mut self.state);
+    }
+
+    pub fn command_done(&mut self, event: &crate::tui::commands::CommandEvent) {
+        let mut cx = Cx {
+            tasks: &mut self.action_tasks,
+            commands: None,
+        };
+        self.page.command_done(event, &mut cx);
     }
 
     pub fn render(&mut self, f: &mut Frame, area: Rect, focused: bool) {

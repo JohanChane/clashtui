@@ -205,10 +205,8 @@ fn read_log_messages(
             return;
         }
         match read() {
-            Ok(tungstenite::Message::Text(text)) => {
-                if monitor::status().ready().is_ok() {
-                    queue_log_message(&text, pending, paused);
-                }
+            Ok(tungstenite::Message::Text(text)) if monitor::status().ready().is_ok() => {
+                queue_log_message(&text, pending, paused);
             }
             Ok(tungstenite::Message::Close(_)) => return,
             Err(tungstenite::Error::Io(ref e))
@@ -533,7 +531,10 @@ mod tests {
     async fn subscription_level_survives_tab_and_core_config_events() {
         let mut host = crate::tui::page::Host::<Logs>::default();
         assert_eq!(*host.page().subscription_level.lock().unwrap(), "info");
-        host.handle_action(Action::ToggleDebug);
+        host.handle_action(
+            Action::ToggleDebug,
+            &mut crate::tui::commands::Commands::default(),
+        );
         for event in [
             Event::Hidden,
             Event::Shown,

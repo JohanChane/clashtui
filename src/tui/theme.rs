@@ -615,28 +615,4 @@ default:
         assert_eq!(file_sec.border.fg, Some(Color::Rgb(0xab, 0xcd, 0xef)));
         assert_eq!(file_sec.highlight.bg, Some(Color::Rgb(0x12, 0x34, 0x56)));
     }
-
-    #[test]
-    fn old_format_detected_via_tab_key() {
-        let yaml = r##"tab:
-  tab_focused: { fg: "#ff0000" }
-"##;
-        let mapping: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
-        let legacy: &[&str] = &["tab", "bars", "connection_tab", "profile_tab", "browser"];
-        let has_legacy = mapping
-            .keys()
-            .any(|k| k.as_str().is_some_and(|s| legacy.contains(&s)));
-        assert!(has_legacy);
-    }
-
-    #[test]
-    fn new_format_no_legacy_keys() {
-        let yaml = "tabbar:\n  text: {}\n  highlight: {}\ndefault:\n  border: {}\n";
-        let mapping: serde_yml::Mapping = serde_yml::from_str(yaml).unwrap();
-        let legacy: &[&str] = &["tab", "bars", "connection_tab", "profile_tab", "browser"];
-        let has_legacy = mapping
-            .keys()
-            .any(|k| k.as_str().is_some_and(|s| legacy.contains(&s)));
-        assert!(!has_legacy);
-    }
 }

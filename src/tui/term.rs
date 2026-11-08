@@ -1,320 +1,24 @@
-use super::utils::raw_mode;
-use anyhow::{Result, anyhow, bail};
-use std::sync::{
-    Arc, Condvar, Mutex, Weak,
-    atomic::{AtomicBool, Ordering},
-    mpsc as sync_mpsc,
+use super::commands::TaskId;
+use super::{
+    input::InputReader,
+    utils::{TerminalState, raw_mode},
 };
-use tokio::sync::mpsc;
+use crate::command::{CommandError, CommandResult};
+use anyhow::{Context, Result, bail};
+use std::time::Duration;
+use std::{
+    io::Write,
+    sync::{
+        Mutex, MutexGuard,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
+};
+use tokio::sync::{mpsc as async_mpsc, oneshot};
 
-mod input;
-pub(in crate::tui) use input::InputReader;
-
-static COORDINATOR: Mutex<Option<Weak<Bridge>>> = Mutex::new(None);
-
-type Acknowledgement = sync_mpsc::SyncSender<Result<(), String>>;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct OperationId(u64);
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Action {
-    Suspend,
-    Resume,
-}
-
-pub(in crate::tui) struct TerminalControl {
-    id: OperationId,
-    action: Action,
-    acknowledgement: Acknowledgement,
-}
-
-impl TerminalControl {
-    pub(in crate::tui) fn is_suspend(&self) -> bool {
-        self.action == Action::Suspend
-    }
-}
-
-#[derive(Default)]
-struct Slot {
-    next_id: u64,
-    owner: Option<OperationId>,
-    waiting_ack: Option<Acknowledgement>,
-}
-
-struct Bridge {
-    sender: mpsc::Sender<TerminalControl>,
-    slot: Mutex<Slot>,
-    available: Condvar,
-    closing: AtomicBool,
-}
-
-impl Bridge {
-    fn close(&self) {
-        self.closing.store(true, Ordering::Release);
-        let mut slot = self.slot.lock().unwrap();
-        if let Some(ack) = slot.waiting_ack.take() {
-            let _ = ack.try_send(Err("Terminal handoff cancelled".into()));
-        }
-        self.available.notify_all();
-    }
-
-    fn release_owner(&self, id: OperationId) {
-        let mut slot = self.slot.lock().unwrap();
-        if slot.owner == Some(id) {
-            slot.owner = None;
-            slot.waiting_ack = None;
-            self.available.notify_all();
-        }
-    }
-}
-
-/// Owned by App. Workers request terminal access; only App changes terminal modes.
-pub(in crate::tui) struct TerminalCoordinator {
-    bridge: Arc<Bridge>,
-    receiver: mpsc::Receiver<TerminalControl>,
-    active: Option<OperationId>,
-}
-
-impl TerminalCoordinator {
-    fn new() -> Self {
-        // A worker holds the single slot until Resume is acknowledged, so at most
-        // one handoff is queued. Waiting workers use a cancellable condition variable.
-        let (sender, receiver) = mpsc::channel(2);
-        Self {
-            bridge: Arc::new(Bridge {
-                sender,
-                slot: Mutex::new(Slot::default()),
-                available: Condvar::new(),
-                closing: AtomicBool::new(false),
-            }),
-            receiver,
-            active: None,
-        }
-    }
-
-    pub(in crate::tui) fn install() -> Self {
-        let coordinator = Self::new();
-        *COORDINATOR.lock().unwrap() = Some(Arc::downgrade(&coordinator.bridge));
-        coordinator
-    }
-
-    pub(in crate::tui) async fn recv(&mut self) -> Option<TerminalControl> {
-        self.receiver.recv().await
-    }
-
-    pub(in crate::tui) fn owns_terminal(&self) -> bool {
-        self.active.is_none()
-    }
-
-    pub(in crate::tui) fn is_idle(&self) -> bool {
-        self.active.is_none() && self.bridge.slot.lock().unwrap().owner.is_none()
-    }
-
-    pub(in crate::tui) fn begin_shutdown(&mut self) {
-        self.bridge.close();
-    }
-
-    /// App must stop reading terminal input before handling Suspend. A true return
-    /// means Resume restored raw mode and the next frame needs a complete redraw.
-    pub(in crate::tui) fn handle(&mut self, control: TerminalControl) -> Result<bool> {
-        self.handle_with(
-            control,
-            || raw_mode::restore().map_err(Into::into),
-            || raw_mode::setup().map_err(Into::into),
-        )
-    }
-
-    fn handle_with(
-        &mut self,
-        control: TerminalControl,
-        mut suspend: impl FnMut() -> Result<()>,
-        mut resume: impl FnMut() -> Result<()>,
-    ) -> Result<bool> {
-        let TerminalControl {
-            id,
-            action,
-            acknowledgement,
-        } = control;
-        match action {
-            Action::Suspend => {
-                let owner_matches = self.bridge.slot.lock().unwrap().owner == Some(id);
-                if self.bridge.closing.load(Ordering::Acquire)
-                    || !owner_matches
-                    || self.active.is_some()
-                {
-                    if self.active != Some(id) {
-                        self.bridge.release_owner(id);
-                    }
-                    let _ =
-                        acknowledgement.try_send(Err("Terminal handoff cancelled or stale".into()));
-                    return Ok(false);
-                }
-                if let Err(error) = suspend() {
-                    self.bridge.release_owner(id);
-                    let _ = acknowledgement.try_send(Err(error.to_string()));
-                    return Err(error);
-                }
-                self.active = Some(id);
-                self.bridge.slot.lock().unwrap().waiting_ack = None;
-                if acknowledgement.try_send(Ok(())).is_err() {
-                    // The requester cannot use the terminal if it never receives approval.
-                    resume()?;
-                    self.active = None;
-                    self.bridge.release_owner(id);
-                    return Ok(true);
-                }
-                Ok(false)
-            }
-            Action::Resume => {
-                if self.active != Some(id) {
-                    let _ = acknowledgement.try_send(Err("Stale terminal resume".into()));
-                    return Ok(false);
-                }
-                let result = resume();
-                self.active = None;
-                // App may have no other wake source during shutdown. Release the
-                // slot before acknowledging, rather than waiting for the worker
-                // to wake up and make is_idle true without waking App again.
-                self.bridge.release_owner(id);
-                let _ = acknowledgement
-                    .try_send(result.as_ref().map(|_| ()).map_err(ToString::to_string));
-                result.map(|_| true)
-            }
-        }
-    }
-}
-
-impl Drop for TerminalCoordinator {
-    fn drop(&mut self) {
-        self.bridge.close();
-        let mut installed = COORDINATOR.lock().unwrap();
-        if installed
-            .as_ref()
-            .and_then(Weak::upgrade)
-            .is_some_and(|bridge| Arc::ptr_eq(&bridge, &self.bridge))
-        {
-            *installed = None;
-        }
-    }
-}
-
-/// A blocking worker's exclusive terminal lease. CLI calls receive an empty lease.
-pub struct TerminalLease {
-    bridge: Option<Arc<Bridge>>,
-    id: OperationId,
-}
-
-impl TerminalLease {
-    pub fn is_cancelled(&self) -> bool {
-        self.bridge
-            .as_ref()
-            .is_some_and(|bridge| bridge.closing.load(Ordering::Acquire))
-    }
-
-    pub fn release(mut self) -> Result<()> {
-        self.release_inner()
-    }
-
-    fn release_inner(&mut self) -> Result<()> {
-        let Some(bridge) = self.bridge.take() else {
-            return Ok(());
-        };
-        let (acknowledgement, reply) = sync_mpsc::sync_channel(1);
-        let sent = bridge.sender.blocking_send(TerminalControl {
-            id: self.id,
-            action: Action::Resume,
-            acknowledgement,
-        });
-        let result = match sent {
-            Ok(()) => reply
-                .recv()
-                .map_err(|_| anyhow!("Terminal coordinator closed"))
-                .and_then(|result| result.map_err(anyhow::Error::msg)),
-            Err(_) => Err(anyhow!("Terminal coordinator closed")),
-        };
-        bridge.release_owner(self.id);
-        result
-    }
-}
-
-impl Drop for TerminalLease {
-    fn drop(&mut self) {
-        if let Err(error) = self.release_inner() {
-            log::warn!("Terminal release: {error:#}");
-        }
-    }
-}
-
-fn acquire(bridge: Arc<Bridge>) -> Result<TerminalLease> {
-    let (acknowledgement, reply) = sync_mpsc::sync_channel(1);
-    let id = {
-        let mut slot = bridge.slot.lock().unwrap();
-        while slot.owner.is_some() && !bridge.closing.load(Ordering::Acquire) {
-            slot = bridge.available.wait(slot).unwrap();
-        }
-        if bridge.closing.load(Ordering::Acquire) {
-            bail!("Terminal handoff cancelled");
-        }
-        slot.next_id = slot
-            .next_id
-            .checked_add(1)
-            .ok_or_else(|| anyhow!("Terminal operation IDs exhausted"))?;
-        let id = OperationId(slot.next_id);
-        slot.owner = Some(id);
-        slot.waiting_ack = Some(acknowledgement.clone());
-        id
-    };
-    if bridge
-        .sender
-        .blocking_send(TerminalControl {
-            id,
-            action: Action::Suspend,
-            acknowledgement,
-        })
-        .is_err()
-    {
-        bridge.release_owner(id);
-        bail!("Terminal coordinator closed");
-    }
-    let approved = reply
-        .recv()
-        .map_err(|_| anyhow!("Terminal coordinator closed"))
-        .and_then(|value| value.map_err(anyhow::Error::msg));
-    if let Err(error) = approved {
-        bridge.release_owner(id);
-        return Err(error);
-    }
-    let lease = TerminalLease {
-        bridge: Some(bridge),
-        id,
-    };
-    if lease.is_cancelled() {
-        drop(lease);
-        bail!("Terminal handoff cancelled");
-    }
-    Ok(lease)
-}
-
-/// Call only from a blocking worker, never from an App callback or async task.
-pub fn terminal_lease() -> Result<TerminalLease> {
-    let bridge = COORDINATOR.lock().unwrap().as_ref().and_then(Weak::upgrade);
-    match bridge {
-        Some(bridge) => acquire(bridge),
-        None => Ok(TerminalLease {
-            bridge: None,
-            id: OperationId(0),
-        }),
-    }
-}
-
-/// Run the entire synchronous operation, including lease acquisition and release,
-/// outside Tokio's asynchronous task context.
-pub(in crate::tui) async fn run_blocking<T: Send + 'static>(
-    operation: impl FnOnce() -> Result<T> + Send + 'static,
-) -> Result<T> {
-    tokio::task::spawn_blocking(operation).await?
-}
+static TERMINAL_LOCK: Mutex<()> = Mutex::new(());
+static COORDINATOR: Mutex<Option<async_mpsc::UnboundedSender<Request>>> = Mutex::new(None);
+static EXTERNAL: AtomicBool = AtomicBool::new(false);
 
 pub fn setup() -> Result<()> {
     raw_mode::setup()?;
@@ -326,161 +30,367 @@ pub fn teardown() {
     let _ = raw_mode::restore();
 }
 
+#[cfg(unix)]
+pub(crate) fn is_external() -> bool {
+    EXTERNAL.load(Ordering::SeqCst)
+}
+
+pub(super) struct Request {
+    task: TaskId,
+    ready: mpsc::SyncSender<CommandResult<TerminalState>>,
+    released: oneshot::Receiver<()>,
+}
+
+pub(super) struct Coordinator {
+    requests: async_mpsc::UnboundedReceiver<Request>,
+}
+
+impl Coordinator {
+    pub fn register() -> Result<Self> {
+        let (sender, requests) = async_mpsc::unbounded_channel();
+        let mut current = COORDINATOR.lock().unwrap_or_else(|e| e.into_inner());
+        if current.is_some() {
+            bail!("Terminal coordinator already registered");
+        }
+        *current = Some(sender);
+        Ok(Self { requests })
+    }
+
+    pub async fn next(&mut self) -> Option<Request> {
+        self.requests.recv().await
+    }
+
+    pub fn close(&mut self) {
+        *COORDINATOR.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        self.requests.close();
+        while let Ok(request) = self.requests.try_recv() {
+            let _ = request.ready.send(Err(CommandError::cancelled()));
+        }
+    }
+
+    pub async fn handoff(
+        &mut self,
+        request: Request,
+        input: &mut InputReader,
+        cancel: &AtomicBool,
+    ) -> Result<()> {
+        log::trace!("Terminal handoff for task {}", request.task);
+        let paused = tokio::select! {
+            result = input.pause() => result,
+            _ = wait_cancel(cancel) => Err(CommandError::cancelled().into()),
+        };
+        if let Err(error) = paused {
+            input.resume();
+            let _ = request.ready.send(Err(CommandError::io(error)));
+            return Ok(());
+        }
+        let state = match raw_mode::restore().and_then(|()| TerminalState::capture()) {
+            Ok(state) => state,
+            Err(error) => {
+                let _ = raw_mode::setup();
+                input.resume();
+                let _ = request.ready.send(Err(CommandError::io(error)));
+                return Ok(());
+            }
+        };
+        let mut restore = RestoreTerminal(Some(state.clone()));
+        EXTERNAL.store(true, Ordering::SeqCst);
+        if !cancel.load(Ordering::Acquire) && request.ready.send(Ok(state)).is_ok() {
+            // Draw and input polling stay stopped until the worker releases ownership.
+            let _ = request.released.await;
+        }
+        EXTERNAL.store(false, Ordering::SeqCst);
+        let modes = restore.0.take().unwrap().restore();
+        let setup = raw_mode::setup();
+        input.resume();
+        modes.context("Failed to restore terminal modes")?;
+        setup.context("Failed to restore TUI terminal")?;
+        Ok(())
+    }
+}
+
+impl Drop for Coordinator {
+    fn drop(&mut self) {
+        self.close();
+        EXTERNAL.store(false, Ordering::SeqCst);
+    }
+}
+
+struct RestoreTerminal(Option<TerminalState>);
+impl Drop for RestoreTerminal {
+    fn drop(&mut self) {
+        if let Some(state) = self.0.take() {
+            EXTERNAL.store(false, Ordering::SeqCst);
+            let _ = state.restore();
+            let _ = raw_mode::setup();
+        }
+    }
+}
+
+struct TerminalLease {
+    _lock: MutexGuard<'static, ()>,
+    tui: TuiLease,
+}
+
+struct TuiLease {
+    release: Option<oneshot::Sender<()>>,
+    normal_modes: TerminalState,
+}
+
+impl TerminalLease {
+    fn acquire(task: TaskId, cancel: &AtomicBool) -> CommandResult<Self> {
+        if cancel.load(Ordering::Acquire) {
+            return Err(CommandError::cancelled());
+        }
+        let lock = match TERMINAL_LOCK.try_lock() {
+            Ok(lock) => lock,
+            Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                return Err(CommandError::io(anyhow::anyhow!(
+                    "Another terminal operation is running"
+                )));
+            }
+        };
+        let coordinator = COORDINATOR
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        let coordinator = coordinator.ok_or_else(CommandError::cancelled)?;
+        let (ready, receiver) = mpsc::sync_channel(1);
+        let (release, released) = oneshot::channel();
+        coordinator
+            .send(Request {
+                task,
+                ready,
+                released,
+            })
+            .map_err(|_| CommandError::cancelled())?;
+        loop {
+            if cancel.load(Ordering::Acquire) {
+                return Err(CommandError::cancelled());
+            }
+            match receiver.recv_timeout(Duration::from_millis(10)) {
+                Ok(result) => {
+                    let normal_modes = result?;
+                    if cancel.load(Ordering::Acquire) {
+                        return Err(CommandError::cancelled());
+                    }
+                    return Ok(Self {
+                        _lock: lock,
+                        tui: TuiLease {
+                            release: Some(release),
+                            normal_modes,
+                        },
+                    });
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => (),
+                Err(mpsc::RecvTimeoutError::Disconnected) => return Err(CommandError::cancelled()),
+            }
+        }
+    }
+}
+
+impl Drop for TerminalLease {
+    fn drop(&mut self) {
+        if let Some(release) = self.tui.release.take() {
+            let _ = release.send(());
+        }
+    }
+}
+
+async fn wait_cancel(cancel: &AtomicBool) {
+    while !cancel.load(Ordering::Acquire) {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+pub fn with_terminal<T>(
+    task: TaskId,
+    cancel: &AtomicBool,
+    job: impl FnOnce() -> CommandResult<T>,
+) -> CommandResult<T> {
+    let lease = TerminalLease::acquire(task, cancel)?;
+    if cancel.load(Ordering::Acquire) {
+        return Err(CommandError::cancelled());
+    }
+    let result = job();
+    if let Err(error) = lease.tui.normal_modes.restore() {
+        return Err(match result {
+            Err(original) => original.with_cleanup(error),
+            Ok(_) => CommandError::io(error),
+        });
+    }
+    if let Err(error) = &result {
+        eprintln!("{error}");
+    }
+    if !cancel.load(Ordering::Acquire) && !crate::command::shutdown_requested() {
+        println!("Press Enter to return to clashtui...");
+        let _ = std::io::stdout().flush();
+        if let Err(error) = wait_for_enter(cancel) {
+            return Err(match result {
+                Err(original) => original.with_cleanup(error),
+                Ok(_) => CommandError::io(error),
+            });
+        }
+    }
+    drop(lease);
+    result
+}
+
+#[cfg(unix)]
+pub(super) fn suspend(cancel: &AtomicBool) -> Result<()> {
+    let _lease = TerminalLease::acquire(0, cancel)?;
+    if unsafe { libc::raise(libc::SIGSTOP) } != 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn wait_for_enter(cancel: &AtomicBool) -> Result<()> {
+    use std::io::{self, IsTerminal};
+    if !io::stdin().is_terminal() {
+        return Ok(());
+    }
+    // Ctrl-C can flush tty input after poll reports readiness. The following
+    // read must stay nonblocking so cancellation cannot get stuck in that gap.
+    struct RestoreFlags(libc::c_int);
+    impl Drop for RestoreFlags {
+        fn drop(&mut self) {
+            unsafe { libc::fcntl(libc::STDIN_FILENO, libc::F_SETFL, self.0) };
+        }
+    }
+    let flags = unsafe { libc::fcntl(libc::STDIN_FILENO, libc::F_GETFL) };
+    if flags < 0
+        || unsafe { libc::fcntl(libc::STDIN_FILENO, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0
+    {
+        return Err(io::Error::last_os_error().into());
+    }
+    let _restore = RestoreFlags(flags);
+    while !cancel.load(Ordering::Acquire) {
+        let mut fd = libc::pollfd {
+            fd: libc::STDIN_FILENO,
+            events: libc::POLLIN,
+            revents: 0,
+        };
+        let ready = unsafe { libc::poll(&mut fd, 1, 50) };
+        if ready < 0 {
+            let error = io::Error::last_os_error();
+            if error.kind() == io::ErrorKind::Interrupted {
+                continue;
+            }
+            return Err(error.into());
+        }
+        if ready > 0 {
+            let mut buffer = [0u8; 256];
+            let count =
+                unsafe { libc::read(libc::STDIN_FILENO, buffer.as_mut_ptr().cast(), buffer.len()) };
+            if count == 0 {
+                return Ok(());
+            }
+            if count < 0 {
+                let error = io::Error::last_os_error();
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::Interrupted | io::ErrorKind::WouldBlock
+                ) {
+                    continue;
+                }
+                return Err(error.into());
+            }
+            if buffer[..count as usize]
+                .iter()
+                .any(|byte| matches!(byte, b'\n' | b'\r'))
+            {
+                return Ok(());
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn wait_for_enter(cancel: &AtomicBool) -> Result<()> {
+    use std::io::{self, IsTerminal};
+    use windows_sys::Win32::{
+        Foundation::{WAIT_OBJECT_0, WAIT_TIMEOUT},
+        System::{
+            Console::{GetStdHandle, INPUT_RECORD, KEY_EVENT, ReadConsoleInputW, STD_INPUT_HANDLE},
+            Threading::WaitForSingleObject,
+        },
+    };
+    if !io::stdin().is_terminal() {
+        return Ok(());
+    }
+    let input = unsafe { GetStdHandle(STD_INPUT_HANDLE) };
+    while !cancel.load(Ordering::Acquire) {
+        match unsafe { WaitForSingleObject(input, 50) } {
+            WAIT_OBJECT_0 => {
+                let mut record = INPUT_RECORD::default();
+                let mut read = 0;
+                if unsafe { ReadConsoleInputW(input, &mut record, 1, &mut read) } == 0 {
+                    return Err(io::Error::last_os_error().into());
+                }
+                if read == 1
+                    && u32::from(record.EventType) == KEY_EVENT
+                    && unsafe { record.Event.KeyEvent.bKeyDown } != 0
+                    && unsafe { record.Event.KeyEvent.wVirtualKeyCode } == 13
+                {
+                    return Ok(());
+                }
+            }
+            WAIT_TIMEOUT => (),
+            _ => return Err(io::Error::last_os_error().into()),
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
-
-    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn async_caller_runs_handoff_and_error_cleanup_on_blocking_worker() {
-        let mut coordinator = TerminalCoordinator::new();
-        let bridge = coordinator.bridge.clone();
-        // Exercise the same async-to-blocking boundary as service and signal tasks.
-        let worker = tokio::spawn(async move {
-            run_blocking(move || -> Result<()> {
-                let _lease = acquire(bridge)?;
-                bail!("command failed after acquiring terminal")
-            })
-            .await
-        });
-        let request = tokio::time::timeout(Duration::from_secs(2), coordinator.recv())
-            .await
-            .unwrap()
-            .unwrap();
-        coordinator
-            .handle_with(request, || Ok(()), || Ok(()))
-            .unwrap();
-        assert!(!coordinator.owns_terminal());
-        let returned = tokio::time::timeout(Duration::from_secs(2), coordinator.recv())
-            .await
-            .unwrap()
-            .unwrap();
-        assert!(!returned.is_suspend());
-        coordinator
-            .handle_with(returned, || Ok(()), || Ok(()))
-            .unwrap();
-        let error = worker.await.unwrap().unwrap_err();
-        assert_eq!(error.to_string(), "command failed after acquiring terminal");
-        assert!(coordinator.is_idle());
-    }
-
-    #[tokio::test]
-    async fn shutdown_allows_active_worker_to_return_terminal() {
-        let mut coordinator = TerminalCoordinator::new();
-        let bridge = coordinator.bridge.clone();
-        let (finish, wait) = sync_mpsc::sync_channel(1);
-        let (acquired, ready) = tokio::sync::oneshot::channel();
-        let worker = tokio::spawn(run_blocking(move || {
-            let lease = acquire(bridge)?;
-            acquired.send(()).unwrap();
-            wait.recv().unwrap();
-            assert!(lease.is_cancelled());
-            lease.release()
-        }));
-        let request = coordinator.recv().await.unwrap();
-        coordinator
-            .handle_with(request, || Ok(()), || Ok(()))
-            .unwrap();
-        // Wait until acquire has returned; closing earlier tests cancellation
-        // during acquisition instead of shutdown with an active lease.
-        ready.await.unwrap();
-        coordinator.begin_shutdown();
-        assert!(!coordinator.is_idle());
-        finish.send(()).unwrap();
-        let returned = tokio::time::timeout(Duration::from_secs(2), coordinator.recv())
-            .await
-            .unwrap()
-            .unwrap();
-        coordinator
-            .handle_with(returned, || Ok(()), || Ok(()))
-            .unwrap();
-        worker.await.unwrap().unwrap();
-        assert!(coordinator.is_idle());
-    }
+    use std::sync::Arc;
+    static SERIAL: Mutex<()> = Mutex::new(());
 
     #[test]
-    fn resume_becomes_idle_before_requester_receives_acknowledgement() {
-        let mut coordinator = TerminalCoordinator::new();
-        let id = OperationId(1);
-        coordinator.active = Some(id);
-        coordinator.bridge.slot.lock().unwrap().owner = Some(id);
-        let (acknowledgement, reply) = sync_mpsc::sync_channel(1);
-        let returned = TerminalControl {
-            id,
-            action: Action::Resume,
-            acknowledgement,
-        };
-        assert!(
-            coordinator
-                .handle_with(returned, || unreachable!(), || Ok(()))
-                .unwrap()
-        );
-        // No worker receives the reply or sends another App wake in this test.
-        assert!(coordinator.is_idle());
-        assert!(reply.try_recv().unwrap().is_ok());
-    }
-
-    #[tokio::test]
-    async fn cancelled_handoff_never_grants_terminal_and_releases_waiters() {
-        let mut coordinator = TerminalCoordinator::new();
-        let bridge = coordinator.bridge.clone();
-        let worker = std::thread::spawn(move || acquire(bridge).is_err());
-        let request = coordinator.recv().await.unwrap();
-        coordinator.begin_shutdown();
-        assert!(
-            !coordinator
-                .handle_with(
-                    request,
-                    || panic!("must not suspend"),
-                    || panic!("must not resume")
-                )
-                .unwrap()
-        );
-        assert!(worker.join().unwrap());
-        assert!(coordinator.is_idle());
-    }
-
-    #[tokio::test]
-    async fn lease_returns_terminal_on_early_error_and_stale_resume_is_ignored() {
-        let mut coordinator = TerminalCoordinator::new();
-        let bridge = coordinator.bridge.clone();
+    fn waiting_handoff_cancels_without_a_main_loop_acknowledgement() {
+        let _serial = SERIAL.lock().unwrap();
+        let mut coordinator = Coordinator::register().unwrap();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let task_cancel = cancel.clone();
         let worker = std::thread::spawn(move || {
-            let _lease = acquire(bridge).unwrap();
-            // Leaving scope is the same path used when spawning a command fails.
+            with_terminal(42, &task_cancel, || -> CommandResult<()> {
+                panic!("cancelled job started")
+            })
         });
-        let request = coordinator.recv().await.unwrap();
-        let id = request.id;
-        assert!(
-            !coordinator
-                .handle_with(request, || Ok(()), || Ok(()))
-                .unwrap()
+        let request = coordinator.requests.blocking_recv().unwrap();
+        assert_eq!(request.task, 42);
+        cancel.store(true, Ordering::Release);
+        assert_eq!(
+            worker.join().unwrap().unwrap_err().kind,
+            crate::command::CommandErrorKind::Cancelled
         );
-        assert!(!coordinator.owns_terminal());
-        let returned = tokio::time::timeout(Duration::from_secs(1), coordinator.recv())
-            .await
-            .unwrap()
-            .unwrap();
-        assert!(
-            coordinator
-                .handle_with(returned, || Ok(()), || Ok(()))
-                .unwrap()
-        );
-        worker.join().unwrap();
-        assert!(coordinator.is_idle());
-        let (acknowledgement, _reply) = sync_mpsc::sync_channel(1);
-        let stale = TerminalControl {
-            id,
-            action: Action::Resume,
-            acknowledgement,
-        };
-        assert!(
-            !coordinator
-                .handle_with(
-                    stale,
-                    || panic!("unexpected suspend"),
-                    || panic!("unexpected resume")
-                )
-                .unwrap()
+        // A late coordinator cannot authorize a worker which already cancelled.
+        assert!(request.ready.send(Err(CommandError::cancelled())).is_err());
+    }
+    #[test]
+    fn coordinator_close_unblocks_queued_handoff_as_cancelled() {
+        let _serial = SERIAL.lock().unwrap();
+        let mut coordinator = Coordinator::register().unwrap();
+        let worker = std::thread::spawn(|| {
+            with_terminal(43, &AtomicBool::new(false), || -> CommandResult<()> {
+                panic!("closed coordinator started job")
+            })
+        });
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while coordinator.requests.is_empty() {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        coordinator.close();
+        assert_eq!(
+            worker.join().unwrap().unwrap_err().kind,
+            crate::command::CommandErrorKind::Cancelled
         );
     }
 }

@@ -131,6 +131,7 @@ jobs:
             ./artifacts/clashtui-windows-amd64.exe
           zip -j "clashtui-windows-arm64-${RELEASE_TAG}.zip" \
             ./artifacts/clashtui-windows-arm64.exe
+          tar -czf contrib.tar.gz contrib
 
       - name: Verify tag still points to the checked commit
         env:
@@ -153,3 +154,4 @@ jobs:
             clashtui-darwin-arm64-${{ env.RELEASE_TAG }}.gz
             clashtui-windows-amd64-${{ env.RELEASE_TAG }}.zip
             clashtui-windows-arm64-${{ env.RELEASE_TAG }}.zip
+            contrib.tar.gz

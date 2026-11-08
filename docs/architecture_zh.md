@@ -2,6 +2,10 @@
 
 本文档描述 Clashtui 的代码架构，供开发者了解项目结构。
 
+服务控制按[脚本协议](service_scripts_zh.md)执行。平台服务命令在 `contrib/scripts/coresrvctrl/`；Rust 仅保留通用配置、执行、终端与进程适配。
+
+
+`scripts/config` 保存只读定义，`scripts/variables` 解析本次调用变量，`scripts/action` 解释动作输入和状态协议。`command` 执行通用进程选项；内部检查用 capture，权限修复用 inherit。`tui/commands` 单任务调度并向 App 返回完成事件，`tui/term` 提供可取消的终端交接。`functions/service` 保留同步 CLI 桥接。安装器管理默认资源。
 
 ## 技术栈
 
@@ -17,6 +21,10 @@
 
 ```
 src/
+├── command.rs           # 通用进程执行：capture / inherit / run
+├── command/             # Unix 进程组／Windows Job、信号作用域
+├── scripts.rs           # 启动时加载脚本配置
+├── scripts/             # config.rs / variables.rs / action.rs
 ├── main.rs              # 入口：五阶段启动流程
 ├── cli.rs               # CLI 模块入口，re-exports from cli/
 │   └── cli/
@@ -25,17 +33,19 @@ src/
 │       └── utils.rs     # 版本信息、shell 补全生成
 ├── config.rs            # 配置模块入口，re-exports from config/
 │   └── config/
-│       ├── core.rs      # CoreType 枚举、ServiceController
+│       ├── core.rs      # CoreType 枚举、core 配置
 │       ├── database.rs  # ProfileManager（Profile 持久化结构）
 │       └── util.rs      # 配置目录解析、load_save! 宏、文件路径常量
 ├── functions.rs         # 业务逻辑入口，re-exports from functions/
 │   └── functions/
-│       ├── command.rs   # 系统操作（文件权限、服务启停、目录打开）
+│       ├── command.rs   # 核心 Test/Check；CLI restart/stop 入口
+│       ├── service.rs   # 同步 CLI 脚本桥接
 │       ├── file.rs      # 文件操作（Profile 导入/更新、Template 处理）
 │       └── restful.rs   # REST API 调用（config/mode/proxies/connections）
 ├── tui.rs               # TUI 模块入口，re-exports from tui/
 │   └── tui/
 │       ├── app.rs       # App 结构体、事件循环（~50fps）、按键路由
+│       ├── commands.rs  # 单任务调度、完成事件
 │       ├── app/
 │       │   ├── actions.rs   # 全局动作、标签目标和默认绑定
 │       │   ├── hub.rs       # 标签页列表和 CoreMonitor；Init、Shown、Hidden、广播
@@ -49,7 +59,6 @@ src/
 │       ├── monitor.rs   # CoreMonitor 和状态快照
 │       ├── ops.rs       # 操作模块声明与统一事件约定
 │       ├── ops/
-│       │   ├── service.rs     # 核心服务生命周期与完成事件
 │       │   ├── profile.rs     # Profile 选择与更新
 │       │   ├── config.rs      # 核心运行时配置修改
 │       │   └── connections.rs # 连接关闭与事件
@@ -61,7 +70,8 @@ src/
 │       │   ├── matcher.rs   # App 持有的组合键状态机
 │       │   └── notation.rs  # 按键记法解析和显示
 │       ├── signals.rs   # OS 信号处理
-│       ├── term.rs      # 终端 raw mode 进入/退出/挂起
+│       ├── input.rs     # 唯一输入线程；暂停后确认交接
+│       ├── term.rs      # 终端独占租约、恢复与挂起
 │       ├── theme.rs     # 主题加载
 │       ├── utils.rs     # 工具函数
 │       ├── popmsg.rs    # 弹窗定义（Confirm、Input 等）
@@ -213,12 +223,13 @@ src/
 
 ## 业务逻辑
 
-`functions/` 目录包含所有业务逻辑，分为三个模块：
+`functions/` 保留文件操作、核心配置检查、CLI 服务调用和 REST API：
 
 | 模块 | 职责 |
 |------|------|
-| `command` | 系统级操作：服务启停（systemd）、文件权限修复、打开目录、文件编辑器 |
+| `command` | 核心 Test/Check 使用 capture；保留 CLI restart/stop 入口 |
 | `file` | Profile 管理：导入、更新（下载 + 解析）、Template 展开、订阅类型检测 |
+| `service` | CLI 脚本桥接 |
 | `restful` | REST API：获取/设置 config、切换 proxies、查询 connections、获取日志 |
 
 ## 构建脚本

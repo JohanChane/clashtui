@@ -38,14 +38,18 @@ impl crate::tui::tab::TuiTab for FileTab {
         }
     }
 
-    fn handle_action(&mut self, action: crate::tui::key::Action) {
+    fn handle_action(
+        &mut self,
+        action: crate::tui::key::Action,
+        commands: &mut crate::tui::commands::Commands,
+    ) {
         use crate::tui::key::Action::{Profile, Template};
         match action {
             Profile(profile::Action::Switch) | Template(template::Action::Switch) => {
                 self.0.toggle_focus()
             }
-            Profile(action) => self.0.left_action(action),
-            Template(action) => self.0.right_action(action),
+            Profile(action) => self.0.left_action(action, commands),
+            Template(action) => self.0.right_action(action, commands),
             _ => unreachable!("action routed to the wrong page"),
         }
     }
@@ -58,8 +62,25 @@ impl crate::tui::tab::TuiTab for FileTab {
         self.0.deliver(event);
     }
 
+    fn command_done(&mut self, event: &crate::tui::commands::CommandEvent) {
+        self.0.command_done(event);
+    }
     fn sync(&mut self, now: std::time::Instant) {
         self.0.sync(now);
+    }
+}
+
+/// Match ratatui's clamping when a filter shrinks a list under its cursor.
+pub(super) fn selected<I: IntoIterator>(items: I, index: Option<usize>) -> Option<I::Item> {
+    items.into_iter().take(index?.saturating_add(1)).last()
+}
+
+pub(super) fn path_text(path: &std::path::Path) -> String {
+    let text = path.to_string_lossy();
+    if cfg!(windows) {
+        crate::scripts::variables::sanitize_windows_path(&text)
+    } else {
+        text.into_owned()
     }
 }
 
@@ -85,7 +106,7 @@ mod tests {
             let Match::Execute(action) = input.feed(&"l".parse().unwrap(), current, current) else {
                 panic!("the pane switch must resolve to an action");
             };
-            tab.handle_action(action);
+            tab.handle_action(action, &mut crate::tui::commands::Commands::default());
             assert_eq!(tab.input_scope(), scope);
             let result = input.feed(&"x".parse().unwrap(), scope, scope);
             if scope == Scope::Template {

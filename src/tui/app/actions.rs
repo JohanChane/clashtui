@@ -55,15 +55,18 @@ pub enum GlobalAction {
 }
 
 impl GlobalAction {
-    pub(super) fn execute(self) -> anyhow::Result<()> {
+    pub(super) fn execute(
+        self,
+        commands: &mut crate::tui::commands::Commands,
+    ) -> anyhow::Result<()> {
         use crate::{
             config::{CONFIG, CoreType},
-            functions::command,
+            scripts::ActionRequest,
         };
         match self {
             Self::OpenCoreDataDir => {
                 let dir = crate::config::core_data_dir(CONFIG.core_type());
-                command::open_dir(&dir)
+                commands.submit(CONFIG.core_type(), ActionRequest::OpenDir(dir))
             }
             Self::OpenCoreInstallDir => {
                 let dir = match CONFIG.core_type() {
@@ -71,10 +74,23 @@ impl GlobalAction {
                     CoreType::Singbox => &CONFIG.cfg_file.singbox.core.config_dir,
                 };
                 let dir = std::path::Path::new(dir);
-                command::open_dir(dir.parent().unwrap_or(dir))
+                commands.submit(
+                    CONFIG.core_type(),
+                    ActionRequest::OpenDir(dir.parent().unwrap_or(dir).to_path_buf()),
+                )
             }
-            Self::RestartCoreService => crate::tui::ops::service::restart().map(drop),
-            Self::CloseAllConnections => crate::tui::ops::connections::close_all(),
+            Self::RestartCoreService => commands.submit(
+                CONFIG.core_type(),
+                ActionRequest::Run("restart_core".into()),
+            ),
+            Self::CloseAllConnections => {
+                tokio::task::spawn_blocking(|| {
+                    if let Err(error) = crate::tui::ops::connections::close_all() {
+                        crate::tui::popmsg::prelude::Confirm::err(error);
+                    }
+                });
+                Ok(())
+            }
         }
     }
 }
@@ -146,7 +162,7 @@ impl Document for AppAction {
             Self::Global(action) => match action {
                 GlobalAction::OpenCoreDataDir => "Open core data dir",
                 GlobalAction::OpenCoreInstallDir => "Open core install dir",
-                GlobalAction::RestartCoreService => "Start/restart core service",
+                GlobalAction::RestartCoreService => "Restart core service",
                 GlobalAction::CloseAllConnections => "Close all connections",
             },
         }

@@ -140,6 +140,14 @@ impl InputReader {
         event
     }
 
+    pub(in crate::tui) async fn pause(&mut self) -> anyhow::Result<()> {
+        self.request_pause()
+            .await
+            .map_err(|_| anyhow::anyhow!("Terminal input stopped before pause acknowledgement"))?;
+        while self.receiver.try_recv().is_ok() {}
+        Ok(())
+    }
+
     pub(in crate::tui) fn request_pause(&mut self) -> oneshot::Receiver<()> {
         let (ack, receiver) = oneshot::channel();
         let mut state = self.control.state.lock().unwrap();

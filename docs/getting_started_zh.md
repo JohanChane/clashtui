@@ -43,7 +43,7 @@ clashtui --config-dir /my/config/path
 | `4` | Connections | 查看当前所有连接，可关闭单个或全部连接 |
 | `5` | Logs | 实时查看核心日志 |
 | `6` | Settings | 修改 Clashtui 设置项 |
-| `7` | CoreSrvCtl | 控制核心服务：启动、停止、重启、切换 Mihomo / sing-box |
+| `7` | CoreSrvCtl | 控制核心服务：启动、停止、重启、自启设置 |
 
 ### 快捷键
 
@@ -124,7 +124,7 @@ logs:
 | `f` | 启动/重启当前核心服务 |
 | `t` | 关闭当前核心的所有连接 |
 
-打开目录使用 `extra.open_dir_cmd`，未配置时使用系统默认程序。全局与页面双键可以共享首键：例如 `app` 的 `gp` 与页面的 `gg` 同时有效，Which 面板合并显示双方候选，第二键决定执行哪个动作。应用会为每个页面和文件面板预先合成有效绑定表；执行、Which 和帮助都使用这份表。标签栏始终显示位置序号（1、2、3……），修改或取消切页快捷键不会改变序号。冲突配置在启动时拒绝，不会静默覆盖。等待第二键期间，不会再启动新的双键；Esc 或无匹配键取消双方候选，并消费该次输入。输入框和确认弹窗仍优先处理输入。
+编辑文件和打开目录分别使用 `scripts.json` 的 `edit_file`、`open_dir`，默认调用系统关联程序。见[文件动作](service_scripts_zh.md#文件动作)。全局与页面双键可以共享首键：例如 `app` 的 `gp` 与页面的 `gg` 同时有效，Which 面板合并显示双方候选，第二键决定执行哪个动作。应用会为每个页面和文件面板预先合成有效绑定表；执行、Which 和帮助都使用这份表。标签栏始终显示位置序号（1、2、3……），修改或取消切页快捷键不会改变序号。冲突配置在启动时拒绝，不会静默覆盖。等待第二键期间，不会再启动新的双键；Esc 或无匹配键取消双方候选，并消费该次输入。输入框和确认弹窗仍优先处理输入。
 
 帮助面板中可启动全局双键，此时只使用全局候选。帮助内容超出屏幕时，使用 ↑/↓ 或 `j`/`k` 滚动，PageUp/PageDown 翻页，Home/End 跳到首尾；Esc 或其他非滚动按键关闭面板。窄终端使用单列显示。
 
@@ -152,6 +152,8 @@ app:
 仅支持上述列表格式。旧的结构化 Key 映射、`common/submap`、`files/profile` 顶层路径以及嵌套动作（如 `action: { Action: Edit }`）不再支持；请改为 `file.profile` 嵌套页面和 `action: Edit` 这样的平铺动作名。
 
 完整参考见 [`default_keymap.yaml`](../contrib/default_configs/default_keymap.yaml)。文件不存在、为空或内容为 `{}` 时，使用默认按键。
+
+File 页面用 `y s`（`CopySubscription`）复制选中 Profile 的订阅 URL，用 `y p`（`CopyPath`）复制选中 Profile/Template 的路径。脚本参数见[复制到剪贴板](clipboard_zh.md)。
 
 ## 命令行模式
 
@@ -265,7 +267,6 @@ mihomo:
     config_path: /opt/clashtui/mihomo/config/config.yaml  # 最终配置文件路径
   core_service:
     service_name: clashtui_mihomo                # systemd 服务名
-    is_user: false                               # 是否为用户服务
 singbox:
   core:
     bin_path: /opt/clashtui/sing-box/sing-box
@@ -273,11 +274,7 @@ singbox:
     config_path: /opt/clashtui/sing-box/config/config.json
   core_service:
     service_name: clashtui_singbox
-    is_user: false
 timeout: null
-extra:
-  edit_cmd: kitty -e nvim "%s"      # 编辑文件使用的命令，%s 替换为文件路径
-  open_dir_cmd: kitty -e yazi "%s"  # 打开目录使用的命令
 ```
 
 ### core_override_config.yaml
@@ -349,9 +346,9 @@ sing-box 使用深度合并。你只需写要覆盖的部分，其他字段保�
 
 ## 核心管理
 
-### 切换核心
+### 核心服务动作
 
-在 CoreSrvCtl 标签页（按 `7`）中，可以切换 Mihomo 和 sing-box 两种核心。切换后需要重启 Clashtui。
+CoreSrvCtl（按 `7`）从 `CONFIG_ROOT/scripts.json` 列出当前核心的启停、重启、自启及自定义动作，见[服务脚本](service_scripts_zh.md)。本版不提供 Switch Core／Stop All。当前核心由 `clashtui.db` 的 `core_type` 决定，修改后重启 Clashtui。
 
 Clashtui 会自动检测当前运行的核心类型是否与设置匹配。如果不匹配，会弹窗提示并阻止显示错误数据。
 

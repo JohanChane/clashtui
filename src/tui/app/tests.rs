@@ -3,6 +3,83 @@ use super::*;
 use crate::tui::key::{self, Keymaps, Match, Matcher, Scope};
 
 #[test]
+fn core_switch_failure_stays_open_and_success_exits_on_any_key() {
+    use crate::config::CoreType;
+    const CHILD: &str = "CLASHTUI_TEST_CORE_SWITCH_NOTICE";
+    // Config, keymaps and QUIT are process-global; isolate this app-level test.
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "tui::app::tests::core_switch_failure_stays_open_and_success_exits_on_any_key",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+    let root = std::env::temp_dir().join(format!("clashtui-switch-notice-{}", fastrand::u64(..)));
+    crate::config::init(Some(root.clone())).unwrap();
+    key::load().unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let _guard = runtime.enter();
+    let mut app = App::new();
+    app.core_switch_done(
+        CoreType::Mihomo,
+        CoreType::Singbox,
+        &Err(anyhow::anyhow!("disk full")),
+    );
+    assert!(app.switched_core.is_none());
+    assert!(!QUIT.load(Ordering::Relaxed));
+    app.popup.sync();
+    assert!(app.popup.check());
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(100, 24)).unwrap();
+    terminal.draw(|f| app.popup.render(f, f.area())).unwrap();
+    let screen = |terminal: &ratatui::Terminal<ratatui::backend::TestBackend>| -> String {
+        terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect()
+    };
+    assert!(screen(&terminal).contains("Failed to switch core to sing-box: disk full"));
+    app.handle_key_event(&"<Enter>".parse().unwrap());
+    assert!(!QUIT.load(Ordering::Relaxed));
+
+    app.core_switch_done(CoreType::Mihomo, CoreType::Singbox, &Ok(()));
+    assert_eq!(app.switched_core, Some(CoreType::Singbox));
+    assert!(!QUIT.load(Ordering::Relaxed));
+    terminal
+        .draw(|f| render_core_switched(CoreType::Singbox, f))
+        .unwrap();
+    assert!(screen(&terminal).contains("Switched to sing-box."));
+    assert!(screen(&terminal).contains("Press any key to exit clashtui."));
+    for key in ["x", "q", "<Esc>", "<Tab>", "<C-c>", "<Enter>"] {
+        QUIT.store(false, Ordering::Relaxed);
+        app.handle_key_event(&key.parse().unwrap());
+        assert!(QUIT.load(Ordering::Relaxed), "did not exit for {key}");
+    }
+    assert!(
+        app.commands
+            .submit(CoreType::Mihomo, crate::scripts::ActionRequest::Status)
+            .is_err()
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn default_global_chords_execute_and_clear_pending_state() {
     let (map, docs) = compile_globals("[]").unwrap();
     let mut input = Matcher::new(&map);
@@ -17,7 +94,7 @@ fn default_global_chords_execute_and_clear_pending_state() {
         (
             "f",
             GlobalAction::RestartCoreService,
-            "Start/restart core service",
+            "Restart core service",
         ),
         (
             "t",

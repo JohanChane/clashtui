@@ -62,6 +62,12 @@ impl Hub {
         }
     }
 
+    pub fn command_done(&mut self, event: &crate::tui::commands::CommandEvent) {
+        for tab in &mut self.tabs {
+            tab.command_done(event);
+        }
+    }
+
     pub fn shown(&mut self) -> &mut Tab {
         &mut self.tabs[self.shown]
     }

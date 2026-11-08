@@ -47,6 +47,35 @@ Linux and macOS:
 Windows:
 -   nssm
 
+### Shell 安装脚本（Linux/macOS）
+
+脚本默认开启询问。默认选择：系统安装、两个核心、对应模板和 mihomo 规则数据。服务管理器默认使用 `--service-controller auto-detect` 自动检测：Linux 使用 systemd 或 OpenRC，macOS 使用 launchd。`--no-prompt`（或 `-y` / `--yes`）跳过询问，使用相同默认值。
+
+```sh
+# 在本地仓库中交互安装
+git clone https://github.com/JohanChane/clashtui.git
+cd clashtui
+bash installs/install
+
+# 指定 contrib 目录
+bash installs/install --contrib-dir /path/to/contrib
+
+# 免询问，安装到当前用户目录
+bash <(curl -fsSL https://raw.githubusercontent.com/JohanChane/clashtui/refs/heads/main/installs/install) --is-user --no-prompt
+```
+
+用 `--core mihomo` 或 `--core sing-box` 选择单个核心。`--templates no` 跳过模板，`--rules-dat no` 跳过 mihomo 规则数据。用户安装使用 `~/.local/clashtui`，不开启 TUN。完整参数见 `bash installs/install --help`。
+
+脚本资源、默认配置和模板按以下顺序选择：`--contrib-dir PATH`、安装脚本同级或上一级的 `contrib/`、release 的 `contrib.tar.gz`。`PATH` 支持相对或绝对路径，目录内须包含 `scripts/`、`default_configs/` 和 `templates/`。显式指定的目录缺失或不完整时直接报错，不回退。此参数只选择资源目录，缺失的程序和已启用的规则数据仍可能需要下载。
+
+脚本优先复用安装目录中的程序，再查找 `PATH`，只下载缺失的程序。下载的 clashtui 程序和 contrib 使用同一 release。`--version <tag>` 固定这两者的下载版本（默认 `latest`），本地 contrib 仍优先。缺失的核心始终下载各自的最新 release。用 `--repo <owner/repo>` 指定 ClashTui 下载仓库。
+
+重装会用安装默认值覆盖 `config.yaml`、`scripts.json`、核心配置和 override，以及安装资源。原内容保存为 `<文件名>.bak.N`；内容相同的文件不重复备份。安装后不会自动启动服务或开启自启动。
+
+免询问模式使用 `sudo -n`，权限不足会立即失败。系统安装前先运行 `sudo -v`，或以 root 身份运行。OpenRC 用户服务写入 `${XDG_CONFIG_HOME:-$HOME/.config}/rc/init.d`，无需 sudo。
+
+免询问卸载：`bash installs/install --uninstall --no-prompt`。卸载用户安装时加上 `--is-user`。卸载会保留配置、备份、日志和系统账号。
+
 ### 想开启 tun 并有 root 权限
 
 #### Linux

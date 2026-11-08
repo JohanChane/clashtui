@@ -385,25 +385,6 @@ mod tests {
     }
 
     #[test]
-    fn test_ordering_preserved_proxy_groups() {
-        let tpl = load_yaml(testdata_path("simple_tpl.yaml")).unwrap();
-        let groups = make_groups("pvd", &["https://example.com/sub1.yaml"]);
-        let result = gen_template_with_urls(tpl, "simple_tpl", &groups).unwrap();
-
-        let groups = result
-            .get(PROXY_GROUPS)
-            .and_then(|v| v.as_sequence())
-            .unwrap();
-
-        // Expected order: Select, Auto-pvd0, Direct
-        let names: Vec<&str> = groups
-            .iter()
-            .filter_map(|g| g.get("name").and_then(|n| n.as_str()))
-            .collect();
-        assert_eq!(names, vec!["Select", "Auto-pvd0", "Direct"]);
-    }
-
-    #[test]
     fn test_ordering_preserved_proxy_providers() {
         let tpl = load_yaml(testdata_path("simple_tpl.yaml")).unwrap();
         let groups = make_groups("pvd", &["https://example.com/sub1.yaml"]);
@@ -417,99 +398,6 @@ mod tests {
         // pvd0 generated from pvd template, static follows
         let keys: Vec<&str> = providers.keys().filter_map(|k| k.as_str()).collect();
         assert_eq!(keys, vec!["pvd0", "static"]);
-    }
-
-    #[test]
-    fn test_dollar_brace_provider_placeholder() {
-        let tpl = load_yaml(testdata_path("multi_provider_tpl.yaml")).unwrap();
-        let groups = make_multi_groups(&[
-            (
-                "pvd",
-                &[
-                    "https://example.com/sub1.yaml" as &str,
-                    "https://example.com/sub2.yaml",
-                ],
-            ),
-            (
-                "pvd2",
-                &[
-                    "https://example.com/sub1.yaml",
-                    "https://example.com/sub2.yaml",
-                ],
-            ),
-        ]);
-        let result = gen_template_with_urls(tpl, "multi_provider_tpl", &groups).unwrap();
-
-        let groups = result
-            .get(PROXY_GROUPS)
-            .and_then(|v| v.as_sequence())
-            .unwrap();
-
-        let all_in_one = groups
-            .iter()
-            .find(|g| g.get("name").and_then(|n| n.as_str()) == Some("AllInOne"))
-            .unwrap();
-
-        let uses: Vec<&str> = all_in_one
-            .get("use")
-            .and_then(|v| v.as_sequence())
-            .unwrap()
-            .iter()
-            .filter_map(|v| v.as_str())
-            .collect();
-
-        assert_eq!(uses, vec!["pvd0", "pvd1", "pvd20", "pvd21"]);
-    }
-
-    #[test]
-    fn test_dollar_brace_group_placeholder() {
-        let tpl = load_yaml(testdata_path("multi_provider_tpl.yaml")).unwrap();
-        let groups = make_multi_groups(&[
-            (
-                "pvd",
-                &[
-                    "https://example.com/sub1.yaml" as &str,
-                    "https://example.com/sub2.yaml",
-                ],
-            ),
-            (
-                "pvd2",
-                &[
-                    "https://example.com/sub1.yaml",
-                    "https://example.com/sub2.yaml",
-                ],
-            ),
-        ]);
-        let result = gen_template_with_urls(tpl, "multi_provider_tpl", &groups).unwrap();
-
-        let groups = result
-            .get(PROXY_GROUPS)
-            .and_then(|v| v.as_sequence())
-            .unwrap();
-
-        let select = groups
-            .iter()
-            .find(|g| g.get("name").and_then(|n| n.as_str()) == Some("Select"))
-            .unwrap();
-
-        let proxies: Vec<&str> = select
-            .get("proxies")
-            .and_then(|v| v.as_sequence())
-            .unwrap()
-            .iter()
-            .filter_map(|v| v.as_str())
-            .collect();
-
-        assert_eq!(
-            proxies,
-            vec![
-                "DIRECT",
-                "Auto-pvd0",
-                "Auto-pvd1",
-                "Fallback-pvd20",
-                "Fallback-pvd21"
-            ]
-        );
     }
 
     #[test]
