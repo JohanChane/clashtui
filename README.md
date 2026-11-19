@@ -30,6 +30,14 @@ ClashTui is a terminal user interface (TUI) proxy management tool supporting bot
 - **which panel** - convenient for user operations
 - **Supports fzf** - users can use fzf for selection
 
+## Saving runtime settings
+
+In Settings, press `w` to save the current runtime Mode, Allow LAN and TUN settings (Mihomo only) to the active core's `config_path`. The bottom border shows whether changes are unsaved or the save succeeded. Press `q` to quit.
+
+In Proxies, press `w` to write pending manual selector choices as startup defaults for groups defined in the core file. In Logs, press `w` to write the chosen log level for the next core restart. The `t w` chord still selects Warning.
+
+Other fields are preserved, but YAML comments and formatting are not. This saves only the generated core config; selecting a Profile again regenerates it from the Profile and `core_override_config`. For sing-box, Mode is stored as `experimental.clash_api.default_mode`, and Allow LAN updates HTTP, SOCKS and mixed inbound listen addresses.
+
 ## Supported Platforms
 
 -   [x] Linux

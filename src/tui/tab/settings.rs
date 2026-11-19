@@ -1,4 +1,4 @@
-use super::dev::*;
+use super::{SaveStatus, dev::*};
 use crate::config::CONFIG;
 use ratatui::{
     layout::{Constraint, Layout},
@@ -14,6 +14,7 @@ key_map!(
     Action,
     DefaultBindings::new().with_keys([
         (KeyCode::Enter, Action::Execute),
+        (KeyCode::Char('w'), Action::Save),
         (KeyCode::Esc, Action::Esc),
         (KeyCode::Up, Action::MoveUp),
         (KeyCode::Down, Action::MoveDown),
@@ -25,6 +26,7 @@ key_map!(
 #[derive_aliases::derive(..Action, Debug)]
 pub(in crate::tui) enum Action {
     Execute,
+    Save,
     MoveUp,
     MoveDown,
     Esc,
@@ -33,6 +35,7 @@ impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
+            Self::Save => "Write core config",
             Self::Execute => "Execute",
             Self::MoveUp => MOVE_UP,
             Self::MoveDown => MOVE_DOWN,
@@ -71,6 +74,8 @@ impl SettingsOp {
 
 #[derive(Default)]
 struct SettingsContent {
+    busy: bool,
+    save_status: Option<SaveStatus>,
     ops: Vec<SettingsOp>,
     current_mode: String,
     allow_lan: bool,
@@ -106,6 +111,13 @@ impl Page for SettingsContent {
     }
 
     fn on_action(&mut self, action: Action, cx: &mut Cx<Self>, state: &mut Self::State) {
+        if self.busy {
+            return;
+        }
+        if matches!(action, Action::Save) {
+            self.save(cx);
+            return;
+        }
         if self.mode_selector_visible {
             match action {
                 Action::MoveUp => {
@@ -118,6 +130,7 @@ impl Page for SettingsContent {
                         self.mode_selector_state.select(Some(i + 1));
                     }
                 }
+                Action::Save => unreachable!(),
                 Action::Esc => {
                     self.mode_selector_visible = false;
                 }
@@ -126,29 +139,10 @@ impl Page for SettingsContent {
                     if let Some(mode) = self.modes.get(idx) {
                         let mode = *mode;
                         self.mode_selector_visible = false;
-                        async move {
-                            if monitor::status().ready().is_err() {
-                                return do_nothing();
-                            }
-                            let payload = serde_json::json!({"mode": mode.to_string()}).to_string();
-                            let result =
-                                tokio::task::spawn_blocking(move || ops::config::patch(payload))
-                                    .await
-                                    .unwrap();
-                            match result {
-                                Ok(_) => {
-                                    let new_val = mode.to_string();
-                                    wrapper(move |c: &mut SettingsContent| {
-                                        c.current_mode = new_val;
-                                    })
-                                }
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        }
-                        .spawn_at(cx);
+                        let new_val = mode.to_string();
+                        self.apply(serde_json::json!({"mode": new_val}), cx, move |c| {
+                            c.current_mode = new_val;
+                        });
                     }
                 }
             }
@@ -167,6 +161,7 @@ impl Page for SettingsContent {
                         self.tun_selector_state.select(Some(i + 1));
                     }
                 }
+                Action::Save => unreachable!(),
                 Action::Esc => {
                     self.tun_selector_visible = false;
                 }
@@ -175,30 +170,14 @@ impl Page for SettingsContent {
                     if let Some(stack) = self.tun_stacks.get(idx) {
                         let stack = *stack;
                         self.tun_selector_visible = false;
-                        async move {
-                            if monitor::status().ready().is_err() {
-                                return do_nothing();
-                            }
-                            let payload = serde_json::json!({"tun": {"stack": stack.to_string()}})
-                                .to_string();
-                            let result =
-                                tokio::task::spawn_blocking(move || ops::config::patch(payload))
-                                    .await
-                                    .unwrap();
-                            match result {
-                                Ok(_) => {
-                                    let new_val = stack.to_string();
-                                    wrapper(move |c: &mut SettingsContent| {
-                                        c.tun_stack = new_val;
-                                    })
-                                }
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    do_nothing()
-                                }
-                            }
-                        }
-                        .spawn_at(cx);
+                        let new_val = stack.to_string();
+                        self.apply(
+                            serde_json::json!({"tun": {"stack": new_val}}),
+                            cx,
+                            move |c| {
+                                c.tun_stack = new_val;
+                            },
+                        );
                     }
                 }
             }
@@ -225,56 +204,19 @@ impl Page for SettingsContent {
                     }
                     SettingsOp::AllowLan => {
                         let new_val = !self.allow_lan;
-                        self.allow_lan = new_val;
-                        async move {
-                            if monitor::status().ready().is_err() {
-                                return do_nothing();
-                            }
-                            let payload = serde_json::json!({"allow-lan": new_val}).to_string();
-                            let result =
-                                tokio::task::spawn_blocking(move || ops::config::patch(payload))
-                                    .await
-                                    .unwrap();
-                            match result {
-                                Ok(_) => wrapper(move |c: &mut SettingsContent| {
-                                    c.allow_lan = new_val;
-                                }),
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    wrapper(move |c: &mut SettingsContent| {
-                                        c.allow_lan = !new_val;
-                                    })
-                                }
-                            }
-                        }
-                        .spawn_at(cx);
+                        self.apply(serde_json::json!({"allow-lan": new_val}), cx, move |c| {
+                            c.allow_lan = new_val;
+                        });
                     }
                     SettingsOp::TunEnable => {
                         let new_val = !self.tun_enable;
-                        self.tun_enable = new_val;
-                        async move {
-                            if monitor::status().ready().is_err() {
-                                return do_nothing();
-                            }
-                            let payload =
-                                serde_json::json!({"tun": {"enable": new_val}}).to_string();
-                            let result =
-                                tokio::task::spawn_blocking(move || ops::config::patch(payload))
-                                    .await
-                                    .unwrap();
-                            match result {
-                                Ok(_) => wrapper(move |c: &mut SettingsContent| {
-                                    c.tun_enable = new_val;
-                                }),
-                                Err(e) => {
-                                    Confirm::err(e);
-                                    wrapper(move |c: &mut SettingsContent| {
-                                        c.tun_enable = !new_val;
-                                    })
-                                }
-                            }
-                        }
-                        .spawn_at(cx);
+                        self.apply(
+                            serde_json::json!({"tun": {"enable": new_val}}),
+                            cx,
+                            move |c| {
+                                c.tun_enable = new_val;
+                            },
+                        );
                     }
                     SettingsOp::TunStackOp => {
                         self.tun_selector_visible = true;
@@ -359,6 +301,8 @@ impl Page for SettingsContent {
             return;
         }
 
+        let block = super::with_save_status(block, self.save_status);
+
         let value_style = Theme::get().section("settings").muted;
 
         let items: Vec<ListItem> = self
@@ -437,6 +381,59 @@ impl Page for SettingsContent {
 }
 
 impl SettingsContent {
+    fn apply(
+        &mut self,
+        payload: serde_json::Value,
+        cx: &mut Cx<Self>,
+        update: impl FnOnce(&mut Self) + Send + 'static,
+    ) {
+        if let Err(e) = monitor::status().ready() {
+            Confirm::err(e);
+            return;
+        }
+        self.busy = true;
+        async move {
+            let result =
+                tokio::task::spawn_blocking(move || ops::config::patch(payload.to_string()))
+                    .await
+                    .map_err(anyhow::Error::from)
+                    .and_then(|result| result);
+            wrapper(move |content: &mut Self| {
+                content.busy = false;
+                match result {
+                    Ok(()) => {
+                        update(content);
+                        content.save_status = Some(SaveStatus::Unsaved);
+                    }
+                    Err(e) => Confirm::err(e),
+                }
+            })
+        }
+        .spawn_at(cx);
+    }
+
+    fn save(&mut self, cx: &mut Cx<Self>) {
+        if let Err(e) = monitor::status().ready() {
+            Confirm::err(e);
+            return;
+        }
+        self.busy = true;
+        async move {
+            let result = tokio::task::spawn_blocking(crate::functions::file::settings::save)
+                .await
+                .map_err(anyhow::Error::from)
+                .and_then(|result| result);
+            wrapper(move |content: &mut Self| {
+                content.busy = false;
+                match result {
+                    Ok(()) => content.save_status = Some(SaveStatus::Saved),
+                    Err(e) => Confirm::err(e),
+                }
+            })
+        }
+        .spawn_at(cx);
+    }
+
     fn load(&mut self, cx: &mut Cx<Self>) {
         if monitor::status().ready().is_err() {
             self.current_mode.clear();

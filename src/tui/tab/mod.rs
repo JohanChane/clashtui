@@ -185,3 +185,20 @@ pub mod prelude {
         }
     );
 }
+
+#[derive(Clone, Copy)]
+enum SaveStatus {
+    Unsaved,
+    Saved,
+}
+
+fn with_save_status(
+    block: ratatui::widgets::Block<'_>,
+    status: Option<SaveStatus>,
+) -> ratatui::widgets::Block<'_> {
+    match status {
+        Some(SaveStatus::Unsaved) => block.title_bottom(" 未写入，重启失效 "),
+        Some(SaveStatus::Saved) => block.title_bottom(" 保存成功 "),
+        None => block,
+    }
+}

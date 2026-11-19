@@ -30,6 +30,14 @@ ClashTui 是一个终端用户界面（TUI）代理管理工具，支持 **Mihom
 - **which panel** - 方便用户操作
 - **支持 fzf** - 用户可以使用 fzf 进行选择
 
+## 保存运行时设置
+
+在 Settings 页按 `w`，将内核当前的 Mode、Allow LAN 和 TUN 设置（仅 Mihomo）写入当前内核的 `config_path`。页面底部显示“未写入，重启失效”或“保存成功”。按 `q` 退出。
+
+在 Proxies 页按 `w`，将配置文件中已定义的手动选择组的待保存选择写为启动默认值。在 Logs 页按 `w`，将选定的日志级别写入配置，下次内核重启时生效。`t w` 仍用于选择 Warning。
+
+保存保留其他配置字段，但 YAML 注释及排版不会保留。此操作仅保存生成后的内核配置文件；重新选择 Profile 时仍会依据 Profile 和 `core_override_config` 重新生成。sing-box 的 Mode 写入 `experimental.clash_api.default_mode`，Allow LAN 则更新 HTTP、SOCKS 和 mixed 入站的监听地址。
+
 ## 支持的平台
 
 -   [x] Linux

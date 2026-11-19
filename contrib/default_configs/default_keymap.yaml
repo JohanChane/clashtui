@@ -232,6 +232,9 @@ proxies:
   - on: "<Enter>"
     action: Select
     desc: Select
+  - on: "w"
+    action: Save
+    desc: Write proxy selections
   - on: ["g", "g"]
     action: GoTop
     desc: Go to top
@@ -302,6 +305,9 @@ settings:
   - on: "<Enter>"
     action: Execute
     desc: Execute
+  - on: "w"
+    action: Save
+    desc: Write core config
   - on: "<Esc>"
     action: Esc
     desc: Back
@@ -349,6 +355,9 @@ logs:
   - on: "c"
     action: Clear
     desc: Clear logs
+  - on: "w"
+    action: Save
+    desc: Write core log level
   - on: ["t", "d"]
     action: ToggleDebug
     desc: Toggle Debug

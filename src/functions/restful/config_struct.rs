@@ -127,6 +127,7 @@ impl std::fmt::Display for Mode {
 pub enum LogLevel {
     Silent,
     Error,
+    #[serde(alias = "warn")]
     Warning,
     Info,
     Debug,
