@@ -276,7 +276,17 @@ pub fn select_proxy(group: &str, node: &str) -> Result<()> {
         &format!("/proxies/{}", encode_path(group)),
         Some(payload),
     )
-    .map(|_| ())
+    .and_then(|response| {
+        if (200..300).contains(&response.status_code) {
+            Ok(())
+        } else {
+            Err(minreq::Error::IoError(std::io::Error::other(format!(
+                "HTTP {}: {}",
+                response.status_code,
+                response.as_str().unwrap_or("(non-utf8 body)")
+            ))))
+        }
+    })
 }
 
 fn proxy_delay_endpoint(target: &ProxyTarget, url: Option<&str>, timeout: u64) -> String {

@@ -13,6 +13,9 @@ pub(super) struct Proxies {
     pub testing_since: Option<Instant>,
     pub jump_target: Cell<Option<SelectionKey>>,
     pub filter: Option<String>,
+    pub(super) pending_selections: std::collections::BTreeMap<String, String>,
+    pub(super) selected_and_saved: bool,
+    pub(super) selection_busy: bool,
 }
 
 type SelectionKey = (String, Option<String>, NodeType);
@@ -248,6 +251,7 @@ impl Page for Proxies {
                     }
                 }
             }
+            super::Action::Save => self.save_selections(cx),
             super::Action::Select => {
                 let info = self
                     .tree

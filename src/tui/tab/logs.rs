@@ -1,4 +1,4 @@
-use super::dev::*;
+use super::{SaveStatus, dev::*};
 use crate::config::CONFIG;
 use crate::functions::restful::api_log::{self, LogEntry};
 use ratatui::text::Line;
@@ -24,6 +24,7 @@ key_map!(
             (KeyCode::Char('p'), Action::TogglePause),
             (KeyCode::Char('f'), Action::FzfFind),
             (KeyCode::Char('c'), Action::Clear),
+            (KeyCode::Char('w'), Action::Save),
         ])
         .with_chords(KeyCode::Char('g'), [(KeyCode::Char('g'), Action::GoTop)])
         .with_chords(
@@ -47,6 +48,7 @@ pub(in crate::tui) enum Action {
     TogglePause,
     FzfFind,
     Clear,
+    Save,
     ToggleDebug,
     ToggleInfo,
     ToggleWarning,
@@ -57,6 +59,7 @@ impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
+            Self::Save => "Write core log level",
             Self::MoveUp => MOVE_UP,
             Self::MoveDown => MOVE_DOWN,
             Self::GoTop => GO_TOP,
@@ -144,6 +147,8 @@ impl Default for Logs {
             filter: None,
             paused: Arc::new(AtomicBool::new(true)),
             ws_pending: None,
+            save_status: None,
+            saving: false,
             subscription_level: Arc::new(Mutex::new("info".to_owned())),
         }
     }
@@ -157,6 +162,8 @@ struct Logs {
     filter: Option<String>,
     paused: Arc<AtomicBool>,
     ws_pending: Option<Arc<Mutex<Vec<LogEntry>>>>,
+    save_status: Option<SaveStatus>,
+    saving: bool,
     subscription_level: Arc<Mutex<String>>,
 }
 
@@ -349,6 +356,7 @@ impl Page for Logs {
                 self.scroll.set(0);
                 self.filter = None;
             }
+            Action::Save => self.save_log_level(cx),
             Action::ToggleDebug => self.toggle_log_level("debug"),
             Action::ToggleInfo => self.toggle_log_level("info"),
             Action::ToggleWarning => self.toggle_log_level("warning"),
@@ -383,6 +391,8 @@ impl Page for Logs {
         } else {
             block
         };
+
+        let block = super::with_save_status(block, self.save_status);
 
         if !self.error.as_deref().unwrap_or("").is_empty() && self.buffer.is_empty() {
             let widget =
@@ -479,7 +489,35 @@ impl Logs {
     }
 
     fn toggle_log_level(&mut self, level: &str) {
+        if self.saving {
+            return;
+        }
         *self.subscription_level.lock().unwrap() = level.to_owned();
+        self.save_status = Some(SaveStatus::Unsaved);
+    }
+
+    fn save_log_level(&mut self, cx: &mut Cx<Self>) {
+        if self.saving || !matches!(self.save_status, Some(SaveStatus::Unsaved)) {
+            return;
+        }
+        self.saving = true;
+        let level = self.subscription_level.lock().unwrap().clone();
+        async move {
+            let result = tokio::task::spawn_blocking(move || {
+                crate::functions::file::settings::save_log_level(&level)
+            })
+            .await
+            .map_err(anyhow::Error::from)
+            .and_then(|result| result);
+            wrapper(move |content: &mut Self| {
+                content.saving = false;
+                match result {
+                    Ok(()) => content.save_status = Some(SaveStatus::Saved),
+                    Err(e) => Confirm::err(e),
+                }
+            })
+        }
+        .spawn_at(cx);
     }
 }
 

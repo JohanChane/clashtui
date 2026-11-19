@@ -867,6 +867,21 @@ mod contexts {
     }
 
     #[test]
+    fn log_save_key_does_not_override_warning_chord() {
+        let maps = Keymaps::from_config(serde_yml::Mapping::new(), "mihomo").unwrap();
+        let mut input = Matcher::new(&maps);
+        assert_eq!(
+            press(&mut input, Scope::Logs, "w"),
+            Match::Execute(Action::Logs(logs::Action::Save))
+        );
+        assert_eq!(press(&mut input, Scope::Logs, "t"), Match::Pending);
+        assert_eq!(
+            press(&mut input, Scope::Logs, "w"),
+            Match::Execute(Action::Logs(logs::Action::ToggleWarning))
+        );
+    }
+
+    #[test]
     fn reference_configuration_matches_all_builtin_bindings() {
         fn bindings(maps: &Keymaps, scope: Scope) -> Vec<(KeySequence, Action, &str)> {
             maps.effective_bindings(scope)

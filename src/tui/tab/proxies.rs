@@ -20,6 +20,7 @@ key_map!(
             (KeyCode::Char('h'), Action::Parent),
             (KeyCode::Char('l'), Action::Expand),
             (KeyCode::Enter, Action::Select),
+            (KeyCode::Char('w'), Action::Save),
             (KeyCode::Char('/'), Action::Search),
             (KeyCode::Char('t'), Action::TestDelay),
             (KeyCode::Char('r'), Action::Refresh),
@@ -61,6 +62,7 @@ pub(in crate::tui) enum Action {
     Parent,
     Expand,
     Select,
+    Save,
     GoTop,
     GoBottom,
     CollapseAll,
@@ -95,6 +97,7 @@ impl Document for Action {
     fn get_doc(&self) -> &'static str {
         use crate::tui::key::consts::*;
         match self {
+            Self::Save => "Write proxy selections",
             Self::MoveUp => MOVE_UP,
             Self::MoveDown => MOVE_DOWN,
             Self::Parent => "Go to parent",

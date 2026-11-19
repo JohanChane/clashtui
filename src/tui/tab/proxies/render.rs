@@ -105,14 +105,23 @@ pub(super) fn render(content: &Proxies, f: &mut Frame, area: Rect, state: &mut L
     let footer = footer_parts.join("");
 
     let block = if let Some(ref s) = spinner_str {
-        block.title_bottom(Line::raw(s.as_str()))
+        block.title_bottom(Line::raw(s.as_str()).right_aligned())
     } else if let Some(ref error) = content.error {
-        block.title_bottom(Line::raw(error.as_str()))
+        block.title_bottom(Line::raw(error.as_str()).right_aligned())
     } else if !footer.is_empty() {
         block.title_bottom(Line::raw(footer).right_aligned().reversed())
     } else {
         block
     };
+
+    let status = if !content.pending_selections.is_empty() {
+        Some(super::super::SaveStatus::Unsaved)
+    } else if content.selected_and_saved {
+        Some(super::super::SaveStatus::Saved)
+    } else {
+        None
+    };
+    let block = super::super::with_save_status(block, status);
 
     let items: Vec<ListItem> = filtered_indices
         .iter()

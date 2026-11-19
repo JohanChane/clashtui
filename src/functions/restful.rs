@@ -103,8 +103,17 @@ pub mod config {
     }
 
     pub fn patch(payload: String) -> Result<String> {
-        request(Method::Patch, "/configs", Some(payload))
-            .and_then(|r| r.as_str().map(|s| s.to_owned()))
+        request(Method::Patch, "/configs", Some(payload)).and_then(|r| {
+            if (200..300).contains(&r.status_code) {
+                r.as_str().map(|s| s.to_owned())
+            } else {
+                Err(minreq::Error::IoError(std::io::Error::other(format!(
+                    "HTTP {}: {}",
+                    r.status_code,
+                    r.as_str().unwrap_or("(non-utf8 body)")
+                ))))
+            }
+        })
     }
 }
 
